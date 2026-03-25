@@ -278,7 +278,24 @@ export class EmpresasController {
 @Controller('minhas-empresas')
 @ApiTags('minhas-empresas')
 export class MinhasEmpresasController {
-  constructor(private readonly empresasService: EmpresasService) {}
+  private readonly platformOwnerEmpresaIds: Set<string>;
+
+  constructor(private readonly empresasService: EmpresasService) {
+    this.platformOwnerEmpresaIds = this.parseOwnerIds(process.env.PLATFORM_OWNER_EMPRESA_IDS);
+  }
+
+  private parseOwnerIds(raw?: string): Set<string> {
+    if (!raw || typeof raw !== 'string') {
+      return new Set();
+    }
+
+    return new Set(
+      raw
+        .split(/[;,]/g)
+        .map((value) => value.trim())
+        .filter(Boolean),
+    );
+  }
 
   private static readonly SWITCH_BLOCKED_STATUS = new Set([
     'suspended',
@@ -289,7 +306,10 @@ export class MinhasEmpresasController {
     'cancelada',
   ]);
 
-  private buildCardPermissions(user: { role?: string; permissions?: unknown } | null | undefined) {
+  private buildCardPermissions(
+    user: { role?: string; permissions?: unknown } | null | undefined,
+    canManageEmpresas: boolean,
+  ) {
     const isSuperadmin = this.isSuperadmin(user);
 
     return {
@@ -309,7 +329,7 @@ export class MinhasEmpresasController {
         this.hasPermission(user, Permission.RELATORIOS_READ) ||
         this.hasPermission(user, Permission.DASHBOARD_READ),
       podeAlterarPlano: isSuperadmin || this.hasPermission(user, Permission.PLANOS_MANAGE),
-      podeGerenciarEmpresas: this.canManageEmpresas(user),
+      podeGerenciarEmpresas: canManageEmpresas,
     };
   }
 
@@ -420,8 +440,137 @@ export class MinhasEmpresasController {
     );
   }
 
-  private canManageEmpresas(user: { role?: string; permissions?: unknown } | null | undefined): boolean {
+  private extractEmpresaIdFromUser(
+    user:
+      | { empresa_id?: string | null; empresaId?: string | null; empresa?: { id?: string | null } | null }
+      | null
+      | undefined,
+  ): string | null {
+    const candidates = [user?.empresa_id, user?.empresaId, user?.empresa?.id];
+    for (const candidate of candidates) {
+      if (typeof candidate === 'string' && candidate.trim()) {
+        return candidate.trim();
+      }
+    }
+    return null;
+  }
+
+  private canManageEmpresasPortfolio(
+    user: { role?: string; permissions?: unknown } | null | undefined,
+  ): boolean {
     return this.isSuperadmin(user) || this.hasPermission(user, Permission.ADMIN_EMPRESAS_MANAGE);
+  }
+
+  private isPlatformOwnerEmpresa(empresaId: string | null | undefined): boolean {
+    const normalized = String(empresaId || '').trim();
+    if (!normalized) {
+      return false;
+    }
+
+    return this.platformOwnerEmpresaIds.has(normalized);
+  }
+
+  private canManageEmpresasNoPainelMinhasEmpresas(
+    user: { role?: string; permissions?: unknown } | null | undefined,
+    empresaIdContexto: string | null | undefined,
+  ): boolean {
+    return (
+      this.canManageEmpresasPortfolio(user) &&
+      !this.isPlatformOwnerEmpresa(empresaIdContexto)
+    );
+  }
+
+  private async resolvePortfolioOwnerKey(empresaIdContexto: string): Promise<string> {
+    const resolvedOwnerKey = await this.empresasService.resolverOwnerKeyPortfolioPorEmpresa(
+      empresaIdContexto,
+    );
+    const normalizedContext = String(empresaIdContexto || '').trim();
+    const normalizedOwner = String(resolvedOwnerKey || '').trim();
+
+    // Minhas Empresas deve permanecer no escopo do cliente.
+    // Se a empresa estiver vinculada ao tenant proprietario da plataforma,
+    // limitamos o portfolio ao proprio tenant de contexto.
+    if (
+      normalizedContext &&
+      normalizedOwner &&
+      normalizedOwner !== normalizedContext &&
+      this.platformOwnerEmpresaIds.has(normalizedOwner)
+    ) {
+      return normalizedContext;
+    }
+
+    return normalizedOwner || normalizedContext;
+  }
+
+  private async obterEmpresasDoPortfolio(
+    empresaIdContexto: string,
+  ): Promise<Empresa[]> {
+    if (this.isPlatformOwnerEmpresa(empresaIdContexto)) {
+      const empresaContexto = await this.empresasService.obterPorId(empresaIdContexto);
+      return [empresaContexto];
+    }
+
+    const ownerKey = await this.resolvePortfolioOwnerKey(empresaIdContexto);
+
+    await this.empresasService.vincularEmpresaAoPortfolioSeAusente(empresaIdContexto, ownerKey);
+
+    const empresasPortfolio = await this.empresasService.listarEmpresasDoPortfolio(ownerKey);
+    if (empresasPortfolio.some((empresa) => empresa.id === empresaIdContexto)) {
+      return empresasPortfolio;
+    }
+
+    const empresaContexto = await this.empresasService.obterPorId(empresaIdContexto);
+    return [empresaContexto, ...empresasPortfolio];
+  }
+
+  private async assertCanManageEmpresaTarget(
+    user:
+      | {
+          id?: string | null;
+          role?: string;
+          permissions?: unknown;
+        }
+      | null
+      | undefined,
+    empresaIdContexto: string | null,
+    empresaIdAlvo: string,
+  ): Promise<void> {
+    const canManagePortfolio = this.canManageEmpresasPortfolio(user);
+    if (!canManagePortfolio) {
+      throw new HttpException(
+        'Usuario nao possui permissao para gerenciar empresas',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    if (this.isPlatformOwnerEmpresa(empresaIdContexto)) {
+      throw new HttpException(
+        'Operacao indisponivel neste painel para tenant proprietario da plataforma',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    const normalizedTargetId = String(empresaIdAlvo || '').trim();
+    if (empresaIdContexto && normalizedTargetId === String(empresaIdContexto).trim()) {
+      return;
+    }
+
+    if (!empresaIdContexto) {
+      throw new HttpException('Escopo de portfolio nao identificado', HttpStatus.FORBIDDEN);
+    }
+    const ownerKey = await this.resolvePortfolioOwnerKey(empresaIdContexto);
+
+    const pertenceAoPortfolio = await this.empresasService.empresaPertenceAoPortfolio(
+      normalizedTargetId,
+      ownerKey,
+    );
+
+    if (!pertenceAoPortfolio) {
+      throw new HttpException(
+        'Acesso permitido apenas para empresas do mesmo proprietario',
+        HttpStatus.FORBIDDEN,
+      );
+    }
   }
 
   private normalizeText(value: unknown, fallback = 'Nao informado'): string {
@@ -530,20 +679,25 @@ export class MinhasEmpresasController {
   @ApiResponse({ status: 200, description: 'Lista de empresas retornada com sucesso' })
   async getMinhasEmpresas(@Request() req) {
     try {
-      const empresaId = req.user?.empresa_id;
-      const cardPermissions = this.buildCardPermissions(req.user);
+      const empresaId = this.extractEmpresaIdFromUser(req.user);
+      const canManageEmpresasPortfolio = this.canManageEmpresasNoPainelMinhasEmpresas(
+        req.user,
+        empresaId,
+      );
+      const cardPermissions = this.buildCardPermissions(req.user, canManageEmpresasPortfolio);
       if (!empresaId) {
         throw new HttpException('empresa_id ausente no token', HttpStatus.UNAUTHORIZED);
       }
 
-      if (this.canManageEmpresas(req.user)) {
-        const empresas = await this.empresasService.listarTodasEmpresasParaGestao();
+      if (canManageEmpresasPortfolio) {
+        const empresasPortfolio = await this.obterEmpresasDoPortfolio(empresaId);
         const estatisticasByEmpresa = await this.empresasService.obterEstatisticasCardEmpresas(
-          empresas.map((empresa) => empresa.id),
+          empresasPortfolio.map((empresa) => empresa.id),
         );
+
         return {
           success: true,
-          empresas: empresas.map((empresa) =>
+          empresas: empresasPortfolio.map((empresa) =>
             this.mapEmpresaCard(
               empresa,
               empresa.id === empresaId,
@@ -563,6 +717,9 @@ export class MinhasEmpresasController {
         empresas: [this.mapEmpresaCard(empresa, true, cardPermissions, estatisticasByEmpresa[empresa.id])],
       };
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
       throw new HttpException(
         error.message || 'Erro ao buscar empresas',
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
@@ -577,8 +734,22 @@ export class MinhasEmpresasController {
   @UsePipes(strictBodyValidationPipe)
   @ApiOperation({ summary: 'Criar nova empresa via area administrativa' })
   @ApiResponse({ status: 201, description: 'Empresa criada com sucesso' })
-  async criarEmpresa(@Body() body: CreateMinhaEmpresaDto) {
+  async criarEmpresa(@Request() req, @Body() body: CreateMinhaEmpresaDto) {
     try {
+      const empresaIdContexto = this.extractEmpresaIdFromUser(req.user);
+      if (!empresaIdContexto) {
+        throw new HttpException('empresa_id ausente no token', HttpStatus.UNAUTHORIZED);
+      }
+
+      if (!this.canManageEmpresasNoPainelMinhasEmpresas(req.user, empresaIdContexto)) {
+        throw new HttpException(
+          'Operacao indisponivel neste painel para tenant proprietario da plataforma',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+      const ownerKey = await this.resolvePortfolioOwnerKey(empresaIdContexto);
+      await this.empresasService.vincularEmpresaAoPortfolioSeAusente(empresaIdContexto, ownerKey);
+
       const endereco = body.endereco;
       const senhaTemporaria =
         body.usuarioAdmin?.senha?.trim() || this.gerarSenhaTemporaria();
@@ -605,6 +776,7 @@ export class MinhasEmpresasController {
       };
 
       const empresaCriada = await this.empresasService.registrarEmpresa(payload);
+      await this.empresasService.vincularEmpresaAoPortfolio(empresaCriada.id, ownerKey);
       await this.empresasService.marcarAdminEmpresaComoSenhaTemporaria(empresaCriada.id);
       const estatisticasByEmpresa =
         await this.empresasService.obterEstatisticasCardEmpresas([empresaCriada.id]);
@@ -636,6 +808,8 @@ export class MinhasEmpresasController {
     @Body() body: { motivo?: string },
   ) {
     try {
+      const empresaIdContexto = this.extractEmpresaIdFromUser(req.user);
+      await this.assertCanManageEmpresaTarget(req.user, empresaIdContexto, empresaId);
       const motivo = typeof body?.motivo === 'string' ? body.motivo.trim() : '';
       const empresa = await this.empresasService.suspenderEmpresa(
         empresaId,
@@ -647,8 +821,11 @@ export class MinhasEmpresasController {
         message: 'Empresa suspensa com sucesso',
         empresa: this.mapEmpresaCard(
           empresa,
-          empresa.id === req.user?.empresa_id,
-          this.buildCardPermissions(req.user),
+          empresa.id === empresaIdContexto,
+          this.buildCardPermissions(
+            req.user,
+            this.canManageEmpresasNoPainelMinhasEmpresas(req.user, empresaIdContexto),
+          ),
         ),
       };
     } catch (error) {
@@ -666,6 +843,8 @@ export class MinhasEmpresasController {
   @ApiOperation({ summary: 'Reativar empresa pelo painel de minhas empresas' })
   async reativarEmpresa(@Request() req, @Param('empresaId') empresaId: string) {
     try {
+      const empresaIdContexto = this.extractEmpresaIdFromUser(req.user);
+      await this.assertCanManageEmpresaTarget(req.user, empresaIdContexto, empresaId);
       const empresa = await this.empresasService.reativarEmpresa(empresaId);
 
       return {
@@ -673,8 +852,11 @@ export class MinhasEmpresasController {
         message: 'Empresa reativada com sucesso',
         empresa: this.mapEmpresaCard(
           empresa,
-          empresa.id === req.user?.empresa_id,
-          this.buildCardPermissions(req.user),
+          empresa.id === empresaIdContexto,
+          this.buildCardPermissions(
+            req.user,
+            this.canManageEmpresasNoPainelMinhasEmpresas(req.user, empresaIdContexto),
+          ),
         ),
       };
     } catch (error) {
@@ -691,10 +873,13 @@ export class MinhasEmpresasController {
   @Permissions(Permission.PLANOS_MANAGE)
   @ApiOperation({ summary: 'Cancelar servico da empresa (assinatura)' })
   async cancelarServicoEmpresa(
+    @Request() req,
     @Param('empresaId') empresaId: string,
     @Body() body: { dataFim?: string },
   ) {
     try {
+      const empresaIdContexto = this.extractEmpresaIdFromUser(req.user);
+      await this.assertCanManageEmpresaTarget(req.user, empresaIdContexto, empresaId);
       const dataFimRaw = typeof body?.dataFim === 'string' ? body.dataFim.trim() : '';
       const dataFim = dataFimRaw ? new Date(dataFimRaw) : undefined;
       if (dataFim && Number.isNaN(dataFim.getTime())) {
@@ -722,7 +907,7 @@ export class MinhasEmpresasController {
   @ApiResponse({ status: 200, description: 'Contexto da empresa atualizado com sucesso' })
   async switchEmpresa(@Request() req, @Body() body: { empresaId?: string }) {
     try {
-      const empresaIdUsuario = req.user?.empresa_id;
+      const empresaIdUsuario = this.extractEmpresaIdFromUser(req.user);
       const empresaIdSolicitada = body?.empresaId;
 
       if (!empresaIdUsuario) {
@@ -733,13 +918,22 @@ export class MinhasEmpresasController {
         throw new HttpException('empresaId é obrigatório', HttpStatus.BAD_REQUEST);
       }
 
+      const canManageEmpresasPortfolio = this.canManageEmpresasNoPainelMinhasEmpresas(
+        req.user,
+        empresaIdUsuario,
+      );
+
       // Usuarios comuns permanecem no proprio contexto.
-      // Perfis com permissao de gestao podem alternar entre empresas.
-      if (!this.canManageEmpresas(req.user) && empresaIdSolicitada !== empresaIdUsuario) {
-        throw new HttpException(
-          'Usuário não possui acesso à empresa informada',
-          HttpStatus.FORBIDDEN,
-        );
+      // Gestores podem alternar entre empresas do mesmo portfolio.
+      if (empresaIdSolicitada !== empresaIdUsuario) {
+        if (!canManageEmpresasPortfolio) {
+          throw new HttpException(
+            'Usuário não possui acesso à empresa informada',
+            HttpStatus.FORBIDDEN,
+          );
+        }
+
+        await this.assertCanManageEmpresaTarget(req.user, empresaIdUsuario, empresaIdSolicitada);
       }
 
       const empresa = await this.empresasService.obterPorId(empresaIdSolicitada);
@@ -763,7 +957,7 @@ export class MinhasEmpresasController {
         );
       }
 
-      if (this.canManageEmpresas(req.user) && empresaIdSolicitada !== empresaIdUsuario) {
+      if (canManageEmpresasPortfolio && empresaIdSolicitada !== empresaIdUsuario) {
         await this.empresasService.atualizarEmpresaDoUsuario(req.user.id, empresaIdSolicitada);
       }
 
@@ -773,6 +967,9 @@ export class MinhasEmpresasController {
         configuracoes: (empresa.configuracoes as Record<string, unknown>) || {},
       };
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
       throw new HttpException(
         error.message || 'Erro ao alternar empresa',
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,

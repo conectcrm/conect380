@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useNotifications } from './NotificationContext';
 import { useAuth } from './AuthContext';
+import { authService } from '../services/authService';
 import {
   minhasEmpresasService,
   EmpresaCompleta,
@@ -48,7 +49,7 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { addNotification } = useNotifications();
-  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { isAuthenticated, isLoading: isAuthLoading, updateUser } = useAuth();
 
   // Carregar empresas do usuário
   const loadEmpresas = useCallback(async () => {
@@ -123,6 +124,15 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
         });
 
         setEmpresaAtiva({ ...empresa, isActive: true });
+
+        try {
+          const profileResponse = await authService.getProfile();
+          if (profileResponse?.success && profileResponse?.data) {
+            updateUser(profileResponse.data);
+          }
+        } catch (profileError) {
+          console.warn('[EmpresaContext] Falha ao sincronizar perfil apos switch de empresa:', profileError);
+        }
 
         addNotification({
           type: 'success',

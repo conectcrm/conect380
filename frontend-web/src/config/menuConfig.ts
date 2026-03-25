@@ -1700,4 +1700,54 @@ export const canUserAccessPath = (
   );
 };
 
+const collectNavigableMenuPaths = (items: MenuConfig[]): string[] => {
+  const paths: string[] = [];
+
+  const visit = (entry: MenuConfig): void => {
+    if (entry.href) {
+      paths.push(normalizePathname(entry.href));
+    }
+
+    (entry.children || []).forEach(visit);
+  };
+
+  items.forEach(visit);
+  return paths;
+};
+
+export const getDefaultAuthorizedPath = (
+  modulosAtivos: string[],
+  user?: PermissionAwareUser | null,
+  options?: {
+    fallbackPath?: string;
+    excludePaths?: string[];
+  },
+): string => {
+  const fallbackPath = normalizePathname(options?.fallbackPath ?? '/dashboard');
+  const excludedPaths = new Set(
+    (options?.excludePaths ?? []).map((path) => normalizePathname(path)),
+  );
+  const allowedMenu = getMenuParaEmpresa(modulosAtivos, user);
+  const orderedPaths = collectNavigableMenuPaths(allowedMenu);
+
+  for (const candidatePath of orderedPaths) {
+    if (excludedPaths.has(candidatePath)) {
+      continue;
+    }
+
+    if (canUserAccessPath(candidatePath, modulosAtivos, user)) {
+      return candidatePath;
+    }
+  }
+
+  if (
+    !excludedPaths.has(fallbackPath) &&
+    canUserAccessPath(fallbackPath, modulosAtivos, user)
+  ) {
+    return fallbackPath;
+  }
+
+  return fallbackPath;
+};
+
 export default menuConfig;

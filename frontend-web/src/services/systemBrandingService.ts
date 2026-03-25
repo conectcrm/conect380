@@ -147,6 +147,11 @@ export const systemBrandingService = {
     return normalizeBranding(response.data);
   },
 
+  async getRuntimeBranding(): Promise<SystemBrandingEffectiveConfig> {
+    const response = await api.get<SystemBrandingEffectiveConfig>('/system-branding/runtime');
+    return normalizeBranding(response.data);
+  },
+
   async getAdminBranding(): Promise<SystemBrandingAdminResponse> {
     const response = await api.get<SystemBrandingAdminResponse | { data?: SystemBrandingAdminResponse }>(
       '/admin/system-branding',

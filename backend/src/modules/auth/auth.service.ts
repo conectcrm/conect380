@@ -667,6 +667,24 @@ export class AuthService {
     }
   }
 
+  private ensureEmpresaDisponivelParaSessao(user: Pick<User, 'empresa_id' | 'empresa'>): void {
+    if (!user?.empresa_id) {
+      return;
+    }
+
+    if (!user.empresa) {
+      throw new UnauthorizedException(
+        'Empresa vinculada ao usuario nao foi encontrada. Contate o suporte.',
+      );
+    }
+
+    if (user.empresa.ativo === false) {
+      throw new UnauthorizedException(
+        'Empresa vinculada ao usuario esta inativa. Solicite reativacao para acessar o sistema.',
+      );
+    }
+  }
+
   private async buildAuthenticatedLoginResponse(
     user: User,
     context: Exclude<TokenIssueContext, 'refresh'> = 'login',
@@ -822,6 +840,8 @@ export class AuthService {
       );
     }
 
+    this.ensureEmpresaDisponivelParaSessao(user);
+
     const shouldRequireMfa = await this.shouldRequireAdminMfa(user);
     if (shouldRequireMfa) {
       const mfaChallenge = await this.criarDesafioMfaLogin(user, metadata);
@@ -909,6 +929,8 @@ export class AuthService {
         'Sessao de autenticacao invalida. Refaca o login para continuar.',
       );
     }
+
+    this.ensureEmpresaDisponivelParaSessao(user);
 
     securityLogger.mfaChallengeVerified(user.id, ip, challenge.id);
 
@@ -1035,6 +1057,8 @@ export class AuthService {
       );
       throw new UnauthorizedException('Sessao de autenticacao invalida. Refaca o login.');
     }
+
+    this.ensureEmpresaDisponivelParaSessao(user);
 
     if (this.isAdminRoleForMfa(user.role)) {
       const idleTimeoutMs = this.getAdminIdleTimeoutMinutes() * 60 * 1000;

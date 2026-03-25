@@ -69,11 +69,27 @@ const DEFAULT_SYSTEM_BRANDING: SystemBrandingEffectiveConfig = {
 @Injectable()
 export class SystemBrandingService {
   private readonly logger = new Logger(SystemBrandingService.name);
+  private readonly ownerEmpresaIds: Set<string>;
 
   constructor(
     @InjectRepository(SystemBranding)
     private readonly systemBrandingRepository: Repository<SystemBranding>,
-  ) {}
+  ) {
+    this.ownerEmpresaIds = this.parseOwnerIds(process.env.PLATFORM_OWNER_EMPRESA_IDS);
+  }
+
+  private parseOwnerIds(raw?: string): Set<string> {
+    if (!raw || typeof raw !== 'string') {
+      return new Set();
+    }
+
+    const ids = raw
+      .split(/[;,]/g)
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    return new Set(ids);
+  }
 
   private isSchemaMismatchError(error: unknown): boolean {
     const message =
@@ -260,6 +276,27 @@ export class SystemBrandingService {
   async getPublicBranding(): Promise<SystemBrandingEffectiveConfig> {
     const record = await this.findGlobalRecordSafely();
     return this.toEffectiveConfig(record);
+  }
+
+  async getRuntimeBrandingForEmpresa(
+    empresaId: string | null | undefined,
+  ): Promise<SystemBrandingEffectiveConfig> {
+    const normalizedEmpresaId = String(empresaId || '').trim();
+    if (!normalizedEmpresaId) {
+      return {
+        ...DEFAULT_SYSTEM_BRANDING,
+        maintenanceBanner: { ...DEFAULT_SYSTEM_BRANDING.maintenanceBanner },
+      };
+    }
+
+    if (!this.ownerEmpresaIds.has(normalizedEmpresaId)) {
+      return {
+        ...DEFAULT_SYSTEM_BRANDING,
+        maintenanceBanner: { ...DEFAULT_SYSTEM_BRANDING.maintenanceBanner },
+      };
+    }
+
+    return this.getPublicBranding();
   }
 
   async getAdminBranding(): Promise<SystemBrandingAdminResponse> {

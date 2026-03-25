@@ -31,6 +31,8 @@ type RegistroEmpresaConsentAuditMeta = {
 @Injectable()
 export class EmpresasService {
   private readonly logger = new Logger(EmpresasService.name);
+  private static readonly UUID_REGEX =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   private static readonly DASHBOARD_V2_FLAG_KEY = 'dashboard_v2_enabled';
   private static readonly OPORTUNIDADES_LIFECYCLE_FLAG_KEY = 'crm_oportunidades_lifecycle_v1';
   private static readonly SELF_SIGNUP_ENABLE_OPORTUNIDADES_LIFECYCLE =
@@ -1026,6 +1028,192 @@ export class EmpresasService {
         created_at: 'DESC',
       },
     });
+  }
+
+  async listarEmpresasDoPortfolio(ownerPortfolioId: string): Promise<Empresa[]> {
+    const ownerId = String(ownerPortfolioId || '').trim();
+    if (!ownerId) {
+      return [];
+    }
+
+    if (!this.isUuid(ownerId)) {
+      this.logger.warn(
+        `[PORTFOLIO] ownerPortfolioId invalido ao listar empresas: ${ownerId}. Retornando lista vazia.`,
+      );
+      return [];
+    }
+
+    try {
+      return this.empresaRepository
+        .createQueryBuilder('empresa')
+        .where('empresa.account_manager_id = :ownerId', { ownerId })
+        .orWhere('empresa.id = CAST(:ownerId AS uuid)', { ownerId })
+        .orderBy('empresa.created_at', 'DESC')
+        .getMany();
+    } catch (error) {
+      if (this.isAccountManagerColumnMissing(error)) {
+        const empresa = await this.empresaRepository.findOne({
+          where: { id: ownerId },
+        });
+        return empresa ? [empresa] : [];
+      }
+      throw error;
+    }
+  }
+
+  async empresaPertenceAoPortfolio(empresaId: string, ownerPortfolioId: string): Promise<boolean> {
+    const normalizedEmpresaId = String(empresaId || '').trim();
+    const ownerId = String(ownerPortfolioId || '').trim();
+
+    if (!normalizedEmpresaId || !ownerId) {
+      return false;
+    }
+
+    if (!this.isUuid(normalizedEmpresaId) || !this.isUuid(ownerId)) {
+      return false;
+    }
+
+    try {
+      const empresa = await this.empresaRepository.findOne({
+        where: { id: normalizedEmpresaId },
+        select: ['id', 'account_manager_id'],
+      });
+
+      if (!empresa) {
+        return false;
+      }
+
+      const empresaOwnerId = String(empresa.account_manager_id || '').trim();
+      return empresaOwnerId === ownerId || empresa.id === ownerId;
+    } catch (error) {
+      if (this.isAccountManagerColumnMissing(error)) {
+        return normalizedEmpresaId === ownerId;
+      }
+      throw error;
+    }
+  }
+
+  async vincularEmpresaAoPortfolio(empresaId: string, ownerPortfolioId: string): Promise<Empresa> {
+    const normalizedEmpresaId = String(empresaId || '').trim();
+    const ownerId = String(ownerPortfolioId || '').trim();
+
+    if (!normalizedEmpresaId || !ownerId) {
+      throw new HttpException('Dados invalidos para vinculo de portfolio', HttpStatus.BAD_REQUEST);
+    }
+
+    if (!this.isUuid(normalizedEmpresaId) || !this.isUuid(ownerId)) {
+      throw new HttpException('IDs invalidos para vinculo de portfolio', HttpStatus.BAD_REQUEST);
+    }
+
+    try {
+      const empresa = await this.obterPorId(normalizedEmpresaId);
+      empresa.account_manager_id = ownerId;
+      return this.empresaRepository.save(empresa);
+    } catch (error) {
+      if (this.isAccountManagerColumnMissing(error)) {
+        return this.obterPorId(normalizedEmpresaId);
+      }
+      throw error;
+    }
+  }
+
+  async vincularEmpresaAoPortfolioSeAusente(empresaId: string, ownerPortfolioId: string): Promise<void> {
+    const normalizedEmpresaId = String(empresaId || '').trim();
+    const ownerId = String(ownerPortfolioId || '').trim();
+
+    if (!normalizedEmpresaId || !ownerId) {
+      return;
+    }
+
+    if (!this.isUuid(normalizedEmpresaId) || !this.isUuid(ownerId)) {
+      return;
+    }
+
+    try {
+      const empresa = await this.empresaRepository.findOne({
+        where: { id: normalizedEmpresaId },
+        select: ['id', 'account_manager_id'],
+      });
+
+      if (!empresa) {
+        return;
+      }
+
+      const currentOwner = String(empresa.account_manager_id || '').trim();
+      if (currentOwner) {
+        return;
+      }
+
+      empresa.account_manager_id = ownerId;
+      await this.empresaRepository.save(empresa);
+    } catch (error) {
+      if (this.isAccountManagerColumnMissing(error)) {
+        return;
+      }
+      throw error;
+    }
+  }
+
+  async resolverOwnerKeyPortfolioPorEmpresa(empresaId: string): Promise<string> {
+    const normalizedEmpresaId = String(empresaId || '').trim();
+    if (!normalizedEmpresaId) {
+      throw new HttpException('empresaId invalido para resolver owner do portfolio', HttpStatus.BAD_REQUEST);
+    }
+
+    if (!this.isUuid(normalizedEmpresaId)) {
+      throw new HttpException('empresaId invalido para resolver owner do portfolio', HttpStatus.BAD_REQUEST);
+    }
+
+    try {
+      const empresa = await this.empresaRepository.findOne({
+        where: { id: normalizedEmpresaId },
+        select: ['id', 'account_manager_id'],
+      });
+
+      if (!empresa) {
+        throw new HttpException('Empresa nao encontrada', HttpStatus.NOT_FOUND);
+      }
+
+      const accountManagerId = String(empresa.account_manager_id || '').trim();
+      if (!accountManagerId) {
+        return empresa.id;
+      }
+
+      if (!this.isUuid(accountManagerId)) {
+        this.logger.warn(
+          `[PORTFOLIO] account_manager_id invalido para empresa ${empresa.id}. Fallback para empresa raiz.`,
+        );
+        return empresa.id;
+      }
+
+      const ownerEmpresa = await this.empresaRepository.findOne({
+        where: { id: accountManagerId },
+        select: ['id'],
+      });
+
+      return ownerEmpresa?.id || empresa.id;
+    } catch (error) {
+      if (this.isAccountManagerColumnMissing(error)) {
+        const empresaFallback = await this.empresaRepository.findOne({
+          where: { id: normalizedEmpresaId },
+          select: ['id'],
+        });
+        if (!empresaFallback) {
+          throw new HttpException('Empresa nao encontrada', HttpStatus.NOT_FOUND);
+        }
+        return empresaFallback.id;
+      }
+      throw error;
+    }
+  }
+
+  private isAccountManagerColumnMissing(error: unknown): boolean {
+    const message = String((error as { message?: string })?.message || '').toLowerCase();
+    return message.includes('account_manager_id') && message.includes('does not exist');
+  }
+
+  private isUuid(value: string): boolean {
+    return EmpresasService.UUID_REGEX.test(String(value || '').trim());
   }
 
   async atualizarEmpresaDoUsuario(userId: string, empresaId: string): Promise<void> {

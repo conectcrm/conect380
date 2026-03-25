@@ -104,9 +104,32 @@ export class SystemBrandingController {
 
   constructor(private readonly systemBrandingService: SystemBrandingService) {}
 
+  private extractEmpresaIdFromUser(
+    user:
+      | { empresa_id?: string | null; empresaId?: string | null; empresa?: { id?: string | null } | null }
+      | null
+      | undefined,
+  ): string | null {
+    const candidates = [user?.empresa_id, user?.empresaId, user?.empresa?.id];
+    for (const candidate of candidates) {
+      if (typeof candidate === 'string' && candidate.trim()) {
+        return candidate.trim();
+      }
+    }
+
+    return null;
+  }
+
   @Get('system-branding/public')
   async getPublicBranding() {
     return this.systemBrandingService.getPublicBranding();
+  }
+
+  @Get('system-branding/runtime')
+  @UseGuards(JwtAuthGuard)
+  async getRuntimeBranding(@Req() req: any) {
+    const empresaId = this.extractEmpresaIdFromUser(req?.user);
+    return this.systemBrandingService.getRuntimeBrandingForEmpresa(empresaId);
   }
 
   @Get('admin/system-branding')

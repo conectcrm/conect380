@@ -1,4 +1,9 @@
-import { canUserAccessPath, getMenuParaEmpresa, type MenuConfig } from '../menuConfig';
+import {
+  canUserAccessPath,
+  getDefaultAuthorizedPath,
+  getMenuParaEmpresa,
+  type MenuConfig,
+} from '../menuConfig';
 
 const ALL_MODULES = ['ATENDIMENTO', 'CRM', 'VENDAS', 'FINANCEIRO', 'BILLING', 'ADMINISTRACAO'];
 
@@ -163,6 +168,26 @@ describe('menuConfig permission filtering', () => {
     expect(ids).toContain('atendimento');
     expect(ids).toContain('atendimento-inbox');
     expect(ids).toContain('atendimento-configuracoes');
+  });
+
+  it('resolves first allowed path when dashboard is not permitted', () => {
+    const defaultPath = getDefaultAuthorizedPath(ALL_MODULES, {
+      email: 'financeiro@empresa.com',
+      role: 'custom',
+      permissions: ['financeiro.faturamento.read'],
+    } as any);
+
+    expect(defaultPath).toBe('/nuclei/financeiro');
+  });
+
+  it('keeps configured fallback when user has no accessible menu path', () => {
+    const defaultPath = getDefaultAuthorizedPath(ALL_MODULES, {
+      email: 'sem-acesso@empresa.com',
+      role: 'custom',
+      permissions: [],
+    } as any);
+
+    expect(defaultPath).toBe('/dashboard');
   });
 
   it('blocks direct URL access for canonical config route without permission', () => {

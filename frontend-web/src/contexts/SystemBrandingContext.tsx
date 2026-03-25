@@ -3,6 +3,7 @@ import systemBrandingService, {
   DEFAULT_SYSTEM_BRANDING,
   type SystemBrandingEffectiveConfig,
 } from '../services/systemBrandingService';
+import { buildScopedStorageKey } from '../utils/storageScope';
 
 interface SystemBrandingContextValue {
   branding: SystemBrandingEffectiveConfig;
@@ -11,8 +12,176 @@ interface SystemBrandingContextValue {
   refreshBranding: (options?: { silent?: boolean }) => Promise<void>;
 }
 
-const STORAGE_KEY = 'conect_system_branding_cache_v1';
+const STORAGE_KEY = 'conect_system_branding_cache_v2';
 const BRANDING_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+const AUTH_TOKEN_EVENT_NAME = 'authTokenChanged';
+const EMPRESA_EVENT_NAME = 'empresaAtivaChanged';
+const BRANDING_CACHE_PREFIX = `${STORAGE_KEY}::`;
+const MAX_CACHEABLE_URL_LENGTH = 2048;
+let brandingCacheDisabled = false;
+const isQuotaExceededError = (error: unknown): boolean => {
+  if (!(error instanceof DOMException)) {
+    return false;
+  }
+
+  return (
+    error.name === 'QuotaExceededError' ||
+    error.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+    error.code === 22 ||
+    error.code === 1014
+  );
+};
+
+const sanitizeAssetForCache = (value: string | null | undefined, fallback = ''): string => {
+  const normalized = String(value || '').trim();
+  if (!normalized) {
+    return fallback;
+  }
+
+  if (normalized.startsWith('data:') || normalized.startsWith('blob:')) {
+    return fallback;
+  }
+
+  if (normalized.length > MAX_CACHEABLE_URL_LENGTH) {
+    return fallback;
+  }
+
+  return normalized;
+};
+
+const sanitizeBrandingForCache = (
+  value: SystemBrandingEffectiveConfig,
+): SystemBrandingEffectiveConfig => {
+  const normalized = systemBrandingService.normalizeBranding(value);
+
+  return {
+    ...normalized,
+    logoFullUrl: sanitizeAssetForCache(normalized.logoFullUrl, ''),
+    logoFullLightUrl: sanitizeAssetForCache(normalized.logoFullLightUrl, ''),
+    logoIconUrl: sanitizeAssetForCache(normalized.logoIconUrl, ''),
+    loadingLogoUrl: sanitizeAssetForCache(normalized.loadingLogoUrl, ''),
+    faviconUrl: sanitizeAssetForCache(
+      normalized.faviconUrl,
+      DEFAULT_SYSTEM_BRANDING.faviconUrl,
+    ),
+  };
+};
+
+const buildMinimalBrandingCache = (
+  value: SystemBrandingEffectiveConfig,
+): SystemBrandingEffectiveConfig => {
+  const normalized = systemBrandingService.normalizeBranding(value);
+  return {
+    ...DEFAULT_SYSTEM_BRANDING,
+    faviconUrl: sanitizeAssetForCache(
+      normalized.faviconUrl,
+      DEFAULT_SYSTEM_BRANDING.faviconUrl,
+    ),
+    maintenanceBanner: normalized.maintenanceBanner,
+  };
+};
+
+const removeScopedBrandingCacheEntries = (): void => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const keysToRemove: string[] = [];
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
+    if (key && key.startsWith(BRANDING_CACHE_PREFIX)) {
+      keysToRemove.push(key);
+    }
+  }
+
+  keysToRemove.forEach((key) => window.localStorage.removeItem(key));
+};
+
+const readCachedBranding = (storageKey: string): Partial<SystemBrandingEffectiveConfig> | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const cached = window.localStorage.getItem(storageKey);
+    if (!cached) {
+      return null;
+    }
+
+    return JSON.parse(cached) as Partial<SystemBrandingEffectiveConfig>;
+  } catch (error) {
+    console.warn('[SystemBranding] Cache invalido, descartando entrada atual.', error);
+    try {
+      window.localStorage.removeItem(storageKey);
+    } catch (removeError) {
+      console.warn('[SystemBranding] Nao foi possivel limpar cache invalido.', removeError);
+    }
+    return null;
+  }
+};
+
+const persistBrandingCache = (
+  storageKey: string,
+  value: SystemBrandingEffectiveConfig,
+): void => {
+  if (typeof window === 'undefined' || brandingCacheDisabled) {
+    return;
+  }
+
+  const safePayload = sanitizeBrandingForCache(value);
+  const serializedPayload = JSON.stringify(safePayload);
+
+  try {
+    window.localStorage.setItem(storageKey, serializedPayload);
+    return;
+  } catch (error) {
+    if (!isQuotaExceededError(error)) {
+      console.warn('[SystemBranding] Nao foi possivel persistir cache de branding.', error);
+      return;
+    }
+  }
+
+  try {
+    removeScopedBrandingCacheEntries();
+  } catch (cleanupError) {
+    console.warn('[SystemBranding] Falha ao limpar cache de branding apos quota excedida.', cleanupError);
+  }
+
+  try {
+    const minimalPayload = JSON.stringify(buildMinimalBrandingCache(safePayload));
+    window.localStorage.setItem(storageKey, minimalPayload);
+  } catch (retryError) {
+    brandingCacheDisabled = true;
+    console.warn('[SystemBranding] Quota excedida ao persistir cache minimo de branding.', retryError);
+  }
+};
+
+const hasAuthToken = (): boolean => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  try {
+    return Boolean(window.localStorage.getItem('authToken'));
+  } catch {
+    return false;
+  }
+};
+
+const getScopedStorageKey = (): string => {
+  if (typeof window === 'undefined') {
+    return `${STORAGE_KEY}::public`;
+  }
+
+  if (hasAuthToken()) {
+    return buildScopedStorageKey(STORAGE_KEY, {
+      includeEmpresa: true,
+      includeUser: true,
+    });
+  }
+
+  return `${STORAGE_KEY}::public`;
+};
 
 const resolveAssetUrl = (url: string): string => {
   if (!url) {
@@ -90,12 +259,22 @@ export const SystemBrandingProvider: React.FC<SystemBrandingProviderProps> = ({ 
     }
 
     try {
-      const data = await systemBrandingService.getPublicBranding();
+      const data = hasAuthToken()
+        ? await systemBrandingService.getRuntimeBranding()
+        : await systemBrandingService.getPublicBranding();
       const normalized = systemBrandingService.normalizeBranding(data);
       setBranding(normalized);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+      const scopedStorageKey = getScopedStorageKey();
+      persistBrandingCache(scopedStorageKey, normalized);
     } catch (error) {
       console.warn('[SystemBranding] Nao foi possivel atualizar branding publico.', error);
+
+      if (hasAuthToken()) {
+        const fallback = systemBrandingService.normalizeBranding(DEFAULT_SYSTEM_BRANDING);
+        setBranding(fallback);
+        const scopedStorageKey = getScopedStorageKey();
+        persistBrandingCache(scopedStorageKey, fallback);
+      }
     } finally {
       if (!silent) {
         setIsLoading(false);
@@ -105,17 +284,43 @@ export const SystemBrandingProvider: React.FC<SystemBrandingProviderProps> = ({ 
   }, []);
 
   useEffect(() => {
-    const cached = localStorage.getItem(STORAGE_KEY);
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached) as Partial<SystemBrandingEffectiveConfig>;
-        setBranding(systemBrandingService.normalizeBranding(parsed));
-      } catch (error) {
-        console.warn('[SystemBranding] Cache invalido, usando branding padrao.', error);
-      }
+    const scopedStorageKey = getScopedStorageKey();
+    const parsed = readCachedBranding(scopedStorageKey);
+    if (parsed) {
+      setBranding(systemBrandingService.normalizeBranding(parsed));
     }
 
     void refreshBranding();
+  }, [refreshBranding]);
+
+  useEffect(() => {
+    const handleScopeChanged = () => {
+      const scopedStorageKey = getScopedStorageKey();
+      const parsed = readCachedBranding(scopedStorageKey);
+      if (parsed) {
+        setBranding(systemBrandingService.normalizeBranding(parsed));
+      } else {
+        setBranding(systemBrandingService.normalizeBranding(DEFAULT_SYSTEM_BRANDING));
+      }
+
+      void refreshBranding({ silent: true });
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === 'authToken' || event.key === 'empresaAtiva') {
+        handleScopeChanged();
+      }
+    };
+
+    window.addEventListener(AUTH_TOKEN_EVENT_NAME, handleScopeChanged);
+    window.addEventListener(EMPRESA_EVENT_NAME, handleScopeChanged);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener(AUTH_TOKEN_EVENT_NAME, handleScopeChanged);
+      window.removeEventListener(EMPRESA_EVENT_NAME, handleScopeChanged);
+      window.removeEventListener('storage', handleStorage);
+    };
   }, [refreshBranding]);
 
   useEffect(() => {

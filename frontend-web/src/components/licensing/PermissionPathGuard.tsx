@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { ShieldAlert } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useModulosAtivos } from '../../hooks/useModuloAtivo';
-import { canUserAccessPath } from '../../config/menuConfig';
+import { canUserAccessPath, getDefaultAuthorizedPath } from '../../config/menuConfig';
 
 interface PermissionPathGuardProps {
   children: React.ReactNode;
@@ -11,8 +11,39 @@ interface PermissionPathGuardProps {
 
 const PermissionPathGuard: React.FC<PermissionPathGuardProps> = ({ children }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [modulosAtivos, loadingModulos] = useModulosAtivos();
+  const normalizedPath = location.pathname || '/';
+  const hasAccess =
+    !loadingModulos && canUserAccessPath(normalizedPath, modulosAtivos, user);
+  const shouldAutoRedirect =
+    normalizedPath === '/' || normalizedPath === '/dashboard';
+  const fallbackPath = useMemo(
+    () =>
+      getDefaultAuthorizedPath(modulosAtivos, user, {
+        fallbackPath: '/dashboard',
+        excludePaths: [normalizedPath],
+      }),
+    [modulosAtivos, normalizedPath, user],
+  );
+
+  useEffect(() => {
+    if (loadingModulos || hasAccess || !shouldAutoRedirect) {
+      return;
+    }
+
+    if (fallbackPath && fallbackPath !== normalizedPath) {
+      navigate(fallbackPath, { replace: true });
+    }
+  }, [
+    fallbackPath,
+    hasAccess,
+    loadingModulos,
+    navigate,
+    normalizedPath,
+    shouldAutoRedirect,
+  ]);
 
   if (loadingModulos) {
     return (
@@ -25,9 +56,24 @@ const PermissionPathGuard: React.FC<PermissionPathGuardProps> = ({ children }) =
     );
   }
 
-  const hasAccess = canUserAccessPath(location.pathname, modulosAtivos, user);
   if (hasAccess) {
     return <>{children}</>;
+  }
+
+  const actionPath =
+    fallbackPath && fallbackPath !== normalizedPath ? fallbackPath : '/dashboard';
+  const actionLabel =
+    actionPath === '/dashboard' ? 'Voltar ao dashboard' : 'Ir para tela inicial';
+
+  if (shouldAutoRedirect && actionPath !== normalizedPath) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-16 w-16 border-b-4 border-[#159A9C] mb-4"></div>
+          <p className="text-gray-600 text-lg">Redirecionando para sua tela inicial...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -40,12 +86,12 @@ const PermissionPathGuard: React.FC<PermissionPathGuardProps> = ({ children }) =
         <p className="text-gray-600 mb-4">
           Voce nao possui permissao para acessar esta funcionalidade.
         </p>
-        <a
-          href="/dashboard"
+        <Link
+          to={actionPath}
           className="inline-flex items-center justify-center px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors text-sm font-medium"
         >
-          Voltar ao dashboard
-        </a>
+          {actionLabel}
+        </Link>
       </div>
     </div>
   );
