@@ -29,7 +29,7 @@ import {
   Palette,
 } from 'lucide-react';
 import { isMenuItemAllowedInMvp } from './mvpScope';
-import { isOmnichannelEnabled } from './featureFlags';
+import { isAtendimentoModuleVisible, isOmnichannelEnabled } from './featureFlags';
 import type { User } from '../types';
 
 export interface MenuConfig {
@@ -792,18 +792,22 @@ export const menuConfig: MenuConfig[] = [
     permissions: ['dashboard.read'],
     section: 'Vis\u00e3o Geral',
   },
-  {
-    id: 'atendimento',
-    title: 'Atendimento',
-    shortTitle: 'Atend.',
-    icon: MessageSquare,
-    href: isOmnichannelEnabled ? '/atendimento' : '/atendimento/tickets',
-    color: 'purple',
-    permissions: ['atendimento.chats.read', 'atendimento.tickets.read', 'ATENDIMENTO'],
-    requiredModule: 'ATENDIMENTO', // Requer licenca de Atendimento
-    section: 'Opera\u00e7\u00f5es',
-    children: atendimentoChildren,
-  },
+  ...(isAtendimentoModuleVisible
+    ? [
+        {
+          id: 'atendimento',
+          title: 'Atendimento',
+          shortTitle: 'Atend.',
+          icon: MessageSquare,
+          href: isOmnichannelEnabled ? '/atendimento' : '/atendimento/tickets',
+          color: 'purple',
+          permissions: ['atendimento.chats.read', 'atendimento.tickets.read', 'ATENDIMENTO'],
+          requiredModule: 'ATENDIMENTO', // Requer licenca de Atendimento
+          section: 'Opera\u00e7\u00f5es',
+          children: atendimentoChildren,
+        } as MenuConfig,
+      ]
+    : []),
   {
     id: 'comercial',
     title: 'Comercial',

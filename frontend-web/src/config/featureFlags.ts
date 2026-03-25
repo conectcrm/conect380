@@ -25,3 +25,13 @@ export const isOmnichannelEnabled = (() => {
 
   return !isProduction;
 })();
+
+export const isAtendimentoModuleVisible = (() => {
+  const explicitValue = parseBoolean(process.env.REACT_APP_ENABLE_ATENDIMENTO_MODULE);
+  if (explicitValue !== null) {
+    return explicitValue;
+  }
+
+  // Em producao fica oculto por padrao ate o modulo ser retomado.
+  return !isProduction;
+})();
