@@ -1,4 +1,4 @@
-import React, {
+﻿import React, {
   createContext,
   useContext,
   useState,
@@ -53,7 +53,7 @@ export interface NotificationReminderInput {
   title: string;
   message?: string;
   scheduledFor: Date | string | number;
-  entityType?: ReminderEntityType | 'client' | 'reuniÃ£o' | 'reuniao';
+  entityType?: ReminderEntityType | 'client' | 'reuniao' | 'reuniao';
   entityId?: string;
   recurring?: {
     type: 'daily' | 'weekly' | 'monthly';
@@ -63,7 +63,7 @@ export interface NotificationReminderInput {
 }
 
 interface NotificationContextData {
-  // NotificaÃ§Ãµes
+  // Notificacoes
   notifications: Notification[];
   unreadCount: number;
   addNotification: (notification: AddNotificationInput) => void;
@@ -78,7 +78,7 @@ interface NotificationContextData {
   updateReminder: (id: string, updates: Partial<NotificationReminder>) => void;
   removeReminder: (id: string) => void;
 
-  // ConfiguraÃ§Ãµes
+  // Configuracoes
   settings: {
     soundEnabled: boolean;
     browserNotifications: boolean;
@@ -87,7 +87,7 @@ interface NotificationContextData {
   };
   updateSettings: (settings: Partial<NotificationContextData['settings']>) => void;
 
-  // MÃ©todos de conveniÃªncia
+  // Metodos de conveniencia
   showSuccess: (title: string, message: string, action?: Notification['action']) => void;
   showError: (title: string, message: string, action?: Notification['action']) => void;
   showWarning: (title: string, message: string, action?: Notification['action']) => void;
@@ -194,7 +194,7 @@ interface NotificationProviderProps {
 
 export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children }) => {
   const { isAuthenticated, user } = useAuth();
-  // âœ… Garantir que estados iniciais sejam arrays vÃ¡lidos
+  //  Garantir que estados iniciais sejam arrays validos
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const notificationsRef = useRef<Notification[]>([]);
   const [reminders, setReminders] = useState<NotificationReminder[]>([]);
@@ -239,7 +239,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       switch (entityType) {
         case 'client':
           return 'cliente';
-        case 'reuniÃ£o':
+        case 'reuniao':
         case 'reuniao':
           return 'agenda';
         case 'proposta':
@@ -272,7 +272,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   };
 
   // Carregar dados do localStorage.
-  // NotificaÃ§Ãµes nÃ£o sÃ£o persistidas; lembretes sÃ£o persistidos por usuÃ¡rio autenticado.
+  // Notificacoes nao sao persistidas; lembretes sao persistidos por usuario autenticado.
   useEffect(() => {
     localStorage.removeItem('conect-notifications');
 
@@ -286,7 +286,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
           setSettings(DEFAULT_NOTIFICATION_SETTINGS);
         }
       } catch (error) {
-        console.error('Erro ao carregar configurações:', error);
+        console.error('Erro ao carregar configuraes:', error);
         setSettings(DEFAULT_NOTIFICATION_SETTINGS);
       }
     } else {
@@ -317,7 +317,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       try {
         const parsed = JSON.parse(sourceRemindersPayload);
         if (!Array.isArray(parsed)) {
-          console.warn('savedReminders nÃ£o Ã© um array, ignorando:', parsed);
+          console.warn('savedReminders nao um array, ignorando:', parsed);
           localStorage.removeItem(remindersStorageKey);
           if (savedLegacyUserReminders && legacyUserRemindersStorageKey) {
             localStorage.removeItem(legacyUserRemindersStorageKey);
@@ -341,7 +341,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
                   r.id,
                 );
               } catch (innerError) {
-                console.warn('Lembrete invÃ¡lido ignorado:', innerError);
+                console.warn('Lembrete invalido ignorado:', innerError);
                 return null;
               }
             })
@@ -352,7 +352,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
           setReminders(validReminders);
           setLoadedReminderScopeKey(remindersStorageKey);
 
-          // MigraÃ§Ã£o automÃ¡tica da chave legada para a chave escopada por usuÃ¡rio.
+          // Migracao automatica da chave legada para a chave escopada por usuario.
           if (!savedScopedReminders && savedLegacyUserReminders && legacyUserRemindersStorageKey) {
             localStorage.setItem(remindersStorageKey, sourceRemindersPayload);
             localStorage.removeItem(legacyUserRemindersStorageKey);
@@ -375,9 +375,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     settingsStorageKey,
   ]);
 
-  // âŒ REMOVIDO: NÃ£o persistir notificaÃ§Ãµes no localStorage
-  // Motivo: Causava vazamento de notificaÃ§Ãµes entre usuÃ¡rios
-  // As notificaÃ§Ãµes vÃªm da API com polling e sÃ£o filtradas por userId no backend
+  //  REMOVIDO: Nao persistir notificacoes nao localStorage
+  // Motivo: Causava vazamento de notificacoes entre usuarios
+  // As notificacoes vem da API com polling e sao filtradas por userId nao backend
 
   useEffect(() => {
     notificationsRef.current = notifications;
@@ -393,7 +393,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     toast.dismiss();
   }, [isAuthenticated]);
 
-  // Salvar lembretes no localStorage
+  // Salvar lembretes nao localStorage
   useEffect(() => {
     if (!isAuthenticated || !remindersStorageKey) {
       return;
@@ -405,7 +405,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     localStorage.setItem(remindersStorageKey, JSON.stringify(reminders));
   }, [isAuthenticated, loadedReminderScopeKey, reminders, remindersStorageKey]);
 
-  // Salvar configuraÃ§Ãµes no localStorage
+  // Salvar configuraes nao localStorage
   useEffect(() => {
     if (loadedSettingsScopeKey !== settingsStorageKey) {
       return;
@@ -518,7 +518,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       return resolvedId;
     }
 
-    // Verificar se jÃ¡ existe uma notificaÃ§Ã£o similar muito recente (Ãºltimos 2 minutos para erros)
+    // Verificar se ja existe uma notificacao similar muito recente (ultimos 2 minutos para erros)
     const timeWindow = notificationData.type === 'error' ? 2 * 60 * 1000 : 5 * 60 * 1000;
     const recentTimeAgo = new Date(Date.now() - timeWindow);
     const recentSimilar = currentNotifications.find(
@@ -532,7 +532,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
     if (recentSimilar) {
       if (process.env.NODE_ENV === 'development') {
-        console.debug('NotificaÃ§Ã£o duplicada evitada:', notificationData.title);
+        console.debug('Notificao duplicada evitada:', notificationData.title);
       }
       return;
     }
@@ -594,7 +594,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
           ? false
           : shouldAutoShowBrowserNotification(newNotification);
 
-    // NotificaÃ§Ã£o do navegador
+    // Notificao do navegador
     if (
       shouldShowBrowserNotification &&
       settings.browserNotifications &&
@@ -617,26 +617,26 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   }, [isAuthenticated, settings.browserNotifications, settings.soundEnabled]);
 
   const playNotificationSound = (type: Notification['type']) => {
-    // Som desabilitado por padrÃ£o devido Ã  polÃ­tica de autoplay dos navegadores
-    // O AudioContext precisa ser criado apÃ³s interaÃ§Ã£o do usuÃ¡rio
-    // Para habilitar: usuÃ¡rio deve clicar em algum lugar da pÃ¡gina primeiro
+    // Som desabilitado por padro devido  poltica de autoplay dos navegadores
+    // O AudioContext precisa ser criado apos interacao do usuario
+    // Para habilitar: usuario deve clicar em algum lugar da pgina primeiro
     return;
 
-    /* CÃ“DIGO DE SOM DESABILITADO - Remover comentÃ¡rio apÃ³s implementar botÃ£o de ativaÃ§Ã£o
+    /* CDIGO DE SOM DESABILITADO - Remover comentrio apos implementar boto de ativao
     try {
-      // Verificar se Web Audio API estÃ¡ disponÃ­vel
+      // Verificar se Web Audio API est disponvel
       if (typeof window === 'undefined' || !('AudioContext' in window || 'webkitAudioContext' in (window as any))) {
-        return; // Navegador nÃ£o suporta
+        return; // Navegador nao suporta
       }
 
-      // Criar contexto de Ã¡udio
+      // Criar contexto de udio
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
 
-      // Verificar se AudioContext foi suspenso pela polÃ­tica do navegador
+      // Verificar se AudioContext foi suspenso pela poltica do navegador
       if (audioContext.state === 'suspended') {
-        // Tentar resumir (sÃ³ funciona apÃ³s interaÃ§Ã£o do usuÃ¡rio)
+        // Tentar resumir (s funciona apos interacao do usuario)
         audioContext.resume().catch(() => {
-          // Silenciosamente ignorar - som nÃ£o Ã© crÃ­tico
+          // Silenciosamente ignorar - som nao critico
         });
         return;
       }
@@ -647,7 +647,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       oscillator.connect(gainNode);
       gainNode.connect(audioContext.destination);
 
-      // FrequÃªncias diferentes para cada tipo
+      // Frequncias diferentes para cada tipo
       const frequencies = {
         success: 800,
         error: 400,
@@ -665,7 +665,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.3);
     } catch (error) {
-      // Silenciosamente ignorar - som nÃ£o Ã© crÃ­tico
+      // Silenciosamente ignorar - som nao critico
     }
     */
   };
@@ -674,9 +674,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     try {
       // Atualizar estado local imediatamente (UX responsivo)
       setNotifications((prev) => {
-        // âœ… Garantir que prev Ã© um array vÃ¡lido
+        //  Garantir que prev  um array valido
         if (!Array.isArray(prev)) {
-          console.warn('âš ï¸ notifications nÃ£o Ã© um array em markAsRead, resetando');
+          console.warn(' notifications nao um array em markAsRead, resetando');
           notificationsRef.current = [];
           return [];
         }
@@ -687,7 +687,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         return next;
       });
 
-      // Persistir no backend apenas para notificacoes reais (UUID)
+      // Persistir nao backend apenas para notificacoes reais (UUID)
       if (!isPersistedNotificationId(id)) {
         return;
       }
@@ -695,8 +695,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       const notificationService = await import('../services/notificationService');
       await notificationService.default.marcarComoLida(id);
     } catch (error) {
-      console.error('Erro ao marcar notificaÃ§Ã£o como lida:', error);
-      // Se falhar no backend, estado local jÃ¡ estÃ¡ atualizado para melhor UX
+      console.error('Erro ao marcar notificacao como lida:', error);
+      // Se falhar nao backend, estado local ja est atualizado para melhor UX
     }
   };
 
@@ -704,9 +704,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     try {
       // Atualizar estado local imediatamente (UX responsivo)
       setNotifications((prev) => {
-        // âœ… Garantir que prev Ã© um array vÃ¡lido
+        //  Garantir que prev  um array valido
         if (!Array.isArray(prev)) {
-          console.warn('âš ï¸ notifications nÃ£o Ã© um array em markAllAsRead, resetando');
+          console.warn(' notifications nao um array em markAllAsRead, resetando');
           notificationsRef.current = [];
           return [];
         }
@@ -715,12 +715,12 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         return next;
       });
 
-      // Persistir no backend
+      // Persistir nao backend
       const notificationService = await import('../services/notificationService');
       await notificationService.default.marcarTodasComoLidas();
     } catch (error) {
       console.error('Erro ao marcar todas como lidas:', error);
-      // Se falhar no backend, estado local jÃ¡ estÃ¡ atualizado para melhor UX
+      // Se falhar nao backend, estado local ja est atualizado para melhor UX
     }
   };
 
@@ -740,8 +740,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
       await api.delete(`/notifications/${id}`);
     } catch (error) {
-      console.error('Erro ao remover notificaÃ§Ã£o:', error);
-      // Se falhar no backend, nÃ£o recarregar - usuÃ¡rio jÃ¡ viu a remoÃ§Ã£o
+      console.error('Erro ao remover notificacao:', error);
+      // Se falhar nao backend, nao recarregar - usuario ja viu a remocao
     }
   };
 
@@ -751,10 +751,10 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       notificationsRef.current = [];
       setNotifications([]);
 
-      // Limpar no backend
+      // Limpar nao backend
       await api.delete('/notifications');
     } catch (error) {
-      console.error('Erro ao limpar notificaÃ§Ãµes:', error);
+      console.error('Erro ao limpar notificacoes:', error);
     }
   };
 
@@ -775,9 +775,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
   const updateReminder = (id: string, updates: Partial<NotificationReminder>) => {
     setReminders((prev) => {
-      // âœ… Garantir que prev Ã© um array vÃ¡lido
+      //  Garantir que prev  um array valido
       if (!Array.isArray(prev)) {
-        console.warn('âš ï¸ reminders nÃ£o Ã© um array em updateReminder, resetando');
+        console.warn(' reminders nao um array em updateReminder, resetando');
         return [];
       }
       return prev.map((reminder) => (reminder.id === id ? { ...reminder, ...updates } : reminder));
@@ -792,7 +792,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     setSettings((prev) => ({ ...prev, ...newSettings }));
   };
 
-  // MÃ©todos de conveniÃªncia
+  // Metodos de conveniencia
   const showSuccess = (title: string, message: string, action?: Notification['action']) => {
     addNotification({ type: 'success', title, message, priority: 'medium', action });
   };
@@ -853,4 +853,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 };
 
 export default NotificationContext;
+
+
 
