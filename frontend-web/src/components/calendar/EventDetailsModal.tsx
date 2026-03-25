@@ -89,6 +89,8 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
 
   const attendees = Array.isArray(event.attendees) ? event.attendees : [];
   const organizerLabel = resolveOrganizerLabel(event.criadoPorNome, event.responsavel, event.collaborator);
+  const isConfirmedResponse = event.myRsvp === 'confirmed';
+  const isDeclinedResponse = event.myRsvp === 'declined';
   const detailsPagePath = location.pathname.startsWith('/crm/')
     ? `/crm/agenda/eventos/${event.id}`
     : `/agenda/eventos/${event.id}`;
@@ -238,7 +240,8 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
               <button
                 type="button"
                 onClick={() => onRespond?.('declined')}
-                disabled={isResponding}
+                disabled={isResponding || isDeclinedResponse}
+                title={isDeclinedResponse ? 'Resposta ja registrada como "Nao vou"' : undefined}
                 className="inline-flex h-10 items-center justify-center rounded-lg border border-[#F2C5CD] bg-white px-4 text-sm font-semibold text-[#B42318] transition-colors hover:bg-[#FFF5F6] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Não vou
@@ -246,7 +249,8 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
               <button
                 type="button"
                 onClick={() => onRespond?.('confirmed')}
-                disabled={isResponding}
+                disabled={isResponding || isConfirmedResponse}
+                title={isConfirmedResponse ? 'Presenca ja confirmada para este convite' : undefined}
                 className="inline-flex h-10 items-center justify-center rounded-lg bg-[#159A9C] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isResponding ? 'Salvando...' : 'Confirmar presença'}

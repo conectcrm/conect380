@@ -67,7 +67,13 @@ export class AgendaController {
     @EmpresaId() empresaId: string,
     @Request() req: any,
   ) {
-    const event = await this.agendaService.update(id, dto, empresaId, req.user?.email);
+    const event = await this.agendaService.update(
+      id,
+      dto,
+      empresaId,
+      req.user?.email,
+      req.user?.id,
+    );
     return this.agendaService.serializeEventoParaUsuarioComCriador(event, req.user?.email);
   }
 
@@ -85,6 +91,6 @@ export class AgendaController {
   @Delete(':id')
   @Permissions(Permission.CRM_AGENDA_DELETE)
   remove(@Param('id') id: string, @EmpresaId() empresaId: string, @Request() req: any) {
-    return this.agendaService.remove(id, empresaId, req.user?.email);
+    return this.agendaService.remove(id, empresaId, req.user?.email, req.user?.id);
   }
 }

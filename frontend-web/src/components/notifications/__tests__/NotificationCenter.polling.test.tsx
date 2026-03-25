@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import NotificationCenter from '../NotificationCenter';
 import { NotificationProvider, useNotifications } from '../../../contexts/NotificationContext';
 import notificationService from '../../../services/notificationService';
+import { useAuth } from '../../../hooks/useAuth';
 
 jest.mock('../../../services/api', () => ({
   __esModule: true,
@@ -23,6 +24,11 @@ jest.mock('../../../services/notificationService', () => ({
   },
 }));
 
+jest.mock('../../../hooks/useAuth', () => ({
+  __esModule: true,
+  useAuth: jest.fn(),
+}));
+
 jest.mock('react-hot-toast', () => ({
   __esModule: true,
   default: {
@@ -32,6 +38,7 @@ jest.mock('react-hot-toast', () => ({
 }));
 
 const mockedNotificationService = notificationService as jest.Mocked<typeof notificationService>;
+const mockedUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 
 const NotificationsProbe = () => {
   const { notifications, markAsRead } = useNotifications();
@@ -67,9 +74,21 @@ const renderWithProviders = () =>
   );
 
 describe('NotificationCenter polling sync', () => {
+  const persistedNotificationId = '11111111-1111-4111-8111-111111111111';
+
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
+    mockedUseAuth.mockReturnValue({
+      user: { id: 'test-user-id' } as any,
+      isAuthenticated: true,
+      isLoading: false,
+      login: jest.fn(),
+      verifyMfa: jest.fn(),
+      resendMfa: jest.fn(),
+      logout: jest.fn(),
+      updateUser: jest.fn(),
+    });
     Object.defineProperty(document, 'visibilityState', {
       configurable: true,
       value: 'visible',
@@ -84,7 +103,7 @@ describe('NotificationCenter polling sync', () => {
     mockedNotificationService.listar
       .mockResolvedValueOnce([
         {
-          id: 'notif-1',
+          id: persistedNotificationId,
           type: 'COTACAO_PENDENTE',
           title: 'Cotacao pendente',
           message: 'Primeira versao',
@@ -94,7 +113,7 @@ describe('NotificationCenter polling sync', () => {
       ] as any)
       .mockResolvedValueOnce([
         {
-          id: 'notif-1',
+          id: persistedNotificationId,
           type: 'COTACAO_PENDENTE',
           title: 'Cotacao pendente',
           message: 'Atualizada no polling',
@@ -128,7 +147,7 @@ describe('NotificationCenter polling sync', () => {
     mockedNotificationService.listar
       .mockResolvedValueOnce([
         {
-          id: 'notif-1',
+          id: persistedNotificationId,
           type: 'COTACAO_PENDENTE',
           title: 'Cotacao pendente',
           message: 'Nao lida',
@@ -138,7 +157,7 @@ describe('NotificationCenter polling sync', () => {
       ] as any)
       .mockResolvedValueOnce([
         {
-          id: 'notif-1',
+          id: persistedNotificationId,
           type: 'COTACAO_PENDENTE',
           title: 'Cotacao pendente',
           message: 'Ja lida no backend',
@@ -159,7 +178,9 @@ describe('NotificationCenter polling sync', () => {
 
     fireEvent.click(screen.getByTestId('mark-first-as-read'));
 
-    await waitFor(() => expect(mockedNotificationService.marcarComoLida).toHaveBeenCalledWith('notif-1'));
+    await waitFor(() =>
+      expect(mockedNotificationService.marcarComoLida).toHaveBeenCalledWith(persistedNotificationId),
+    );
     await waitFor(() => expect(screen.getByTestId('first-notification-read')).toHaveTextContent('read'));
 
     await act(async () => {

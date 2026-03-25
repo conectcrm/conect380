@@ -1,9 +1,13 @@
 import axios from 'axios';
 import { api } from './api';
 import { CalendarEvent } from '../types/calendar';
+import { buildScopedStorageKey } from '../utils/storageScope';
 
 export type AgendaStatusBackend = 'confirmado' | 'pendente' | 'cancelado';
 export type AgendaPrioridadeBackend = 'alta' | 'media' | 'baixa';
+export type AgendaTipoBackend = 'reuniao' | 'ligacao' | 'tarefa' | 'evento' | 'follow-up';
+export type AgendaLocationTypeBackend = 'presencial' | 'virtual';
+export type AgendaReminderTypeBackend = 'notification' | 'email' | 'both';
 export type EventoTipoBackend =
   | 'reuniao'
   | 'ligacao'
@@ -24,6 +28,17 @@ interface AgendaEventoResponse {
   prioridade: AgendaPrioridadeBackend;
   local?: string | null;
   color?: string | null;
+  tipo?: AgendaTipoBackend | null;
+  location_type?: AgendaLocationTypeBackend | null;
+  reminder_time?: number | null;
+  reminder_type?: AgendaReminderTypeBackend | null;
+  email_offline?: boolean | null;
+  attachments?: string[] | null;
+  is_recurring?: boolean | null;
+  recurring_pattern?: Record<string, unknown> | null;
+  notes?: string | null;
+  responsavel_id?: string | null;
+  responsavel_nome?: string | null;
   attendees?: string[] | null;
   attendee_responses?: Record<string, 'pending' | 'confirmed' | 'declined'> | null;
   my_rsvp?: 'pending' | 'confirmed' | 'declined' | null;
@@ -65,7 +80,7 @@ interface EventoResponse {
 }
 
 const CREVASSE_PRIMARY = '#159A9C';
-const LOCAL_AGENDA_EVENT_META_STORAGE_KEY = 'conectcrm:agenda:event-meta:v1';
+const LOCAL_AGENDA_EVENT_META_STORAGE_KEY = 'conectcrm:agenda:event-meta:v2';
 
 type AgendaEventLocalMeta = Pick<
   Partial<CalendarEvent>,
@@ -122,11 +137,17 @@ const AGENDA_EVENT_LOCAL_META_KEYS: Array<keyof AgendaEventLocalMeta> = [
 
 const canUseLocalStorage = () => typeof window !== 'undefined' && !!window.localStorage;
 
+const getAgendaEventLocalMetaStorageKey = (): string =>
+  buildScopedStorageKey(LOCAL_AGENDA_EVENT_META_STORAGE_KEY, {
+    includeEmpresa: true,
+    includeUser: true,
+  });
+
 const readAgendaEventLocalMetaMap = (): Record<string, AgendaEventLocalMeta> => {
   if (!canUseLocalStorage()) return {};
 
   try {
-    const raw = window.localStorage.getItem(LOCAL_AGENDA_EVENT_META_STORAGE_KEY);
+    const raw = window.localStorage.getItem(getAgendaEventLocalMetaStorageKey());
     if (!raw) return {};
     const parsed = JSON.parse(raw);
     return parsed && typeof parsed === 'object' ? parsed : {};
@@ -140,7 +161,7 @@ const writeAgendaEventLocalMetaMap = (map: Record<string, AgendaEventLocalMeta>)
   if (!canUseLocalStorage()) return;
 
   try {
-    window.localStorage.setItem(LOCAL_AGENDA_EVENT_META_STORAGE_KEY, JSON.stringify(map));
+    window.localStorage.setItem(getAgendaEventLocalMetaStorageKey(), JSON.stringify(map));
   } catch (error) {
     console.warn('Falha ao salvar metadados locais da agenda:', error);
   }
@@ -230,6 +251,32 @@ const mapPriorityToBackend = (
   return 'media';
 };
 
+const mapAgendaTypeToCalendarType = (tipo: AgendaTipoBackend | null | undefined): CalendarEvent['type'] => {
+  switch (tipo) {
+    case 'reuniao':
+      return 'meeting';
+    case 'ligacao':
+      return 'call';
+    case 'tarefa':
+      return 'task';
+    case 'follow-up':
+      return 'follow-up';
+    case 'evento':
+    default:
+      return 'event';
+  }
+};
+
+const mapCalendarTypeToAgendaType = (
+  tipo: CalendarEvent['type'] | AgendaTipoBackend | string | undefined,
+): AgendaTipoBackend => {
+  if (tipo === 'meeting' || tipo === 'reuniao') return 'reuniao';
+  if (tipo === 'call' || tipo === 'ligacao') return 'ligacao';
+  if (tipo === 'task' || tipo === 'tarefa') return 'tarefa';
+  if (tipo === 'follow-up') return 'follow-up';
+  return 'evento';
+};
+
 const mapEventosTypeToCalendarType = (
   tipo: EventoTipoBackend | undefined,
 ): CalendarEvent['type'] => {
@@ -258,6 +305,8 @@ const mapCalendarTypeToEventosType = (
 };
 
 const toCalendarEventFromAgenda = (evento: AgendaEventoResponse): CalendarEvent => {
+  const type = mapAgendaTypeToCalendarType(evento.tipo);
+
   return {
     id: evento.id,
     title: evento.titulo,
@@ -274,8 +323,22 @@ const toCalendarEventFromAgenda = (evento: AgendaEventoResponse): CalendarEvent 
     myRsvp: evento.my_rsvp ?? undefined,
     criadoPorId: evento.criado_por_id ?? undefined,
     criadoPorNome: evento.criado_por_nome ?? undefined,
-    type: 'event',
-    category: 'meeting',
+    type,
+    category: evento.tipo ?? mapCalendarTypeToAgendaType(type),
+    locationType: evento.location_type ?? 'presencial',
+    reminderTime:
+      typeof evento.reminder_time === 'number' && Number.isFinite(evento.reminder_time)
+        ? evento.reminder_time
+        : undefined,
+    reminderType: evento.reminder_type ?? undefined,
+    emailOffline: !!evento.email_offline,
+    attachments: Array.isArray(evento.attachments) ? evento.attachments : undefined,
+    isRecurring: !!evento.is_recurring,
+    recurringPattern: evento.recurring_pattern ?? undefined,
+    notes: evento.notes ?? undefined,
+    responsavelId: evento.responsavel_id ?? undefined,
+    responsavel: evento.responsavel_nome ?? evento.responsavel_id ?? undefined,
+    collaborator: evento.responsavel_nome ?? undefined,
   };
 };
 
@@ -316,6 +379,17 @@ const fromCalendarEventToAgenda = (event: Omit<CalendarEvent, 'id'>) => {
     all_day: !!event.allDay,
     status: mapStatusToBackend(event.status),
     prioridade: mapPriorityToBackend(event.priority),
+    tipo: mapCalendarTypeToAgendaType(event.type),
+    location_type: event.locationType ?? 'presencial',
+    reminder_time: event.reminderTime,
+    reminder_type: event.reminderType,
+    email_offline: !!event.emailOffline,
+    attachments: event.attachments?.length ? event.attachments : undefined,
+    is_recurring: !!event.isRecurring,
+    recurring_pattern: event.recurringPattern ?? event.recurring ?? undefined,
+    notes: event.notes,
+    responsavel_id: event.responsavelId || undefined,
+    responsavel_nome: event.collaborator || undefined,
     local: event.location,
     color: event.color ?? CREVASSE_PRIMARY,
     attendees: event.attendees?.length ? event.attendees : undefined,
@@ -348,6 +422,17 @@ const fromCalendarUpdatesToAgenda = (updates: Partial<CalendarEvent>) => {
   if (updates.allDay !== undefined) payload.all_day = updates.allDay;
   if (updates.status !== undefined) payload.status = mapStatusToBackend(updates.status);
   if (updates.priority !== undefined) payload.prioridade = mapPriorityToBackend(updates.priority);
+  if (updates.type !== undefined) payload.tipo = mapCalendarTypeToAgendaType(updates.type);
+  if (updates.locationType !== undefined) payload.location_type = updates.locationType;
+  if (updates.reminderTime !== undefined) payload.reminder_time = updates.reminderTime;
+  if (updates.reminderType !== undefined) payload.reminder_type = updates.reminderType;
+  if (updates.emailOffline !== undefined) payload.email_offline = updates.emailOffline;
+  if (updates.attachments !== undefined) payload.attachments = updates.attachments;
+  if (updates.isRecurring !== undefined) payload.is_recurring = updates.isRecurring;
+  if (updates.recurringPattern !== undefined) payload.recurring_pattern = updates.recurringPattern;
+  if (updates.notes !== undefined) payload.notes = updates.notes;
+  if (updates.responsavelId !== undefined) payload.responsavel_id = updates.responsavelId;
+  if (updates.collaborator !== undefined) payload.responsavel_nome = updates.collaborator;
   if (updates.location !== undefined) payload.local = updates.location;
   if (updates.color !== undefined) payload.color = updates.color;
   if (updates.attendees !== undefined) payload.attendees = updates.attendees;
@@ -385,10 +470,12 @@ class AgendaEventosService {
     return [] as AgendaEventoResponse[];
   }
 
-  private canFallback(error: unknown): boolean {
+  private canFallback(error: unknown, options?: { allowServerError?: boolean }): boolean {
     if (!axios.isAxiosError(error)) return false;
     const status = error.response?.status;
-    return status === 404 || status === 500;
+    if (status === 404) return true;
+    if (options?.allowServerError && status === 500) return true;
+    return false;
   }
 
   private isSharedAgendaEvent(
@@ -452,10 +539,26 @@ class AgendaEventosService {
       eventosParams.tipo = mapCalendarTypeToEventosType(filtros.type);
     }
 
-    let agendaEvents: CalendarEvent[] = [];
-    let eventosEvents: CalendarEvent[] = [];
-    let agendaError: unknown;
-    let eventosError: unknown;
+    const fetchEventosList = async () => {
+      const response = await api.get<EventoResponse[]>(this.eventosBaseUrl, { params: eventosParams });
+      const raw = Array.isArray(response.data) ? response.data : [];
+      this.endpointVariant = 'eventos';
+      return raw
+        .map(toCalendarEventFromEventos)
+        .map(mergeAgendaEventLocalMeta)
+        .sort((a, b) => a.start.getTime() - b.start.getTime());
+    };
+
+    // Se o endpoint legado foi o último válido, priorizamos ele para evitar 500 repetitivo.
+    if (this.endpointVariant === 'eventos') {
+      try {
+        return await fetchEventosList();
+      } catch (eventosError) {
+        if (!this.canFallback(eventosError, { allowServerError: true })) {
+          throw eventosError;
+        }
+      }
+    }
 
     try {
       const buildAgendaUrl = (page: number) => {
@@ -485,40 +588,23 @@ class AgendaEventosService {
         }
       }
 
-      agendaEvents = rawAgenda.map(toCalendarEventFromAgenda).map(mergeAgendaEventLocalMeta);
+      const agendaEvents = rawAgenda.map(toCalendarEventFromAgenda);
       this.endpointVariant = 'agenda';
-    } catch (error) {
-      agendaError = error;
-    }
-
-    try {
-      const response = await api.get<EventoResponse[]>(this.eventosBaseUrl, { params: eventosParams });
-      const raw = Array.isArray(response.data) ? response.data : [];
-      eventosEvents = raw.map(toCalendarEventFromEventos).map(mergeAgendaEventLocalMeta);
-      if (agendaEvents.length === 0) {
-        this.endpointVariant = 'eventos';
+      return agendaEvents.sort((a, b) => a.start.getTime() - b.start.getTime());
+    } catch (agendaError) {
+      if (!this.canFallback(agendaError, { allowServerError: true })) {
+        throw agendaError;
       }
-    } catch (error) {
-      eventosError = error;
     }
 
-    if (agendaEvents.length === 0 && eventosEvents.length === 0) {
-      throw (this.endpointVariant === 'agenda' ? agendaError : eventosError) || agendaError || eventosError;
-    }
-
-    const mergedById = new Map<string, CalendarEvent>();
-    [...eventosEvents, ...agendaEvents].forEach((event) => {
-      mergedById.set(event.id, event);
-    });
-
-    return Array.from(mergedById.values()).sort((a, b) => a.start.getTime() - b.start.getTime());
+    return fetchEventosList();
   }
 
   async obterEvento(id: string): Promise<CalendarEvent> {
     return this.withEndpointFallback({
       agenda: async () => {
         const response = await api.get<AgendaEventoResponse>(`${this.agendaBaseUrl}/${id}`);
-        return mergeAgendaEventLocalMeta(toCalendarEventFromAgenda(response.data));
+        return toCalendarEventFromAgenda(response.data);
       },
       eventos: async () => {
         const response = await api.get<EventoResponse>(`${this.eventosBaseUrl}/${id}`);
@@ -553,18 +639,14 @@ class AgendaEventosService {
       const payload = fromCalendarEventToAgenda(event);
       const response = await api.post<AgendaEventoResponse>(this.agendaBaseUrl, payload);
       this.endpointVariant = 'agenda';
-      const mappedEvent = toCalendarEventFromAgenda(response.data);
-      upsertAgendaEventLocalMeta(mappedEvent.id, event);
-      return mergeAgendaEventLocalMeta(mappedEvent);
+      return toCalendarEventFromAgenda(response.data);
     }
 
     return this.withEndpointFallback({
       agenda: async () => {
         const payload = fromCalendarEventToAgenda(event);
         const response = await api.post<AgendaEventoResponse>(this.agendaBaseUrl, payload);
-        const mappedEvent = toCalendarEventFromAgenda(response.data);
-        upsertAgendaEventLocalMeta(mappedEvent.id, event);
-        return mergeAgendaEventLocalMeta(mappedEvent);
+        return toCalendarEventFromAgenda(response.data);
       },
       eventos: async () => {
         const payload = fromCalendarEventToEventos(event);
@@ -581,16 +663,14 @@ class AgendaEventosService {
       const payload = fromCalendarUpdatesToAgenda(updates);
       const response = await api.patch<AgendaEventoResponse>(`${this.agendaBaseUrl}/${id}`, payload);
       this.endpointVariant = 'agenda';
-      upsertAgendaEventLocalMeta(id, updates);
-      return mergeAgendaEventLocalMeta(toCalendarEventFromAgenda(response.data));
+      return toCalendarEventFromAgenda(response.data);
     }
 
     return this.withEndpointFallback({
       agenda: async () => {
         const payload = fromCalendarUpdatesToAgenda(updates);
         const response = await api.patch<AgendaEventoResponse>(`${this.agendaBaseUrl}/${id}`, payload);
-        upsertAgendaEventLocalMeta(id, updates);
-        return mergeAgendaEventLocalMeta(toCalendarEventFromAgenda(response.data));
+        return toCalendarEventFromAgenda(response.data);
       },
       eventos: async () => {
         const payload = fromCalendarUpdatesToEventos(updates);
@@ -605,7 +685,6 @@ class AgendaEventosService {
     await this.withEndpointFallback({
       agenda: async () => {
         await api.delete(`${this.agendaBaseUrl}/${id}`);
-        removeAgendaEventLocalMeta(id);
       },
       eventos: async () => {
         await api.delete(`${this.eventosBaseUrl}/${id}`);
@@ -623,8 +702,7 @@ class AgendaEventosService {
     });
 
     this.endpointVariant = 'agenda';
-    upsertAgendaEventLocalMeta(id, { myRsvp: resposta });
-    return mergeAgendaEventLocalMeta(toCalendarEventFromAgenda(response.data));
+    return toCalendarEventFromAgenda(response.data);
   }
 
   atualizarMetadadosLocaisEvento(id: string, updates: Partial<CalendarEvent>): void {

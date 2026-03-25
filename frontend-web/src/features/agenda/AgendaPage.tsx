@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { MonthView } from '../../components/calendar/MonthView';
 import { WeekView } from '../../components/calendar/WeekView';
 import { CreateEventModal } from '../../components/calendar/CreateEventModal';
@@ -10,7 +11,12 @@ import { useAuth } from '../../contexts/AuthContext';
 import { authService } from '../../services/authService';
 import { CalendarEvent } from '../../types/calendar';
 import { getMonthName, formatDate } from '../../utils/calendarUtils';
-import { buildAgendaUpcomingNotification, getAgendaSummaryNotificationId } from './agendaNotifications';
+import { buildScopedStorageKey } from '../../utils/storageScope';
+import {
+  buildAgendaUpcomingNotification,
+  getAgendaSummaryNotificationId,
+  shouldSuppressUpcomingWarningForDedicatedReminder,
+} from './agendaNotifications';
 import {
   Calendar,
   Plus,
@@ -49,9 +55,12 @@ const mapModalEventTypeToCalendarType = (
 };
 
 const AGENDA_PREFERENCES_KEYS = {
-  showStatsPanel: 'agenda:show-stats-panel',
-  openFiltersByDefault: 'agenda:open-filters-default',
+  showStatsPanel: 'agenda:show-stats-panel:v2',
+  openFiltersByDefault: 'agenda:open-filters-default:v2',
+  showHeaderSummary: 'agenda:show-header-summary:v1',
 } as const;
+const AGENDA_SUMMARY_SESSION_KEY = 'agenda:summary:shown:v1';
+const EMPRESA_EVENT_NAME = 'empresaAtivaChanged';
 
 const readBooleanPreference = (key: string, defaultValue: boolean): boolean => {
   if (typeof window === 'undefined') return defaultValue;
@@ -65,6 +74,12 @@ const writeBooleanPreference = (key: string, value: boolean): void => {
   window.localStorage.setItem(key, String(value));
 };
 
+const getStoredEmpresaAtivaId = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  const value = String(window.localStorage.getItem('empresaAtiva') || '').trim();
+  return value || null;
+};
+
 const matchesCollaboratorFilter = (event: CalendarEvent, filterValue: string): boolean => {
   if (!filterValue) return true;
   if (event.collaborator === filterValue) return true;
@@ -76,12 +91,19 @@ const toCsvCell = (value: unknown): string => {
   return `"${String(value ?? '').replace(/"/g, '""')}"`;
 };
 
+type AgendaNavigationState = {
+  openCreateEvent?: boolean;
+  selectedDate?: string;
+};
+
 const UUID_LIKE_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const AGENDA_PROFILE_SYNC_MIN_INTERVAL_MS = 60_000;
 let lastAgendaProfileSyncAt = 0;
 
 export const AgendaPage: React.FC = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
   // Hook de notificações
   const { addNotification, showSuccess, showWarning } = useNotifications();
 
@@ -107,26 +129,102 @@ export const AgendaPage: React.FC = () => {
   const [showEventDetailsModal, setShowEventDetailsModal] = useState(false);
   const [isRespondingToInvite, setIsRespondingToInvite] = useState(false);
   const [eventModalDate, setEventModalDate] = useState<Date | null>(null);
-  const [showFilters, setShowFilters] = useState<boolean>(() =>
-    readBooleanPreference(AGENDA_PREFERENCES_KEYS.openFiltersByDefault, false),
-  );
-  const [showStatsPanel, setShowStatsPanel] = useState<boolean>(() =>
-    readBooleanPreference(AGENDA_PREFERENCES_KEYS.showStatsPanel, true),
-  );
+  const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [showStatsPanel, setShowStatsPanel] = useState<boolean>(false);
+  const [showHeaderSummary, setShowHeaderSummary] = useState<boolean>(false);
   const [showAgendaSettings, setShowAgendaSettings] = useState(false);
   const [dragDisabledByServer, setDragDisabledByServer] = useState(false);
-  const [settingsShowStatsPanel, setSettingsShowStatsPanel] = useState<boolean>(showStatsPanel);
-  const [settingsOpenFiltersByDefault, setSettingsOpenFiltersByDefault] = useState<boolean>(() =>
-    readBooleanPreference(AGENDA_PREFERENCES_KEYS.openFiltersByDefault, false),
+  const [settingsShowStatsPanel, setSettingsShowStatsPanel] = useState<boolean>(false);
+  const [settingsShowHeaderSummary, setSettingsShowHeaderSummary] = useState<boolean>(false);
+  const [settingsOpenFiltersByDefault, setSettingsOpenFiltersByDefault] = useState<boolean>(false);
+  const [empresaAtivaStorageId, setEmpresaAtivaStorageId] = useState<string | null>(
+    getStoredEmpresaAtivaId,
   );
   const [filterType, setFilterType] = useState<string>('');
   const [filterPriority, setFilterPriority] = useState<string>('');
   const [filterStatus, setFilterStatus] = useState<string>('');
   const [filterCollaborator, setFilterCollaborator] = useState<string>('');
 
+  const resolvedEmpresaId = user?.empresa?.id ?? empresaAtivaStorageId ?? null;
+  const agendaStorageScope = useMemo(() => {
+    const options = {
+      includeEmpresa: true,
+      includeUser: true,
+      fallbackEmpresaId: resolvedEmpresaId,
+      fallbackUserId: user?.id ?? null,
+    };
+
+    return {
+      showStatsPanel: buildScopedStorageKey(AGENDA_PREFERENCES_KEYS.showStatsPanel, options),
+      openFiltersByDefault: buildScopedStorageKey(
+        AGENDA_PREFERENCES_KEYS.openFiltersByDefault,
+        options,
+      ),
+      showHeaderSummary: buildScopedStorageKey(AGENDA_PREFERENCES_KEYS.showHeaderSummary, options),
+      summarySessionPrefix: buildScopedStorageKey(AGENDA_SUMMARY_SESSION_KEY, options),
+    };
+  }, [resolvedEmpresaId, user?.id]);
+
   useEffect(() => {
     updateUserRef.current = updateUser;
   }, [updateUser]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const syncEmpresaAtiva = (): void => {
+      setEmpresaAtivaStorageId(getStoredEmpresaAtivaId());
+    };
+
+    const handleStorage = (event: StorageEvent): void => {
+      if (event.key === 'empresaAtiva') {
+        syncEmpresaAtiva();
+      }
+    };
+
+    window.addEventListener(EMPRESA_EVENT_NAME, syncEmpresaAtiva);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener(EMPRESA_EVENT_NAME, syncEmpresaAtiva);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    const nextOpenFilters = readBooleanPreference(agendaStorageScope.openFiltersByDefault, false);
+    const nextShowStats = readBooleanPreference(agendaStorageScope.showStatsPanel, false);
+    const nextShowSummary = readBooleanPreference(agendaStorageScope.showHeaderSummary, false);
+
+    setShowFilters(nextOpenFilters);
+    setShowStatsPanel(nextShowStats);
+    setShowHeaderSummary(nextShowSummary);
+    setSettingsOpenFiltersByDefault(nextOpenFilters);
+    setSettingsShowStatsPanel(nextShowStats);
+    setSettingsShowHeaderSummary(nextShowSummary);
+  }, [agendaStorageScope]);
+
+  useEffect(() => {
+    const state = (location.state as AgendaNavigationState | null) ?? null;
+    if (!state?.openCreateEvent) {
+      return;
+    }
+
+    let selectedDateFromState: Date | null = null;
+    if (typeof state.selectedDate === 'string') {
+      const parsedDate = new Date(state.selectedDate);
+      if (!Number.isNaN(parsedDate.getTime())) {
+        selectedDateFromState = parsedDate;
+      }
+    }
+
+    setSelectedEvent(null);
+    setShowEventDetailsModal(false);
+    setEventModalDate(selectedDateFromState);
+    setShowEventModal(true);
+
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.pathname, location.state, navigate, setSelectedEvent]);
 
   useEffect(() => {
     const now = Date.now();
@@ -404,7 +502,12 @@ export const AgendaPage: React.FC = () => {
       // Agrupar eventos por período para evitar notificações duplicadas
       const upcomingEvents15min = events.filter((event) => {
         const eventStart = new Date(event.start);
-        return eventStart > now && eventStart <= next15Minutes && !event.allDay;
+        return (
+          eventStart > now &&
+          eventStart <= next15Minutes &&
+          !event.allDay &&
+          !shouldSuppressUpcomingWarningForDedicatedReminder(event, now, 15)
+        );
       });
 
       const upcomingEvents1hour = events.filter((event) => {
@@ -425,7 +528,7 @@ export const AgendaPage: React.FC = () => {
     const interval = setInterval(checkUpcomingEvents, 5 * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [events, addNotification]);
+  }, [agendaStorageScope.summarySessionPrefix, events, addNotification]);
 
   // Notificação de boas-vindas e resumo da agenda
   useEffect(() => {
@@ -444,30 +547,31 @@ export const AgendaPage: React.FC = () => {
 
     // Notificação de resumo - evitar duplicatas usando um ID único baseado na data
     const summaryId = getAgendaSummaryNotificationId(today);
+    const scopedSummaryId = `${agendaStorageScope.summarySessionPrefix}:${summaryId}`;
 
     // Verificar se já foi mostrada hoje
-    const summaryStatus = sessionStorage.getItem(summaryId);
+    const summaryStatus = sessionStorage.getItem(scopedSummaryId);
 
     if (!summaryStatus) {
-      sessionStorage.setItem(summaryId, 'scheduled');
+      sessionStorage.setItem(scopedSummaryId, 'scheduled');
 
       const timeoutId = window.setTimeout(() => {
         addNotification({
-          id: summaryId,
+          id: scopedSummaryId,
           title: '\u{1F4C5} Agenda Carregada',
           message: `${todayEvents.length} eventos hoje • ${pendingEvents.length} pendentes`,
           type: 'info',
           priority: 'low',
           entityType: 'agenda',
-          entityId: summaryId,
+          entityId: scopedSummaryId,
         });
 
-        sessionStorage.setItem(summaryId, 'shown');
+        sessionStorage.setItem(scopedSummaryId, 'shown');
       }, 1000);
 
       return () => window.clearTimeout(timeoutId);
     }
-  }, [events, addNotification]);
+  }, [agendaStorageScope.summarySessionPrefix, events, addNotification]);
 
   const handleCloseModal = () => {
     setShowEventModal(false);
@@ -482,6 +586,7 @@ export const AgendaPage: React.FC = () => {
 
   const handleInviteResponse = async (response: Extract<CalendarEvent['myRsvp'], 'confirmed' | 'declined'>) => {
     if (!selectedEvent) return;
+    if (selectedEvent.myRsvp === response) return;
 
     setIsRespondingToInvite(true);
     try {
@@ -601,19 +706,22 @@ export const AgendaPage: React.FC = () => {
 
   const handleOpenAgendaSettings = () => {
     setSettingsShowStatsPanel(showStatsPanel);
+    setSettingsShowHeaderSummary(showHeaderSummary);
     setSettingsOpenFiltersByDefault(
-      readBooleanPreference(AGENDA_PREFERENCES_KEYS.openFiltersByDefault, false),
+      readBooleanPreference(agendaStorageScope.openFiltersByDefault, false),
     );
     setShowAgendaSettings(true);
   };
 
   const handleSaveAgendaSettings = () => {
     setShowStatsPanel(settingsShowStatsPanel);
+    setShowHeaderSummary(settingsShowHeaderSummary);
     setShowFilters(settingsOpenFiltersByDefault);
 
-    writeBooleanPreference(AGENDA_PREFERENCES_KEYS.showStatsPanel, settingsShowStatsPanel);
+    writeBooleanPreference(agendaStorageScope.showStatsPanel, settingsShowStatsPanel);
+    writeBooleanPreference(agendaStorageScope.showHeaderSummary, settingsShowHeaderSummary);
     writeBooleanPreference(
-      AGENDA_PREFERENCES_KEYS.openFiltersByDefault,
+      agendaStorageScope.openFiltersByDefault,
       settingsOpenFiltersByDefault,
     );
 
@@ -721,9 +829,20 @@ export const AgendaPage: React.FC = () => {
               ) : null}
             </span>
           }
-          description={pageDescription}
+          description={showHeaderSummary ? pageDescription : undefined}
           actions={
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowHeaderSummary((prev) => !prev)}
+                className={`inline-flex h-10 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors ${
+                  showHeaderSummary
+                    ? 'border-[#159A9C] bg-[#159A9C] text-white'
+                    : 'border-[#CFDDE2] bg-white text-[#355061] hover:bg-[#F6FBFC]'
+                }`}
+              >
+                Resumo
+              </button>
               <button
                 type="button"
                 onClick={() => setShowFilters((prev) => !prev)}
@@ -751,15 +870,17 @@ export const AgendaPage: React.FC = () => {
             </div>
           }
         />
-        <InlineStats
-          stats={[
-            { label: 'Total filtrado', value: String(filteredEvents.length), tone: 'neutral' },
-            { label: 'Hoje', value: String(todayEventsCount), tone: 'accent' },
-            { label: 'Confirmados', value: String(confirmedEventsCount), tone: 'accent' },
-            { label: 'Pendentes', value: String(pendingEventsCount), tone: 'warning' },
-            { label: 'Alta prioridade', value: String(highPriorityEventsCount), tone: 'warning' },
-          ]}
-        />
+        {showHeaderSummary ? (
+          <InlineStats
+            stats={[
+              { label: 'Total filtrado', value: String(filteredEvents.length), tone: 'neutral' },
+              { label: 'Hoje', value: String(todayEventsCount), tone: 'accent' },
+              { label: 'Confirmados', value: String(confirmedEventsCount), tone: 'accent' },
+              { label: 'Pendentes', value: String(pendingEventsCount), tone: 'warning' },
+              { label: 'Alta prioridade', value: String(highPriorityEventsCount), tone: 'warning' },
+            ]}
+          />
+        ) : null}
       </SectionCard>
       <FiltersBar className="p-4">
         <div className="flex w-full flex-col gap-4">
@@ -781,6 +902,17 @@ export const AgendaPage: React.FC = () => {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowStatsPanel((prev) => !prev)}
+                className={`inline-flex h-10 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors ${
+                  showStatsPanel
+                    ? 'border-[#159A9C] bg-[#159A9C] text-white'
+                    : 'border-[#D4E2E7] bg-white text-[#355061] hover:bg-[#F6FBFC]'
+                }`}
+              >
+                Próximos
+              </button>
               <div className="inline-flex overflow-hidden rounded-lg border border-[#D7E5EA] bg-white">
                 <button
                   type="button"
@@ -1088,6 +1220,15 @@ export const AgendaPage: React.FC = () => {
             </div>
             <div className="space-y-3 px-6 py-5">
               <label className="flex items-center justify-between gap-3 rounded-xl border border-[#E3EDF1] bg-[#FBFDFE] px-3 py-2.5">
+                <span className="text-sm font-medium text-[#355061]">Exibir resumo no topo</span>
+                <input
+                  type="checkbox"
+                  checked={settingsShowHeaderSummary}
+                  onChange={(e) => setSettingsShowHeaderSummary(e.target.checked)}
+                  className="h-4 w-4 rounded border-[#B4BEC9] text-[#159A9C] focus:ring-[#159A9C]"
+                />
+              </label>
+              <label className="flex items-center justify-between gap-3 rounded-xl border border-[#E3EDF1] bg-[#FBFDFE] px-3 py-2.5">
                 <span className="text-sm font-medium text-[#355061]">Exibir painel de próximos eventos</span>
                 <input
                   type="checkbox"
@@ -1146,3 +1287,4 @@ export const AgendaPage: React.FC = () => {
 };
 
 export default AgendaPage;
+

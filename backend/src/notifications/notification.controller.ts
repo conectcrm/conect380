@@ -12,6 +12,7 @@ import {
   HttpStatus,
   HttpCode,
   ForbiddenException,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../modules/auth/jwt-auth.guard';
 import { NotificationService } from './notification.service';
@@ -113,7 +114,7 @@ export class NotificationController {
   @Put(':id/read')
   @HttpCode(HttpStatus.OK)
   async markAsRead(
-    @Param('id') notificationId: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) notificationId: string,
     @Request() req,
   ): Promise<NotificationResponseDto> {
     const userId = req.user.id; // ✅ CORRIGIDO: era req.user.userId (undefined)
@@ -151,7 +152,10 @@ export class NotificationController {
    */
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async delete(@Param('id') notificationId: string, @Request() req): Promise<void> {
+  async delete(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) notificationId: string,
+    @Request() req,
+  ): Promise<void> {
     const userId = req.user.id; // ✅ CORRIGIDO: era req.user.userId (undefined)
     await this.notificationService.delete(notificationId, userId);
   }

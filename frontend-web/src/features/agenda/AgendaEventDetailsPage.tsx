@@ -111,6 +111,8 @@ export const AgendaEventDetailsPage: React.FC = () => {
   );
 
   const canRespond = !!event && isAttendee && event.status !== 'cancelled';
+  const isCurrentResponseConfirmed = event?.myRsvp === 'confirmed';
+  const isCurrentResponseDeclined = event?.myRsvp === 'declined';
 
   const canUpdateAgendaEvents = useMemo(() => {
     const permissions = [
@@ -180,6 +182,7 @@ export const AgendaEventDetailsPage: React.FC = () => {
 
   const handleRespond = async (response: InviteResponse) => {
     if (!event) return;
+    if (event.myRsvp === response) return;
 
     setIsResponding(true);
     try {
@@ -448,7 +451,8 @@ export const AgendaEventDetailsPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => void handleRespond('declined')}
-                    disabled={isResponding}
+                    disabled={isResponding || isCurrentResponseDeclined}
+                    title={isCurrentResponseDeclined ? 'Resposta ja registrada como "Nao vou"' : undefined}
                     className="inline-flex h-10 items-center justify-center rounded-lg border border-[#F2C5CD] bg-white px-4 text-sm font-semibold text-[#B42318] transition-colors hover:bg-[#FFF5F6] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Não vou
@@ -456,7 +460,8 @@ export const AgendaEventDetailsPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => void handleRespond('confirmed')}
-                    disabled={isResponding}
+                    disabled={isResponding || isCurrentResponseConfirmed}
+                    title={isCurrentResponseConfirmed ? 'Presenca ja confirmada para este convite' : undefined}
                     className="inline-flex h-10 items-center justify-center rounded-lg bg-[#159A9C] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isResponding ? 'Salvando...' : 'Confirmar presença'}

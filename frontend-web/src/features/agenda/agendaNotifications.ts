@@ -13,6 +13,7 @@ type AgendaNotificationDraft = {
   entityType: 'agenda';
   entityId?: string;
   autoClose?: boolean;
+  duration?: number;
 };
 
 const sanitizeIdPart = (value: string) => value.replace(/[^a-zA-Z0-9:_-]/g, '_');
@@ -80,7 +81,8 @@ export const buildAgendaUpcomingNotification = (
       priority: window === '15m' ? 'high' : 'medium',
       entityType: 'agenda',
       entityId: firstEvent.id,
-      autoClose: window === '15m' ? false : undefined,
+      autoClose: true,
+      duration: window === '15m' ? 8000 : undefined,
     };
   }
 
@@ -96,6 +98,30 @@ export const buildAgendaUpcomingNotification = (
     priority: window === '15m' ? 'high' : 'medium',
     entityType: 'agenda',
     entityId: `batch:${hashString(batchSignature)}`,
-    autoClose: window === '15m' ? false : undefined,
+    autoClose: true,
+    duration: window === '15m' ? 8000 : undefined,
   };
+};
+
+export const shouldSuppressUpcomingWarningForDedicatedReminder = (
+  event: CalendarEvent,
+  now: Date,
+  windowMinutes: number,
+): boolean => {
+  const reminderType = event.reminderType;
+  const reminderTime = event.reminderTime;
+
+  if (reminderType !== 'notification' && reminderType !== 'both') {
+    return false;
+  }
+
+  if (typeof reminderTime !== 'number' || reminderTime <= 0 || reminderTime > windowMinutes) {
+    return false;
+  }
+
+  const eventStart = new Date(event.start);
+  const millisecondsUntilEvent = eventStart.getTime() - now.getTime();
+
+  // Avoid suppressing fallback warning when dedicated reminder is already in the past.
+  return millisecondsUntilEvent >= reminderTime * 60 * 1000 - 1000;
 };

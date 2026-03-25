@@ -127,8 +127,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
   const participantsSectionRef = useRef<HTMLDivElement | null>(null);
 
   // Hook de notificações
-  const { addNotification, addReminder, removeReminder, showSuccess, showError, showWarning } =
-    useNotifications();
+  const { addNotification, addReminder, removeReminder, showSuccess, showError } = useNotifications();
 
   // Hook de autenticação para obter usuário atual
   const { user: usuarioAtual } = useAuth();
@@ -626,92 +625,6 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
     }
   };
 
-  const resolveInternalParticipantsByEmails = (emails: string[]) => {
-    const seenEmails = new Set<string>();
-
-    return emails
-      .map((email) => {
-        const normalizedEmail = email.trim().toLowerCase();
-        if (!normalizedEmail || seenEmails.has(normalizedEmail)) return null;
-        seenEmails.add(normalizedEmail);
-
-        return usuarios.find((usuario) => usuario.email.toLowerCase() === normalizedEmail) || null;
-      })
-      .filter(
-        (
-          usuario,
-        ): usuario is {
-          id: string;
-          nome: string;
-          email: string;
-        } => !!usuario && usuario.id !== usuarioAtual?.id,
-      );
-  };
-
-  const notifyInternalAgendaParticipants = async (params: {
-    users: { id: string; nome: string; email: string }[];
-    action: 'updated' | 'cancelled' | 'deleted';
-    eventId: string;
-    eventTitle: string;
-    eventStart: Date;
-    allDay?: boolean;
-    location?: string;
-  }) => {
-    if (!params.users.length) {
-      return { attempted: 0, failed: 0 };
-    }
-
-    const actorName = usuarioAtual?.nome || 'Um usuário';
-    const actionConfig = {
-      updated: {
-        title: 'Evento atualizado na agenda',
-        message: `${actorName} atualizou o evento "${params.eventTitle}" (${formatEventDateLabel(
-          params.eventStart,
-          params.allDay,
-        )})${params.location ? ` - ${params.location}` : ''}.`,
-      },
-      cancelled: {
-        title: 'Evento cancelado na agenda',
-        message: `${actorName} cancelou o evento "${params.eventTitle}"${
-          params.location ? ` (${params.location})` : ''
-        }.`,
-      },
-      deleted: {
-        title: 'Evento removido da agenda',
-        message: `${actorName} removeu o evento "${params.eventTitle}" da agenda.`,
-      },
-    } as const;
-
-    const config = actionConfig[params.action];
-
-    const results = await Promise.allSettled(
-      params.users.map((usuario) =>
-        notificationService.criar({
-          userId: usuario.id,
-          type: 'SISTEMA',
-          title: config.title,
-          message: config.message,
-          data: {
-            modulo: 'agenda',
-            action: params.action,
-            eventId: params.eventId,
-            eventTitle: params.eventTitle,
-            eventStart: new Date(params.eventStart).toISOString(),
-            allDay: !!params.allDay,
-            location: params.location || null,
-            actorUserId: usuarioAtual?.id || null,
-            actorName,
-          },
-        }),
-      ),
-    );
-
-    return {
-      attempted: results.length,
-      failed: results.filter((result) => result.status === 'rejected').length,
-    };
-  };
-
   const sanitizeVisibleParticipants = (emails?: string[] | null) => {
     const currentUserEmail = usuarioAtual?.email?.trim().toLowerCase();
     const unique = new Set<string>();
@@ -786,71 +699,6 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
       const reminderId = getAgendaReminderId(resolvedEventId);
       const isEditing = !!event;
 
-      const previousParticipantEmails = new Set(
-        (event?.attendees || []).map((email) => email.trim().toLowerCase()),
-      );
-      const participantEmailsToNotify = participants.filter((email) => {
-        const normalizedEmail = email.trim().toLowerCase();
-        if (!normalizedEmail) return false;
-        if (isEditing && previousParticipantEmails.has(normalizedEmail)) return false;
-        return true;
-      });
-
-      const internalParticipantUsers = participantEmailsToNotify
-        .map((email) =>
-          usuarios.find((usuario) => usuario.email.toLowerCase() === email.trim().toLowerCase()),
-        )
-        .filter(
-          (
-            usuario,
-          ): usuario is {
-            id: string;
-            nome: string;
-            email: string;
-          } => !!usuario && usuario.id !== usuarioAtual?.id,
-        );
-
-      if (internalParticipantUsers.length > 0) {
-        const actorName = usuarioAtual?.nome || 'Um usuário';
-        const inviteTitle = isEditing ? 'Voce foi adicionado a um evento' : 'Novo convite na agenda';
-        const inviteMessage = `${actorName} ${
-          isEditing ? 'adicionou voce ao evento' : 'convidou voce para o evento'
-        } "${data.title}"${
-          data.isAllDay
-            ? ` em ${parseLocalDateInputValue(data.startDate).toLocaleDateString('pt-BR')}`
-            : ` em ${new Date(eventData.start).toLocaleString('pt-BR')}`
-        }${data.location ? ` (${data.location})` : ''}.`;
-
-        const inviteResults = await Promise.allSettled(
-          internalParticipantUsers.map((usuario) =>
-            notificationService.criar({
-              userId: usuario.id,
-              type: 'SISTEMA',
-              title: inviteTitle,
-              message: inviteMessage,
-              data: {
-                modulo: 'agenda',
-                eventId: resolvedEventId,
-                eventTitle: data.title,
-                eventStart: eventData.start.toISOString(),
-                allDay: !!data.isAllDay,
-                location: data.location || null,
-                invitedByUserId: usuarioAtual?.id || null,
-                invitedByName: actorName,
-              },
-            }),
-          ),
-        );
-
-        const failedInvites = inviteResults.filter((result) => result.status === 'rejected').length;
-        if (failedInvites > 0) {
-          showWarning(
-            'Convites internos parciais',
-            `Evento salvo, mas ${failedInvites} notificações para usuários internos não foram enviadas.`,
-          );
-        }
-      }
-
       // Notificacao de sucesso
       showSuccess(
         isEditing ? 'Evento Atualizado' : 'Evento Criado',
@@ -906,48 +754,17 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
         });
       }
 
-      if (isEditing && (lifecycleAction === 'updated' || lifecycleAction === 'cancelled')) {
-        const newParticipantEmailsSet = new Set(
-          participantEmailsToNotify.map((email) => email.trim().toLowerCase()),
-        );
-        const participantEmailsForChangeNotification = participants.filter((email) => {
-          const normalizedEmail = email.trim().toLowerCase();
-          if (!normalizedEmail) return false;
-          return !newParticipantEmailsSet.has(normalizedEmail);
-        });
-
-        const internalParticipantsToNotify = resolveInternalParticipantsByEmails(
-          participantEmailsForChangeNotification,
-        );
-
-        const participantChangeNotificationResult = await notifyInternalAgendaParticipants({
-          users: internalParticipantsToNotify,
-          action: lifecycleAction,
-          eventId: resolvedEventId,
-          eventTitle: data.title,
-          eventStart: eventData.start,
-          allDay: data.isAllDay,
-          location: data.location || '',
-        });
-
-        if (participantChangeNotificationResult.failed > 0) {
-          showWarning(
-            'Atualização de participantes parcial',
-            `Evento salvo, mas ${participantChangeNotificationResult.failed} notificações de ${lifecycleAction === 'cancelled' ? 'cancelamento' : 'atualização'} não foram enviadas aos participantes internos.`,
-          );
-        }
-      }
-
       // Notificação específica sobre participantes
       if (participants.length > 0) {
         addNotification({
           id: getAgendaEventNotificationId('participants', resolvedEventId),
-          title: '\u{1F465} Participantes Convidados',
+          title: 'Participantes convidados',
           message: `${participants.length} participante(s) foram convidados para o evento`,
           type: 'info',
           priority: 'low',
           entityType: 'agenda',
           entityId: resolvedEventId,
+          silent: true,
         });
       }
 
@@ -961,7 +778,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
         if (reminderDateTime > new Date()) {
           addReminder({
             id: reminderId,
-            title: `\u{1F514} Lembrete: ${data.title}`,
+            title: `Lembrete: ${data.title}`,
             message: `Evento em ${data.reminderTime} minutos${data.location ? ` - Local: ${data.location}` : ''}`,
             entityType: 'agenda',
             entityId: resolvedEventId,
@@ -972,12 +789,13 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
           // Notificação sobre o lembrete criado
           addNotification({
             id: getAgendaEventNotificationId('reminder-configured', resolvedEventId),
-            title: '⏰ Lembrete Configurado',
+            title: 'Lembrete configurado',
             message: `Você será lembrado ${data.reminderTime} minutos antes do evento`,
             type: 'info',
             priority: 'low',
             entityType: 'agenda',
             entityId: resolvedEventId,
+            silent: true,
           });
         }
       } else {
@@ -1063,24 +881,6 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
             entityType: 'agenda',
             entityId: event.id,
           });
-        }
-
-        const internalParticipantsToNotify = resolveInternalParticipantsByEmails(event.attendees || []);
-        const participantDeleteNotificationResult = await notifyInternalAgendaParticipants({
-          users: internalParticipantsToNotify,
-          action: 'deleted',
-          eventId: event.id,
-          eventTitle: event.title,
-          eventStart: event.start,
-          allDay: event.allDay,
-          location: event.location || '',
-        });
-
-        if (participantDeleteNotificationResult.failed > 0) {
-          showWarning(
-            'Cancelamento de notificações parcial',
-            `Evento removido, mas ${participantDeleteNotificationResult.failed} notificações para participantes internos não foram enviadas.`,
-          );
         }
 
         onClose();

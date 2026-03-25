@@ -11,6 +11,7 @@ import GlobalSearchCommand, { type GlobalSearchEntry } from '../navigation/Globa
 import NotificationCenter from '../notifications/NotificationCenter';
 import Conect360Logo from '../ui/Conect360Logo';
 import CompanySelector from '../tenant/CompanySelector';
+import GlobalAgendaQuickPanel from '../topbar/GlobalAgendaQuickPanel';
 import RouteTemplateFrame from './RouteTemplateFrame';
 import SystemMaintenanceBanner from './SystemMaintenanceBanner';
 import { shellSpacing, shellTokens } from './tokens';
@@ -81,6 +82,26 @@ const resolveInitials = (name?: string): string => {
 const getTipoColor = (tipo: PerfilUsuario): string => {
   if (tipo === 'administrador') return 'bg-red-100 text-red-700';
   return 'bg-[#159A9C]/10 text-[#159A9C]';
+};
+
+const hasAgendaRouteAccess = (menuItems: MenuConfig[]): boolean => {
+  const targetRoutes = new Set(['/agenda', '/crm/agenda']);
+  const stack = [...menuItems];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) continue;
+
+    if (current.href && targetRoutes.has(current.href)) {
+      return true;
+    }
+
+    if (Array.isArray(current.children) && current.children.length > 0) {
+      stack.push(...current.children);
+    }
+  }
+
+  return false;
 };
 
 const Brand: React.FC = () => {
@@ -201,6 +222,10 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
     if (loadingModulos) return [];
     return getMenuParaEmpresa(modulosAtivos, user);
   }, [loadingModulos, modulosAtivos, user]);
+  const canAccessAgendaQuickPanel = useMemo(
+    () => hasAgendaRouteAccess(menuFiltrado),
+    [menuFiltrado],
+  );
 
   const globalSearchEntries = useMemo<GlobalSearchEntry[]>(() => {
     const normalizePath = (href: string): string => {
@@ -367,6 +392,8 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
                 <CompanySelector className="hidden sm:inline-flex" />
                 <CompanySelector compact className="sm:hidden" />
+
+                {canAccessAgendaQuickPanel ? <GlobalAgendaQuickPanel /> : null}
 
                 {isSuperAdmin ? (
                   <button

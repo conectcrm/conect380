@@ -10,8 +10,11 @@ import { In, Repository } from 'typeorm';
 import {
   AgendaAttendeeRsvpStatus,
   AgendaEvento,
+  AgendaLocationType,
   AgendaPrioridade,
+  AgendaReminderType,
   AgendaStatus,
+  AgendaTipo,
 } from './agenda-evento.entity';
 import {
   AgendaEventoFiltroDto,
@@ -39,7 +42,7 @@ export class AgendaService {
   private sanitize<T extends Partial<CreateAgendaEventoDto | UpdateAgendaEventoDto>>(payload: T): T {
     const sanitized = { ...payload } as Record<string, unknown>;
 
-    const textFields = ['titulo', 'descricao', 'local', 'color'];
+    const textFields = ['titulo', 'descricao', 'local', 'color', 'notes', 'responsavel_nome'];
     textFields.forEach((field) => {
       if (typeof sanitized[field] === 'string') {
         const trimmed = (sanitized[field] as string).trim();
@@ -68,6 +71,295 @@ export class AgendaService {
     );
 
     return normalized.length > 0 ? normalized : null;
+  }
+
+  private normalizeAttachments(attachments?: string[] | null): string[] | null {
+    if (!Array.isArray(attachments) || attachments.length === 0) return null;
+
+    const normalized = Array.from(
+      new Set(
+        attachments
+          .map((attachment) => (typeof attachment === 'string' ? attachment.trim() : ''))
+          .filter((attachment): attachment is string => !!attachment),
+      ),
+    );
+
+    return normalized.length > 0 ? normalized : null;
+  }
+
+  private normalizeReminderTime(reminderTime?: number | null): number | null {
+    if (typeof reminderTime !== 'number' || Number.isNaN(reminderTime)) return null;
+    if (reminderTime <= 0) return null;
+    return Math.floor(reminderTime);
+  }
+
+  private normalizeStatus(status: unknown): AgendaStatus {
+    const normalized = String(status || '').trim().toLowerCase();
+    if (normalized === AgendaStatus.PENDENTE) return AgendaStatus.PENDENTE;
+    if (normalized === AgendaStatus.CANCELADO) return AgendaStatus.CANCELADO;
+    return AgendaStatus.CONFIRMADO;
+  }
+
+  private normalizePrioridade(prioridade: unknown): AgendaPrioridade {
+    const normalized = String(prioridade || '').trim().toLowerCase();
+    if (normalized === AgendaPrioridade.ALTA) return AgendaPrioridade.ALTA;
+    if (normalized === AgendaPrioridade.BAIXA) return AgendaPrioridade.BAIXA;
+    return AgendaPrioridade.MEDIA;
+  }
+
+  private normalizeLegacyEvento(raw: AgendaEvento): AgendaEvento {
+    const inicio = new Date(raw.inicio);
+    const fimRaw = raw.fim ? new Date(raw.fim) : null;
+
+    return {
+      ...raw,
+      inicio: Number.isNaN(inicio.getTime()) ? new Date() : inicio,
+      fim: fimRaw && !Number.isNaN(fimRaw.getTime()) ? fimRaw : null,
+      all_day: Boolean(raw.all_day),
+      status: this.normalizeStatus(raw.status),
+      prioridade: this.normalizePrioridade(raw.prioridade),
+      tipo: raw.tipo ?? AgendaTipo.EVENTO,
+      location_type: raw.location_type ?? AgendaLocationType.PRESENCIAL,
+      reminder_time: this.normalizeReminderTime(raw.reminder_time ?? null),
+      reminder_type: raw.reminder_type ?? null,
+      email_offline: Boolean(raw.email_offline),
+      attachments: Array.isArray(raw.attachments) ? raw.attachments : null,
+      is_recurring: Boolean(raw.is_recurring),
+      recurring_pattern: raw.recurring_pattern ?? null,
+      notes: raw.notes ?? null,
+      responsavel_id: raw.responsavel_id ?? null,
+      responsavel_nome: raw.responsavel_nome ?? null,
+      attendee_responses: raw.attendee_responses ?? null,
+      criado_por_id: raw.criado_por_id ?? null,
+    };
+  }
+
+  private isAgendaSchemaColumnMissing(error: unknown): boolean {
+    const message = String((error as { message?: string })?.message || '').toLowerCase();
+    if (!message.includes('does not exist') || !message.includes('column')) {
+      return false;
+    }
+
+    const mentionsAgendaTable = message.includes('agenda_eventos') || message.includes('agenda.');
+    if (!mentionsAgendaTable) {
+      return false;
+    }
+
+    const knownExtendedColumns = [
+      'tipo',
+      'location_type',
+      'reminder_time',
+      'reminder_type',
+      'email_offline',
+      'attachments',
+      'is_recurring',
+      'recurring_pattern',
+      'notes',
+      'responsavel_id',
+      'responsavel_nome',
+      'attendee_responses',
+      'criado_por_id',
+    ];
+
+    return knownExtendedColumns.some((column) => message.includes(column));
+  }
+
+  private async findAllWithLegacySchemaFallback(
+    empresaId: string,
+    filtros: AgendaEventoFiltroDto,
+    userEmail?: string,
+  ) {
+    const page = filtros.page ?? 1;
+    const limit = filtros.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const query = this.agendaRepository
+      .createQueryBuilder('agenda')
+      .select([
+        'agenda.id',
+        'agenda.empresa_id',
+        'agenda.titulo',
+        'agenda.descricao',
+        'agenda.inicio',
+        'agenda.fim',
+        'agenda.all_day',
+        'agenda.status',
+        'agenda.prioridade',
+        'agenda.local',
+        'agenda.color',
+        'agenda.attendees',
+        'agenda.interacao_id',
+        'agenda.created_at',
+        'agenda.updated_at',
+      ])
+      .where('agenda.empresa_id = :empresaId', { empresaId });
+
+    if (userEmail) {
+      query.andWhere(
+        "(agenda.attendees IS NULL OR agenda.attendees = '[]'::jsonb OR agenda.attendees @> :attendeeFilter::jsonb)",
+        {
+          attendeeFilter: JSON.stringify([String(userEmail).trim().toLowerCase()]),
+        },
+      );
+    }
+
+    if (filtros.status) {
+      query.andWhere('agenda.status = :status', { status: filtros.status });
+    }
+
+    if (filtros.prioridade) {
+      query.andWhere('agenda.prioridade = :prioridade', { prioridade: filtros.prioridade });
+    }
+
+    if (filtros.interacao_id) {
+      query.andWhere('agenda.interacao_id = :interacao_id', {
+        interacao_id: filtros.interacao_id,
+      });
+    }
+
+    if (filtros.dataInicio && filtros.dataFim) {
+      query.andWhere('agenda.inicio BETWEEN :inicio AND :fim', {
+        inicio: filtros.dataInicio,
+        fim: filtros.dataFim,
+      });
+    }
+
+    if (filtros.busca) {
+      query.andWhere('(agenda.titulo ILIKE :busca OR agenda.descricao ILIKE :busca)', {
+        busca: `%${filtros.busca}%`,
+      });
+    }
+
+    query.orderBy('agenda.inicio', 'ASC');
+    query.skip(skip).take(limit);
+
+    const [data, total] = await query.getManyAndCount();
+    const normalized = data.map((event) => this.normalizeLegacyEvento(event));
+    const serialized = normalized.map((event) => this.serializeEventoParaUsuario(event, userEmail, null));
+
+    return createPaginatedResponse(serialized, total, page, limit);
+  }
+
+  private formatEventDateLabel(event: AgendaEvento): string {
+    const startDate = new Date(event.inicio);
+    if (Number.isNaN(startDate.getTime())) return 'data indefinida';
+
+    if (event.all_day) {
+      return startDate.toLocaleDateString('pt-BR');
+    }
+
+    return startDate.toLocaleString('pt-BR');
+  }
+
+  private async resolveActorDisplayName(actorUserId?: string, actorEmail?: string): Promise<string> {
+    if (actorUserId) {
+      const actor = await this.userRepository.findOne({
+        where: { id: actorUserId },
+        select: {
+          id: true,
+          nome: true,
+          email: true,
+        },
+      });
+
+      const actorName = actor?.nome?.trim();
+      if (actorName) return actorName;
+      const actorEmailValue = actor?.email?.trim();
+      if (actorEmailValue) return actorEmailValue;
+    }
+
+    const normalizedActorEmail = this.normalizeEmail(actorEmail);
+    return normalizedActorEmail || 'Um usuário';
+  }
+
+  private async resolveInternalParticipantsByEmails(
+    empresaId: string,
+    attendees?: string[] | null,
+    excludeEmail?: string | null,
+  ) {
+    const normalizedAttendees = this.normalizeAttendees(attendees);
+    if (!normalizedAttendees?.length) return [];
+
+    const excludedEmail = this.normalizeEmail(excludeEmail);
+    const filteredAttendees = normalizedAttendees.filter((email) => email !== excludedEmail);
+    if (!filteredAttendees.length) return [];
+
+    const users = await this.userRepository.find({
+      where: {
+        empresa_id: empresaId,
+        email: In(filteredAttendees),
+        ativo: true,
+      },
+      select: {
+        id: true,
+        nome: true,
+        email: true,
+      },
+    });
+
+    return users.filter((user) => !!user.id && !!user.email);
+  }
+
+  private async notifyParticipantsAboutEvent(params: {
+    action: 'created' | 'updated' | 'cancelled' | 'deleted';
+    event: AgendaEvento;
+    empresaId: string;
+    users: Array<Pick<User, 'id' | 'nome' | 'email'>>;
+    actorName: string;
+    actorUserId?: string;
+  }) {
+    if (!params.users.length) return;
+
+    const titleByAction = {
+      created: 'Novo convite na agenda',
+      updated: 'Evento atualizado na agenda',
+      cancelled: 'Evento cancelado na agenda',
+      deleted: 'Evento removido da agenda',
+    } as const;
+
+    const messageByAction = {
+      created: `${params.actorName} convidou você para o evento "${params.event.titulo}" em ${this.formatEventDateLabel(
+        params.event,
+      )}${params.event.local ? ` (${params.event.local})` : ''}.`,
+      updated: `${params.actorName} atualizou o evento "${params.event.titulo}"${
+        params.event.local ? ` (${params.event.local})` : ''
+      }.`,
+      cancelled: `${params.actorName} cancelou o evento "${params.event.titulo}"${
+        params.event.local ? ` (${params.event.local})` : ''
+      }.`,
+      deleted: `${params.actorName} removeu o evento "${params.event.titulo}" da agenda.`,
+    } as const;
+
+    const results = await Promise.allSettled(
+      params.users.map((user) =>
+        this.notificationService.create({
+          empresaId: params.empresaId,
+          userId: user.id,
+          type: NotificationType.SISTEMA,
+          title: titleByAction[params.action],
+          message: messageByAction[params.action],
+          data: {
+            modulo: 'agenda',
+            action: params.action,
+            eventId: params.event.id,
+            eventTitle: params.event.titulo,
+            eventStart: params.event.inicio ? new Date(params.event.inicio).toISOString() : null,
+            eventEnd: params.event.fim ? new Date(params.event.fim).toISOString() : null,
+            allDay: !!params.event.all_day,
+            location: params.event.local || null,
+            actorName: params.actorName,
+            actorUserId: params.actorUserId || null,
+          },
+        }),
+      ),
+    );
+
+    const failures = results.filter((result) => result.status === 'rejected').length;
+    if (failures > 0) {
+      this.logger.warn(
+        `Falha parcial ao notificar participantes da agenda (action=${params.action}, event=${params.event.id}, failed=${failures}, total=${results.length})`,
+      );
+    }
   }
 
   private buildAttendeeResponses(
@@ -248,6 +540,9 @@ export class AgendaService {
     try {
       const sanitized = this.sanitize(dto);
       const normalizedAttendees = this.normalizeAttendees(dto.attendees);
+      const normalizedAttachments = this.normalizeAttachments(dto.attachments);
+      const reminderTime = this.normalizeReminderTime(dto.reminder_time);
+      const actorName = await this.resolveActorDisplayName(actorUserId, actorEmail);
 
       const entity = this.agendaRepository.create({
         ...sanitized,
@@ -257,12 +552,45 @@ export class AgendaService {
         all_day: dto.all_day ?? false,
         status: dto.status ?? AgendaStatus.CONFIRMADO,
         prioridade: dto.prioridade ?? AgendaPrioridade.MEDIA,
+        tipo: dto.tipo ?? AgendaTipo.EVENTO,
+        location_type: dto.location_type ?? AgendaLocationType.PRESENCIAL,
+        reminder_time: reminderTime,
+        reminder_type: dto.reminder_type ?? null,
+        email_offline: dto.email_offline ?? false,
+        attachments: normalizedAttachments,
+        is_recurring: dto.is_recurring ?? false,
+        recurring_pattern: dto.recurring_pattern ?? null,
+        notes: sanitized.notes ?? null,
+        responsavel_id: dto.responsavel_id ?? null,
+        responsavel_nome: sanitized.responsavel_nome ?? null,
         attendees: normalizedAttendees,
         attendee_responses: this.buildAttendeeResponses(normalizedAttendees, null, actorEmail),
         criado_por_id: actorUserId || null,
       });
 
-      return await this.agendaRepository.save(entity);
+      const savedEvent = await this.agendaRepository.save(entity);
+
+      try {
+        const internalParticipants = await this.resolveInternalParticipantsByEmails(
+          empresaId,
+          savedEvent.attendees,
+          actorEmail,
+        );
+        await this.notifyParticipantsAboutEvent({
+          action: 'created',
+          event: savedEvent,
+          empresaId,
+          users: internalParticipants,
+          actorName,
+          actorUserId,
+        });
+      } catch (notificationError) {
+        this.logger.warn(
+          `Falha ao notificar participantes no create da agenda (event=${savedEvent.id}): ${notificationError instanceof Error ? notificationError.message : String(notificationError)}`,
+        );
+      }
+
+      return savedEvent;
     } catch (error) {
       this.logger.error(
         `Erro ao criar evento de agenda (empresa=${empresaId}): ${error instanceof Error ? error.message : String(error)}`,
@@ -333,6 +661,20 @@ export class AgendaService {
 
       return createPaginatedResponse(serialized, total, page, limit);
     } catch (error) {
+      if (this.isAgendaSchemaColumnMissing(error)) {
+        this.logger.warn(
+          'Schema legado detectado em agenda_eventos. Aplicando fallback de compatibilidade para listagem.',
+        );
+        try {
+          return await this.findAllWithLegacySchemaFallback(empresaId, filtros, userEmail);
+        } catch (fallbackError) {
+          this.logger.error(
+            `Falha no fallback de listagem da agenda (empresa=${empresaId}): ${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`,
+            fallbackError instanceof Error ? fallbackError.stack : undefined,
+          );
+        }
+      }
+
       throw new InternalServerErrorException('Erro ao listar eventos de agenda');
     }
   }
@@ -361,17 +703,19 @@ export class AgendaService {
     dto: UpdateAgendaEventoDto,
     empresaId: string,
     actorEmail?: string,
+    actorUserId?: string,
   ): Promise<AgendaEvento> {
     try {
       const existing = await this.findOne(id, empresaId, actorEmail);
       const sanitized = this.sanitize(dto);
+      const actorName = await this.resolveActorDisplayName(actorUserId, actorEmail);
 
       if (dto.inicio) {
         (sanitized as any).inicio = new Date(dto.inicio);
       }
 
-      if (dto.fim) {
-        (sanitized as any).fim = new Date(dto.fim);
+      if (Object.prototype.hasOwnProperty.call(dto, 'fim')) {
+        (sanitized as any).fim = dto.fim ? new Date(dto.fim) : null;
       }
 
       if (Object.prototype.hasOwnProperty.call(dto, 'attendees')) {
@@ -384,10 +728,63 @@ export class AgendaService {
         );
       }
 
+      if (Object.prototype.hasOwnProperty.call(dto, 'attachments')) {
+        (sanitized as any).attachments = this.normalizeAttachments(dto.attachments ?? null);
+      }
+
+      if (Object.prototype.hasOwnProperty.call(dto, 'reminder_time')) {
+        (sanitized as any).reminder_time = this.normalizeReminderTime(dto.reminder_time ?? null);
+      }
+
+      if (Object.prototype.hasOwnProperty.call(dto, 'reminder_type')) {
+        (sanitized as any).reminder_type = dto.reminder_type ?? null;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(dto, 'recurring_pattern')) {
+        (sanitized as any).recurring_pattern = dto.recurring_pattern ?? null;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(dto, 'notes')) {
+        (sanitized as any).notes = sanitized.notes ?? null;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(dto, 'responsavel_nome')) {
+        (sanitized as any).responsavel_nome = sanitized.responsavel_nome ?? null;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(dto, 'responsavel_id')) {
+        (sanitized as any).responsavel_id = dto.responsavel_id ?? null;
+      }
+
       const merged = this.agendaRepository.merge(existing, sanitized);
       await this.agendaRepository.save(merged);
 
-      return this.findOne(id, empresaId, actorEmail);
+      const updatedEvent = await this.findOne(id, empresaId, actorEmail);
+
+      const notificationAction =
+        updatedEvent.status === AgendaStatus.CANCELADO ? 'cancelled' : 'updated';
+
+      try {
+        const internalParticipants = await this.resolveInternalParticipantsByEmails(
+          empresaId,
+          updatedEvent.attendees,
+          actorEmail,
+        );
+        await this.notifyParticipantsAboutEvent({
+          action: notificationAction,
+          event: updatedEvent,
+          empresaId,
+          users: internalParticipants,
+          actorName,
+          actorUserId,
+        });
+      } catch (notificationError) {
+        this.logger.warn(
+          `Falha ao notificar participantes no update da agenda (event=${updatedEvent.id}): ${notificationError instanceof Error ? notificationError.message : String(notificationError)}`,
+        );
+      }
+
+      return updatedEvent;
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) {
         throw error;
@@ -413,6 +810,10 @@ export class AgendaService {
 
     const previousResponse =
       existing.attendee_responses?.[normalizedUserEmail] ?? AgendaAttendeeRsvpStatus.PENDING;
+
+    if (previousResponse === dto.resposta) {
+      return existing;
+    }
 
     existing.attendees = normalizedAttendees;
     existing.attendee_responses = this.buildAttendeeResponses(
@@ -445,8 +846,35 @@ export class AgendaService {
     return this.findOne(id, empresaId, userEmail);
   }
 
-  async remove(id: string, empresaId: string, actorEmail?: string): Promise<void> {
+  async remove(
+    id: string,
+    empresaId: string,
+    actorEmail?: string,
+    actorUserId?: string,
+  ): Promise<void> {
     const existing = await this.findOne(id, empresaId, actorEmail);
+
+    try {
+      const actorName = await this.resolveActorDisplayName(actorUserId, actorEmail);
+      const internalParticipants = await this.resolveInternalParticipantsByEmails(
+        empresaId,
+        existing.attendees,
+        actorEmail,
+      );
+      await this.notifyParticipantsAboutEvent({
+        action: 'deleted',
+        event: existing,
+        empresaId,
+        users: internalParticipants,
+        actorName,
+        actorUserId,
+      });
+    } catch (notificationError) {
+      this.logger.warn(
+        `Falha ao notificar participantes no remove da agenda (event=${existing.id}): ${notificationError instanceof Error ? notificationError.message : String(notificationError)}`,
+      );
+    }
+
     await this.agendaRepository.remove(existing);
   }
 }
