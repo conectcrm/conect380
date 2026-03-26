@@ -11,6 +11,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import api from '../../services/api';
 import faturamentoService, {
   EstatisticasPagamentos,
   FaturasPaginadasResponse,
@@ -26,7 +27,8 @@ import {
   ImportacaoExtrato,
   ResumoFinanceiro,
 } from '../../types/financeiro';
-import type { DashboardV2Insight } from './useDashboardV2';
+import { toastService } from '../../services/toastService';
+import type { DashboardV2Insight, DashboardV2Insights } from './useDashboardV2';
 import GoalProgressCard from './components/GoalProgressCard';
 import InsightsPanel from './components/InsightsPanel';
 import KpiTrendCard from './components/KpiTrendCard';
@@ -148,6 +150,7 @@ const FinanceiroDashboardV2: React.FC = () => {
   const [warning, setWarning] = useState<string | null>(null);
   const [warningAlertas, setWarningAlertas] = useState<string | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
+  const [insights, setInsights] = useState<DashboardV2Insight[]>([]);
   const [alertaActionById, setAlertaActionById] = useState<
     Record<string, 'ack' | 'resolver' | 'reprocessar' | undefined>
   >({});
@@ -179,6 +182,12 @@ const FinanceiroDashboardV2: React.FC = () => {
       alertasOperacionaisFinanceiroService
         .recalcular()
         .then(() => alertasOperacionaisFinanceiroService.listar({ limite: 12 })),
+      api.get<DashboardV2Insights>('/dashboard/v2/financeiro/insights', {
+        params: {
+          periodStart: dataInicio,
+          periodEnd: dataFim,
+        },
+      }),
     ]);
 
     let falhasCriticas = 0;
@@ -201,6 +210,12 @@ const FinanceiroDashboardV2: React.FC = () => {
       setAlertasOperacionais(resultados[6].value);
     } else {
       setWarningAlertas('Não foi possível carregar alertas operacionais agora.');
+    }
+    if (resultados[7].status === 'fulfilled') {
+      setInsights(resultados[7].value.data?.insights || []);
+    } else {
+      falhasCriticas += 1;
+      setInsights([]);
     }
 
     if (falhasCriticas > 0) {
@@ -320,6 +335,75 @@ const FinanceiroDashboardV2: React.FC = () => {
       : totalAtrasado > 0 || taxaRecebimento < 70
         ? 'bg-[#FFF4E9] text-[#A06213]'
         : 'bg-[#EAF5FA] text-[#2C708D]';
+  const focoAlertasOperacionais = useCallback(() => {
+    if (typeof document === 'undefined') return;
+    const secao = document.getElementById('financeiro-alertas-operacionais');
+    if (secao) {
+      secao.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, []);
+
+  const compartilharInsights = useCallback(async () => {
+    if (!insights.length) {
+      toastService.info('Sem insights para compartilhar neste período.');
+      return;
+    }
+
+    const linhas = insights.slice(0, 5).map((insight, index) => {
+      const acao = insight.action ? ` | Ação: ${insight.action}` : '';
+      return `${index + 1}. ${insight.title} - ${insight.description}${acao}`;
+    });
+
+    const resumo = `Insights financeiros (${periodoRangeLabel})\n${linhas.join('\n')}`;
+    const clipboardApi =
+      typeof navigator !== 'undefined' && navigator.clipboard
+        ? navigator.clipboard
+        : null;
+
+    if (!clipboardApi) {
+      toastService.warning('Cópia automática indisponível neste navegador.');
+      return;
+    }
+
+    try {
+      await clipboardApi.writeText(resumo);
+      toastService.success('Insights copiados para a área de transferência.');
+    } catch {
+      toastService.error('Não foi possível copiar os insights automaticamente.');
+    }
+  }, [insights, periodoRangeLabel]);
+
+  const abrirInsight = useCallback(
+    (insight: DashboardV2Insight) => {
+      switch (insight.id) {
+        case 'financeiro-recebimento-abaixo-meta':
+        case 'financeiro-recebimento-em-linha':
+          navigate('/financeiro/faturamento');
+          return;
+        case 'financeiro-contas-atrasadas':
+        case 'financeiro-sem-atrasos':
+          navigate('/financeiro/contas-pagar');
+          return;
+        case 'financeiro-pressao-caixa':
+          navigate('/financeiro/contas-bancarias');
+          return;
+        case 'financeiro-fila-aprovacao':
+          navigate('/financeiro/aprovacoes');
+          return;
+        case 'financeiro-alertas-criticos':
+        case 'financeiro-alertas-ativos':
+          focoAlertasOperacionais();
+          return;
+        case 'financeiro-conciliacao-recente':
+        case 'financeiro-sem-importacao':
+          navigate('/financeiro/conciliacao');
+          return;
+        default:
+          navigate('/nuclei/financeiro');
+      }
+    },
+    [focoAlertasOperacionais, navigate],
+  );
 
   const atualizarAlerta = useCallback(
     async (alerta: AlertaOperacionalFinanceiro, acao: 'ack' | 'resolver' | 'reprocessar') => {
@@ -369,51 +453,6 @@ const FinanceiroDashboardV2: React.FC = () => {
       }
     },
     [],
-  );
-
-  const insights = useMemo<DashboardV2Insight[]>(
-    () => [
-      {
-        id: 'recebimento',
-        type: taxaRecebimento < 75 ? 'warning' : 'opportunity',
-        title:
-          taxaRecebimento < 75 ? 'Recebimento abaixo da meta' : 'Recebimento em linha com a meta',
-        description: `${taxaRecebimento.toFixed(1)}% do faturado foi recebido.`,
-        impact: taxaRecebimento < 75 ? 'alto' : 'medio',
-        action: 'Revisar fila de cobranca e vencimentos.',
-      },
-      {
-        id: 'atrasos',
-        type: totalAtrasado > 0 ? 'warning' : 'info',
-        title: totalAtrasado > 0 ? 'Contas atrasadas' : 'Sem atrasos relevantes',
-        description: `${formatCurrency(totalAtrasado)} em contas vencidas.`,
-        impact: totalAtrasado > 0 ? 'alto' : 'baixo',
-        action: 'Priorizar pagamentos com juros e multa.',
-      },
-      {
-        id: 'aprovacoes',
-        type: pendenciasAprovacao.length > 0 ? 'info' : 'opportunity',
-        title: 'Fila de aprovação financeira',
-        description: `${formatNumber(pendenciasAprovacao.length)} itens somando ${formatCurrency(pendenciasValor)}.`,
-        impact: pendenciasAprovacao.length > 0 ? 'medio' : 'baixo',
-        action: 'Liberar aprovações pendentes conforme alçada.',
-      },
-      {
-        id: 'conciliacao',
-        type: importacoesConciliacao.length > 0 ? 'opportunity' : 'info',
-        title: 'Conciliação bancária',
-        description: `${formatNumber(importacoesConciliacao.length)} importações recentes.`,
-        impact: 'medio',
-        action: 'Executar matching automático para reduzir pendências.',
-      },
-    ],
-    [
-      importacoesConciliacao.length,
-      pendenciasAprovacao.length,
-      pendenciasValor,
-      taxaRecebimento,
-      totalAtrasado,
-    ],
   );
 
   if (loading) {
@@ -631,7 +670,7 @@ const FinanceiroDashboardV2: React.FC = () => {
 
       <section className="grid grid-cols-1 gap-3.5 2xl:grid-cols-12">
         <article className="space-y-3.5 2xl:col-span-9">
-          <div className={sectionSurfaceClass}>
+          <div id="financeiro-alertas-operacionais" className={sectionSurfaceClass}>
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div>
                 <span className="inline-flex items-center rounded-full border border-[#D7E5EA] bg-[#F5FAFB] px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4F7282]">
@@ -926,7 +965,13 @@ const FinanceiroDashboardV2: React.FC = () => {
         </article>
 
         <div className="2xl:col-span-3">
-          <InsightsPanel insights={insights} />
+          <InsightsPanel
+            insights={insights}
+            onInsightClick={abrirInsight}
+            onShareClick={() => {
+              void compartilharInsights();
+            }}
+          />
         </div>
       </section>
     </div>

@@ -831,6 +831,99 @@ describe('menuConfig permission filtering', () => {
     expect(combined).toBe(true);
   });
 
+  it('requires combined permissions for central report routes by area', () => {
+    const centralWithRelatorios = canUserAccessPath('/relatorios', ALL_MODULES, {
+      email: 'analyst@empresa.com',
+      role: 'custom',
+      permissions: ['relatorios.read'],
+    } as any);
+
+    const agendaWithoutCrm = canUserAccessPath('/relatorios/agenda', ALL_MODULES, {
+      email: 'analyst@empresa.com',
+      role: 'custom',
+      permissions: ['relatorios.read'],
+    } as any);
+    const agendaWithCrm = canUserAccessPath('/relatorios/agenda', ALL_MODULES, {
+      email: 'agenda@empresa.com',
+      role: 'custom',
+      permissions: ['relatorios.read', 'crm.agenda.read'],
+    } as any);
+
+    const comercialWithoutRelatorios = canUserAccessPath('/relatorios/comercial/drilldown', ALL_MODULES, {
+      email: 'sales@empresa.com',
+      role: 'custom',
+      permissions: ['crm.oportunidades.read'],
+    } as any);
+    const comercialCombined = canUserAccessPath('/relatorios/comercial/drilldown', ALL_MODULES, {
+      email: 'sales.analyst@empresa.com',
+      role: 'custom',
+      permissions: ['crm.oportunidades.read', 'relatorios.read'],
+    } as any);
+    const propostasContratosWithoutRelatorios = canUserAccessPath(
+      '/relatorios/comercial/propostas-contratos',
+      ALL_MODULES,
+      {
+        email: 'sales@empresa.com',
+        role: 'custom',
+        permissions: ['comercial.propostas.read'],
+      } as any,
+    );
+    const propostasContratosCombined = canUserAccessPath(
+      '/relatorios/comercial/propostas-contratos',
+      ALL_MODULES,
+      {
+        email: 'sales.analyst@empresa.com',
+        role: 'custom',
+        permissions: ['comercial.propostas.read', 'relatorios.read'],
+      } as any,
+    );
+    const clientesLeadsWithoutRelatorios = canUserAccessPath(
+      '/relatorios/comercial/clientes-leads',
+      ALL_MODULES,
+      {
+        email: 'crm@empresa.com',
+        role: 'custom',
+        permissions: ['crm.clientes.read', 'crm.leads.read'],
+      } as any,
+    );
+    const clientesLeadsMissingLeadsRead = canUserAccessPath(
+      '/relatorios/comercial/clientes-leads',
+      ALL_MODULES,
+      {
+        email: 'crm@empresa.com',
+        role: 'custom',
+        permissions: ['crm.clientes.read', 'relatorios.read'],
+      } as any,
+    );
+    const clientesLeadsCombined = canUserAccessPath(
+      '/relatorios/comercial/clientes-leads',
+      ALL_MODULES,
+      {
+        email: 'crm.analyst@empresa.com',
+        role: 'custom',
+        permissions: ['crm.clientes.read', 'crm.leads.read', 'relatorios.read'],
+      } as any,
+    );
+
+    const financeiroCombined = canUserAccessPath('/relatorios/financeiro', ALL_MODULES, {
+      email: 'finance.analyst@empresa.com',
+      role: 'custom',
+      permissions: ['financeiro.faturamento.read', 'relatorios.read'],
+    } as any);
+
+    expect(centralWithRelatorios).toBe(true);
+    expect(agendaWithoutCrm).toBe(false);
+    expect(agendaWithCrm).toBe(true);
+    expect(comercialWithoutRelatorios).toBe(false);
+    expect(comercialCombined).toBe(true);
+    expect(propostasContratosWithoutRelatorios).toBe(false);
+    expect(propostasContratosCombined).toBe(true);
+    expect(clientesLeadsWithoutRelatorios).toBe(false);
+    expect(clientesLeadsMissingLeadsRead).toBe(false);
+    expect(clientesLeadsCombined).toBe(true);
+    expect(financeiroCombined).toBe(true);
+  });
+
   it('shows billing self-service menu without legacy faturas/pagamentos duplication', () => {
     const menu = getMenuParaEmpresa(ALL_MODULES, {
       email: 'owner@empresa.com',

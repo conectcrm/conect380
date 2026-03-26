@@ -94,7 +94,20 @@ const DashboardDistribuicaoPage = React.lazy(() => import('./pages/DashboardDist
 const GestaoSkillsPage = React.lazy(() => import('./pages/GestaoSkillsPage'));
 const ConfiguracaoSLAPage = React.lazy(() => import('./pages/ConfiguracaoSLAPage'));
 const DashboardAnalyticsPage = React.lazy(() => import('./pages/DashboardAnalyticsPage'));
-const AnalyticsPage = React.lazy(() => import('./pages/AnalyticsPage'));
+const ComercialDrilldownPage = React.lazy(
+  () => import('./features/dashboard-v2/ComercialDrilldownPage'),
+);
+const ReportsHubPage = React.lazy(() => import('./features/reports/ReportsHubPage'));
+const AgendaReportPage = React.lazy(() => import('./features/reports/AgendaReportPage'));
+const FinanceiroReportsPage = React.lazy(
+  () => import('./features/reports/FinanceiroReportsPage'),
+);
+const ComercialPropostasContratosReportPage = React.lazy(
+  () => import('./features/reports/ComercialPropostasContratosReportPage'),
+);
+const ComercialClientesLeadsReportPage = React.lazy(
+  () => import('./features/reports/ComercialClientesLeadsReportPage'),
+);
 const FechamentoAutomaticoPage = React.lazy(() => import('./pages/FechamentoAutomaticoPage'));
 const GestaoTicketsPage = React.lazy(() => import('./pages/GestaoTicketsPage'));
 const TicketCreatePage = React.lazy(() => import('./pages/TicketCreatePage'));
@@ -521,7 +534,34 @@ const AppRoutes: React.FC = () => {
                     path="/nuclei/configuracoes/tickets/tipos"
                     element={<Navigate to="/configuracoes/tickets/tipos" replace />}
                   />
-                  <Route path="/relatorios/analytics" element={<AnalyticsPage />} />
+                  <Route path="/relatorios" element={<ReportsHubPage />} />
+                  <Route
+                    path="/relatorios/agenda"
+                    element={protegerRota(ModuloEnum.CRM, <AgendaReportPage />)}
+                  />
+                  <Route
+                    path="/relatorios/financeiro"
+                    element={<Navigate to="/financeiro/relatorios" replace />}
+                  />
+                  <Route path="/relatorios/analytics" element={<Navigate to="/relatorios" replace />} />
+                  <Route
+                    path="/relatorios/comercial"
+                    element={protegerRota(ModuloEnum.CRM, <ComercialDrilldownPage />)}
+                  />
+                  <Route
+                    path="/relatorios/comercial/drilldown"
+                    element={protegerRota(ModuloEnum.CRM, <ComercialDrilldownPage />)}
+                  />
+                  <Route
+                    path="/relatorios/comercial/propostas-contratos"
+                    element={
+                      protegerRota(ModuloEnum.VENDAS, <ComercialPropostasContratosReportPage />)
+                    }
+                  />
+                  <Route
+                    path="/relatorios/comercial/clientes-leads"
+                    element={protegerRota(ModuloEnum.CRM, <ComercialClientesLeadsReportPage />)}
+                  />
                   <Route
                     path="/gestao/permissoes"
                     element={<Navigate to="/configuracoes/usuarios" replace />}
@@ -834,20 +874,7 @@ const AppRoutes: React.FC = () => {
                   />
                   <Route
                     path="/financeiro/relatorios"
-                    element={
-                      <ModuleUnderConstruction
-                        moduleName="Relatórios Financeiros"
-                        description="Análises e indicadores financeiros avançados"
-                        estimatedCompletion="Q2 2025"
-                        features={[
-                          'DRE (Demonstração do Resultado)',
-                          'Balanço patrimonial',
-                          'Análise de indicadores',
-                          'Gráficos interativos',
-                          'Exportação em múltiplos formatos',
-                        ]}
-                      />
-                    }
+                    element={protegerRota(ModuloEnum.FINANCEIRO, <FinanceiroReportsPage />)}
                   />
                   <Route
                     path="/financeiro/conciliacao"

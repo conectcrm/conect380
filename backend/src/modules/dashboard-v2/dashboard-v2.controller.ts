@@ -72,4 +72,9 @@ export class DashboardV2Controller {
   async getInsights(@EmpresaId() empresaId: string, @Query() query: DashboardV2QueryDto) {
     return this.dashboardV2Service.getInsights(empresaId, query);
   }
+
+  @Get('financeiro/insights')
+  async getFinanceiroInsights(@EmpresaId() empresaId: string, @Query() query: DashboardV2QueryDto) {
+    return this.dashboardV2Service.getFinanceiroInsights(empresaId, query);
+  }
 }

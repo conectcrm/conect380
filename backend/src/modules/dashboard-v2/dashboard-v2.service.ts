@@ -462,6 +462,29 @@ export class DashboardV2Service {
     };
   }
 
+  async getFinanceiroInsights(empresaId: string, query: DashboardV2QueryDto) {
+    await this.ensureEnabled(empresaId);
+    this.validateFilters(query);
+
+    const context = this.resolveContext(query);
+    const response = await this.withCache(
+      empresaId,
+      context.periodKey,
+      'financeiro-insights',
+      this.toFilterHash(query),
+      async () => this.aggregationService.getFinanceiroInsights(empresaId, context.range),
+    );
+
+    return {
+      insights: response.data,
+      cache: {
+        hit: response.hit,
+        key: response.key,
+        generatedAt: response.generatedAt,
+      },
+    };
+  }
+
   private async ensureEnabled(empresaId: string): Promise<void> {
     const decision = await this.featureFlagService.resolve(empresaId);
 

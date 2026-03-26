@@ -24,6 +24,11 @@ import { DashboardV2AggregationService } from './services/dashboard-v2-aggregati
 import { DashboardV2CacheService } from './services/dashboard-v2-cache.service';
 import { DashboardV2FeatureFlagService } from './services/dashboard-v2-feature-flag.service';
 import { DashboardV2ValidationService } from './services/dashboard-v2-validation.service';
+import { Fatura } from '../faturamento/entities/fatura.entity';
+import { ContaPagar } from '../financeiro/entities/conta-pagar.entity';
+import { ContaBancaria } from '../financeiro/entities/conta-bancaria.entity';
+import { ExtratoBancarioImportacao } from '../financeiro/entities/extrato-bancario-importacao.entity';
+import { AlertaOperacionalFinanceiro } from '../financeiro/entities/alerta-operacional-financeiro.entity';
 
 @Module({
   imports: [
@@ -38,6 +43,11 @@ import { DashboardV2ValidationService } from './services/dashboard-v2-validation
       DashboardRevenueMetricsDaily,
       FeatureFlagTenant,
       DashboardV2MetricDivergence,
+      Fatura,
+      ContaPagar,
+      ContaBancaria,
+      ExtratoBancarioImportacao,
+      AlertaOperacionalFinanceiro,
     ]),
     BullModule.registerQueue({
       name: DASHBOARD_V2_QUEUE,

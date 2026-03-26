@@ -17,6 +17,7 @@ describe('DashboardV2Service', () => {
     periodKey: jest.fn(),
     ensureMetricsForRange: jest.fn(),
     getOverview: jest.fn(),
+    getFinanceiroInsights: jest.fn(),
   };
 
   const validationService = {
@@ -52,6 +53,15 @@ describe('DashboardV2Service', () => {
       cicloMedioDias: 10,
       oportunidadesAtivas: 4,
     });
+    aggregationService.getFinanceiroInsights.mockResolvedValue([
+      {
+        id: 'financeiro-recebimento-em-linha',
+        type: 'opportunity',
+        title: 'Recebimento em linha com a meta',
+        description: 'Teste',
+        impact: 'medio',
+      },
+    ]);
 
     cacheService.buildKey.mockReturnValue('dashboard-key');
     cacheService.get.mockResolvedValue(null);
@@ -132,6 +142,34 @@ describe('DashboardV2Service', () => {
         receitaFechada: 1000,
         receitaPrevista: 2000,
         metaReceita: 2500,
+      }),
+    );
+  });
+
+  it('retorna insights financeiros com metadados de cache', async () => {
+    const result = await service.getFinanceiroInsights('empresa-1', {
+      periodStart: '2026-03-01',
+      periodEnd: '2026-03-31',
+    } as any);
+
+    expect(aggregationService.getFinanceiroInsights).toHaveBeenCalledWith(
+      'empresa-1',
+      expect.objectContaining({
+        start: expect.any(Date),
+        end: expect.any(Date),
+      }),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        insights: expect.arrayContaining([
+          expect.objectContaining({
+            id: 'financeiro-recebimento-em-linha',
+          }),
+        ]),
+        cache: expect.objectContaining({
+          hit: false,
+          key: 'dashboard-key',
+        }),
       }),
     );
   });

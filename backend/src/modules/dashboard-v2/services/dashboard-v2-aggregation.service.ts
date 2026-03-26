@@ -4,6 +4,14 @@ import { Between, Repository } from 'typeorm';
 import { LifecycleStatusOportunidade, Oportunidade } from '../../oportunidades/oportunidade.entity';
 import { OportunidadeStageEvent } from '../../oportunidades/oportunidade-stage-event.entity';
 import { Proposta } from '../../propostas/proposta.entity';
+import { Fatura, StatusFatura } from '../../faturamento/entities/fatura.entity';
+import { ContaPagar } from '../../financeiro/entities/conta-pagar.entity';
+import { ContaBancaria } from '../../financeiro/entities/conta-bancaria.entity';
+import { ExtratoBancarioImportacao } from '../../financeiro/entities/extrato-bancario-importacao.entity';
+import {
+  AlertaOperacionalFinanceiro,
+  AlertaOperacionalFinanceiroStatus,
+} from '../../financeiro/entities/alerta-operacional-financeiro.entity';
 import { DashboardV2QueryDto } from '../dto/dashboard-v2-query.dto';
 import { DashboardAgingStageDaily } from '../entities/dashboard-aging-stage-daily.entity';
 import { DashboardFunnelMetricsDaily } from '../entities/dashboard-funnel-metrics-daily.entity';
@@ -25,6 +33,15 @@ type DashboardV2TrendPoint = {
   cicloMedioDias: number;
   oportunidadesAtivas: number;
   conversao: number;
+};
+
+type DashboardV2Insight = {
+  id: string;
+  type: 'warning' | 'opportunity' | 'info';
+  title: string;
+  description: string;
+  impact: 'alto' | 'medio' | 'baixo';
+  action?: string;
 };
 
 @Injectable()
@@ -52,6 +69,16 @@ export class DashboardV2AggregationService {
     private readonly agingStageRepository: Repository<DashboardAgingStageDaily>,
     @InjectRepository(DashboardRevenueMetricsDaily)
     private readonly revenueMetricsRepository: Repository<DashboardRevenueMetricsDaily>,
+    @InjectRepository(Fatura)
+    private readonly faturaRepository: Repository<Fatura>,
+    @InjectRepository(ContaPagar)
+    private readonly contaPagarRepository: Repository<ContaPagar>,
+    @InjectRepository(ContaBancaria)
+    private readonly contaBancariaRepository: Repository<ContaBancaria>,
+    @InjectRepository(ExtratoBancarioImportacao)
+    private readonly extratoImportacaoRepository: Repository<ExtratoBancarioImportacao>,
+    @InjectRepository(AlertaOperacionalFinanceiro)
+    private readonly alertaOperacionalRepository: Repository<AlertaOperacionalFinanceiro>,
   ) {}
 
   resolveDateRange(input?: { periodStart?: string; periodEnd?: string }): DateRange {
@@ -339,28 +366,274 @@ export class DashboardV2AggregationService {
     });
   }
 
+  async getFinanceiroInsights(empresaId: string, range: DateRange): Promise<DashboardV2Insight[]> {
+    const periodStart = this.toDateKey(range.start);
+    const periodEnd = this.toDateKey(range.end);
+    const hoje = this.toDateKey(new Date());
+
+    const [
+      faturasRaw,
+      contasRaw,
+      saldoRaw,
+      importacoesRaw,
+      alertasRaw,
+    ] = await Promise.all([
+      this.faturaRepository
+        .createQueryBuilder('f')
+        .select('COALESCE(SUM(f.valorTotal), 0)', 'valorFaturado')
+        .addSelect('COALESCE(SUM(f.valorPago), 0)', 'valorRecebido')
+        .addSelect('COUNT(*)::int', 'totalFaturas')
+        .where('f.empresaId = :empresaId', { empresaId })
+        .andWhere('f.ativo = :ativo', { ativo: true })
+        .andWhere('f.status != :cancelada', { cancelada: StatusFatura.CANCELADA })
+        .andWhere('f.dataEmissao BETWEEN :periodStart AND :periodEnd', { periodStart, periodEnd })
+        .getRawOne<{
+          valorFaturado?: string;
+          valorRecebido?: string;
+          totalFaturas?: string;
+        }>(),
+      this.contaPagarRepository
+        .createQueryBuilder('c')
+        .select(
+          `
+            COALESCE(
+              SUM(
+                CASE
+                  WHEN (
+                    c.status = 'vencida'
+                    OR (c.status = 'pendente' AND c.dataVencimento < :hoje)
+                  )
+                  THEN COALESCE(c.valorRestante, COALESCE(c.valorTotal, c.valor, 0) - COALESCE(c.valorPago, 0))
+                  ELSE 0
+                END
+              ),
+              0
+            )
+          `,
+          'totalAtrasado',
+        )
+        .addSelect(
+          `
+            SUM(
+              CASE
+                WHEN c.necessitaAprovacao = true
+                  AND c.dataAprovacao IS NULL
+                  AND c.status NOT IN ('paga', 'cancelada')
+                THEN 1
+                ELSE 0
+              END
+            )::int
+          `,
+          'pendenciasAprovacao',
+        )
+        .where('c.empresaId = :empresaId', { empresaId })
+        .andWhere('c.dataVencimento BETWEEN :periodStart AND :periodEnd', { periodStart, periodEnd })
+        .setParameter('hoje', hoje)
+        .getRawOne<{
+          totalAtrasado?: string;
+          pendenciasAprovacao?: string;
+        }>(),
+      this.contaBancariaRepository
+        .createQueryBuilder('cb')
+        .select('COALESCE(SUM(cb.saldo), 0)', 'saldoTotal')
+        .where('cb.empresaId = :empresaId', { empresaId })
+        .andWhere('cb.ativo = :ativo', { ativo: true })
+        .getRawOne<{ saldoTotal?: string }>(),
+      this.extratoImportacaoRepository
+        .createQueryBuilder('i')
+        .select('COUNT(*)::int', 'totalImportacoes')
+        .where('i.empresaId = :empresaId', { empresaId })
+        .andWhere('i.createdAt BETWEEN :periodStartAt AND :periodEndAt', {
+          periodStartAt: range.start.toISOString(),
+          periodEndAt: range.end.toISOString(),
+        })
+        .getRawOne<{ totalImportacoes?: string }>(),
+      this.alertaOperacionalRepository
+        .createQueryBuilder('a')
+        .select('COUNT(*)::int', 'alertasAtivos')
+        .addSelect(
+          `
+            SUM(
+              CASE
+                WHEN a.severidade = 'critical'
+                THEN 1
+                ELSE 0
+              END
+            )::int
+          `,
+          'alertasCriticos',
+        )
+        .where('a.empresaId = :empresaId', { empresaId })
+        .andWhere('a.status = :statusAtivo', { statusAtivo: AlertaOperacionalFinanceiroStatus.ATIVO })
+        .getRawOne<{ alertasAtivos?: string; alertasCriticos?: string }>(),
+    ]);
+
+    const valorFaturado = this.toNumber(faturasRaw?.valorFaturado);
+    const valorRecebido = this.toNumber(faturasRaw?.valorRecebido);
+    const totalFaturas = this.toNumber(faturasRaw?.totalFaturas);
+    const totalAtrasado = this.toNumber(contasRaw?.totalAtrasado);
+    const pendenciasAprovacao = this.toNumber(contasRaw?.pendenciasAprovacao);
+    const saldoTotal = this.toNumber(saldoRaw?.saldoTotal);
+    const totalImportacoes = this.toNumber(importacoesRaw?.totalImportacoes);
+    const alertasAtivos = this.toNumber(alertasRaw?.alertasAtivos);
+    const alertasCriticos = this.toNumber(alertasRaw?.alertasCriticos);
+
+    return this.buildFinanceiroInsights({
+      valorFaturado,
+      valorRecebido,
+      totalFaturas,
+      totalAtrasado,
+      pendenciasAprovacao,
+      saldoTotal,
+      totalImportacoes,
+      alertasAtivos,
+      alertasCriticos,
+    });
+  }
+
+  buildFinanceiroInsights(params: {
+    valorFaturado: number;
+    valorRecebido: number;
+    totalFaturas: number;
+    totalAtrasado: number;
+    pendenciasAprovacao: number;
+    saldoTotal: number;
+    totalImportacoes: number;
+    alertasAtivos: number;
+    alertasCriticos: number;
+  }): DashboardV2Insight[] {
+    const insights: DashboardV2Insight[] = [];
+    const taxaRecebimento =
+      params.valorFaturado > 0 ? (params.valorRecebido / params.valorFaturado) * 100 : 100;
+    const recebimentoAlertThreshold = this.getFinanceiroRecebimentoAlertThreshold();
+    const caixaPressaoFator = this.getFinanceiroCaixaAlertFactor();
+    const insightsLimit = this.getFinanceiroInsightsLimit();
+
+    if (params.totalFaturas > 0) {
+      if (taxaRecebimento < recebimentoAlertThreshold) {
+        insights.push({
+          id: 'financeiro-recebimento-abaixo-meta',
+          type: 'warning',
+          title: 'Recebimento abaixo da meta',
+          description: `${taxaRecebimento.toFixed(1)}% do faturado foi recebido no periodo.`,
+          impact: 'alto',
+          action: 'Revisar fila de cobranca e faturas vencidas.',
+        });
+      } else {
+        insights.push({
+          id: 'financeiro-recebimento-em-linha',
+          type: 'opportunity',
+          title: 'Recebimento em linha com a meta',
+          description: `${taxaRecebimento.toFixed(1)}% do faturado convertido em recebimento.`,
+          impact: 'medio',
+          action: 'Manter rotina de cobranca preventiva.',
+        });
+      }
+    }
+
+    if (params.totalAtrasado > 0) {
+      insights.push({
+        id: 'financeiro-contas-atrasadas',
+        type: 'warning',
+        title: 'Contas atrasadas no contas a pagar',
+        description: `Existem R$ ${params.totalAtrasado.toFixed(2)} em compromissos vencidos.`,
+        impact: 'alto',
+        action: 'Priorizar pagamentos com multa e juros.',
+      });
+
+      if (params.saldoTotal > 0 && params.saldoTotal < params.totalAtrasado * caixaPressaoFator) {
+        insights.push({
+          id: 'financeiro-pressao-caixa',
+          type: 'warning',
+          title: 'Pressao de caixa sobre vencimentos',
+          description:
+            'O saldo bancario ativo esta abaixo do valor total em atraso no periodo atual.',
+          impact: 'alto',
+          action: 'Repriorizar pagamentos e revisar agenda de desembolso.',
+        });
+      }
+    } else {
+      insights.push({
+        id: 'financeiro-sem-atrasos',
+        type: 'info',
+        title: 'Sem atrasos relevantes',
+        description: 'Nao foram encontrados compromissos financeiros vencidos no recorte.',
+        impact: 'baixo',
+      });
+    }
+
+    if (params.pendenciasAprovacao > 0) {
+      insights.push({
+        id: 'financeiro-fila-aprovacao',
+        type: 'warning',
+        title: 'Fila de aprovacoes pendente',
+        description: `${params.pendenciasAprovacao} conta(s) aguardam aprovacao financeira.`,
+        impact: 'medio',
+        action: 'Liberar aprovacoes pendentes para evitar bloqueios operacionais.',
+      });
+    }
+
+    if (params.alertasCriticos > 0) {
+      insights.push({
+        id: 'financeiro-alertas-criticos',
+        type: 'warning',
+        title: 'Alertas operacionais criticos',
+        description: `${params.alertasCriticos} alerta(s) critico(s) ativos no financeiro.`,
+        impact: 'alto',
+        action: 'Executar plano de resposta operacional imediatamente.',
+      });
+    } else if (params.alertasAtivos > 0) {
+      insights.push({
+        id: 'financeiro-alertas-ativos',
+        type: 'info',
+        title: 'Alertas financeiros em monitoramento',
+        description: `${params.alertasAtivos} alerta(s) ativo(s) exigem acompanhamento.`,
+        impact: 'medio',
+        action: 'Acompanhar os alertas para evitar escalada.',
+      });
+    }
+
+    if (params.totalImportacoes > 0) {
+      insights.push({
+        id: 'financeiro-conciliacao-recente',
+        type: 'opportunity',
+        title: 'Conciliacao com movimentacao recente',
+        description: `${params.totalImportacoes} importacao(oes) de extrato no periodo analisado.`,
+        impact: 'baixo',
+        action: 'Executar matching automatico para reduzir pendencias.',
+      });
+    } else {
+      insights.push({
+        id: 'financeiro-sem-importacao',
+        type: 'info',
+        title: 'Sem importacoes recentes de extrato',
+        description: 'Nao houve importacoes de extrato no recorte selecionado.',
+        impact: 'baixo',
+        action: 'Importar extratos para manter a conciliacao atualizada.',
+      });
+    }
+
+    if (insights.length === 0) {
+      insights.push({
+        id: 'financeiro-painel-estavel',
+        type: 'info',
+        title: 'Indicadores financeiros estaveis',
+        description: 'Nao foram detectados desvios criticos no periodo analisado.',
+        impact: 'baixo',
+      });
+    }
+
+    return this.prioritizeInsights(insights).slice(0, insightsLimit);
+  }
+
   buildInsights(params: {
     overview: { receitaPrevista: number; receitaFechada: number };
     trends: Array<{ receitaFechada: number }>;
     pipelineSummary: { stages: Array<{ paradas: number }> };
-  }): Array<{
-    id: string;
-    type: 'warning' | 'opportunity' | 'info';
-    title: string;
-    description: string;
-    impact: 'alto' | 'medio' | 'baixo';
-    action?: string;
-  }> {
+  }): DashboardV2Insight[] {
     const { overview, trends, pipelineSummary } = params;
 
-    const insights: Array<{
-      id: string;
-      type: 'warning' | 'opportunity' | 'info';
-      title: string;
-      description: string;
-      impact: 'alto' | 'medio' | 'baixo';
-      action?: string;
-    }> = [];
+    const insights: DashboardV2Insight[] = [];
 
     if (overview.receitaPrevista > overview.receitaFechada * 1.4) {
       insights.push({
@@ -1254,5 +1527,75 @@ export class DashboardV2AggregationService {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  }
+
+  private toNumber(value: unknown): number {
+    const parsed = Number(value ?? 0);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  private prioritizeInsights(insights: DashboardV2Insight[]): DashboardV2Insight[] {
+    const impactWeight: Record<DashboardV2Insight['impact'], number> = {
+      alto: 300,
+      medio: 200,
+      baixo: 100,
+    };
+    const typeWeight: Record<DashboardV2Insight['type'], number> = {
+      warning: 30,
+      opportunity: 20,
+      info: 10,
+    };
+
+    return insights
+      .map((insight, index) => ({
+        insight,
+        index,
+        score: impactWeight[insight.impact] + typeWeight[insight.type],
+      }))
+      .sort((a, b) => {
+        if (b.score !== a.score) {
+          return b.score - a.score;
+        }
+        return a.index - b.index;
+      })
+      .map(({ insight }) => insight);
+  }
+
+  private getFinanceiroRecebimentoAlertThreshold(): number {
+    return this.readEnvNumber(
+      'DASHBOARD_V2_FINANCEIRO_RECEBIMENTO_ALERT_THRESHOLD',
+      75,
+      1,
+      100,
+    );
+  }
+
+  private getFinanceiroCaixaAlertFactor(): number {
+    return this.readEnvNumber('DASHBOARD_V2_FINANCEIRO_CAIXA_ALERT_FACTOR', 1, 0.1, 10);
+  }
+
+  private getFinanceiroInsightsLimit(): number {
+    return Math.trunc(
+      this.readEnvNumber('DASHBOARD_V2_FINANCEIRO_INSIGHTS_LIMIT', 5, 1, 10),
+    );
+  }
+
+  private readEnvNumber(
+    key: string,
+    fallback: number,
+    min: number,
+    max: number,
+  ): number {
+    const rawValue = process.env[key];
+    if (typeof rawValue !== 'string' || !rawValue.trim()) {
+      return fallback;
+    }
+
+    const parsed = Number(rawValue);
+    if (!Number.isFinite(parsed)) {
+      return fallback;
+    }
+
+    return Math.min(max, Math.max(min, parsed));
   }
 }

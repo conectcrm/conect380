@@ -29,6 +29,11 @@ describe('DashboardV2AggregationService', () => {
       {} as any,
       {} as any,
       revenueRepositoryMock as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
     );
   });
 
@@ -116,5 +121,124 @@ describe('DashboardV2AggregationService', () => {
     expect(expr).toContain('o.estagio');
     expect(expr).toContain("'won'");
     expect(expr).toContain("'lost'");
+  });
+
+  it('gera insight critico quando recebimento esta abaixo da meta', () => {
+    const insights = service.buildFinanceiroInsights({
+      valorFaturado: 1000,
+      valorRecebido: 500,
+      totalFaturas: 10,
+      totalAtrasado: 0,
+      pendenciasAprovacao: 0,
+      saldoTotal: 5000,
+      totalImportacoes: 2,
+      alertasAtivos: 0,
+      alertasCriticos: 0,
+    });
+
+    expect(insights.some((item) => item.id === 'financeiro-recebimento-abaixo-meta')).toBe(true);
+  });
+
+  it('gera insight de atraso quando existem contas vencidas', () => {
+    const insights = service.buildFinanceiroInsights({
+      valorFaturado: 1000,
+      valorRecebido: 900,
+      totalFaturas: 5,
+      totalAtrasado: 250,
+      pendenciasAprovacao: 0,
+      saldoTotal: 3000,
+      totalImportacoes: 1,
+      alertasAtivos: 0,
+      alertasCriticos: 0,
+    });
+
+    expect(insights.some((item) => item.id === 'financeiro-contas-atrasadas')).toBe(true);
+  });
+
+  it('permite ajustar o threshold de recebimento por variavel de ambiente', () => {
+    const previousThreshold = process.env.DASHBOARD_V2_FINANCEIRO_RECEBIMENTO_ALERT_THRESHOLD;
+    process.env.DASHBOARD_V2_FINANCEIRO_RECEBIMENTO_ALERT_THRESHOLD = '60';
+
+    try {
+      const insights = service.buildFinanceiroInsights({
+        valorFaturado: 1000,
+        valorRecebido: 650,
+        totalFaturas: 5,
+        totalAtrasado: 0,
+        pendenciasAprovacao: 0,
+        saldoTotal: 2000,
+        totalImportacoes: 0,
+        alertasAtivos: 0,
+        alertasCriticos: 0,
+      });
+
+      expect(
+        insights.some((item) => item.id === 'financeiro-recebimento-abaixo-meta'),
+      ).toBe(false);
+      expect(insights.some((item) => item.id === 'financeiro-recebimento-em-linha')).toBe(true);
+    } finally {
+      if (previousThreshold === undefined) {
+        delete process.env.DASHBOARD_V2_FINANCEIRO_RECEBIMENTO_ALERT_THRESHOLD;
+      } else {
+        process.env.DASHBOARD_V2_FINANCEIRO_RECEBIMENTO_ALERT_THRESHOLD = previousThreshold;
+      }
+    }
+  });
+
+  it('respeita limite configuravel para quantidade de insights financeiros', () => {
+    const previousLimit = process.env.DASHBOARD_V2_FINANCEIRO_INSIGHTS_LIMIT;
+    process.env.DASHBOARD_V2_FINANCEIRO_INSIGHTS_LIMIT = '2';
+
+    try {
+      const insights = service.buildFinanceiroInsights({
+        valorFaturado: 1000,
+        valorRecebido: 400,
+        totalFaturas: 8,
+        totalAtrasado: 300,
+        pendenciasAprovacao: 2,
+        saldoTotal: 100,
+        totalImportacoes: 3,
+        alertasAtivos: 2,
+        alertasCriticos: 1,
+      });
+
+      expect(insights.length).toBe(2);
+    } finally {
+      if (previousLimit === undefined) {
+        delete process.env.DASHBOARD_V2_FINANCEIRO_INSIGHTS_LIMIT;
+      } else {
+        process.env.DASHBOARD_V2_FINANCEIRO_INSIGHTS_LIMIT = previousLimit;
+      }
+    }
+  });
+
+  it('prioriza alertas mais criticos quando o limite de insights e reduzido', () => {
+    const previousLimit = process.env.DASHBOARD_V2_FINANCEIRO_INSIGHTS_LIMIT;
+    process.env.DASHBOARD_V2_FINANCEIRO_INSIGHTS_LIMIT = '2';
+
+    try {
+      const insights = service.buildFinanceiroInsights({
+        valorFaturado: 1000,
+        valorRecebido: 900,
+        totalFaturas: 6,
+        totalAtrasado: 0,
+        pendenciasAprovacao: 1,
+        saldoTotal: 5000,
+        totalImportacoes: 0,
+        alertasAtivos: 2,
+        alertasCriticos: 1,
+      });
+
+      expect(insights).toHaveLength(2);
+      expect(insights.some((item) => item.id === 'financeiro-alertas-criticos')).toBe(true);
+      expect(insights.some((item) => item.id === 'financeiro-fila-aprovacao')).toBe(true);
+      expect(insights.some((item) => item.id === 'financeiro-sem-atrasos')).toBe(false);
+    } finally {
+      if (previousLimit === undefined) {
+        delete process.env.DASHBOARD_V2_FINANCEIRO_INSIGHTS_LIMIT;
+      } else {
+        process.env.DASHBOARD_V2_FINANCEIRO_INSIGHTS_LIMIT = previousLimit;
+      }
+    }
   });
 });

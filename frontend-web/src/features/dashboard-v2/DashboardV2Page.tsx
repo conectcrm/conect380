@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Activity, BadgeCheck, Clock3, DollarSign, RefreshCw, Target } from 'lucide-react';
 import {
   useDashboardV2,
+  type DashboardV2Insight,
   type DashboardV2PeriodPreset,
   type DashboardV2TrendPoint,
 } from './useDashboardV2';
@@ -12,8 +13,16 @@ import ConversionFunnel from './components/ConversionFunnel';
 import InsightsPanel from './components/InsightsPanel';
 import PipelineStageSummary from './components/PipelineStageSummary';
 import { useAuth } from '../../contexts/AuthContext';
+import { toastService } from '../../services/toastService';
 
 type ChartWindow = '3m' | '6m' | '12m';
+type ComercialDrilldownMetric =
+  | 'geral'
+  | 'faturamento'
+  | 'ticket-medio'
+  | 'ganhos'
+  | 'pipeline-negociacao'
+  | 'meta-carteira';
 
 type MonthTrend = {
   key: string;
@@ -31,34 +40,34 @@ type VendedorOption = {
 const dashboardPeriodOptions: Array<{ value: DashboardV2PeriodPreset; label: string }> = [
   { value: 'today', label: 'Hoje' },
   { value: 'yesterday', label: 'Ontem' },
-  { value: '7d', label: 'Últimos 7 dias' },
-  { value: '30d', label: 'Últimos 30 dias' },
-  { value: '90d', label: 'Últimos 90 dias' },
-  { value: 'month', label: 'Mês atual' },
-  { value: 'lastMonth', label: 'Mês anterior' },
+  { value: '7d', label: 'Ultimos 7 dias' },
+  { value: '30d', label: 'Ultimos 30 dias' },
+  { value: '90d', label: 'Ultimos 90 dias' },
+  { value: 'month', label: 'Mes atual' },
+  { value: 'lastMonth', label: 'Mes anterior' },
   { value: 'ytd', label: 'Ano atual' },
-  { value: '365d', label: 'Últimos 12 meses' },
+  { value: '365d', label: 'Ultimos 12 meses' },
   { value: 'custom', label: 'Personalizado' },
 ];
 
 const dashboardQuickPeriodChips: Array<{ value: DashboardV2PeriodPreset; label: string }> = [
   { value: 'today', label: 'Hoje' },
   { value: '7d', label: '7 dias' },
-  { value: 'month', label: 'Mês atual' },
+  { value: 'month', label: 'Mes atual' },
   { value: '30d', label: '30 dias' },
   { value: '90d', label: '90 dias' },
 ];
 
 const dashboardTrendLabelByPreset: Record<Exclude<DashboardV2PeriodPreset, 'custom'>, string> = {
-  today: 'vs. início de hoje',
-  yesterday: 'vs. início de ontem',
-  '7d': 'vs. início dos últimos 7 dias',
-  '30d': 'vs. início dos últimos 30 dias',
-  '90d': 'vs. início dos últimos 90 dias',
-  month: 'vs. início do mês atual',
-  lastMonth: 'vs. início do mês anterior',
-  ytd: 'vs. início do ano atual',
-  '365d': 'vs. início dos últimos 12 meses',
+  today: 'vs. inicio de hoje',
+  yesterday: 'vs. inicio de ontem',
+  '7d': 'vs. inicio dos ultimos 7 dias',
+  '30d': 'vs. inicio dos ultimos 30 dias',
+  '90d': 'vs. inicio dos ultimos 90 dias',
+  month: 'vs. inicio do mes atual',
+  lastMonth: 'vs. inicio do mes anterior',
+  ytd: 'vs. inicio do ano atual',
+  '365d': 'vs. inicio dos ultimos 12 meses',
 };
 
 const periodButtons: Array<{ key: ChartWindow; label: string }> = [
@@ -313,7 +322,7 @@ const DashboardV2Page: React.FC = () => {
   const conversaoDeltaFallback = useMemo(() => trendDelta(trendPoints, 'conversao'), [trendPoints]);
   const trendPeriodLabel =
     filters.periodPreset === 'custom'
-      ? 'vs. início do período personalizado'
+      ? 'vs. inicio do periodo personalizado'
       : dashboardTrendLabelByPreset[filters.periodPreset];
 
   const goalProgress = useMemo(() => {
@@ -432,6 +441,79 @@ const DashboardV2Page: React.FC = () => {
       : metaProgressPercent >= 70
         ? 'bg-[#EAF5FA] text-[#2C708D]'
         : 'bg-[#FFF4E9] text-[#A06213]';
+  const buildComercialDrilldownPath = useCallback(
+    (metric: ComercialDrilldownMetric): string => {
+      const params = new URLSearchParams({
+        metric,
+        periodStart: activeRange.periodStart,
+        periodEnd: activeRange.periodEnd,
+      });
+
+      if (filters.vendedorId) {
+        params.set('vendedorId', filters.vendedorId);
+      }
+
+      if (filters.pipelineId) {
+        params.set('pipelineId', filters.pipelineId);
+      }
+
+      return `/relatorios/comercial/drilldown?${params.toString()}`;
+    },
+    [activeRange.periodEnd, activeRange.periodStart, filters.pipelineId, filters.vendedorId],
+  );
+
+  const abrirInsight = useCallback(
+    (insight: DashboardV2Insight) => {
+      switch (insight.id) {
+        case 'previsto-maior-que-fechado':
+          navigate(buildComercialDrilldownPath('pipeline-negociacao'));
+          return;
+        case 'queda-receita-fechada':
+          navigate(buildComercialDrilldownPath('faturamento'));
+          return;
+        case 'oportunidades-paradas':
+          navigate(buildComercialDrilldownPath('pipeline-negociacao'));
+          return;
+        case 'painel-estavel':
+          navigate(buildComercialDrilldownPath('geral'));
+          return;
+        default:
+          navigate(buildComercialDrilldownPath('geral'));
+      }
+    },
+    [buildComercialDrilldownPath, navigate],
+  );
+
+  const compartilharInsights = useCallback(async () => {
+    const insights = data?.insights?.insights || [];
+    if (!insights.length) {
+      toastService.info('Sem insights para compartilhar neste periodo.');
+      return;
+    }
+
+    const linhas = insights.slice(0, 5).map((insight, index) => {
+      const acao = insight.action ? ` | Acao: ${insight.action}` : '';
+      return `${index + 1}. ${insight.title} - ${insight.description}${acao}`;
+    });
+
+    const resumo = `Insights comerciais (${formatRangeLabel(activeRange.periodStart, activeRange.periodEnd)})\n${linhas.join('\n')}`;
+    const clipboardApi =
+      typeof navigator !== 'undefined' && navigator.clipboard
+        ? navigator.clipboard
+        : null;
+
+    if (!clipboardApi) {
+      toastService.warning('Copia automatica indisponivel neste navegador.');
+      return;
+    }
+
+    try {
+      await clipboardApi.writeText(resumo);
+      toastService.success('Insights copiados para a area de transferencia.');
+    } catch {
+      toastService.error('Nao foi possivel copiar os insights automaticamente.');
+    }
+  }, [activeRange.periodEnd, activeRange.periodStart, data?.insights?.insights]);
 
   if (loading) {
     return (
@@ -478,7 +560,7 @@ const DashboardV2Page: React.FC = () => {
       <section className="rounded-[20px] border border-[#DCE6EA] bg-white p-5 shadow-[0_10px_28px_-22px_rgba(15,55,71,0.45)]">
         <h2 className="text-xl font-semibold text-[#173548]">Sem dados no Dashboard V2</h2>
         <p className="mt-2 text-sm text-[#5E7A88]">
-          Sincronize os dados para gerar os indicadores analíticos.
+          Sincronize os dados para gerar os indicadores analiticos.
         </p>
       </section>
     );
@@ -692,7 +774,7 @@ const DashboardV2Page: React.FC = () => {
       <section className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 min-[1850px]:grid-cols-5">
         <KpiTrendCard
           title="Faturamento"
-          featureHint="Mostra a receita fechada no periodo selecionado. Clique para abrir contas a receber."
+          featureHint="Mostra a receita fechada no periodo selecionado. Clique para abrir o relatorio contextual."
           value={formatCurrency(data.overview.receitaFechada)}
           trendPercent={receitaTrendPercent}
           trendLabel={trendPeriodLabel}
@@ -702,13 +784,13 @@ const DashboardV2Page: React.FC = () => {
           footerLeft={`Meta do recorte: ${formatCurrency(metaTotal)}`}
           footerRight={`${Math.max(0, goalProgress).toFixed(0)}% da meta atingida`}
           icon={<DollarSign className="h-5 w-5" />}
-          onClick={() => navigate('/financeiro/contas-receber')}
-          ariaLabel="Abrir contas a receber"
+          onClick={() => navigate(buildComercialDrilldownPath('faturamento'))}
+          ariaLabel="Abrir relatorio contextual de faturamento"
         />
 
         <KpiTrendCard
           title="Ticket Medio"
-          featureHint="Mostra o valor medio por venda no periodo. Clique para abrir as propostas."
+          featureHint="Mostra o valor médio por venda no período. Clique para abrir o relatório contextual."
           value={formatCurrency(data.overview.ticketMedio)}
           trendPercent={ticketTrendPercent}
           trendLabel={trendPeriodLabel}
@@ -717,47 +799,47 @@ const DashboardV2Page: React.FC = () => {
           progressTone="teal"
           footerLeft={
             ticketBenchmark > 0
-              ? `Base histórica: ${formatCurrency(ticketBenchmark)}`
-              : 'Histórico insuficiente para comparação'
+              ? `Base historica: ${formatCurrency(ticketBenchmark)}`
+              : 'Historico insuficiente para comparacao'
           }
           footerRight={
             ticketProgress > 0 ? `${ticketProgress.toFixed(0)}% do benchmark recente` : ''
           }
           icon={<Target className="h-5 w-5" />}
-          onClick={() => navigate('/propostas')}
-          ariaLabel="Abrir propostas para análise de ticket médio"
+          onClick={() => navigate(buildComercialDrilldownPath('ticket-medio'))}
+          ariaLabel="Abrir relatório contextual de ticket médio"
         />
 
         <KpiTrendCard
-          title="Ganhos no período"
-          featureHint="Mostra quantas vendas foram ganhas e como esta a conversao no periodo."
+          title="Ganhos no periodo"
+          featureHint="Mostra quantas vendas foram ganhas e como está a conversão no período."
           value={formatNumber(Number(wonStage?.quantidade || 0))}
           valueSuffix="vendas"
           trendPercent={vendasFechadasTrendPercent}
-          trendLabel={`taxa de conversão ${trendPeriodLabel}`}
+          trendLabel={`taxa de conversao ${trendPeriodLabel}`}
           sparkline={conversaoSparkline}
           progressPercent={Math.max(0, Math.min(100, wonConversionPercent))}
           progressTone="teal"
-          footerLeft={`Chegada até negociação: ${Math.max(0, Number(funnelStepToNegotiation?.conversionRate || 0)).toFixed(0)}%`}
+          footerLeft={`Chegada ate negociacao: ${Math.max(0, Number(funnelStepToNegotiation?.conversionRate || 0)).toFixed(0)}%`}
           footerRight={`Taxa final de ganho: ${Math.max(0, wonConversionPercent).toFixed(0)}%`}
           icon={<BadgeCheck className="h-5 w-5" />}
-          onClick={() => navigate('/propostas')}
-          ariaLabel="Abrir propostas fechadas"
+          onClick={() => navigate(buildComercialDrilldownPath('ganhos'))}
+          ariaLabel="Abrir relatório contextual de ganhos"
         />
 
         <KpiTrendCard
-          title="Pipeline em negociação"
-          featureHint="Mostra o valor em negociacao e a participacao dessas oportunidades no pipeline."
+          title="Pipeline em negociacao"
+          featureHint="Mostra o valor em negociação e a participação dessas oportunidades no pipeline."
           value={formatCurrency(Number(negotiationStage?.valor || 0))}
           trendPercent={negociacaoTrendPercent}
-          trendLabel={`estoque em negociação ${trendPeriodLabel}`}
+          trendLabel={`estoque em negociacao ${trendPeriodLabel}`}
           progressPercent={Math.max(0, Math.min(100, negotiationSharePercent))}
           progressTone="amber"
           footerLeft={`Chance de ganho: ${Math.max(0, wonConversionPercent).toFixed(0)}%`}
           footerRight={`${negotiationCount} de ${activeOpportunityCount} oportunidades ativas`}
           icon={<Clock3 className="h-5 w-5" />}
-          onClick={() => navigate('/pipeline')}
-          ariaLabel="Abrir pipeline comercial"
+          onClick={() => navigate(buildComercialDrilldownPath('pipeline-negociacao'))}
+          ariaLabel="Abrir relatório contextual de pipeline em negociação"
           rightVisual={
             <div className="relative h-[62px] w-[62px]">
               <svg viewBox="0 0 36 36" className="h-full w-full -rotate-90">
@@ -789,7 +871,7 @@ const DashboardV2Page: React.FC = () => {
           secondaryLabel="Oportunidades ativas"
           trendPercent={progressoAtivoTrendPercent}
           progressPercent={goalProgress}
-          projectionLabel={`Projeção do pipeline: ${formatCurrency(data.overview.receitaPrevista)}`}
+          projectionLabel={`Projecao do pipeline: ${formatCurrency(data.overview.receitaPrevista)}`}
           icon={<Activity className="h-5 w-5" />}
         />
       </section>
@@ -801,7 +883,7 @@ const DashboardV2Page: React.FC = () => {
               <div className="flex flex-wrap items-start justify-between gap-2.5">
                 <div>
                   <h3 className="text-[20px] font-semibold tracking-[-0.012em] text-[#18374B]">
-                    Vendas vs. meta do período
+                    Vendas vs. meta do periodo
                   </h3>
                   <p className="mt-1.5 inline-flex items-center gap-1 text-[14px] text-[#617D89]">
                     <span className={`font-semibold ${vendasVsPeriodoAnteriorClass}`}>
@@ -901,7 +983,13 @@ const DashboardV2Page: React.FC = () => {
         </div>
 
         <div className="2xl:col-span-3">
-          <InsightsPanel insights={data.insights.insights} />
+          <InsightsPanel
+            insights={data.insights.insights}
+            onInsightClick={abrirInsight}
+            onShareClick={() => {
+              void compartilharInsights();
+            }}
+          />
         </div>
       </section>
     </div>
@@ -909,3 +997,5 @@ const DashboardV2Page: React.FC = () => {
 };
 
 export default DashboardV2Page;
+
+

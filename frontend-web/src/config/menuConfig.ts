@@ -893,9 +893,9 @@ export const menuConfig: MenuConfig[] = [
       },
       {
         id: 'comercial-analytics',
-        title: 'Analytics Comercial',
+        title: 'Central de Relatorios',
         icon: BarChart3,
-        href: '/relatorios/analytics',
+        href: '/relatorios',
         color: 'blue',
         permissions: ['relatorios.read'],
         requiredModule: 'CRM',
@@ -1035,6 +1035,16 @@ export const menuConfig: MenuConfig[] = [
         href: '/financeiro/conciliacao',
         color: 'orange',
         permissions: ['financeiro.conciliacao.read'],
+        group: 'Fluxo Financeiro',
+      },
+      {
+        id: 'financeiro-relatorios',
+        title: 'Relatorios Financeiros',
+        shortTitle: 'Relatorios',
+        icon: BarChart3,
+        href: '/financeiro/relatorios',
+        color: 'orange',
+        permissions: ['financeiro.faturamento.read', 'relatorios.read'],
         group: 'Fluxo Financeiro',
       },
     ],
@@ -1325,6 +1335,37 @@ const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
     permissions: ['financeiro.faturamento.read', 'relatorios.read'],
     match: 'all',
   },
+  { pattern: '/relatorios', permissions: ['relatorios.read'] },
+  {
+    pattern: '/relatorios/comercial',
+    permissions: ['crm.oportunidades.read', 'relatorios.read'],
+    match: 'all',
+  },
+  {
+    pattern: '/relatorios/comercial/drilldown',
+    permissions: ['crm.oportunidades.read', 'relatorios.read'],
+    match: 'all',
+  },
+  {
+    pattern: '/relatorios/comercial/propostas-contratos',
+    permissions: ['comercial.propostas.read', 'relatorios.read'],
+    match: 'all',
+  },
+  {
+    pattern: '/relatorios/comercial/clientes-leads',
+    permissions: ['crm.clientes.read', 'crm.leads.read', 'relatorios.read'],
+    match: 'all',
+  },
+  {
+    pattern: '/relatorios/agenda',
+    permissions: ['crm.agenda.read', 'relatorios.read'],
+    match: 'all',
+  },
+  {
+    pattern: '/relatorios/financeiro',
+    permissions: ['financeiro.faturamento.read', 'relatorios.read'],
+    match: 'all',
+  },
   { pattern: '/financeiro/contas-receber', permissions: ['financeiro.faturamento.read'] },
   { pattern: '/financeiro/fluxo-caixa', permissions: ['financeiro.faturamento.read'] },
   { pattern: '/financeiro/conciliacao', permissions: ['financeiro.conciliacao.read'] },
@@ -1332,7 +1373,6 @@ const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
   { pattern: '/financeiro/centro-custos', permissions: ['financeiro.centro-custos.read'] },
   { pattern: '/financeiro/tesouraria', permissions: ['financeiro.faturamento.read'] },
   { pattern: '/configuracoes/departamentos', permissions: ['config.automacoes.manage'] },
-  { pattern: '/relatorios/analytics', permissions: ['relatorios.read'] },
   {
     pattern: '/gestao/permissoes',
     permissions: ['users.read', 'admin.empresas.manage'],
@@ -1432,6 +1472,8 @@ const ROUTE_MODULE_REQUIREMENTS: Array<{ pattern: string; module: LicensedModule
 
   { pattern: '/contratos', module: 'VENDAS' },
   { pattern: '/propostas', module: 'VENDAS' },
+  { pattern: '/relatorios/comercial/propostas-contratos', module: 'VENDAS' },
+  { pattern: '/relatorios/comercial/clientes-leads', module: 'CRM' },
 
   { pattern: '/gestao/permissoes', module: 'ADMINISTRACAO' },
   { pattern: '/gestao/empresas', module: 'ADMINISTRACAO' },
