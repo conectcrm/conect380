@@ -15,6 +15,12 @@ export const resolveRuntimeAssetUrl = (url: string): string => {
     return normalized;
   }
 
+  const ensureLeadingSlash = (value: string): string =>
+    value.startsWith('/') ? value : `/${value}`;
+
+  const isApiHostedAssetPath = (value: string): boolean =>
+    ensureLeadingSlash(value).startsWith('/uploads/');
+
   if (
     normalized.startsWith('data:') ||
     normalized.startsWith('blob:') ||
@@ -29,17 +35,20 @@ export const resolveRuntimeAssetUrl = (url: string): string => {
   }
 
   const baseURL = api.defaults.baseURL || '';
-  if (baseURL) {
+  if (baseURL && isApiHostedAssetPath(normalized)) {
     const normalizedBase = baseURL.replace(/\/$/, '');
-    const normalizedPath = normalized.startsWith('/') ? normalized : `/${normalized}`;
+    const normalizedPath = ensureLeadingSlash(normalized);
     return `${normalizedBase}${normalizedPath}`;
   }
 
+  if (isApiHostedAssetPath(normalized)) {
+    return ensureLeadingSlash(normalized);
+  }
+
   if (normalized.startsWith('/')) {
-    const basePath = process.env.PUBLIC_URL || '';
+    const basePath = (process.env.PUBLIC_URL || '').replace(/\/$/, '');
     return `${basePath}${normalized}`;
   }
 
   return normalized;
 };
-
