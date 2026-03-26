@@ -71,7 +71,6 @@ const PATH_PREFIX_TO_MODULE: Array<{ prefix: string; module: EntitlementModule }
   { prefix: '/redmine', module: 'ATENDIMENTO' },
 
   { prefix: '/dashboard', module: 'DASHBOARD' },
-  { prefix: '/analytics', module: 'DASHBOARD' },
   { prefix: '/orquestrador', module: 'DASHBOARD' },
 
   { prefix: '/ia', module: 'IA' },

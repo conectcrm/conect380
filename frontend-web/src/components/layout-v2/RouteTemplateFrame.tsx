@@ -11,7 +11,7 @@ type RouteTemplateRule = {
 const routeRules: RouteTemplateRule[] = [
   {
     pattern:
-      /^\/(dashboard|atendimento\/analytics|atendimento\/distribuicao\/dashboard|nuclei\/crm|nuclei\/financeiro|nuclei\/vendas|relatorios\/analytics)$/,
+      /^\/(dashboard|atendimento\/analytics|atendimento\/distribuicao\/dashboard|nuclei\/crm|nuclei\/financeiro|nuclei\/vendas)$/,
     type: 'DASHBOARD',
   },
   {

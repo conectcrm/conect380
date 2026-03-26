@@ -23,7 +23,6 @@ import { FaturamentoModule } from './modules/faturamento/faturamento.module';
 import { CotacaoModule } from './cotacao/cotacao.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { DashboardV2Module } from './modules/dashboard-v2/dashboard-v2.module';
-import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { OportunidadesModule } from './modules/oportunidades/oportunidades.module';
 import { EmpresasModule } from './empresas/empresas.module';
 import { MetasModule } from './modules/metas/metas.module';
@@ -107,7 +106,6 @@ const throttlerShortLimit = isProduction ? 10 : 200;
     CotacaoModule,
     DashboardModule,
     DashboardV2Module,
-    AnalyticsModule,
     OportunidadesModule,
     EmpresasModule,
     MetasModule,
