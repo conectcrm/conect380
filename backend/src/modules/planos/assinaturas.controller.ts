@@ -27,6 +27,8 @@ import type { Request } from 'express';
 import { AssinaturaStatus, toCanonicalAssinaturaStatus } from './entities/assinatura-empresa.entity';
 import { AssinaturaDueDateSchedulerService } from './assinatura-due-date-scheduler.service';
 import { LegacyAdminTransitionGuard } from '../admin/guards/legacy-admin-transition.guard';
+import { GatewayProvider } from '../pagamentos/entities/configuracao-gateway.entity';
+import { assertGatewayProviderEnabled } from '../pagamentos/services/gateway-provider-support.util';
 
 @Controller('assinaturas')
 @UseGuards(JwtAuthGuard, EmpresaGuard, RolesGuard, PermissionsGuard)
@@ -89,6 +91,9 @@ export class AssinaturasController {
     @Body() dados: CriarCheckoutDto,
     @Req() req: Request,
   ) {
+    assertGatewayProviderEnabled(GatewayProvider.MERCADO_PAGO);
+    this.mercadoPagoService.assertCheckoutReady();
+
     const assinatura = await this.assinaturasService.criarAssinaturaPendenteParaCheckout(
       empresaId,
       dados.planoId,

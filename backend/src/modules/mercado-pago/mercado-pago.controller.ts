@@ -4,6 +4,7 @@ import {
   Get,
   Body,
   Param,
+  Query,
   Headers,
   HttpException,
   HttpStatus,
@@ -316,12 +317,23 @@ export class MercadoPagoController {
   @Get('installments')
   @Permissions(Permission.FINANCEIRO_PAGAMENTOS_READ)
   async getInstallments(
-    @Param('amount') amount: number,
-    @Param('paymentMethodId') paymentMethodId: string,
+    @Query('amount') amountRaw: string,
+    @Query('paymentMethodId') paymentMethodId: string,
   ) {
     try {
+      const amount = Number(amountRaw);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new HttpException('amount deve ser um numero maior que zero', HttpStatus.BAD_REQUEST);
+      }
+      if (!paymentMethodId || !String(paymentMethodId).trim()) {
+        throw new HttpException('paymentMethodId e obrigatorio', HttpStatus.BAD_REQUEST);
+      }
+
       return await this.mercadoPagoService.getInstallments(amount, paymentMethodId);
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
       this.logger.error('Erro ao buscar parcelas:', error);
       throw new HttpException(
         error.message || 'Erro interno do servidor',

@@ -212,6 +212,51 @@ describe('MercadoPagoService', () => {
     );
   });
 
+  it('rejeita webhook sem secret em ambiente de producao', async () => {
+    configService.get.mockImplementation((key: string) => {
+      if (key === 'MERCADO_PAGO_ACCESS_TOKEN') return undefined;
+      if (key === 'MERCADO_PAGO_MOCK') return 'true';
+      if (key === 'NODE_ENV') return 'production';
+      return undefined;
+    });
+
+    service = new MercadoPagoService(
+      configService as any,
+      assinaturaRepository as any,
+      billingEventRepository as any,
+      faturaRepository as any,
+      pagamentoRepository as any,
+      pagamentoService as any,
+    );
+
+    const result = await service.validateWebhookSignature(
+      { data: { id: '123' } },
+      'ts=1,v1=abc',
+      'req-1',
+    );
+
+    expect(result).toBe(false);
+  });
+
+  it('bloqueia checkout quando Mercado Pago nao esta operacional', () => {
+    configService.get.mockImplementation((key: string) => {
+      if (key === 'MERCADO_PAGO_ACCESS_TOKEN') return undefined;
+      if (key === 'MERCADO_PAGO_MOCK') return 'false';
+      return undefined;
+    });
+
+    service = new MercadoPagoService(
+      configService as any,
+      assinaturaRepository as any,
+      billingEventRepository as any,
+      faturaRepository as any,
+      pagamentoRepository as any,
+      pagamentoService as any,
+    );
+
+    expect(() => service.assertCheckoutReady()).toThrow('Checkout Mercado Pago indisponivel');
+  });
+
   it('ativa assinatura no primeiro webhook e nao reaplica efeito no duplicado', async () => {
     const payment = {
       id: 'pay-dup-1',

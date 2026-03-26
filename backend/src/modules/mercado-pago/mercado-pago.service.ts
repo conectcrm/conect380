@@ -1,4 +1,11 @@
-import { Inject, Injectable, Logger, NotFoundException, forwardRef } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+  forwardRef,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MercadoPagoConfig, Customer, Preference, Payment } from 'mercadopago';
@@ -728,6 +735,27 @@ export class MercadoPagoService {
     return raw === 'true' || raw === '1';
   }
 
+  private isProductionEnvironment(): boolean {
+    const nodeEnv = String(this.configService.get<string>('NODE_ENV') || '')
+      .trim()
+      .toLowerCase();
+    const appEnv = String(this.configService.get<string>('APP_ENV') || '')
+      .trim()
+      .toLowerCase();
+
+    return nodeEnv === 'production' || appEnv === 'production';
+  }
+
+  public assertCheckoutReady(): void {
+    if (this.preferenceApi || this.isMockMode()) {
+      return;
+    }
+
+    throw new ServiceUnavailableException(
+      'Checkout Mercado Pago indisponivel. Configure MERCADO_PAGO_ACCESS_TOKEN ou habilite MERCADO_PAGO_MOCK em desenvolvimento.',
+    );
+  }
+
   private buildMockPreference() {
     const id = `mock_pref_${crypto.randomBytes(8).toString('hex')}`;
     const initPoint = `https://mercadopago.mock/checkout/${id}`;
@@ -798,6 +826,8 @@ export class MercadoPagoService {
 
   async createPreference(preferenceData: any) {
     try {
+      this.assertCheckoutReady();
+
       if (!this.preferenceApi) {
         if (this.isMockMode()) {
           this.logger.warn(
@@ -931,8 +961,8 @@ export class MercadoPagoService {
           return mockPayment;
         }
 
-        throw new Error(
-          'Mercado Pago não inicializado. Configure MERCADO_PAGO_ACCESS_TOKEN.',
+        throw new ServiceUnavailableException(
+          'Mercado Pago nao inicializado. Configure MERCADO_PAGO_ACCESS_TOKEN.',
         );
       }
 
@@ -982,8 +1012,17 @@ export class MercadoPagoService {
       const webhookSecret = this.configService.get<string>('MERCADO_PAGO_WEBHOOK_SECRET');
 
       if (!webhookSecret) {
-        this.logger.warn('Webhook secret não configurado, pulando validação');
-        return true; // Em desenvolvimento, pode pular validação
+        if (this.isProductionEnvironment()) {
+          this.logger.error(
+            'MERCADO_PAGO_WEBHOOK_SECRET nao configurado em producao. Webhook rejeitado por seguranca.',
+          );
+          return false;
+        }
+
+        this.logger.warn(
+          'Webhook secret nao configurado, pulando validacao (ambiente nao producao)',
+        );
+        return true;
       }
 
       // Extrair timestamp e hash da assinatura

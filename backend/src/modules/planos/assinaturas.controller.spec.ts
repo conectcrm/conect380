@@ -7,6 +7,7 @@ describe('AssinaturasController', () => {
     criarAssinaturaPendenteParaCheckout: jest.fn(),
   };
   const mercadoPagoService = {
+    assertCheckoutReady: jest.fn(),
     createPreference: jest.fn(),
   };
   const assinaturaDueDateSchedulerService = {
@@ -49,6 +50,8 @@ describe('AssinaturasController', () => {
       req,
     );
 
+    expect(mercadoPagoService.assertCheckoutReady).toHaveBeenCalledTimes(1);
+
     expect(result).toEqual(
       expect.objectContaining({
         assinaturaId: '22222222-2222-2222-2222-222222222222',
@@ -62,6 +65,30 @@ describe('AssinaturasController', () => {
         notification_url: 'https://api.conectcrm.com/mercadopago/webhooks',
       }),
     );
+  });
+
+  it('nao cria assinatura pendente quando checkout do provedor esta indisponivel', async () => {
+    mercadoPagoService.assertCheckoutReady.mockImplementationOnce(() => {
+      throw new Error('checkout indisponivel');
+    });
+
+    const req = {
+      headers: { origin: 'https://app.conectcrm.com' },
+      protocol: 'https',
+      get: jest.fn().mockReturnValue('api.conectcrm.com'),
+      user: { email: 'owner@empresa.com' },
+    } as any;
+
+    await expect(
+      controller.criarCheckout(
+        '11111111-1111-1111-1111-111111111111',
+        { planoId: 'plan-business' } as any,
+        req,
+      ),
+    ).rejects.toThrow('checkout indisponivel');
+
+    expect(assinaturasService.criarAssinaturaPendenteParaCheckout).not.toHaveBeenCalled();
+    expect(mercadoPagoService.createPreference).not.toHaveBeenCalled();
   });
 
   it.each([
