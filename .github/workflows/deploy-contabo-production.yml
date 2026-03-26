@@ -133,10 +133,29 @@ jobs:
 
       - name: Checkout target ref for deploy scripts
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ steps.options.outputs.target_ref }}
-          fetch-depth: 0
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          target_ref="${{ steps.options.outputs.target_ref }}"
+
+          # Garante que commits de qualquer branch/tag estejam disponiveis
+          # antes de resolver o target_ref (branch, tag ou SHA).
+          git fetch --no-tags --prune origin '+refs/heads/*:refs/remotes/origin/*'
+          git fetch --no-tags --prune origin '+refs/tags/*:refs/tags/*'
+
+          target_sha=""
+          if target_sha="$(git rev-parse "${target_ref}^{commit}" 2>/dev/null)"; then
+            :
+          elif target_sha="$(git rev-parse "origin/${target_ref}^{commit}" 2>/dev/null)"; then
+            :
+          else
+            echo "::error::target_ref invalido: ${target_ref}"
+            exit 1
+          fi
+
+          git checkout --detach "${target_sha}"
+          echo "Deploy scripts alinhados ao target_ref ${target_ref} (${target_sha})."
 
       - name: Validate required secrets
         shell: bash
