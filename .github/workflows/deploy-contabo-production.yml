@@ -230,6 +230,43 @@ jobs:
             exit 1
           fi
 
+      - name: Guardrail pagamentos Mercado Pago
+        if: steps.options.outputs.upload_runtime_env == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          read_env() {
+            local key="$1"
+            local value=""
+            value="$(grep -E "^${key}=" "${RUNTIME_ENV_PATH}" | tail -n 1 | sed "s/^${key}=//" | tr -d '\r' || true)"
+            printf '%s' "${value}"
+          }
+
+          providers="$(read_env PAGAMENTOS_GATEWAY_ENABLED_PROVIDERS | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
+          if [[ ",${providers}," != *",mercado_pago,"* ]]; then
+            echo "Mercado Pago nao habilitado em PAGAMENTOS_GATEWAY_ENABLED_PROVIDERS; guardrail especifico nao aplicavel."
+            exit 0
+          fi
+
+          mp_token="$(read_env MERCADO_PAGO_ACCESS_TOKEN)"
+          mp_webhook_secret="$(read_env MERCADO_PAGO_WEBHOOK_SECRET)"
+          mp_mock="$(read_env MERCADO_PAGO_MOCK | tr '[:upper:]' '[:lower:]')"
+
+          missing=()
+          if [ -z "${mp_token}" ]; then missing+=("MERCADO_PAGO_ACCESS_TOKEN"); fi
+          if [ -z "${mp_webhook_secret}" ]; then missing+=("MERCADO_PAGO_WEBHOOK_SECRET"); fi
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Mercado Pago habilitado, mas variaveis obrigatorias ausentes: ${missing[*]}."
+            exit 1
+          fi
+
+          if [ "${mp_mock}" = "true" ] || [ "${mp_mock}" = "1" ]; then
+            echo "::error::MERCADO_PAGO_MOCK deve permanecer false em producao."
+            exit 1
+          fi
+
       - name: Deploy (contabo script)
         shell: pwsh
         env:
