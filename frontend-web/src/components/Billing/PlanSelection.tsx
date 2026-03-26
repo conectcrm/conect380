@@ -30,6 +30,13 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
       return;
     }
 
+    const assinaturaRequerCheckout =
+      assinatura?.status === 'trial' || assinatura?.status === 'canceled';
+    if (!assinatura || assinaturaRequerCheckout) {
+      onPlanSelect?.(plano, { requiresPayment: true });
+      return;
+    }
+
     if (assinatura && plano.id !== assinatura.plano.id) {
       setIsChangingPlan(true);
       try {
@@ -43,7 +50,7 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
       return;
     }
 
-    onPlanSelect?.(plano, { requiresPayment: !assinatura });
+    onPlanSelect?.(plano, { requiresPayment: false });
   };
 
   const getPlanIcon = (codigo: string) => {
@@ -224,6 +231,10 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
         {planos.map((plano) => {
           const isRecommended = plano.codigo === getRecommendedPlan();
           const isCurrent = isCurrentPlan(plano.id);
+          const assinaturaRequerCheckout =
+            assinatura?.status === 'trial' || assinatura?.status === 'canceled';
+          const buttonDisabled =
+            (isCurrent && !assinaturaRequerCheckout) || isChangingPlan || planActionsLocked;
 
           return (
             <Card
@@ -367,7 +378,7 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
 
                 <Button
                   onClick={() => handlePlanSelect(plano)}
-                  disabled={isCurrent || isChangingPlan || planActionsLocked}
+                  disabled={buttonDisabled}
                   className={`
                     w-full mt-6
                     ${isCurrent ? 'bg-green-600 hover:bg-green-700' : ''}
@@ -375,12 +386,16 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
                   `}
                   size="lg"
                 >
-                  {isCurrent
-                    ? 'Plano Atual'
-                    : planActionsLocked
-                      ? 'Gerenciado internamente'
+                  {planActionsLocked
+                    ? 'Gerenciado internamente'
+                    : isCurrent
+                      ? assinaturaRequerCheckout
+                        ? 'Finalizar assinatura'
+                        : 'Plano Atual'
                       : assinatura
-                        ? 'Alterar para este Plano'
+                        ? assinaturaRequerCheckout
+                          ? 'Escolher e pagar'
+                          : 'Alterar para este Plano'
                         : 'Escolher este Plano'}
                 </Button>
               </CardContent>

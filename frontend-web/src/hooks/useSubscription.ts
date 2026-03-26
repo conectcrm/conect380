@@ -527,19 +527,10 @@ const normalizePlanosVisiveis = (input: unknown): Plano[] => {
       return left.nome.localeCompare(right.nome, 'pt-BR');
     });
 
-  const planosCanonicos = planosAtivos.filter((plano) =>
-    CANONICAL_PLAN_CODES.has(
-      String(plano.codigo || '')
-        .trim()
-        .toLowerCase(),
-    ),
-  );
-
-  return planosCanonicos.length > 0 ? planosCanonicos : planosAtivos;
+  return planosAtivos;
 };
 
 const ACCESS_STATUSES: AssinaturaStatusCanonical[] = ['trial', 'active', 'past_due'];
-const CANONICAL_PLAN_CODES = new Set(['starter', 'business', 'enterprise']);
 
 export const useSubscription = () => {
   const { user } = useAuth();

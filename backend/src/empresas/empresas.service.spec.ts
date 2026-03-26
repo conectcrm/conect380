@@ -14,13 +14,19 @@ describe('EmpresasService - normalizacao em atualizarEmpresa', () => {
     createQueryBuilder: jest.fn(),
   };
 
+  const clienteRepository = {
+    count: jest.fn(),
+  };
+
   const featureFlagTenantRepository = {
     createQueryBuilder: jest.fn(),
   };
 
   const mailService = {};
   const empresaModuloService = {};
-  const planosService = {};
+  const planosService = {
+    listarTodos: jest.fn(),
+  };
   const assinaturasService = {};
 
   beforeEach(() => {
@@ -29,6 +35,7 @@ describe('EmpresasService - normalizacao em atualizarEmpresa', () => {
     service = new EmpresasService(
       empresaRepository as any,
       userRepository as any,
+      clienteRepository as any,
       featureFlagTenantRepository as any,
       mailService as any,
       empresaModuloService as any,
@@ -133,5 +140,44 @@ describe('EmpresasService - normalizacao em atualizarEmpresa', () => {
     empresaRepository.findOne.mockResolvedValue(empresa);
 
     await expect(service.verificarEmailAtivacao(tokenAntigo)).rejects.toThrow('Token expirado');
+  });
+
+  it('lista planos ativos do catalogo incluindo planos customizados no registro', async () => {
+    planosService.listarTodos.mockResolvedValue([
+      {
+        codigo: 'starter',
+        nome: 'Starter',
+        preco: 149,
+        descricao: 'Plano inicial',
+        limiteUsuarios: 3,
+        limiteClientes: 1000,
+        limiteStorage: 5 * 1024 * 1024 * 1024,
+        limiteApiCalls: 1000,
+        whiteLabel: false,
+        suportePrioritario: false,
+        modulosInclusos: [{ modulo: { nome: 'CRM' } }],
+      },
+      {
+        codigo: 'plano-teste',
+        nome: 'Plano de teste',
+        preco: 229,
+        descricao: 'Plano customizado para testes',
+        limiteUsuarios: 8,
+        limiteClientes: 2500,
+        limiteStorage: 15 * 1024 * 1024 * 1024,
+        limiteApiCalls: 7500,
+        whiteLabel: true,
+        suportePrioritario: true,
+        modulosInclusos: [{ modulo: { nome: 'CRM' } }, { modulo: { nome: 'FINANCEIRO' } }],
+      },
+    ]);
+
+    const planos = await service.listarPlanos();
+
+    expect(planosService.listarTodos).toHaveBeenCalledTimes(1);
+    expect(Array.isArray(planos)).toBe(true);
+    expect(planos.map((plano: any) => plano.id)).toEqual(
+      expect.arrayContaining(['starter', 'plano-teste']),
+    );
   });
 });

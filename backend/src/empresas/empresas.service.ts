@@ -13,7 +13,6 @@ import { EmpresaModuloService } from '../modules/empresas/services/empresa-modul
 import { PlanosService } from '../modules/planos/planos.service';
 import { AssinaturasService } from '../modules/planos/assinaturas.service';
 import { FeatureFlagTenant } from '../modules/dashboard-v2/entities/feature-flag-tenant.entity';
-import { DEFAULT_PLANOS_SISTEMA } from '../modules/planos/planos.defaults';
 
 export interface EmpresaCardEstatisticasResumo {
   usuariosAtivos: number;
@@ -39,9 +38,6 @@ export class EmpresasService {
     String(process.env.SELF_SIGNUP_ENABLE_OPORTUNIDADES_LIFECYCLE || 'true')
       .trim()
       .toLowerCase() !== 'false';
-  private static readonly SELF_SIGNUP_PLANOS_CANONICOS = new Set(
-    DEFAULT_PLANOS_SISTEMA.map((plano) => String(plano.codigo || '').trim().toLowerCase()),
-  );
   private static readonly TERMOS_VERSAO_ATUAL = process.env.LGPD_TERMOS_VERSAO || '2026-02-23';
   private static readonly PRIVACIDADE_VERSAO_ATUAL =
     process.env.LGPD_PRIVACIDADE_VERSAO || '2026-02-23';
@@ -763,13 +759,7 @@ export class EmpresasService {
   }
 
   async listarPlanos(): Promise<any[]> {
-    const planosCatalogo = (await this.planosService.listarTodos()).filter((plano) => {
-      const codigoPlano = String(plano?.codigo || '')
-        .trim()
-        .toLowerCase();
-
-      return EmpresasService.SELF_SIGNUP_PLANOS_CANONICOS.has(codigoPlano);
-    });
+    const planosCatalogo = await this.planosService.listarTodos();
 
     if (planosCatalogo.length > 0) {
       return planosCatalogo.map((plano) => {
