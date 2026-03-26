@@ -131,6 +131,13 @@ jobs:
             exit 1
           fi
 
+      - name: Checkout target ref for deploy scripts
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.options.outputs.target_ref }}
+          fetch-depth: 0
+
       - name: Validate required secrets
         shell: bash
         env:
