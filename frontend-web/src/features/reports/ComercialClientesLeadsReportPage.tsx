@@ -22,7 +22,7 @@ type SourceSummaryRow = {
 };
 
 const MAX_PAGES = 40;
-const PAGE_SIZE = 250;
+const PAGE_SIZE = 100;
 
 const leadStatusLabel: Record<StatusLead, string> = {
   [StatusLead.NOVO]: 'Novo',

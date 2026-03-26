@@ -235,6 +235,16 @@ class LeadsService {
   async listar(filters: LeadFilters = {}): Promise<PaginatedLeads> {
     const normalizedFilters: Record<string, unknown> = { ...filters };
 
+    const parsedLimit = Number(filters.limit);
+    if (Number.isFinite(parsedLimit) && parsedLimit > 0) {
+      normalizedFilters.limit = Math.min(100, Math.trunc(parsedLimit));
+    }
+
+    const parsedPage = Number(filters.page);
+    if (Number.isFinite(parsedPage) && parsedPage > 0) {
+      normalizedFilters.page = Math.max(1, Math.trunc(parsedPage));
+    }
+
     if (filters.search && !filters.busca) {
       normalizedFilters.busca = filters.search;
     }
