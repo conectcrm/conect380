@@ -789,6 +789,115 @@ export class MercadoPagoService {
     };
   }
 
+  private buildMockSubscriptionPreapproval(subscriptionId: string) {
+    const prefix = 'mock-sub:';
+    if (typeof subscriptionId !== 'string' || !subscriptionId.startsWith(prefix)) {
+      return null;
+    }
+
+    const rawPayload = subscriptionId.slice(prefix.length);
+    let status = 'authorized';
+    let encodedExternalReference = rawPayload;
+
+    const separatorIndex = rawPayload.indexOf(':');
+    if (separatorIndex > 0) {
+      status = rawPayload.slice(0, separatorIndex).trim().toLowerCase() || 'authorized';
+      encodedExternalReference = rawPayload.slice(separatorIndex + 1);
+    }
+
+    let externalReference: string;
+    try {
+      externalReference = decodeURIComponent(encodedExternalReference);
+    } catch {
+      externalReference = encodedExternalReference;
+    }
+
+    return {
+      id: subscriptionId,
+      status,
+      external_reference: externalReference,
+    };
+  }
+
+  private mapSubscriptionWebhookStatusToCanonical(
+    providerStatusRaw: unknown,
+  ): CanonicalAssinaturaStatus | undefined {
+    const providerStatus = String(providerStatusRaw || '')
+      .trim()
+      .toLowerCase();
+
+    if (!providerStatus) {
+      return undefined;
+    }
+
+    if (['authorized', 'active'].includes(providerStatus)) {
+      return 'active';
+    }
+
+    if (['pending', 'in_process'].includes(providerStatus)) {
+      return 'trial';
+    }
+
+    if (['paused'].includes(providerStatus)) {
+      return 'suspended';
+    }
+
+    if (['cancelled', 'canceled'].includes(providerStatus)) {
+      return 'canceled';
+    }
+
+    if (['rejected', 'failed'].includes(providerStatus)) {
+      return 'past_due';
+    }
+
+    return undefined;
+  }
+
+  private async getSubscriptionPreapproval(subscriptionId: string) {
+    if (!subscriptionId) {
+      throw new Error('Identificador da assinatura nao informado para webhook de preapproval.');
+    }
+
+    if (this.isMockMode()) {
+      const mockSubscription = this.buildMockSubscriptionPreapproval(subscriptionId);
+      if (mockSubscription) {
+        this.logger.warn(
+          `Mercado Pago em modo MOCK: retornando assinatura simulada para id=${subscriptionId}`,
+        );
+        return mockSubscription;
+      }
+    }
+
+    const accessToken = this.configService.get<string>('MERCADO_PAGO_ACCESS_TOKEN');
+    if (!accessToken) {
+      throw new ServiceUnavailableException(
+        'Mercado Pago nao inicializado. Configure MERCADO_PAGO_ACCESS_TOKEN.',
+      );
+    }
+
+    const response = await fetch(
+      `https://api.mercadopago.com/preapproval/${encodeURIComponent(subscriptionId)}`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      const errorPayload = await response.text();
+      throw new Error(
+        `Falha ao consultar assinatura ${subscriptionId} no Mercado Pago (${response.status}): ${errorPayload.slice(
+          0,
+          240,
+        )}`,
+      );
+    }
+
+    return response.json();
+  }
+
   async createCustomer(customerData: any) {
     try {
       const customer = await this.customerApi.create({
@@ -1069,6 +1178,8 @@ export class MercadoPagoService {
           break;
 
         case 'subscription':
+        case 'subscription_preapproval':
+        case 'preapproval':
           await this.handleSubscriptionWebhook(resourceId || '', action);
           break;
 
@@ -1337,8 +1448,92 @@ export class MercadoPagoService {
   }
 
   private async handleSubscriptionWebhook(subscriptionId: string, action: string) {
-    this.logger.log(`Webhook assinatura ${subscriptionId}: ${action}`);
-    // Implementar lógica para assinaturas
+    try {
+      if (!subscriptionId) {
+        this.logger.warn(`Webhook de assinatura sem identificador (action=${action})`);
+        return;
+      }
+
+      const preapproval = await this.getSubscriptionPreapproval(subscriptionId);
+      const providerStatus = String(preapproval?.status || '')
+        .trim()
+        .toLowerCase();
+      const targetStatus = this.mapSubscriptionWebhookStatusToCanonical(providerStatus);
+
+      this.logger.log(`Webhook assinatura ${subscriptionId}: ${providerStatus || 'unknown'} - ${action}`);
+
+      if (!targetStatus) {
+        this.logger.log(
+          `Status de assinatura nao mapeado para reconciliacao (${providerStatus || 'unknown'})`,
+        );
+        return;
+      }
+
+      const resolved = this.parseExternalReference(preapproval?.external_reference);
+      if (!resolved) {
+        this.logger.warn(
+          `Assinatura Mercado Pago ${subscriptionId} sem external_reference reconhecida: ${preapproval?.external_reference}`,
+        );
+        return;
+      }
+
+      const { empresaId, assinaturaId } = resolved;
+      await runWithTenant(empresaId, async () => {
+        const assinatura = await this.assinaturaRepository.findOne({
+          where: { id: assinaturaId },
+        });
+
+        if (!assinatura) {
+          this.logger.warn(
+            `Assinatura ${assinaturaId} nao encontrada para empresa ${empresaId} (webhook ${subscriptionId})`,
+          );
+          return;
+        }
+
+        const currentStatus = toCanonicalAssinaturaStatus(assinatura.status);
+        if (currentStatus === targetStatus) {
+          this.logger.log(`Assinatura ${assinatura.id} ja alinhada em ${targetStatus}`);
+          return;
+        }
+
+        if (!canTransitionSubscriptionStatus(currentStatus, targetStatus)) {
+          this.logger.warn(
+            `Transicao invalida de assinatura ${assinatura.id}: ${currentStatus} -> ${targetStatus}`,
+          );
+          return;
+        }
+
+        const now = new Date();
+        if (targetStatus === 'active') {
+          const proximoVencimento = new Date(now);
+          proximoVencimento.setMonth(proximoVencimento.getMonth() + 1);
+          assinatura.dataInicio = now;
+          assinatura.dataFim = null;
+          assinatura.proximoVencimento = proximoVencimento;
+          assinatura.renovacaoAutomatica = true;
+        }
+
+        if (targetStatus === 'suspended') {
+          assinatura.renovacaoAutomatica = false;
+        }
+
+        if (targetStatus === 'canceled') {
+          assinatura.dataFim = now;
+          assinatura.renovacaoAutomatica = false;
+        }
+
+        assinatura.status = targetStatus;
+
+        const linha = `Atualizada via Mercado Pago preapproval ${subscriptionId} (${providerStatus || 'unknown'}) ${currentStatus} -> ${targetStatus} em ${now.toISOString()}`;
+        assinatura.observacoes = assinatura.observacoes
+          ? `${assinatura.observacoes}\n${linha}`
+          : linha;
+
+        await this.assinaturaRepository.save(assinatura);
+      });
+    } catch (error) {
+      this.logger.error('Erro ao processar webhook de assinatura:', error);
+    }
   }
 
   private async handleInvoiceWebhook(invoiceId: string, action: string) {

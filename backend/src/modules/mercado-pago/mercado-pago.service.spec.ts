@@ -104,6 +104,78 @@ describe('MercadoPagoService', () => {
     expect(getPaymentSpy).toHaveBeenCalledWith('999001');
   });
 
+  it('processa webhook subscription_preapproval e ativa assinatura vinculada', async () => {
+    const assinaturaTrial = {
+      id: '66666666-6666-6666-6666-666666666666',
+      status: 'trial',
+      observacoes: null,
+      dataInicio: new Date('2026-01-01'),
+      dataFim: null,
+      proximoVencimento: new Date('2026-02-01'),
+      renovacaoAutomatica: false,
+    };
+
+    const getSubscriptionSpy = jest
+      .spyOn(service as any, 'getSubscriptionPreapproval')
+      .mockResolvedValue({
+        id: 'sub-001',
+        status: 'authorized',
+        external_reference:
+          'conectcrm:empresa:11111111-1111-1111-1111-111111111111:assinatura:66666666-6666-6666-6666-666666666666',
+      });
+
+    assinaturaRepository.findOne.mockResolvedValueOnce(assinaturaTrial);
+    assinaturaRepository.save.mockImplementation(async (value: any) => value);
+
+    await service.processWebhook({
+      type: 'subscription_preapproval',
+      data: { id: 'sub-001' },
+      action: 'updated',
+    });
+
+    expect(getSubscriptionSpy).toHaveBeenCalledWith('sub-001');
+    expect(assinaturaRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: '66666666-6666-6666-6666-666666666666',
+        status: 'active',
+        renovacaoAutomatica: true,
+      }),
+    );
+  });
+
+  it('processa webhook preapproval pausado e suspende assinatura ativa', async () => {
+    const assinaturaAtiva = {
+      id: '77777777-7777-7777-7777-777777777777',
+      status: 'active',
+      observacoes: null,
+      renovacaoAutomatica: true,
+    };
+
+    jest.spyOn(service as any, 'getSubscriptionPreapproval').mockResolvedValue({
+      id: 'sub-002',
+      status: 'paused',
+      external_reference:
+        'conectcrm:empresa:11111111-1111-1111-1111-111111111111:assinatura:77777777-7777-7777-7777-777777777777',
+    });
+
+    assinaturaRepository.findOne.mockResolvedValueOnce(assinaturaAtiva);
+    assinaturaRepository.save.mockImplementation(async (value: any) => value);
+
+    await service.processWebhook({
+      type: 'preapproval',
+      data: { id: 'sub-002' },
+      action: 'updated',
+    });
+
+    expect(assinaturaRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: '77777777-7777-7777-7777-777777777777',
+        status: 'suspended',
+        renovacaoAutomatica: false,
+      }),
+    );
+  });
+
   it('reconcilia pagamento rejeitado e move assinatura de active para past_due', async () => {
     const payment = {
       id: 'pay-200',
