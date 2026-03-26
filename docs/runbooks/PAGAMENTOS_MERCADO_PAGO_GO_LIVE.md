@@ -62,4 +62,3 @@ Se necessario, desabilitar gateway no runtime env e redeploy:
 PAGAMENTOS_GATEWAY_ENABLED_PROVIDERS=
 REACT_APP_PAGAMENTOS_GATEWAY_ENABLED_PROVIDERS=
 ```
-
