@@ -32,6 +32,7 @@ interface PaymentFormProps {
   onCancel: () => void;
   className?: string;
   checkoutEnabled?: boolean;
+  checkoutProviderLabel?: string;
 }
 
 const PAYMENT_METHODS: PaymentMethod[] = [
@@ -74,6 +75,7 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
   onCancel,
   className,
   checkoutEnabled = true,
+  checkoutProviderLabel = 'Gateway de pagamento',
 }) => {
   const [selectedMethod, setSelectedMethod] = useState<string>('card');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -163,7 +165,7 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
           <h3 className="text-lg font-semibold text-[#002333]">Forma de pagamento</h3>
           <p className="text-sm text-[#385A6A]">
             {checkoutEnabled
-              ? 'A cobranca final e concluida no checkout seguro do Mercado Pago.'
+              ? `A cobranca final e concluida no checkout seguro do provedor (${checkoutProviderLabel}).`
               : 'Este tenant utiliza politica interna de cobranca e nao realiza checkout self-service.'}
           </p>
           <div className="grid gap-3">
@@ -177,7 +179,9 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
                   type="button"
                   onClick={() => setSelectedMethod(method.id)}
                   className={`w-full rounded-xl border-2 p-4 text-left transition-all duration-200 hover:border-[#159A9C]/40 hover:bg-[#159A9C]/5 ${
-                    isSelected ? 'border-[#159A9C] bg-[#159A9C]/5 shadow-md' : 'border-[#D4E2E7] bg-white'
+                    isSelected
+                      ? 'border-[#159A9C] bg-[#159A9C]/5 shadow-md'
+                      : 'border-[#D4E2E7] bg-white'
                   }`}
                 >
                   <div className="flex items-center justify-between">
@@ -204,7 +208,8 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
             <div className="text-sm">
               <div className="font-medium text-[#244455]">Checkout seguro</div>
               <div className="text-[#385A6A]">
-                Seus dados de pagamento sao processados no provedor seguro. Este sistema nao armazena dados de cartao.
+                Seus dados de pagamento sao processados no provedor seguro. Este sistema nao
+                armazena dados de cartao.
               </div>
             </div>
           </div>
@@ -230,8 +235,10 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Redirecionando para checkout...
               </>
+            ) : checkoutEnabled ? (
+              'Ir para checkout seguro'
             ) : (
-              checkoutEnabled ? 'Ir para checkout seguro' : 'Checkout indisponivel'
+              'Checkout indisponivel'
             )}
           </Button>
           <Button variant="outline" onClick={onCancel} disabled={isProcessing}>

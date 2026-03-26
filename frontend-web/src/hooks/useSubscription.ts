@@ -2,12 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from './useAuth';
 import { api } from '../services/api';
 
-export type AssinaturaStatusCanonical =
-  | 'trial'
-  | 'active'
-  | 'past_due'
-  | 'suspended'
-  | 'canceled';
+export type AssinaturaStatusCanonical = 'trial' | 'active' | 'past_due' | 'suspended' | 'canceled';
 
 export interface ModuloSistema {
   id: string;
@@ -67,6 +62,78 @@ export interface BillingPolicy {
   enforceLifecycleTransitions: boolean;
 }
 
+export interface BillingCapabilities {
+  isPlatformOwner: boolean;
+  billingExempt: boolean;
+  monitorOnlyLimits: boolean;
+  allowCheckout: boolean;
+  allowPlanMutation: boolean;
+  enforceLifecycleTransitions: boolean;
+  checkoutEnabled: boolean;
+  enabledGatewayProviders: string[];
+}
+
+export interface BillingResumoFinanceiro {
+  totalFaturas: number;
+  totalPagamentos: number;
+  valorFaturadoTotal: number;
+  valorRecebidoTotal: number;
+  valorEmAberto: number;
+  ultimoPagamentoEm: string | null;
+  hasGatewayEnabled: boolean;
+  gatewaysEnabled: string[];
+}
+
+export interface BillingHistoricoFatura {
+  id: number;
+  numero: string;
+  status: string;
+  valorTotal: number;
+  valorPago: number;
+  valorRestante: number;
+  dataEmissao: string;
+  dataVencimento: string;
+  createdAt: string;
+}
+
+export interface BillingHistoricoPagamento {
+  id: number;
+  faturaId: number;
+  transacaoId: string;
+  status: string;
+  tipo: string;
+  valor: number;
+  valorLiquido: number;
+  metodoPagamento: string;
+  gateway: string;
+  dataAprovacao: string | null;
+  createdAt: string;
+}
+
+export interface BillingHistorico {
+  faturas: BillingHistoricoFatura[];
+  pagamentos: BillingHistoricoPagamento[];
+  limit: number;
+  page: number;
+  tipo: 'all' | 'faturas' | 'pagamentos';
+  status: string | null;
+  dataInicio: string | null;
+  dataFim: string | null;
+  totalFaturas: number;
+  totalPagamentos: number;
+  hasNextFaturas: boolean;
+  hasNextPagamentos: boolean;
+}
+
+export interface BillingHistoricoQuery {
+  limit?: number;
+  page?: number;
+  tipo?: 'all' | 'faturas' | 'pagamentos';
+  status?: string | null;
+  dataInicio?: string | null;
+  dataFim?: string | null;
+}
+
 export interface LimitesInfo {
   usuariosAtivos: number;
   limiteUsuarios: number;
@@ -97,6 +164,17 @@ const DEFAULT_BILLING_POLICY: BillingPolicy = {
   allowCheckout: true,
   allowPlanMutation: true,
   enforceLifecycleTransitions: true,
+};
+
+const DEFAULT_BILLING_CAPABILITIES: BillingCapabilities = {
+  isPlatformOwner: false,
+  billingExempt: false,
+  monitorOnlyLimits: false,
+  allowCheckout: true,
+  allowPlanMutation: true,
+  enforceLifecycleTransitions: true,
+  checkoutEnabled: true,
+  enabledGatewayProviders: [],
 };
 
 const normalizeNumber = (value: unknown, fallback = 0): number => {
@@ -160,7 +238,9 @@ const normalizePlano = (input: any): Plano => {
     ? raw.modulosInclusos
         .map((item: any) => normalizeModulo(item?.modulo ?? item))
         .filter((item: ModuloSistema | null): item is ModuloSistema => Boolean(item))
-        .sort((left, right) => left.ordem - right.ordem || left.nome.localeCompare(right.nome, 'pt-BR'))
+        .sort(
+          (left, right) => left.ordem - right.ordem || left.nome.localeCompare(right.nome, 'pt-BR'),
+        )
     : [];
 
   return {
@@ -263,6 +343,179 @@ const normalizeLimites = (input: any): LimitesInfo | null => {
   };
 };
 
+const normalizeBillingCapabilities = (input: any): BillingCapabilities => {
+  if (!input || typeof input !== 'object') {
+    return DEFAULT_BILLING_CAPABILITIES;
+  }
+
+  const raw = input as RawRecord;
+  const enabledGatewayProviders = Array.isArray(raw.enabledGatewayProviders)
+    ? raw.enabledGatewayProviders
+        .map((item: unknown) =>
+          String(item || '')
+            .trim()
+            .toLowerCase(),
+        )
+        .filter((item: string) => item.length > 0)
+    : [];
+
+  return {
+    isPlatformOwner: Boolean(raw.isPlatformOwner),
+    billingExempt: Boolean(raw.billingExempt),
+    monitorOnlyLimits: Boolean(raw.monitorOnlyLimits),
+    allowCheckout: raw.allowCheckout !== false,
+    allowPlanMutation: raw.allowPlanMutation !== false,
+    enforceLifecycleTransitions: raw.enforceLifecycleTransitions !== false,
+    checkoutEnabled:
+      raw.checkoutEnabled !== undefined
+        ? Boolean(raw.checkoutEnabled)
+        : raw.allowCheckout !== false && enabledGatewayProviders.length > 0,
+    enabledGatewayProviders,
+  };
+};
+
+const normalizeBillingResumoFinanceiro = (input: any): BillingResumoFinanceiro | null => {
+  if (!input || typeof input !== 'object') {
+    return null;
+  }
+
+  const raw = input as RawRecord;
+  const gatewaysEnabled = Array.isArray(raw.gatewaysEnabled)
+    ? raw.gatewaysEnabled
+        .map((item: unknown) =>
+          String(item || '')
+            .trim()
+            .toLowerCase(),
+        )
+        .filter((item: string) => item.length > 0)
+    : [];
+
+  return {
+    totalFaturas: normalizeNumber(raw.totalFaturas, 0),
+    totalPagamentos: normalizeNumber(raw.totalPagamentos, 0),
+    valorFaturadoTotal: normalizeNumber(raw.valorFaturadoTotal, 0),
+    valorRecebidoTotal: normalizeNumber(raw.valorRecebidoTotal, 0),
+    valorEmAberto: normalizeNumber(raw.valorEmAberto, 0),
+    ultimoPagamentoEm:
+      raw.ultimoPagamentoEm && typeof raw.ultimoPagamentoEm === 'string'
+        ? raw.ultimoPagamentoEm
+        : null,
+    hasGatewayEnabled:
+      raw.hasGatewayEnabled !== undefined
+        ? Boolean(raw.hasGatewayEnabled)
+        : gatewaysEnabled.length > 0,
+    gatewaysEnabled,
+  };
+};
+
+const normalizeBillingHistorico = (input: any): BillingHistorico | null => {
+  if (!input || typeof input !== 'object') {
+    return null;
+  }
+
+  const raw = input as RawRecord;
+  const faturasRaw = Array.isArray(raw.faturas) ? raw.faturas : [];
+  const pagamentosRaw = Array.isArray(raw.pagamentos) ? raw.pagamentos : [];
+  const limit = normalizeNumber(raw.limit, 20);
+  const page = normalizeNumber(raw.page, 1);
+  const tipoRaw = String(raw.tipo || 'all')
+    .trim()
+    .toLowerCase();
+  const tipo: 'all' | 'faturas' | 'pagamentos' =
+    tipoRaw === 'faturas' || tipoRaw === 'pagamentos' ? tipoRaw : 'all';
+  const status =
+    raw.status && typeof raw.status === 'string' && raw.status.trim().length > 0
+      ? raw.status
+      : null;
+  const dataInicio =
+    raw.dataInicio && typeof raw.dataInicio === 'string' && raw.dataInicio.trim().length > 0
+      ? raw.dataInicio
+      : null;
+  const dataFim =
+    raw.dataFim && typeof raw.dataFim === 'string' && raw.dataFim.trim().length > 0
+      ? raw.dataFim
+      : null;
+  const totalFaturas = normalizeNumber(raw.totalFaturas, faturasRaw.length);
+  const totalPagamentos = normalizeNumber(raw.totalPagamentos, pagamentosRaw.length);
+  const hasNextFaturas =
+    raw.hasNextFaturas !== undefined ? Boolean(raw.hasNextFaturas) : page * limit < totalFaturas;
+  const hasNextPagamentos =
+    raw.hasNextPagamentos !== undefined
+      ? Boolean(raw.hasNextPagamentos)
+      : page * limit < totalPagamentos;
+
+  return {
+    faturas: faturasRaw.map((item: RawRecord) => ({
+      id: normalizeNumber(item.id, 0),
+      numero: String(item.numero || ''),
+      status: String(item.status || ''),
+      valorTotal: normalizeNumber(item.valorTotal, 0),
+      valorPago: normalizeNumber(item.valorPago, 0),
+      valorRestante: normalizeNumber(item.valorRestante, 0),
+      dataEmissao: String(item.dataEmissao || ''),
+      dataVencimento: String(item.dataVencimento || ''),
+      createdAt: String(item.createdAt || ''),
+    })),
+    pagamentos: pagamentosRaw.map((item: RawRecord) => ({
+      id: normalizeNumber(item.id, 0),
+      faturaId: normalizeNumber(item.faturaId, 0),
+      transacaoId: String(item.transacaoId || ''),
+      status: String(item.status || ''),
+      tipo: String(item.tipo || ''),
+      valor: normalizeNumber(item.valor, 0),
+      valorLiquido: normalizeNumber(item.valorLiquido, 0),
+      metodoPagamento: String(item.metodoPagamento || ''),
+      gateway: String(item.gateway || ''),
+      dataAprovacao:
+        item.dataAprovacao && typeof item.dataAprovacao === 'string' ? item.dataAprovacao : null,
+      createdAt: String(item.createdAt || ''),
+    })),
+    limit,
+    page,
+    tipo,
+    status,
+    dataInicio,
+    dataFim,
+    totalFaturas,
+    totalPagamentos,
+    hasNextFaturas,
+    hasNextPagamentos,
+  };
+};
+
+const normalizePlanosVisiveis = (input: unknown): Plano[] => {
+  const planosNormalizados = Array.isArray(input)
+    ? input.map((item: any) => normalizePlano(item))
+    : [];
+
+  const planosAtivos = planosNormalizados
+    .filter((plano) => plano.ativo)
+    .sort((left, right) => {
+      const ordemLeft = typeof left.ordem === 'number' ? left.ordem : 0;
+      const ordemRight = typeof right.ordem === 'number' ? right.ordem : 0;
+
+      if (ordemLeft !== ordemRight) {
+        return ordemLeft - ordemRight;
+      }
+
+      if (left.preco !== right.preco) {
+        return left.preco - right.preco;
+      }
+
+      return left.nome.localeCompare(right.nome, 'pt-BR');
+    });
+
+  const planosCanonicos = planosAtivos.filter((plano) =>
+    CANONICAL_PLAN_CODES.has(
+      String(plano.codigo || '')
+        .trim()
+        .toLowerCase(),
+    ),
+  );
+
+  return planosCanonicos.length > 0 ? planosCanonicos : planosAtivos;
+};
+
 const ACCESS_STATUSES: AssinaturaStatusCanonical[] = ['trial', 'active', 'past_due'];
 const CANONICAL_PLAN_CODES = new Set(['starter', 'business', 'enterprise']);
 
@@ -271,6 +524,11 @@ export const useSubscription = () => {
   const [assinatura, setAssinatura] = useState<AssinaturaEmpresa | null>(null);
   const [limites, setLimites] = useState<LimitesInfo | null>(null);
   const [planos, setPlanos] = useState<Plano[]>([]);
+  const [billingCapabilities, setBillingCapabilities] = useState<BillingCapabilities | null>(null);
+  const [billingResumoFinanceiro, setBillingResumoFinanceiro] =
+    useState<BillingResumoFinanceiro | null>(null);
+  const [billingHistorico, setBillingHistorico] = useState<BillingHistorico | null>(null);
+  const [billingHistoricoLoading, setBillingHistoricoLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -290,21 +548,80 @@ export const useSubscription = () => {
     if (!empresaId) {
       setAssinatura(null);
       setLimites(null);
+      setBillingCapabilities(null);
+      setBillingResumoFinanceiro(null);
+      setBillingHistorico(null);
+      setBillingHistoricoLoading(false);
       setLoading(false);
       return null;
     }
 
     try {
       setLoading(true);
+      try {
+        const overviewResponse = await api.get('/billing/self-service/overview');
+        const overviewPayload =
+          overviewResponse?.data &&
+          typeof overviewResponse.data === 'object' &&
+          overviewResponse.data.data
+            ? overviewResponse.data.data
+            : overviewResponse?.data;
+
+        if (overviewPayload && typeof overviewPayload === 'object') {
+          const assinaturaNormalizada = normalizeAssinatura(
+            (overviewPayload as RawRecord).assinatura,
+          );
+          const limitesNormalizados = normalizeLimites((overviewPayload as RawRecord).limites);
+          const planosNormalizados = normalizePlanosVisiveis((overviewPayload as RawRecord).planos);
+
+          setAssinatura(assinaturaNormalizada);
+          setLimites(limitesNormalizados);
+          if (planosNormalizados.length > 0) {
+            setPlanos(planosNormalizados);
+          }
+          setBillingCapabilities(
+            normalizeBillingCapabilities((overviewPayload as RawRecord).capabilities),
+          );
+          setBillingResumoFinanceiro(
+            normalizeBillingResumoFinanceiro((overviewPayload as RawRecord).resumoFinanceiro),
+          );
+          setError(null);
+          return assinaturaNormalizada;
+        }
+      } catch (_overviewError) {
+        // fallback para endpoints legados abaixo
+      }
+
       const response = await api.get(`/assinaturas/empresa/${empresaId}`);
       const assinaturaNormalizada = normalizeAssinatura(response.data);
       setAssinatura(assinaturaNormalizada);
+      setBillingCapabilities(
+        assinaturaNormalizada?.billingPolicy
+          ? {
+              isPlatformOwner: Boolean(assinaturaNormalizada.billingPolicy.isPlatformOwner),
+              billingExempt: Boolean(assinaturaNormalizada.billingPolicy.billingExempt),
+              monitorOnlyLimits: Boolean(assinaturaNormalizada.billingPolicy.monitorOnlyLimits),
+              allowCheckout: Boolean(assinaturaNormalizada.billingPolicy.allowCheckout),
+              allowPlanMutation: Boolean(assinaturaNormalizada.billingPolicy.allowPlanMutation),
+              enforceLifecycleTransitions: Boolean(
+                assinaturaNormalizada.billingPolicy.enforceLifecycleTransitions,
+              ),
+              checkoutEnabled: Boolean(assinaturaNormalizada.billingPolicy.allowCheckout),
+              enabledGatewayProviders: [],
+            }
+          : DEFAULT_BILLING_CAPABILITIES,
+      );
+      setBillingResumoFinanceiro(null);
       setError(null);
       return assinaturaNormalizada;
     } catch (err: any) {
       if (err.response?.status === 404) {
         setAssinatura(null);
         setLimites(null);
+        setBillingCapabilities(null);
+        setBillingResumoFinanceiro(null);
+        setBillingHistorico(null);
+        setBillingHistoricoLoading(false);
         setError(null);
         return null;
       }
@@ -316,6 +633,61 @@ export const useSubscription = () => {
       setLoading(false);
     }
   }, [empresaId]);
+
+  const buscarHistoricoBilling = useCallback(
+    async (query: number | BillingHistoricoQuery = 20) => {
+      if (!empresaId) {
+        setBillingHistorico(null);
+        setBillingHistoricoLoading(false);
+        return null;
+      }
+
+      try {
+        setBillingHistoricoLoading(true);
+        const normalizedQuery: BillingHistoricoQuery =
+          typeof query === 'number' ? { limit: query } : query;
+        const params: Record<string, unknown> = {
+          limit: normalizedQuery.limit ?? 20,
+        };
+
+        if (normalizedQuery.page && normalizedQuery.page > 0) {
+          params.page = normalizedQuery.page;
+        }
+        if (normalizedQuery.tipo && normalizedQuery.tipo !== 'all') {
+          params.tipo = normalizedQuery.tipo;
+        } else if (normalizedQuery.tipo === 'all') {
+          params.tipo = 'all';
+        }
+        if (normalizedQuery.status && String(normalizedQuery.status).trim().length > 0) {
+          params.status = String(normalizedQuery.status).trim();
+        }
+        if (normalizedQuery.dataInicio) {
+          params.dataInicio = normalizedQuery.dataInicio;
+        }
+        if (normalizedQuery.dataFim) {
+          params.dataFim = normalizedQuery.dataFim;
+        }
+
+        const response = await api.get('/billing/self-service/history', {
+          params,
+        });
+        const payload =
+          response?.data && typeof response.data === 'object' && response.data.data
+            ? response.data.data
+            : response?.data;
+        const historicoNormalizado = normalizeBillingHistorico(payload);
+        setBillingHistorico(historicoNormalizado);
+        return historicoNormalizado;
+      } catch (err) {
+        console.error('Erro ao buscar historico de billing:', err);
+        setBillingHistorico(null);
+        return null;
+      } finally {
+        setBillingHistoricoLoading(false);
+      }
+    },
+    [empresaId],
+  );
 
   const buscarLimites = useCallback(async () => {
     if (!empresaId || !assinatura) {
@@ -336,32 +708,7 @@ export const useSubscription = () => {
   const buscarPlanos = useCallback(async () => {
     try {
       const response = await api.get('/planos');
-      const planosNormalizados = Array.isArray(response.data)
-        ? response.data.map((item: any) => normalizePlano(item))
-        : [];
-
-      const planosAtivos = planosNormalizados
-        .filter((plano) => plano.ativo)
-        .sort((left, right) => {
-          const ordemLeft = typeof left.ordem === 'number' ? left.ordem : 0;
-          const ordemRight = typeof right.ordem === 'number' ? right.ordem : 0;
-
-          if (ordemLeft !== ordemRight) {
-            return ordemLeft - ordemRight;
-          }
-
-          if (left.preco !== right.preco) {
-            return left.preco - right.preco;
-          }
-
-          return left.nome.localeCompare(right.nome, 'pt-BR');
-        });
-
-      const planosCanonicos = planosAtivos.filter((plano) =>
-        CANONICAL_PLAN_CODES.has(String(plano.codigo || '').trim().toLowerCase()),
-      );
-
-      const planosVisiveis = planosCanonicos.length > 0 ? planosCanonicos : planosAtivos;
+      const planosVisiveis = normalizePlanosVisiveis(response.data);
 
       setPlanos(planosVisiveis);
       return planosVisiveis;
@@ -430,7 +777,9 @@ export const useSubscription = () => {
         return false;
       }
 
-      const target = String(codigoModulo || '').trim().toUpperCase();
+      const target = String(codigoModulo || '')
+        .trim()
+        .toUpperCase();
       if (!target) {
         return false;
       }
@@ -568,13 +917,18 @@ export const useSubscription = () => {
       setAssinatura(null);
       setLimites(null);
       setPlanos([]);
+      setBillingCapabilities(null);
+      setBillingResumoFinanceiro(null);
+      setBillingHistorico(null);
+      setBillingHistoricoLoading(false);
       setLoading(false);
       return;
     }
 
     void buscarAssinatura();
     void buscarPlanos();
-  }, [empresaId, buscarAssinatura, buscarPlanos]);
+    void buscarHistoricoBilling();
+  }, [empresaId, buscarAssinatura, buscarPlanos, buscarHistoricoBilling]);
 
   useEffect(() => {
     if (assinatura) {
@@ -589,12 +943,17 @@ export const useSubscription = () => {
     assinatura,
     limites,
     planos,
+    billingCapabilities: billingCapabilities || DEFAULT_BILLING_CAPABILITIES,
+    billingResumoFinanceiro,
+    billingHistorico,
+    billingHistoricoLoading,
     loading,
     error,
 
     buscarAssinatura,
     buscarLimites,
     buscarPlanos,
+    buscarHistoricoBilling,
     alterarPlano,
     cancelarAssinatura,
 
@@ -609,8 +968,14 @@ export const useSubscription = () => {
     ),
     isOwnerTenant: Boolean(assinatura?.billingPolicy?.isPlatformOwner),
     billingPolicy: assinatura?.billingPolicy || DEFAULT_BILLING_POLICY,
-    podeFazerCheckout: Boolean(assinatura?.billingPolicy?.allowCheckout ?? true),
-    podeAlterarPlano: Boolean(assinatura?.billingPolicy?.allowPlanMutation ?? true),
+    podeFazerCheckout: Boolean(
+      billingCapabilities?.checkoutEnabled ?? assinatura?.billingPolicy?.allowCheckout ?? true,
+    ),
+    podeAlterarPlano: Boolean(
+      billingCapabilities?.allowPlanMutation ??
+      assinatura?.billingPolicy?.allowPlanMutation ??
+      true,
+    ),
     precisaUpgrade: (modulo: string) => !temAcessoModulo(modulo),
   };
 };

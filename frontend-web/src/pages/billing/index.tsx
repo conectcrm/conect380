@@ -1,14 +1,15 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { BillingDashboard } from '../../components/Billing/BillingDashboard';
+import { BillingHistory } from '../../components/Billing/BillingHistory';
 import { PlanSelection } from '../../components/Billing/PlanSelection';
 import { UsageMeter } from '../../components/Billing/UsageMeter';
 import { PaymentForm } from '../../components/Billing/PaymentForm';
 import { useSubscription, type Plano } from '../../hooks/useSubscription';
-import { ArrowLeft, CreditCard, FileText, HelpCircle, LayoutDashboard } from 'lucide-react';
+import { ArrowLeft, CalendarDays, CreditCard, FileText, HelpCircle, LayoutDashboard } from 'lucide-react';
 import { FiltersBar, PageHeader, SectionCard } from '../../components/layout-v2';
 
-type BillingTab = 'overview' | 'plans' | 'usage' | 'payment';
+type BillingTab = 'overview' | 'plans' | 'usage' | 'history' | 'payment';
 
 type BillingPrimaryTab = Exclude<BillingTab, 'payment'>;
 
@@ -22,6 +23,10 @@ const resolveTabFromLocation = (pathname: string, search: string): BillingTab =>
 
   if (queryTab === 'usage') {
     return 'usage';
+  }
+
+  if (queryTab === 'history') {
+    return 'history';
   }
 
   if (queryTab === 'plans') {
@@ -60,10 +65,21 @@ export const BillingPage: React.FC = () => {
     planos,
     isOwnerTenant = false,
     podeFazerCheckout = true,
+    billingCapabilities,
   } = useSubscription() as ReturnType<typeof useSubscription> & {
     isOwnerTenant?: boolean;
     podeFazerCheckout?: boolean;
   };
+  const checkoutProviderLabel = useMemo(() => {
+    const rawProvider = billingCapabilities?.enabledGatewayProviders?.[0];
+    const normalized = String(rawProvider || '')
+      .trim()
+      .toLowerCase();
+    if (normalized === 'mercado_pago') return 'Mercado Pago';
+    if (normalized === 'stripe') return 'Stripe';
+    if (normalized === 'pagseguro') return 'PagSeguro';
+    return 'gateway configurado';
+  }, [billingCapabilities?.enabledGatewayProviders]);
 
   const activeTab = useMemo(
     () => resolveTabFromLocation(location.pathname, location.search),
@@ -92,6 +108,8 @@ export const BillingPage: React.FC = () => {
 
       if (tab === 'usage') {
         params.set('tab', 'usage');
+      } else if (tab === 'history') {
+        params.set('tab', 'history');
       } else if (tab === 'payment') {
         params.set('tab', 'payment');
         if (planId) {
@@ -149,7 +167,9 @@ export const BillingPage: React.FC = () => {
   };
 
   const handleOpenDocumentation = useCallback(() => {
-    const docsUrl = (process.env.REACT_APP_BILLING_DOCS_URL || 'https://docs.conect360.com.br/billing').trim();
+    const docsUrl = (
+      process.env.REACT_APP_BILLING_DOCS_URL || 'https://docs.conect360.com.br/billing'
+    ).trim();
     window.open(docsUrl, '_blank', 'noopener,noreferrer');
   }, []);
 
@@ -172,6 +192,7 @@ export const BillingPage: React.FC = () => {
           <PaymentForm
             planoSelecionado={selectedPlan ? mapPlanoToCheckout(selectedPlan) : undefined}
             checkoutEnabled={podeFazerCheckout}
+            checkoutProviderLabel={checkoutProviderLabel}
             onPaymentSuccess={handlePaymentSuccess}
             onCancel={() => navigateToTab('plans')}
           />
@@ -179,6 +200,9 @@ export const BillingPage: React.FC = () => {
 
       case 'usage':
         return <UsageMeter showDetails={true} onUpgrade={() => navigateToTab('plans')} />;
+
+      case 'history':
+        return <BillingHistory />;
 
       default:
         return (
@@ -240,6 +264,18 @@ export const BillingPage: React.FC = () => {
             }`}
           >
             Uso
+          </button>
+          <button
+            type="button"
+            onClick={() => navigateToTab('history')}
+            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              currentPrimaryTab === 'history'
+                ? 'bg-[#159A9C] text-white'
+                : 'border border-[#D4E2E7] bg-white text-[#244455] hover:bg-[#F6FAF9]'
+            }`}
+          >
+            <CalendarDays className="h-4 w-4" />
+            Historico
           </button>
           <button
             type="button"

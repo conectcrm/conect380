@@ -14,6 +14,10 @@ import { MercadoPagoModule } from '../mercado-pago/mercado-pago.module';
 import { User } from '../users/user.entity';
 import { Cliente } from '../clientes/cliente.entity';
 import { Empresa } from '../../empresas/entities/empresa.entity';
+import { Fatura } from '../faturamento/entities/fatura.entity';
+import { Pagamento } from '../faturamento/entities/pagamento.entity';
+import { BillingSelfServiceController } from './billing-self-service.controller';
+import { BillingSelfServiceService } from './billing-self-service.service';
 
 @Module({
   imports: [
@@ -25,21 +29,25 @@ import { Empresa } from '../../empresas/entities/empresa.entity';
       User,
       Cliente,
       Empresa,
+      Fatura,
+      Pagamento,
     ]),
     forwardRef(() => MercadoPagoModule),
   ],
-  controllers: [PlanosController, AssinaturasController],
+  controllers: [PlanosController, AssinaturasController, BillingSelfServiceController],
   providers: [
     PlanosService,
     AssinaturasService,
     AssinaturaDueDateSchedulerService,
     TenantBillingPolicyService,
+    BillingSelfServiceService,
   ],
   exports: [
     PlanosService,
     AssinaturasService,
     AssinaturaDueDateSchedulerService,
     TenantBillingPolicyService,
+    BillingSelfServiceService,
   ],
 })
 export class PlanosModule {}

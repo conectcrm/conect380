@@ -39,6 +39,10 @@ jest.mock('../../../components/Billing/BillingDashboard', () => ({
   ),
 }));
 
+jest.mock('../../../components/Billing/BillingHistory', () => ({
+  BillingHistory: () => <span>billing-history-view</span>,
+}));
+
 jest.mock('../../../components/Billing/PlanSelection', () => ({
   PlanSelection: ({ onPlanSelect, onClose }: any) => (
     <div>
@@ -126,6 +130,15 @@ describe('BillingPage routing tabs', () => {
 
     expect(screen.getByText('usage-meter-view')).toBeInTheDocument();
     expect(screen.getByTestId('location-probe')).toHaveTextContent('/billing/assinaturas?tab=usage');
+  });
+
+  it('abre aba de historico por deep-link via query tab', () => {
+    renderBillingRoute('/billing/assinaturas?tab=history');
+
+    expect(screen.getByText('billing-history-view')).toBeInTheDocument();
+    expect(screen.getByTestId('location-probe')).toHaveTextContent(
+      '/billing/assinaturas?tab=history',
+    );
   });
 
   it('abre pagamento por deep-link com planId', () => {
