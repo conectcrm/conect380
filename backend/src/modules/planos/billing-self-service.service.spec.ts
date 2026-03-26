@@ -83,6 +83,9 @@ describe('BillingSelfServiceService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.PAGAMENTOS_GATEWAY_ENABLED_PROVIDERS = 'mercado_pago';
+    process.env.MERCADO_PAGO_ACCESS_TOKEN = 'APP_USR_test_token';
+    process.env.MERCADO_PAGO_WEBHOOK_SECRET = 'test_webhook_secret';
+    process.env.MERCADO_PAGO_MOCK = 'false';
 
     service = new BillingSelfServiceService(
       assinaturasService as any,
@@ -132,6 +135,10 @@ describe('BillingSelfServiceService', () => {
     expect(result.limites).toBeTruthy();
     expect(result.capabilities.checkoutEnabled).toBe(true);
     expect(result.capabilities.enabledGatewayProviders).toEqual(['mercado_pago']);
+    expect(result.capabilities.checkoutCredentialScope).toBe('platform_owner');
+    expect(result.capabilities.checkoutCredentialSource).toBe('environment');
+    expect(result.capabilities.checkoutCredentialConfigured).toBe(true);
+    expect(result.capabilities.checkoutMockEnabled).toBe(false);
     expect(result.resumoFinanceiro.totalFaturas).toBe(2);
     expect(result.resumoFinanceiro.valorFaturadoTotal).toBe(300.5);
     expect(result.resumoFinanceiro.valorEmAberto).toBe(80);

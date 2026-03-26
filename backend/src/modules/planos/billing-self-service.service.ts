@@ -134,6 +134,14 @@ const mapInternalStatusToMercadoPago = (statusRaw: string | null): string | null
   return status;
 };
 
+const isTruthyFlag = (value: unknown): boolean => {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase();
+
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+};
+
 @Injectable()
 export class BillingSelfServiceService {
   constructor(
@@ -157,6 +165,11 @@ export class BillingSelfServiceService {
 
     const limites = assinatura ? await this.assinaturasService.verificarLimites(empresaId) : null;
     const enabledGatewayProviders = Array.from(getEnabledGatewayProvidersFromEnv()).sort();
+    const mercadoPagoCredentialConfigured =
+      String(process.env.MERCADO_PAGO_ACCESS_TOKEN || '').trim().length > 0 &&
+      String(process.env.MERCADO_PAGO_WEBHOOK_SECRET || '').trim().length > 0;
+    const checkoutMockEnabled = isTruthyFlag(process.env.MERCADO_PAGO_MOCK);
+    const checkoutRuntimeReady = mercadoPagoCredentialConfigured || checkoutMockEnabled;
 
     return {
       assinatura,
@@ -171,7 +184,12 @@ export class BillingSelfServiceService {
         allowPlanMutation: policy.allowPlanMutation,
         enforceLifecycleTransitions: policy.enforceLifecycleTransitions,
         enabledGatewayProviders,
-        checkoutEnabled: policy.allowCheckout && enabledGatewayProviders.length > 0,
+        checkoutEnabled:
+          policy.allowCheckout && enabledGatewayProviders.length > 0 && checkoutRuntimeReady,
+        checkoutCredentialScope: 'platform_owner',
+        checkoutCredentialSource: 'environment',
+        checkoutCredentialConfigured: mercadoPagoCredentialConfigured,
+        checkoutMockEnabled,
       },
     };
   }

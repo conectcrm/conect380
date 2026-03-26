@@ -271,30 +271,38 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
           )}
 
           {!isOwnerTenant && billingResumoFinanceiro && (
-            <div className="mt-4 grid grid-cols-1 gap-3 rounded-lg border border-[#D4E2E7] bg-white p-3 text-sm text-[#244455] sm:grid-cols-2 lg:grid-cols-4">
-              <div>
-                <div className="text-xs uppercase tracking-wide text-[#5A7582]">Faturas</div>
-                <div className="text-base font-semibold">
-                  {billingResumoFinanceiro.totalFaturas}
+            <>
+              <div className="mt-4 grid grid-cols-1 gap-3 rounded-lg border border-[#D4E2E7] bg-white p-3 text-sm text-[#244455] sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-[#5A7582]">Faturas</div>
+                  <div className="text-base font-semibold">
+                    {billingResumoFinanceiro.totalFaturas}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-[#5A7582]">Pagamentos</div>
+                  <div className="text-base font-semibold">
+                    {billingResumoFinanceiro.totalPagamentos}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-[#5A7582]">Em aberto</div>
+                  <div className="text-base font-semibold">
+                    {formatCurrency(billingResumoFinanceiro.valorEmAberto)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-[#5A7582]">Gateway</div>
+                  <div className="text-base font-semibold">{gatewaysLabel}</div>
                 </div>
               </div>
-              <div>
-                <div className="text-xs uppercase tracking-wide text-[#5A7582]">Pagamentos</div>
-                <div className="text-base font-semibold">
-                  {billingResumoFinanceiro.totalPagamentos}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wide text-[#5A7582]">Em aberto</div>
-                <div className="text-base font-semibold">
-                  {formatCurrency(billingResumoFinanceiro.valorEmAberto)}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wide text-[#5A7582]">Gateway</div>
-                <div className="text-base font-semibold">{gatewaysLabel}</div>
-              </div>
-            </div>
+              {billingCapabilities?.checkoutCredentialScope === 'platform_owner' && (
+                <p className="mt-2 text-xs text-[#5A7582]">
+                  Cobranca de assinatura centralizada na conta da empresa proprietaria da
+                  plataforma.
+                </p>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

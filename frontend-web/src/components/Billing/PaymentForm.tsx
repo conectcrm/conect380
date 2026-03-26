@@ -33,6 +33,8 @@ interface PaymentFormProps {
   className?: string;
   checkoutEnabled?: boolean;
   checkoutProviderLabel?: string;
+  checkoutCredentialScope?: 'platform_owner' | 'tenant';
+  checkoutCredentialConfigured?: boolean;
 }
 
 const PAYMENT_METHODS: PaymentMethod[] = [
@@ -76,6 +78,8 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
   className,
   checkoutEnabled = true,
   checkoutProviderLabel = 'Gateway de pagamento',
+  checkoutCredentialScope = 'platform_owner',
+  checkoutCredentialConfigured = false,
 }) => {
   const [selectedMethod, setSelectedMethod] = useState<string>('card');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -83,6 +87,10 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
 
   const price = useMemo(() => parsePrice(planoSelecionado?.preco), [planoSelecionado?.preco]);
   const hasValidPlan = Boolean(planoSelecionado?.id);
+  const scopeLabel =
+    checkoutCredentialScope === 'platform_owner'
+      ? 'conta proprietaria da plataforma'
+      : 'conta da empresa atual';
 
   const handleCheckout = async () => {
     if (!checkoutEnabled) {
@@ -211,9 +219,18 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
                 Seus dados de pagamento sao processados no provedor seguro. Este sistema nao
                 armazena dados de cartao.
               </div>
+              <div className="mt-1 text-[#385A6A]">
+                As mensalidades do Conect360 sao liquidadas na {scopeLabel}.
+              </div>
             </div>
           </div>
         </div>
+
+        {!checkoutCredentialConfigured && (
+          <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
+            O ambiente ainda nao possui credenciais de producao do gateway configuradas.
+          </div>
+        )}
 
         {error && (
           <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">

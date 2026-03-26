@@ -193,6 +193,8 @@ export const BillingPage: React.FC = () => {
             planoSelecionado={selectedPlan ? mapPlanoToCheckout(selectedPlan) : undefined}
             checkoutEnabled={podeFazerCheckout}
             checkoutProviderLabel={checkoutProviderLabel}
+            checkoutCredentialScope={billingCapabilities?.checkoutCredentialScope}
+            checkoutCredentialConfigured={billingCapabilities?.checkoutCredentialConfigured}
             onPaymentSuccess={handlePaymentSuccess}
             onCancel={() => navigateToTab('plans')}
           />

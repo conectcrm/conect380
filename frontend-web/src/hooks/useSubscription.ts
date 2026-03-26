@@ -71,6 +71,10 @@ export interface BillingCapabilities {
   enforceLifecycleTransitions: boolean;
   checkoutEnabled: boolean;
   enabledGatewayProviders: string[];
+  checkoutCredentialScope: 'platform_owner' | 'tenant';
+  checkoutCredentialSource: 'environment' | 'database';
+  checkoutCredentialConfigured: boolean;
+  checkoutMockEnabled: boolean;
 }
 
 export interface BillingResumoFinanceiro {
@@ -175,6 +179,10 @@ const DEFAULT_BILLING_CAPABILITIES: BillingCapabilities = {
   enforceLifecycleTransitions: true,
   checkoutEnabled: true,
   enabledGatewayProviders: [],
+  checkoutCredentialScope: 'platform_owner',
+  checkoutCredentialSource: 'environment',
+  checkoutCredentialConfigured: false,
+  checkoutMockEnabled: false,
 };
 
 const normalizeNumber = (value: unknown, fallback = 0): number => {
@@ -371,6 +379,20 @@ const normalizeBillingCapabilities = (input: any): BillingCapabilities => {
         ? Boolean(raw.checkoutEnabled)
         : raw.allowCheckout !== false && enabledGatewayProviders.length > 0,
     enabledGatewayProviders,
+    checkoutCredentialScope:
+      String(raw.checkoutCredentialScope || '')
+        .trim()
+        .toLowerCase() === 'tenant'
+        ? 'tenant'
+        : 'platform_owner',
+    checkoutCredentialSource:
+      String(raw.checkoutCredentialSource || '')
+        .trim()
+        .toLowerCase() === 'database'
+        ? 'database'
+        : 'environment',
+    checkoutCredentialConfigured: Boolean(raw.checkoutCredentialConfigured),
+    checkoutMockEnabled: Boolean(raw.checkoutMockEnabled),
   };
 };
 
@@ -608,6 +630,10 @@ export const useSubscription = () => {
               ),
               checkoutEnabled: Boolean(assinaturaNormalizada.billingPolicy.allowCheckout),
               enabledGatewayProviders: [],
+              checkoutCredentialScope: 'platform_owner',
+              checkoutCredentialSource: 'environment',
+              checkoutCredentialConfigured: false,
+              checkoutMockEnabled: false,
             }
           : DEFAULT_BILLING_CAPABILITIES,
       );

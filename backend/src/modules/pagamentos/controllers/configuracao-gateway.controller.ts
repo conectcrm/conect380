@@ -23,9 +23,10 @@ import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { Permission } from '../../../common/permissions/permissions.constants';
+import { PlatformOwnerGuard } from '../../../common/guards/platform-owner.guard';
 
 @Controller('pagamentos/gateways/configuracoes')
-@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard, PlatformOwnerGuard)
 @Permissions(Permission.FINANCEIRO_PAGAMENTOS_READ)
 export class ConfiguracaoGatewayController {
   constructor(private readonly configuracaoGatewayService: ConfiguracaoGatewayService) {}
