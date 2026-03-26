@@ -1,32 +1,11 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { resolveRuntimeAssetUrl } from '../utils/runtimeAssetUrl';
 
 const BRANDING_CACHE_KEYS = [
   'conect_system_branding_cache_v2::global',
   'conect_system_branding_cache_v1',
 ];
 const DEFAULT_NOTIFICATION_ICON = '/favicon.svg';
-
-const resolveRuntimeAssetUrl = (url: string): string => {
-  if (!url) {
-    return url;
-  }
-
-  if (
-    url.startsWith('data:') ||
-    url.startsWith('blob:') ||
-    url.startsWith('http://') ||
-    url.startsWith('https://')
-  ) {
-    return url;
-  }
-
-  if (url.startsWith('/')) {
-    const basePath = process.env.PUBLIC_URL || '';
-    return `${basePath}${url}`;
-  }
-
-  return url;
-};
 
 const getCachedBrandingIcon = (): string => {
   try {
@@ -42,9 +21,9 @@ const getCachedBrandingIcon = (): string => {
         return resolveRuntimeAssetUrl(cachedIcon);
       }
     }
-    return resolveRuntimeAssetUrl(DEFAULT_NOTIFICATION_ICON);
+    return DEFAULT_NOTIFICATION_ICON;
   } catch {
-    return resolveRuntimeAssetUrl(DEFAULT_NOTIFICATION_ICON);
+    return DEFAULT_NOTIFICATION_ICON;
   }
 };
 

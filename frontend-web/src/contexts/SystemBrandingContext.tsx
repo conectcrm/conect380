@@ -3,6 +3,7 @@ import systemBrandingService, {
   DEFAULT_SYSTEM_BRANDING,
   type SystemBrandingEffectiveConfig,
 } from '../services/systemBrandingService';
+import { resolveRuntimeAssetUrl } from '../utils/runtimeAssetUrl';
 
 interface SystemBrandingContextValue {
   branding: SystemBrandingEffectiveConfig;
@@ -171,25 +172,7 @@ const hasAuthToken = (): boolean => {
 };
 
 const resolveAssetUrl = (url: string): string => {
-  if (!url) {
-    return url;
-  }
-
-  if (
-    url.startsWith('data:') ||
-    url.startsWith('blob:') ||
-    url.startsWith('http://') ||
-    url.startsWith('https://')
-  ) {
-    return url;
-  }
-
-  if (url.startsWith('/')) {
-    const basePath = process.env.PUBLIC_URL || '';
-    return `${basePath}${url}`;
-  }
-
-  return url;
+  return resolveRuntimeAssetUrl(url);
 };
 
 const applyFavicon = (faviconUrl: string): void => {

@@ -33,6 +33,8 @@ const dynamicVariantMap: Record<Conect360LogoDynamicVariant, Conect360LogoDynami
   loading: 'loadingLogoUrl',
 };
 
+const failedLogoSources = new Set<string>();
+
 const Conect360Logo: React.FC<Conect360LogoProps> = ({
   variant = 'full',
   size = 'md',
@@ -40,6 +42,7 @@ const Conect360Logo: React.FC<Conect360LogoProps> = ({
   alt = 'Logo',
 }) => {
   const { branding } = useSystemBranding();
+  const [hasLoadError, setHasLoadError] = React.useState(false);
 
   const dynamicField =
     variant === 'full' || variant === 'full-light' || variant === 'icon' || variant === 'loading'
@@ -53,11 +56,16 @@ const Conect360Logo: React.FC<Conect360LogoProps> = ({
   const preferred = dynamicField ? branding[dynamicField] : '';
   const fallback = branding[fallbackField];
   const src = systemBrandingUrlResolver(preferred || fallback || '');
+  const shouldFallbackToText = !src || hasLoadError || failedLogoSources.has(src);
+
+  React.useEffect(() => {
+    setHasLoadError(false);
+  }, [src]);
 
   const sizeClass = sizeClassMap[size];
   const widthClass = 'w-auto';
 
-  if (!src) {
+  if (shouldFallbackToText) {
     return (
       <span
         className={`${sizeClass} ${widthClass} inline-flex items-center font-semibold text-[#1D3E4F] ${className}`.trim()}
@@ -75,6 +83,10 @@ const Conect360Logo: React.FC<Conect360LogoProps> = ({
       draggable={false}
       loading="eager"
       decoding="async"
+      onError={() => {
+        failedLogoSources.add(src);
+        setHasLoadError(true);
+      }}
     />
   );
 };
