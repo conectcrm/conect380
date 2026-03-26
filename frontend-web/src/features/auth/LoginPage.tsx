@@ -5,6 +5,7 @@ import { Eye, EyeOff, Loader2, Mail, Lock, ArrowRight, Check, CheckCircle2 } fro
 import Conect360Logo from '../../components/ui/Conect360Logo';
 import { toastService } from '../../services/toastService';
 import { MfaRequiredActionData } from '../../types';
+import { hasKnownLoginForEmail, markKnownLoginForEmail } from './loginGreetingHistory';
 
 const IS_DEV_ENV = process.env.NODE_ENV !== 'production';
 
@@ -38,6 +39,7 @@ const LoginPage: React.FC = () => {
   const [mfaIsResending, setMfaIsResending] = useState(false);
   const [mfaExpiresInSeconds, setMfaExpiresInSeconds] = useState(0);
   const [mfaResendInSeconds, setMfaResendInSeconds] = useState(0);
+  const [isKnownReturningUser, setIsKnownReturningUser] = useState(false);
 
   const { login, verifyMfa, resendMfa } = useAuth();
   const location = useLocation();
@@ -96,6 +98,10 @@ const LoginPage: React.FC = () => {
     return () => window.clearInterval(timerId);
   }, [mfaState]);
 
+  useEffect(() => {
+    setIsKnownReturningUser(hasKnownLoginForEmail(email));
+  }, [email]);
+
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
 
@@ -137,6 +143,8 @@ const LoginPage: React.FC = () => {
 
     try {
       await login(email, password);
+      markKnownLoginForEmail(email);
+      setIsKnownReturningUser(true);
       toastService.success('Login realizado com sucesso!');
     } catch (error: unknown) {
       const errorMessage =
@@ -250,6 +258,8 @@ const LoginPage: React.FC = () => {
 
     try {
       await verifyMfa(mfaState.challengeId, mfaCode.trim());
+      markKnownLoginForEmail(email);
+      setIsKnownReturningUser(true);
       toastService.success('Verificação concluída com sucesso!');
     } catch (error) {
       const message =
@@ -298,6 +308,11 @@ const LoginPage: React.FC = () => {
     setMfaCode('');
     setMfaError(null);
   };
+
+  const loginTitle = isKnownReturningUser ? 'Bem-vindo de volta!' : 'Bem-vindo!';
+  const loginSubtitle = isKnownReturningUser
+    ? 'Faça login para acessar sua conta'
+    : 'Primeiro acesso? Use sua senha temporaria para continuar.';
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -369,12 +384,12 @@ const LoginPage: React.FC = () => {
 
           <div className="text-center mb-8">
             <h1 className="text-fluid-2xl font-bold text-[#002333] mb-2">
-              {mfaState ? 'Validação de segurança' : 'Bem-vindo de volta!'}
+              {mfaState ? 'Validação de segurança' : loginTitle}
             </h1>
             <p className="text-[#B4BEC9]">
               {mfaState
                 ? 'Informe o código enviado para concluir seu acesso administrativo.'
-                : 'Faça login para acessar sua conta'}
+                : loginSubtitle}
             </p>
 
             {redirectMessage && !mfaState && (
