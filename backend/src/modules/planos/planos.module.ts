@@ -16,6 +16,7 @@ import { Cliente } from '../clientes/cliente.entity';
 import { Empresa } from '../../empresas/entities/empresa.entity';
 import { Fatura } from '../faturamento/entities/fatura.entity';
 import { Pagamento } from '../faturamento/entities/pagamento.entity';
+import { BillingEvent } from '../faturamento/entities/billing-event.entity';
 import { BillingSelfServiceController } from './billing-self-service.controller';
 import { BillingSelfServiceService } from './billing-self-service.service';
 
@@ -31,6 +32,7 @@ import { BillingSelfServiceService } from './billing-self-service.service';
       Empresa,
       Fatura,
       Pagamento,
+      BillingEvent,
     ]),
     forwardRef(() => MercadoPagoModule),
   ],

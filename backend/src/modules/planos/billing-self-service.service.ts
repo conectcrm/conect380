@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, FindOptionsWhere, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { PlanosService } from './planos.service';
 import { AssinaturasService } from './assinaturas.service';
 import { Fatura, StatusFatura } from '../faturamento/entities/fatura.entity';
 import { Pagamento, StatusPagamento } from '../faturamento/entities/pagamento.entity';
+import { BillingEvent } from '../faturamento/entities/billing-event.entity';
 import { GatewayProvider } from '../pagamentos/entities/configuracao-gateway.entity';
 import { getEnabledGatewayProvidersFromEnv } from '../pagamentos/services/gateway-provider-support.util';
 
@@ -20,6 +21,15 @@ type BillingHistoryQueryInput = {
   status?: string;
   dataInicio?: string;
   dataFim?: string;
+};
+
+type SubscriptionPaymentHistoryRow = {
+  id: number;
+  payment_id: string | null;
+  payment_status: string | null;
+  payment_action: string | null;
+  occurred_at: string | Date | null;
+  created_at: string | Date | null;
 };
 
 const toNumber = (value: unknown, fallback = 0): number => {
@@ -92,6 +102,38 @@ const parseDateForRange = (value: unknown, endOfDay: boolean): Date | null => {
   return date;
 };
 
+const mapMercadoPagoStatusToInternal = (statusRaw: unknown): string => {
+  const status = String(statusRaw || '')
+    .trim()
+    .toLowerCase();
+
+  if (!status) return StatusPagamento.PENDENTE;
+  if (status === 'approved') return StatusPagamento.APROVADO;
+  if (status === 'pending' || status === 'in_process') return StatusPagamento.PENDENTE;
+  if (status === 'authorized') return StatusPagamento.PROCESSANDO;
+  if (status === 'rejected') return StatusPagamento.REJEITADO;
+  if (status === 'cancelled' || status === 'cancelled_by_user') return StatusPagamento.CANCELADO;
+  if (status === 'refunded' || status === 'charged_back') return StatusPagamento.ESTORNADO;
+
+  return status;
+};
+
+const mapInternalStatusToMercadoPago = (statusRaw: string | null): string | null => {
+  const status = String(statusRaw || '')
+    .trim()
+    .toLowerCase();
+
+  if (!status) return null;
+  if (status === StatusPagamento.APROVADO) return 'approved';
+  if (status === StatusPagamento.PENDENTE || status === StatusPagamento.PROCESSANDO)
+    return 'pending';
+  if (status === StatusPagamento.REJEITADO) return 'rejected';
+  if (status === StatusPagamento.CANCELADO) return 'cancelled';
+  if (status === StatusPagamento.ESTORNADO) return 'refunded';
+
+  return status;
+};
+
 @Injectable()
 export class BillingSelfServiceService {
   constructor(
@@ -101,6 +143,8 @@ export class BillingSelfServiceService {
     private readonly faturaRepository: Repository<Fatura>,
     @InjectRepository(Pagamento)
     private readonly pagamentoRepository: Repository<Pagamento>,
+    @InjectRepository(BillingEvent)
+    private readonly billingEventRepository: Repository<BillingEvent>,
   ) {}
 
   async getOverview(empresaId: string) {
@@ -149,49 +193,53 @@ export class BillingSelfServiceService {
 
     const shouldFetchFaturas = tipo !== 'pagamentos';
     const shouldFetchPagamentos = tipo !== 'faturas';
+    const assinatura = await this.assinaturasService.buscarPorEmpresa(empresaId);
+    const assinaturaId = String(assinatura?.id || '').trim();
 
-    const faturaWhere: FindOptionsWhere<Fatura> = { empresaId };
-    const pagamentoWhere: FindOptionsWhere<Pagamento> = { empresaId };
-
-    if (statusFilter) {
-      (faturaWhere as Record<string, unknown>).status = statusFilter;
-      (pagamentoWhere as Record<string, unknown>).status = statusFilter;
-    }
-
-    if (dataInicio && dataFim) {
-      (faturaWhere as Record<string, unknown>).dataEmissao = Between(dataInicio, dataFim);
-      (pagamentoWhere as Record<string, unknown>).createdAt = Between(dataInicio, dataFim);
-    } else if (dataInicio) {
-      const maxDate = new Date(8640000000000000);
-      (faturaWhere as Record<string, unknown>).dataEmissao = Between(dataInicio, maxDate);
-      (pagamentoWhere as Record<string, unknown>).createdAt = Between(dataInicio, maxDate);
-    } else if (dataFim) {
-      const minDate = new Date(-8640000000000000);
-      (faturaWhere as Record<string, unknown>).dataEmissao = Between(minDate, dataFim);
-      (pagamentoWhere as Record<string, unknown>).createdAt = Between(minDate, dataFim);
+    if (!assinaturaId) {
+      return {
+        faturas: [],
+        pagamentos: [],
+        limit,
+        page,
+        tipo,
+        status: statusFilter,
+        dataInicio: dataInicio ? dataInicio.toISOString() : null,
+        dataFim: dataFim ? dataFim.toISOString() : null,
+        totalFaturas: 0,
+        totalPagamentos: 0,
+        hasNextFaturas: false,
+        hasNextPagamentos: false,
+      };
     }
 
     const [faturasWithCount, pagamentosWithCount] = await Promise.all([
       shouldFetchFaturas
-        ? this.faturaRepository.findAndCount({
-            where: faturaWhere,
-            order: { createdAt: 'DESC' },
-            take: limit,
-            skip: offset,
+        ? this.fetchSubscriptionInvoicesHistory({
+            empresaId,
+            assinaturaId,
+            limit,
+            offset,
+            statusFilter,
+            dataInicio,
+            dataFim,
           })
         : Promise.resolve([[], 0] as [Fatura[], number]),
       shouldFetchPagamentos
-        ? this.pagamentoRepository.findAndCount({
-            where: pagamentoWhere,
-            order: { createdAt: 'DESC' },
-            take: limit,
-            skip: offset,
+        ? this.fetchSubscriptionPaymentsHistory({
+            empresaId,
+            assinaturaId,
+            limit,
+            offset,
+            statusFilter,
+            dataInicio,
+            dataFim,
           })
-        : Promise.resolve([[], 0] as [Pagamento[], number]),
+        : Promise.resolve([[], 0] as [SubscriptionPaymentHistoryRow[], number]),
     ]);
 
     const [faturas, totalFaturas] = faturasWithCount;
-    const [pagamentos, totalPagamentos] = pagamentosWithCount;
+    const [pagamentosEventos, totalPagamentos] = pagamentosWithCount;
     const hasNextFaturas = shouldFetchFaturas ? page * limit < totalFaturas : false;
     const hasNextPagamentos = shouldFetchPagamentos ? page * limit < totalPagamentos : false;
 
@@ -207,19 +255,23 @@ export class BillingSelfServiceService {
         dataVencimento: item.dataVencimento,
         createdAt: item.createdAt,
       })),
-      pagamentos: pagamentos.map((item) => ({
-        id: item.id,
-        faturaId: item.faturaId,
-        transacaoId: item.transacaoId,
-        status: item.status,
-        tipo: item.tipo,
-        valor: toNumber(item.valor),
-        valorLiquido: toNumber(item.valorLiquido),
-        metodoPagamento: item.metodoPagamento,
-        gateway: item.gateway,
-        dataAprovacao: item.dataAprovacao,
-        createdAt: item.createdAt,
-      })),
+      pagamentos: pagamentosEventos.map((item) => {
+        const statusNormalizado = mapMercadoPagoStatusToInternal(item.payment_status);
+        const createdAt = item.occurred_at || item.created_at || null;
+        return {
+          id: toNumber(item.id),
+          faturaId: 0,
+          transacaoId: String(item.payment_id || `mp-${item.id}`),
+          status: statusNormalizado,
+          tipo: String(item.payment_action || 'pagamento'),
+          valor: 0,
+          valorLiquido: 0,
+          metodoPagamento: 'checkout_assinatura',
+          gateway: GatewayProvider.MERCADO_PAGO,
+          dataAprovacao: statusNormalizado === StatusPagamento.APROVADO ? createdAt : null,
+          createdAt,
+        };
+      }),
       limit,
       page,
       tipo,
@@ -231,6 +283,122 @@ export class BillingSelfServiceService {
       hasNextFaturas,
       hasNextPagamentos,
     };
+  }
+
+  private async fetchSubscriptionInvoicesHistory(params: {
+    empresaId: string;
+    assinaturaId: string;
+    limit: number;
+    offset: number;
+    statusFilter: string | null;
+    dataInicio: Date | null;
+    dataFim: Date | null;
+  }): Promise<[Fatura[], number]> {
+    const query = this.faturaRepository
+      .createQueryBuilder('fatura')
+      .where('fatura.empresa_id = :empresaId', { empresaId: params.empresaId })
+      .andWhere(
+        `(
+          (fatura.metadados->>'assinaturaId') = :assinaturaId
+          OR lower(coalesce(fatura.metadados->>'origem', '')) = 'assinatura'
+          OR lower(coalesce(fatura.metadados->>'contexto', '')) = 'assinatura'
+        )`,
+        { assinaturaId: params.assinaturaId },
+      );
+
+    if (params.statusFilter) {
+      query.andWhere('lower(fatura.status) = :statusFilter', {
+        statusFilter: params.statusFilter,
+      });
+    }
+
+    if (params.dataInicio) {
+      query.andWhere(`fatura."dataEmissao" >= :dataInicio`, { dataInicio: params.dataInicio });
+    }
+
+    if (params.dataFim) {
+      query.andWhere(`fatura."dataEmissao" <= :dataFim`, { dataFim: params.dataFim });
+    }
+
+    return query
+      .orderBy(`fatura."createdAt"`, 'DESC')
+      .take(params.limit)
+      .skip(params.offset)
+      .getManyAndCount();
+  }
+
+  private async fetchSubscriptionPaymentsHistory(params: {
+    empresaId: string;
+    assinaturaId: string;
+    limit: number;
+    offset: number;
+    statusFilter: string | null;
+    dataInicio: Date | null;
+    dataFim: Date | null;
+  }): Promise<[SubscriptionPaymentHistoryRow[], number]> {
+    const paymentStatusFilter = mapInternalStatusToMercadoPago(params.statusFilter);
+    const whereClauses: string[] = [
+      'event.empresa_id = $1',
+      "event.aggregate_type = 'mercadopago.payment.webhook'",
+      "COALESCE(event.payload->>'assinaturaId', '') = $2",
+      "COALESCE(event.payload->>'paymentId', '') <> ''",
+    ];
+    const paramsCount: unknown[] = [params.empresaId, params.assinaturaId];
+
+    if (paymentStatusFilter) {
+      whereClauses.push(`LOWER(COALESCE(event.payload->>'paymentStatus', '')) = $${paramsCount.length + 1}`);
+      paramsCount.push(paymentStatusFilter);
+    }
+
+    if (params.dataInicio) {
+      whereClauses.push(`event.occurred_at >= $${paramsCount.length + 1}`);
+      paramsCount.push(params.dataInicio.toISOString());
+    }
+
+    if (params.dataFim) {
+      whereClauses.push(`event.occurred_at <= $${paramsCount.length + 1}`);
+      paramsCount.push(params.dataFim.toISOString());
+    }
+
+    const whereClause = whereClauses.join(' AND ');
+
+    const totalRows = await this.billingEventRepository.query(
+      `
+        SELECT COUNT(DISTINCT (event.payload->>'paymentId'))::int AS total
+        FROM billing_events event
+        WHERE ${whereClause}
+      `,
+      paramsCount,
+    );
+    const total = toNumber(totalRows?.[0]?.total, 0);
+
+    const listParams: unknown[] = [...paramsCount, params.limit, params.offset];
+    const limitParam = paramsCount.length + 1;
+    const offsetParam = paramsCount.length + 2;
+    const rows = await this.billingEventRepository.query(
+      `
+        WITH latest AS (
+          SELECT DISTINCT ON (event.payload->>'paymentId')
+            event.id,
+            event.payload->>'paymentId' AS payment_id,
+            event.payload->>'paymentStatus' AS payment_status,
+            event.payload->>'action' AS payment_action,
+            event.occurred_at,
+            event.created_at
+          FROM billing_events event
+          WHERE ${whereClause}
+          ORDER BY event.payload->>'paymentId', event.occurred_at DESC
+        )
+        SELECT *
+        FROM latest
+        ORDER BY occurred_at DESC
+        LIMIT $${limitParam}
+        OFFSET $${offsetParam}
+      `,
+      listParams,
+    );
+
+    return [rows as SubscriptionPaymentHistoryRow[], total];
   }
 
   private async getFinancialSummary(empresaId: string) {
