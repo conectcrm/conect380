@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, Repository } from 'typeorm';
+import { FindOptionsWhere, In, Repository } from 'typeorm';
 import { Meta as MetaEntity, MetaTipo } from './entities/meta.entity';
 
 export interface Meta {
@@ -246,6 +246,67 @@ export class MetasService {
     return fallback ? this.toMetaDto(fallback) : null;
   }
 
+  async getMetaValorParaRange(
+    dataInicio: Date,
+    dataFim: Date,
+    vendedorId?: string,
+    regiao?: string,
+    empresaId?: string,
+  ): Promise<number> {
+    if (!(dataInicio instanceof Date) || !(dataFim instanceof Date)) {
+      return 0;
+    }
+
+    if (Number.isNaN(dataInicio.getTime()) || Number.isNaN(dataFim.getTime())) {
+      return 0;
+    }
+
+    const inicio = new Date(dataInicio);
+    const fim = new Date(dataFim);
+    inicio.setHours(0, 0, 0, 0);
+    fim.setHours(23, 59, 59, 999);
+
+    const rangeStart = inicio <= fim ? inicio : fim;
+    const rangeEnd = inicio <= fim ? fim : inicio;
+
+    const vendedor = await this.parseVendedorId(vendedorId);
+    const regiaoNormalizada = this.normalizeOptionalText(regiao);
+
+    const escopos: Array<{
+      vendedorId: string | null;
+      regiao: string | null;
+    }> = [];
+
+    if (vendedor !== undefined && regiaoNormalizada) {
+      escopos.push({ vendedorId: vendedor, regiao: regiaoNormalizada });
+    }
+    if (vendedor !== undefined) {
+      escopos.push({ vendedorId: vendedor, regiao: null });
+    }
+    if (regiaoNormalizada) {
+      escopos.push({ vendedorId: null, regiao: regiaoNormalizada });
+    }
+    escopos.push({ vendedorId: null, regiao: null });
+
+    for (const escopo of escopos) {
+      const metas = await this.buscarMetasDoRange(
+        rangeStart,
+        rangeEnd,
+        escopo.vendedorId,
+        escopo.regiao,
+        empresaId,
+      );
+
+      if (!metas.length) {
+        continue;
+      }
+
+      return this.calcularMetaProrata(rangeStart, rangeEnd, metas);
+    }
+
+    return 0;
+  }
+
   private async findOneEntity(id: string, empresaId?: string): Promise<MetaEntity> {
     const where: FindOptionsWhere<MetaEntity> = { id };
     if (empresaId) {
@@ -280,6 +341,251 @@ export class MetasService {
     if (tipo === MetaTipo.TRIMESTRAL) return MetaTipo.TRIMESTRAL;
     if (tipo === MetaTipo.ANUAL) return MetaTipo.ANUAL;
     return MetaTipo.MENSAL;
+  }
+
+  private async buscarMetasDoRange(
+    dataInicio: Date,
+    dataFim: Date,
+    vendedorId: string | null,
+    regiao: string | null,
+    empresaId?: string,
+  ): Promise<MetaEntity[]> {
+    const periodosMensais = this.buildPeriodosMensais(dataInicio, dataFim);
+    const periodosTrimestrais = this.buildPeriodosTrimestrais(dataInicio, dataFim);
+    const periodosAnuais = this.buildPeriodosAnuais(dataInicio, dataFim);
+
+    const whereBase: FindOptionsWhere<MetaEntity> = {
+      ativa: true,
+      vendedorId,
+      regiao,
+    };
+
+    if (empresaId) {
+      whereBase.empresaId = empresaId;
+    }
+
+    const buscas: Promise<MetaEntity[]>[] = [];
+
+    if (periodosMensais.length > 0) {
+      buscas.push(
+        this.metasRepository.find({
+          where: {
+            ...whereBase,
+            tipo: MetaTipo.MENSAL,
+            periodo: In(periodosMensais),
+          },
+          order: { atualizadaEm: 'DESC' },
+        }),
+      );
+    }
+
+    if (periodosTrimestrais.length > 0) {
+      buscas.push(
+        this.metasRepository.find({
+          where: {
+            ...whereBase,
+            tipo: MetaTipo.TRIMESTRAL,
+            periodo: In(periodosTrimestrais),
+          },
+          order: { atualizadaEm: 'DESC' },
+        }),
+      );
+    }
+
+    if (periodosAnuais.length > 0) {
+      buscas.push(
+        this.metasRepository.find({
+          where: {
+            ...whereBase,
+            tipo: MetaTipo.ANUAL,
+            periodo: In(periodosAnuais),
+          },
+          order: { atualizadaEm: 'DESC' },
+        }),
+      );
+    }
+
+    if (buscas.length === 0) {
+      return [];
+    }
+
+    const resultados = await Promise.all(buscas);
+    const metas = resultados.flat();
+
+    const unicas = new Map<string, MetaEntity>();
+    for (const meta of metas) {
+      const periodoNormalizado = this.normalizePeriodo(meta.tipo, meta.periodo);
+      const chave = `${meta.tipo}:${periodoNormalizado || meta.periodo}`;
+      if (!unicas.has(chave)) {
+        unicas.set(chave, meta);
+      }
+    }
+
+    return Array.from(unicas.values());
+  }
+
+  private calcularMetaProrata(dataInicio: Date, dataFim: Date, metas: MetaEntity[]): number {
+    const metasMensais = new Map<string, MetaEntity>();
+    const metasTrimestrais = new Map<string, MetaEntity>();
+    const metasAnuais = new Map<string, MetaEntity>();
+
+    metas.forEach((meta) => {
+      const periodo = this.normalizePeriodo(meta.tipo, meta.periodo);
+      if (!periodo) {
+        return;
+      }
+
+      if (meta.tipo === MetaTipo.MENSAL) {
+        metasMensais.set(periodo, meta);
+        return;
+      }
+      if (meta.tipo === MetaTipo.TRIMESTRAL) {
+        metasTrimestrais.set(periodo, meta);
+        return;
+      }
+      metasAnuais.set(periodo, meta);
+    });
+
+    let total = 0;
+    const cursor = new Date(dataInicio);
+    cursor.setHours(0, 0, 0, 0);
+    const limite = new Date(dataFim);
+    limite.setHours(0, 0, 0, 0);
+
+    while (cursor <= limite) {
+      const mensal = metasMensais.get(this.toPeriodoMensal(cursor));
+      const trimestral = metasTrimestrais.get(this.toPeriodoTrimestral(cursor));
+      const anual = metasAnuais.get(this.toPeriodoAnual(cursor));
+
+      if (mensal) {
+        total += this.getValorDiarioMeta(cursor, mensal);
+      } else if (trimestral) {
+        total += this.getValorDiarioMeta(cursor, trimestral);
+      } else if (anual) {
+        total += this.getValorDiarioMeta(cursor, anual);
+      }
+
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    return Number(total.toFixed(2));
+  }
+
+  private getValorDiarioMeta(data: Date, meta: MetaEntity): number {
+    const valorMeta = Number(meta.valor) || 0;
+    if (valorMeta <= 0) {
+      return 0;
+    }
+
+    const diasNoPeriodo = this.getDiasNoPeriodo(meta.tipo, data);
+    if (diasNoPeriodo <= 0) {
+      return 0;
+    }
+
+    return valorMeta / diasNoPeriodo;
+  }
+
+  private getDiasNoPeriodo(tipo: MetaTipo, data: Date): number {
+    if (tipo === MetaTipo.ANUAL) {
+      const ano = data.getFullYear();
+      const inicioAno = new Date(ano, 0, 1);
+      const inicioProximoAno = new Date(ano + 1, 0, 1);
+      return Math.max(
+        1,
+        Math.round((inicioProximoAno.getTime() - inicioAno.getTime()) / 86_400_000),
+      );
+    }
+
+    if (tipo === MetaTipo.TRIMESTRAL) {
+      const ano = data.getFullYear();
+      const quarter = Math.floor(data.getMonth() / 3);
+      const inicioTrimestre = new Date(ano, quarter * 3, 1);
+      const inicioProximoTrimestre = new Date(ano, quarter * 3 + 3, 1);
+      return Math.max(
+        1,
+        Math.round((inicioProximoTrimestre.getTime() - inicioTrimestre.getTime()) / 86_400_000),
+      );
+    }
+
+    const ano = data.getFullYear();
+    const mes = data.getMonth();
+    return new Date(ano, mes + 1, 0).getDate();
+  }
+
+  private buildPeriodosMensais(dataInicio: Date, dataFim: Date): string[] {
+    const periodos = new Set<string>();
+    const cursor = new Date(dataInicio.getFullYear(), dataInicio.getMonth(), 1);
+    const limite = new Date(dataFim.getFullYear(), dataFim.getMonth(), 1);
+
+    while (cursor <= limite) {
+      periodos.add(this.toPeriodoMensal(cursor));
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    return Array.from(periodos);
+  }
+
+  private buildPeriodosTrimestrais(dataInicio: Date, dataFim: Date): string[] {
+    return Array.from(
+      new Set(this.buildPeriodosMensais(dataInicio, dataFim).map((periodo) => this.toPeriodoTrimestral(periodo))),
+    );
+  }
+
+  private buildPeriodosAnuais(dataInicio: Date, dataFim: Date): string[] {
+    return Array.from(
+      new Set(this.buildPeriodosMensais(dataInicio, dataFim).map((periodo) => this.toPeriodoAnual(periodo))),
+    );
+  }
+
+  private normalizePeriodo(tipo: MetaTipo, periodo: string): string | null {
+    const bruto = (periodo || '').trim();
+    if (!bruto) {
+      return null;
+    }
+
+    if (tipo === MetaTipo.ANUAL) {
+      const match = /^(\d{4})$/.exec(bruto);
+      return match ? match[1] : null;
+    }
+
+    if (tipo === MetaTipo.TRIMESTRAL) {
+      const match = /^(\d{4})-Q([1-4])$/i.exec(bruto);
+      return match ? `${match[1]}-Q${match[2]}` : null;
+    }
+
+    const match = /^(\d{4})-(\d{1,2})$/.exec(bruto);
+    if (!match) {
+      return null;
+    }
+    return `${match[1]}-${String(Number(match[2])).padStart(2, '0')}`;
+  }
+
+  private toPeriodoMensal(data: Date | string): string {
+    if (typeof data === 'string') {
+      return data.slice(0, 7);
+    }
+    return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  private toPeriodoTrimestral(data: Date | string): string {
+    if (typeof data === 'string') {
+      const [anoRaw, mesRaw] = data.split('-');
+      const ano = Number(anoRaw);
+      const mes = Number(mesRaw);
+      const quarter = Math.floor((mes - 1) / 3) + 1;
+      return `${ano}-Q${quarter}`;
+    }
+
+    const ano = data.getFullYear();
+    const quarter = Math.floor(data.getMonth() / 3) + 1;
+    return `${ano}-Q${quarter}`;
+  }
+
+  private toPeriodoAnual(data: Date | string): string {
+    if (typeof data === 'string') {
+      return data.slice(0, 4);
+    }
+    return String(data.getFullYear());
   }
 
   private getPeriodoAtual(tipo: MetaTipo): string {
