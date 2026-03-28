@@ -1,9 +1,9 @@
-import { IsOptional, IsBoolean, IsObject } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsBoolean, IsObject, IsOptional } from 'class-validator';
 
 export class UpdateModuloEmpresaDto {
   @ApiPropertyOptional({
-    description: 'Se o módulo está ativo ou inativo',
+    description: 'Se o modulo esta ativo ou inativo',
     example: true,
   })
   @IsOptional()
@@ -11,12 +11,14 @@ export class UpdateModuloEmpresaDto {
   ativo?: boolean;
 
   @ApiPropertyOptional({
-    description: 'Limites atualizados do módulo',
+    description:
+      'LEGADO (nao suportado). Limites/configuracoes nao sao aceitos no Core Admin para modulo de empresa.',
     example: {
       usuarios: 20,
       leads: 5000,
       storage_mb: 10240,
     },
+    deprecated: true,
   })
   @IsOptional()
   @IsObject()
@@ -30,11 +32,13 @@ export class UpdateModuloEmpresaDto {
   };
 
   @ApiPropertyOptional({
-    description: 'Configurações específicas do módulo',
+    description:
+      'LEGADO (nao suportado). Limites/configuracoes nao sao aceitos no Core Admin para modulo de empresa.',
     example: {
       habilitarIA: false,
       webhooksAtivos: true,
     },
+    deprecated: true,
   })
   @IsOptional()
   @IsObject()

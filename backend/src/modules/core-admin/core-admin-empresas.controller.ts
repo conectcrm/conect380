@@ -109,12 +109,6 @@ export class CoreAdminEmpresasController {
     };
   }
 
-  @Post(':id/health-score')
-  async calcularHealthScore(@Param('id') id: string) {
-    const score = await this.coreAdminEmpresasService.calcularHealthScore(id);
-    return { id, health_score: score };
-  }
-
   @Get(':id/modulos')
   async listarModulos(@Param('id') id: string) {
     return await this.coreAdminEmpresasService.listarModulos(id);

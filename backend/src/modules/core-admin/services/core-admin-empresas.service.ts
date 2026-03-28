@@ -10,15 +10,29 @@ import { FilterEmpresasAdminDto } from '../dto/filter-empresas-admin.dto';
 import { CreateModuloEmpresaDto } from '../dto/create-modulo-empresa.dto';
 import { UpdateModuloEmpresaDto } from '../dto/update-modulo-empresa.dto';
 import { MudarPlanoDto } from '../dto/mudar-plano.dto';
-import { ModuloEmpresa } from '../entities/modulo-empresa.entity';
 import { HistoricoPlano } from '../entities/historico-plano.entity';
 import { PlanosService } from '../../planos/planos.service';
 import { AssinaturasService } from '../../planos/assinaturas.service';
 import { Plano } from '../../planos/entities/plano.entity';
 import { toCanonicalAssinaturaStatus } from '../../planos/entities/assinatura-empresa.entity';
+import { EmpresaModulo, ModuloEnum, PlanoEnum } from '../../empresas/entities/empresa-modulo.entity';
 import { UsersService } from '../../users/users.service';
+import { AuthService } from '../../auth/auth.service';
 import { MailService } from '../../../mail/mail.service';
 import * as bcrypt from 'bcryptjs';
+
+type CoreAdminCompanyModuleView = {
+  id: string;
+  empresaId: string;
+  modulo: string;
+  ativo: boolean;
+  limites: Record<string, number>;
+  uso_atual: Record<string, number>;
+  configuracoes: Record<string, unknown>;
+  dataAtivacao: Date;
+  dataDesativacao: Date | null;
+  ultimaAtualizacao: Date;
+};
 
 @Injectable()
 export class CoreAdminEmpresasService {
@@ -30,14 +44,13 @@ export class CoreAdminEmpresasService {
     private empresaRepository: Repository<Empresa>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
-    @InjectRepository(ModuloEmpresa)
-    private moduloEmpresaRepository: Repository<ModuloEmpresa>,
     @InjectRepository(HistoricoPlano)
     private historicoPlanoRepository: Repository<HistoricoPlano>,
     private empresaModuloService: EmpresaModuloService,
     private planosService: PlanosService,
     private assinaturasService: AssinaturasService,
     private usersService: UsersService,
+    private authService: AuthService,
     private mailService: MailService,
   ) {}
 
@@ -471,7 +484,12 @@ export class CoreAdminEmpresasService {
     usuarioId: string,
     actor: Pick<User, 'id' | 'nome' | 'email'>,
     reason?: string,
-  ): Promise<{ usuarioId: string; novaSenha: string }> {
+  ): Promise<{
+    usuarioId: string;
+    resetLinkDispatched: boolean;
+    temporaryPasswordExposed: boolean;
+    novaSenha?: string;
+  }> {
     const empresa = await this.empresaRepository.findOne({ where: { id: empresaId } });
     if (!empresa) {
       throw new NotFoundException(`Empresa com ID ${empresaId} nao encontrada`);
@@ -492,9 +510,20 @@ export class CoreAdminEmpresasService {
       reason: normalizedReason || undefined,
     });
 
+    const shouldExposeTemporaryPassword =
+      process.env.CORE_ADMIN_EXPOSE_TEMP_PASSWORD_ON_RESET === 'true';
+    const resetLinkDispatched = Boolean(usuario.email) && this.mailService.isGlobalSmtpReady();
+    if (resetLinkDispatched) {
+      await this.authService.solicitarRecuperacaoSenha(usuario.email, {
+        userAgent: 'core-admin.empresas.resetarSenhaUsuario',
+      });
+    }
+
     return {
       usuarioId: usuario.id,
-      novaSenha,
+      resetLinkDispatched,
+      temporaryPasswordExposed: shouldExposeTemporaryPassword,
+      ...(shouldExposeTemporaryPassword ? { novaSenha } : {}),
     };
   }
 
@@ -709,6 +738,78 @@ export class CoreAdminEmpresasService {
     return limites[normalized] || limites.starter;
   }
 
+  private normalizeModuloCode(value: string): string {
+    return String(value || '')
+      .trim()
+      .toUpperCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^A-Z0-9]+/g, '_');
+  }
+
+  private mapModuloToAccessModulo(modulo: string): ModuloEnum | null {
+    const normalized = this.normalizeModuloCode(modulo);
+    const aliases: Record<string, ModuloEnum> = {
+      CRM: ModuloEnum.CRM,
+      VENDAS: ModuloEnum.VENDAS,
+      COMERCIAL: ModuloEnum.VENDAS,
+      FINANCEIRO: ModuloEnum.FINANCEIRO,
+      BILLING: ModuloEnum.BILLING,
+      ADMINISTRACAO: ModuloEnum.ADMINISTRACAO,
+      ADMINISTRATIVO: ModuloEnum.ADMINISTRACAO,
+      CONFIGURACOES: ModuloEnum.ADMINISTRACAO,
+      COMPRAS: ModuloEnum.COMPRAS,
+      ATENDIMENTO: ModuloEnum.ATENDIMENTO,
+    };
+
+    return aliases[normalized] || null;
+  }
+
+  private mapPlanoToEnum(plano?: string | null): PlanoEnum {
+    const normalized = this.resolvePlanCode(String(plano || 'starter'));
+    if (normalized === 'enterprise' || normalized === 'custom') {
+      return PlanoEnum.ENTERPRISE;
+    }
+    if (normalized === 'business') {
+      return PlanoEnum.BUSINESS;
+    }
+    return PlanoEnum.STARTER;
+  }
+
+  private async findAccessModuleRecord(
+    empresaId: string,
+    modulo: ModuloEnum,
+  ): Promise<EmpresaModulo | null> {
+    const records = await this.empresaModuloService.listar(empresaId);
+    return records.find((record) => record.modulo === modulo) || null;
+  }
+
+  private buildCoreAdminModuleView(
+    moduleRecord: EmpresaModulo,
+    empresaPlanoFallback?: string | null,
+  ): CoreAdminCompanyModuleView {
+    const planoBase = moduleRecord.plano || this.mapPlanoToEnum(empresaPlanoFallback);
+    const moduloCode = this.normalizeModuloCode(String(moduleRecord.modulo || ''));
+
+    return {
+      id: moduleRecord.id,
+      empresaId: moduleRecord.empresaId,
+      modulo: moduloCode,
+      ativo: Boolean(moduleRecord.ativo),
+      limites: this.getLimitesPadraoModulo(moduloCode, String(planoBase || 'STARTER')),
+      uso_atual: {
+        usuarios: 0,
+        leads: 0,
+        storage_mb: 0,
+        api_calls_dia: 0,
+      },
+      configuracoes: {},
+      dataAtivacao: moduleRecord.data_ativacao,
+      dataDesativacao: moduleRecord.ativo ? null : moduleRecord.data_expiracao || null,
+      ultimaAtualizacao: moduleRecord.updated_at,
+    };
+  }
+
   /**
    * ========================================
    * GESTÃO DE MÓDULOS
@@ -718,65 +819,72 @@ export class CoreAdminEmpresasService {
   /**
    * Listar módulos de uma empresa
    */
-  async listarModulos(empresaId: string): Promise<ModuloEmpresa[]> {
+  async listarModulos(empresaId: string): Promise<CoreAdminCompanyModuleView[]> {
     const empresa = await this.empresaRepository.findOne({
       where: { id: empresaId },
     });
 
     if (!empresa) {
-      throw new NotFoundException(`Empresa ${empresaId} não encontrada`);
+      throw new NotFoundException(`Empresa ${empresaId} nao encontrada`);
     }
 
-    const modulos = await this.moduloEmpresaRepository.find({
-      where: { empresaId },
-      order: { modulo: 'ASC' },
-    });
+    const modulos = await this.empresaModuloService.listar(empresaId);
+    const modulosOrdenados = [...modulos].sort((a, b) =>
+      String(a.modulo || '').localeCompare(String(b.modulo || '')),
+    );
 
-    this.logger.log(`Listados ${modulos.length} módulos da empresa ${empresa.nome}`);
+    this.logger.log(`Listados ${modulosOrdenados.length} modulos da empresa ${empresa.nome}`);
 
-    return modulos;
+    return modulosOrdenados.map((moduleRecord) =>
+      this.buildCoreAdminModuleView(moduleRecord, empresa.plano),
+    );
   }
 
   /**
    * Ativar módulo para uma empresa
    */
-  async ativarModulo(empresaId: string, dto: CreateModuloEmpresaDto): Promise<ModuloEmpresa> {
+  async ativarModulo(
+    empresaId: string,
+    dto: CreateModuloEmpresaDto,
+  ): Promise<CoreAdminCompanyModuleView> {
     const empresa = await this.empresaRepository.findOne({
       where: { id: empresaId },
     });
 
     if (!empresa) {
-      throw new NotFoundException(`Empresa ${empresaId} não encontrada`);
+      throw new NotFoundException(`Empresa ${empresaId} nao encontrada`);
     }
 
-    // Verificar se módulo já existe
-    const moduloExistente = await this.moduloEmpresaRepository.findOne({
-      where: { empresaId, modulo: dto.modulo },
-    });
+    const moduloCode = this.normalizeModuloCode(dto.modulo);
+    const accessModule = this.mapModuloToAccessModulo(moduloCode);
+    if (!accessModule) {
+      throw new BadRequestException(`Modulo ${moduloCode} nao suportado para empresa`);
+    }
+    if (dto.limites || dto.configuracoes) {
+      throw new BadRequestException(
+        'Campos limites/configuracoes nao sao suportados para modulos no core-admin. Use plano/catalogo.',
+      );
+    }
 
+    const moduloExistente = await this.findAccessModuleRecord(empresaId, accessModule);
     if (moduloExistente) {
-      throw new BadRequestException(`Módulo ${dto.modulo} já está cadastrado para esta empresa`);
+      throw new BadRequestException(`Modulo ${moduloCode} ja esta cadastrado para esta empresa`);
     }
 
-    const modulo = this.moduloEmpresaRepository.create({
-      empresaId,
-      modulo: dto.modulo,
+    await this.empresaModuloService.ativar(empresaId, {
+      modulo: accessModule,
       ativo: dto.ativo !== undefined ? dto.ativo : true,
-      limites: dto.limites || this.getLimitesPadraoModulo(dto.modulo, empresa.plano),
-      configuracoes: dto.configuracoes || {},
-      uso_atual: {
-        usuarios: 0,
-        leads: 0,
-        storage_mb: 0,
-        api_calls_dia: 0,
-      },
+      plano: this.mapPlanoToEnum(empresa.plano),
     });
 
-    const moduloSalvo = await this.moduloEmpresaRepository.save(modulo);
+    const moduloSalvo = await this.findAccessModuleRecord(empresaId, accessModule);
+    if (!moduloSalvo) {
+      throw new NotFoundException(`Modulo ${moduloCode} nao encontrado apos ativacao`);
+    }
 
-    this.logger.log(`Módulo ${dto.modulo} ativado para empresa ${empresa.nome}`);
+    this.logger.log(`Modulo ${moduloCode} ativado para empresa ${empresa.nome}`);
 
-    return moduloSalvo;
+    return this.buildCoreAdminModuleView(moduloSalvo, empresa.plano);
   }
 
   /**
@@ -788,70 +896,78 @@ export class CoreAdminEmpresasService {
     });
 
     if (!empresa) {
-      throw new NotFoundException(`Empresa ${empresaId} não encontrada`);
+      throw new NotFoundException(`Empresa ${empresaId} nao encontrada`);
     }
 
-    const moduloEmpresa = await this.moduloEmpresaRepository.findOne({
-      where: { empresaId, modulo },
-    });
+    const moduloCode = this.normalizeModuloCode(modulo);
+    const accessModule = this.mapModuloToAccessModulo(moduloCode);
+    if (!accessModule) {
+      throw new BadRequestException(`Modulo ${moduloCode} nao suportado para empresa`);
+    }
 
+    const moduloEmpresa = await this.findAccessModuleRecord(empresaId, accessModule);
     if (!moduloEmpresa) {
-      throw new NotFoundException(`Módulo ${modulo} não encontrado para esta empresa`);
+      throw new NotFoundException(`Modulo ${moduloCode} nao encontrado para esta empresa`);
     }
 
-    moduloEmpresa.ativo = false;
-    moduloEmpresa.dataDesativacao = new Date();
-    await this.moduloEmpresaRepository.save(moduloEmpresa);
+    await this.empresaModuloService.desativar(empresaId, accessModule);
 
-    this.logger.log(`Módulo ${modulo} desativado para empresa ${empresa.nome}`);
+    this.logger.log(`Modulo ${moduloCode} desativado para empresa ${empresa.nome}`);
   }
 
   /**
-   * Atualizar limites de um módulo
+   * Atualizar módulo da empresa
    */
   async atualizarModulo(
     empresaId: string,
     modulo: string,
     dto: UpdateModuloEmpresaDto,
-  ): Promise<ModuloEmpresa> {
+  ): Promise<CoreAdminCompanyModuleView> {
     const empresa = await this.empresaRepository.findOne({
       where: { id: empresaId },
     });
 
     if (!empresa) {
-      throw new NotFoundException(`Empresa ${empresaId} não encontrada`);
+      throw new NotFoundException(`Empresa ${empresaId} nao encontrada`);
     }
 
-    const moduloEmpresa = await this.moduloEmpresaRepository.findOne({
-      where: { empresaId, modulo },
-    });
+    const moduloCode = this.normalizeModuloCode(modulo);
+    const accessModule = this.mapModuloToAccessModulo(moduloCode);
+    if (!accessModule) {
+      throw new BadRequestException(`Modulo ${moduloCode} nao suportado para empresa`);
+    }
+    if (dto.limites || dto.configuracoes) {
+      throw new BadRequestException(
+        'Campos limites/configuracoes nao sao suportados para modulos no core-admin. Use plano/catalogo.',
+      );
+    }
 
+    const moduloEmpresa = await this.findAccessModuleRecord(empresaId, accessModule);
     if (!moduloEmpresa) {
-      throw new NotFoundException(`Módulo ${modulo} não encontrado para esta empresa`);
+      throw new NotFoundException(`Modulo ${moduloCode} nao encontrado para esta empresa`);
     }
 
     if (dto.ativo !== undefined) {
-      moduloEmpresa.ativo = dto.ativo;
-      if (!dto.ativo) {
-        moduloEmpresa.dataDesativacao = new Date();
+      if (dto.ativo) {
+        await this.empresaModuloService.ativar(empresaId, {
+          modulo: accessModule,
+          ativo: true,
+          plano: moduloEmpresa.plano || this.mapPlanoToEnum(empresa.plano),
+        });
+      } else {
+        await this.empresaModuloService.desativar(empresaId, accessModule);
       }
     }
 
-    if (dto.limites) {
-      moduloEmpresa.limites = { ...moduloEmpresa.limites, ...dto.limites };
+    const moduloAtualizado = await this.findAccessModuleRecord(empresaId, accessModule);
+    if (!moduloAtualizado) {
+      throw new NotFoundException(`Modulo ${moduloCode} nao encontrado para esta empresa`);
     }
 
-    if (dto.configuracoes) {
-      moduloEmpresa.configuracoes = { ...moduloEmpresa.configuracoes, ...dto.configuracoes };
-    }
+    this.logger.log(`Modulo ${moduloCode} atualizado para empresa ${empresa.nome}`);
 
-    const moduloAtualizado = await this.moduloEmpresaRepository.save(moduloEmpresa);
-
-    this.logger.log(`Módulo ${modulo} atualizado para empresa ${empresa.nome}`);
-
-    return moduloAtualizado;
+    return this.buildCoreAdminModuleView(moduloAtualizado, empresa.plano);
   }
-
   /**
    * ========================================
    * GESTÃO DE PLANOS
@@ -1079,4 +1195,3 @@ export class CoreAdminEmpresasService {
     return limitesBasePorPlano[planoNormalizado] || limitesBasePorPlano.starter;
   }
 }
-

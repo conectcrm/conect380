@@ -6,7 +6,6 @@ import { NotificationModule } from '../../notifications/notification.module';
 import { Empresa } from '../../empresas/entities/empresa.entity';
 import { User } from '../users/user.entity';
 import { EmpresaModulo } from '../empresas/entities/empresa-modulo.entity';
-import { ModuloEmpresa } from './entities/modulo-empresa.entity';
 import { HistoricoPlano } from './entities/historico-plano.entity';
 import { EmpresaModuloService } from '../empresas/services/empresa-modulo.service';
 import { CoreAdminMfaGuard } from './guards/core-admin-mfa.guard';
@@ -28,6 +27,7 @@ import { FeatureFlagTenant } from '../dashboard-v2/entities/feature-flag-tenant.
 import { CoreAdminFeatureFlagService } from './services/core-admin-feature-flag.service';
 import { CoreAdminFeatureFlagsController } from './core-admin-feature-flags.controller';
 import { MailModule } from '../../mail/mail.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -38,13 +38,13 @@ import { MailModule } from '../../mail/mail.module';
       Empresa,
       User,
       EmpresaModulo,
-      ModuloEmpresa,
       HistoricoPlano,
     ]),
     UsersModule,
     PlanosModule,
     NotificationModule,
     MailModule,
+    AuthModule,
   ],
   controllers: [
     CoreAdminController,

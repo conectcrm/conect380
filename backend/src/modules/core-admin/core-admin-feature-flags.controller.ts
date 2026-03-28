@@ -20,6 +20,14 @@ import {
 export class CoreAdminFeatureFlagsController {
   constructor(private readonly coreAdminFeatureFlagService: CoreAdminFeatureFlagService) {}
 
+  @Get('catalog')
+  async listCatalog() {
+    return {
+      success: true,
+      data: await this.coreAdminFeatureFlagService.listCatalog(),
+    };
+  }
+
   @Get()
   async listByEmpresa(@Query('empresaId') empresaId: string) {
     return {

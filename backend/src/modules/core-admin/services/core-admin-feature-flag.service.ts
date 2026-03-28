@@ -10,12 +10,42 @@ export type CoreAdminTenantFlagInput = {
   updatedBy?: string | null;
 };
 
+const DEFAULT_FEATURE_FLAG_CATALOG = [
+  'dashboard_v2_enabled',
+  'crm.reports',
+  'financeiro.gateway',
+  'agenda.notifications',
+  'atendimento.omnichannel',
+  'compras.cotacoes',
+];
+
 @Injectable()
 export class CoreAdminFeatureFlagService {
   constructor(
     @InjectRepository(FeatureFlagTenant)
     private readonly featureFlagRepository: Repository<FeatureFlagTenant>,
   ) {}
+
+  async listCatalog(): Promise<string[]> {
+    const envCatalog = String(process.env.CORE_ADMIN_FEATURE_FLAG_CATALOG || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    const rows = await this.featureFlagRepository
+      .createQueryBuilder('flag')
+      .select('DISTINCT flag.flag_key', 'flag_key')
+      .orderBy('flag.flag_key', 'ASC')
+      .getRawMany<{ flag_key: string }>();
+
+    const dbCatalog = rows
+      .map((row) => String(row.flag_key || '').trim())
+      .filter(Boolean);
+
+    return Array.from(new Set([...DEFAULT_FEATURE_FLAG_CATALOG, ...envCatalog, ...dbCatalog])).sort(
+      (a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }),
+    );
+  }
 
   async listByEmpresa(empresaId: string): Promise<FeatureFlagTenant[]> {
     const normalizedEmpresaId = String(empresaId || '').trim();
@@ -82,4 +112,3 @@ export class CoreAdminFeatureFlagService {
     };
   }
 }
-
