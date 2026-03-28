@@ -27,15 +27,70 @@ function Add-Result {
   }
 }
 
+function Get-ErrorMessage {
+  param(
+    [Parameter(Mandatory = $true)]$ErrorRecord
+  )
+
+  $messages = New-Object System.Collections.Generic.List[string]
+
+  if ($null -ne $ErrorRecord) {
+    $exceptionValue = $null
+    if ($ErrorRecord.PSObject.Properties.Name -contains 'Exception') {
+      $exceptionValue = $ErrorRecord.Exception
+    }
+
+    if ($null -ne $exceptionValue) {
+      if ($exceptionValue -is [System.Exception]) {
+        if (-not [string]::IsNullOrWhiteSpace([string]$exceptionValue.Message)) {
+          $messages.Add([string]$exceptionValue.Message)
+        }
+      }
+      else {
+        $rawException = [string]$exceptionValue
+        if (-not [string]::IsNullOrWhiteSpace($rawException)) {
+          $messages.Add($rawException)
+        }
+      }
+    }
+
+    if ($ErrorRecord.PSObject.Properties.Name -contains 'ErrorDetails') {
+      $errorDetailsValue = $ErrorRecord.ErrorDetails
+      if ($null -ne $errorDetailsValue) {
+        if ($errorDetailsValue -is [System.Management.Automation.ErrorDetails]) {
+          if (-not [string]::IsNullOrWhiteSpace([string]$errorDetailsValue.Message)) {
+            $messages.Add([string]$errorDetailsValue.Message)
+          }
+        }
+        else {
+          $rawErrorDetails = [string]$errorDetailsValue
+          if (-not [string]::IsNullOrWhiteSpace($rawErrorDetails)) {
+            $messages.Add($rawErrorDetails)
+          }
+        }
+      }
+    }
+
+    $recordAsString = [string]$ErrorRecord
+    if (-not [string]::IsNullOrWhiteSpace($recordAsString)) {
+      $messages.Add($recordAsString)
+    }
+  }
+
+  if ($messages.Count -eq 0) {
+    return 'Unknown error'
+  }
+
+  return ($messages | Select-Object -Unique) -join ' | '
+}
+
 function Get-HttpStatusCodeFromError {
   param(
     [Parameter(Mandatory = $true)]$ErrorRecord
   )
 
   $candidateMessages = @(
-    [string]$ErrorRecord.Exception.Message,
-    [string]$ErrorRecord.ErrorDetails.Message,
-    [string]$ErrorRecord.ToString()
+    Get-ErrorMessage -ErrorRecord $ErrorRecord
   ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
   foreach ($message in $candidateMessages) {
@@ -56,11 +111,7 @@ function Test-IsTransientNetworkError {
     [Parameter(Mandatory = $true)]$ErrorRecord
   )
 
-  $message = @(
-    [string]$ErrorRecord.Exception.Message,
-    [string]$ErrorRecord.ErrorDetails.Message,
-    [string]$ErrorRecord.ToString()
-  ) -join ' '
+  $message = Get-ErrorMessage -ErrorRecord $ErrorRecord
 
   if ([string]::IsNullOrWhiteSpace($message)) {
     return $false
@@ -118,7 +169,7 @@ function Run-Step {
         continue
       }
 
-      Add-Result -Step $Name -Status "FAIL" -Details $_.Exception.Message
+      Add-Result -Step $Name -Status "FAIL" -Details (Get-ErrorMessage -ErrorRecord $_)
       return
     }
   }
