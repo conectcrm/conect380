@@ -233,8 +233,21 @@ function Invoke-JsonRequest {
     }
   }
   catch {
-    $httpResponse = $_.Exception.Response
+    $exceptionValue = $null
+    if ($_.PSObject.Properties.Name -contains 'Exception') {
+      $exceptionValue = $_.Exception
+    }
+
+    $httpResponse = $null
+    if ($null -ne $exceptionValue -and $exceptionValue.PSObject.Properties.Name -contains 'Response') {
+      $httpResponse = $exceptionValue.Response
+    }
+
     if ($null -eq $httpResponse) {
+      throw
+    }
+
+    if ($httpResponse.PSObject.Properties.Name -notcontains 'StatusCode') {
       throw
     }
 
