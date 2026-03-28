@@ -118,8 +118,8 @@ export const GovernanceDashboardPage = () => {
 
       try {
         const [overviewResponse, capabilitiesResponse] = await Promise.all([
-          api.get('/guardian/bff/overview'),
-          api.get('/guardian/bff/capabilities'),
+          api.get('/core-admin/bff/overview'),
+          api.get('/core-admin/bff/capabilities'),
         ]);
         const overview = overviewResponse.data?.data ?? {};
         const capabilityState = capabilitiesResponse.data?.data ?? {};
@@ -218,7 +218,7 @@ export const GovernanceDashboardPage = () => {
       <section className="card dashboard-span-wide">
         <header className="card-headline">
           <h2>Resumo operacional</h2>
-          <span className="subtle-inline">Gateway `/guardian/bff/overview`</span>
+          <span className="subtle-inline">Gateway `/core-admin/bff/overview`</span>
         </header>
         <div className="kpi-grid guardian-kpi-grid">
           {cards.map((card) => (
@@ -234,7 +234,7 @@ export const GovernanceDashboardPage = () => {
       <section className="card dashboard-span-narrow">
         <header className="card-headline">
           <h2>Politica ativa</h2>
-          <span className="subtle-inline">Gateway `/guardian/bff/capabilities`</span>
+          <span className="subtle-inline">Gateway `/core-admin/bff/capabilities`</span>
         </header>
         <div className="policy-grid">
           {capabilities.map((item) => (
@@ -288,3 +288,4 @@ export const GovernanceDashboardPage = () => {
     </div>
   );
 };
+

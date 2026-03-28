@@ -439,8 +439,8 @@ jobs:
         if: steps.vendas_changes.outputs.run == 'true'
         run: npm --prefix backend run test:e2e:vendas
 
-  backend-e2e-guardian-hardening:
-    name: Backend - E2E Guardian Hardening
+  backend-e2e-core-admin-hardening:
+    name: Backend - E2E Core Admin Hardening
     runs-on: ubuntu-latest
     needs: backend
 
@@ -451,8 +451,8 @@ jobs:
           fetch-depth: 2
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
-      - name: Detectar mudancas relevantes (Guardian Hardening)
-        id: guardian_hardening_changes
+      - name: Detectar mudancas relevantes (Core Admin Hardening)
+        id: core_admin_hardening_changes
         run: |
           if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
             CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR HEAD^ HEAD || true)
@@ -460,18 +460,18 @@ jobs:
             CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r --diff-filter=ACMR HEAD || true)
           fi
 
-          if echo "$CHANGED_FILES" | grep -E '^(backend/test/guardian/|backend/test/_support/e2e-app.helper.ts|backend/src/modules/guardian/|backend/src/modules/admin/guards/legacy-admin-transition.guard.ts|backend/src/modules/planos/assinatura-due-date-scheduler.service.ts|backend/src/modules/planos/assinaturas.controller.ts|backend/src/modules/planos/planos.controller.ts|backend/package\.json|backend/package-lock\.json)' >/dev/null; then
-            echo "guardian_hardening=true" >> $GITHUB_OUTPUT
+          if echo "$CHANGED_FILES" | grep -E '^(backend/test/core-admin/|backend/test/_support/e2e-app.helper.ts|backend/src/modules/core-admin/|backend/src/common/guards/core-admin-legacy-transition.guard.ts|backend/src/common/guards/core-admin-legacy-transition.guard.spec.ts|backend/src/modules/planos/assinatura-due-date-scheduler.service.ts|backend/src/modules/planos/assinaturas.controller.ts|backend/src/modules/planos/planos.controller.ts|backend/src/main.ts|backend/src/app.module.ts|backend/package\.json|backend/package-lock\.json)' >/dev/null; then
+            echo "core_admin_hardening=true" >> $GITHUB_OUTPUT
           else
-            echo "guardian_hardening=false" >> $GITHUB_OUTPUT
+            echo "core_admin_hardening=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Pular E2E Guardian Hardening (sem mudancas relevantes)
-        if: steps.guardian_hardening_changes.outputs.guardian_hardening != 'true'
-        run: echo "Sem alteracoes no escopo de guardian hardening; job finalizado sem executar testes."
+      - name: Pular E2E Core Admin Hardening (sem mudancas relevantes)
+        if: steps.core_admin_hardening_changes.outputs.core_admin_hardening != 'true'
+        run: echo "Sem alteracoes no escopo de core-admin hardening; job finalizado sem executar testes."
 
       - name: Setup Node.js
-        if: steps.guardian_hardening_changes.outputs.guardian_hardening == 'true'
+        if: steps.core_admin_hardening_changes.outputs.core_admin_hardening == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '22.16.0'
@@ -479,15 +479,15 @@ jobs:
           cache-dependency-path: backend/package-lock.json
 
       - name: Instalar dependencias backend
-        if: steps.guardian_hardening_changes.outputs.guardian_hardening == 'true'
+        if: steps.core_admin_hardening_changes.outputs.core_admin_hardening == 'true'
         run: npm --prefix backend ci
 
-      - name: Rodar E2E Guardian Hardening
-        if: steps.guardian_hardening_changes.outputs.guardian_hardening == 'true'
-        run: npm --prefix backend run test:e2e:guardian:hardening
+      - name: Rodar E2E Core Admin Hardening
+        if: steps.core_admin_hardening_changes.outputs.core_admin_hardening == 'true'
+        run: npm --prefix backend run test:e2e:core-admin:hardening
 
-  backend-e2e-guardian-security:
-    name: Backend - E2E Guardian Security (DB)
+  backend-e2e-core-admin-security:
+    name: Backend - E2E Core Admin Security (DB)
     runs-on: ubuntu-latest
     needs: backend
     env:
@@ -533,8 +533,8 @@ jobs:
           fetch-depth: 2
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
-      - name: Detectar mudancas relevantes (Guardian Security)
-        id: guardian_security_changes
+      - name: Detectar mudancas relevantes (Core Admin Security)
+        id: core_admin_security_changes
         run: |
           if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
             CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR HEAD^ HEAD || true)
@@ -542,18 +542,18 @@ jobs:
             CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r --diff-filter=ACMR HEAD || true)
           fi
 
-          if echo "$CHANGED_FILES" | grep -E '^(backend/test/guardian/guardian-mfa-session.e2e-spec.ts|backend/test/guardian/guardian-backend-bypass.e2e-spec.ts|backend/test/_support/e2e-app.helper.ts|backend/src/modules/guardian/|backend/src/modules/auth/|backend/src/modules/admin/|backend/src/modules/users/|backend/src/modules/planos/|backend/src/main.ts|backend/src/app.module.ts|backend/src/config/|backend/package\.json|backend/package-lock\.json)' >/dev/null; then
-            echo "guardian_security=true" >> $GITHUB_OUTPUT
+          if echo "$CHANGED_FILES" | grep -E '^(backend/test/core-admin/core-admin-mfa-session.e2e-spec.ts|backend/test/core-admin/core-admin-backend-bypass.e2e-spec.ts|backend/test/_support/e2e-app.helper.ts|backend/src/modules/core-admin/|backend/src/modules/auth/|backend/src/modules/users/|backend/src/modules/planos/|backend/src/common/guards/core-admin-legacy-transition.guard.ts|backend/src/common/guards/core-admin-legacy-transition.guard.spec.ts|backend/src/main.ts|backend/src/app.module.ts|backend/src/config/|backend/package\.json|backend/package-lock\.json)' >/dev/null; then
+            echo "core_admin_security=true" >> $GITHUB_OUTPUT
           else
-            echo "guardian_security=false" >> $GITHUB_OUTPUT
+            echo "core_admin_security=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Pular E2E Guardian Security (sem mudancas relevantes)
-        if: steps.guardian_security_changes.outputs.guardian_security != 'true'
-        run: echo "Sem alteracoes no escopo de guardian security; job finalizado sem executar testes."
+      - name: Pular E2E Core Admin Security (sem mudancas relevantes)
+        if: steps.core_admin_security_changes.outputs.core_admin_security != 'true'
+        run: echo "Sem alteracoes no escopo de core-admin security; job finalizado sem executar testes."
 
       - name: Setup Node.js
-        if: steps.guardian_security_changes.outputs.guardian_security == 'true'
+        if: steps.core_admin_security_changes.outputs.core_admin_security == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '22.16.0'
@@ -561,16 +561,16 @@ jobs:
           cache-dependency-path: backend/package-lock.json
 
       - name: Instalar dependencias backend
-        if: steps.guardian_security_changes.outputs.guardian_security == 'true'
+        if: steps.core_admin_security_changes.outputs.core_admin_security == 'true'
         run: npm --prefix backend ci
 
       - name: Aplicar migrations na base de teste e2e
-        if: steps.guardian_security_changes.outputs.guardian_security == 'true'
+        if: steps.core_admin_security_changes.outputs.core_admin_security == 'true'
         run: npm --prefix backend run migration:run
 
-      - name: Rodar E2E Guardian Security
-        if: steps.guardian_security_changes.outputs.guardian_security == 'true'
-        run: npm --prefix backend run test:e2e:guardian:security
+      - name: Rodar E2E Core Admin Security
+        if: steps.core_admin_security_changes.outputs.core_admin_security == 'true'
+        run: npm --prefix backend run test:e2e:core-admin:security
 
   frontend:
     name: Frontend - Testes e Build
@@ -851,8 +851,8 @@ jobs:
         if: steps.guardian_exposure_changes.outputs.guardian_exposure == 'true'
         run: pwsh -NoLogo -NoProfile -File ./scripts/ci/guardian-exposure-scan.ps1
 
-  frontend-e2e-guardian-billing-governance:
-    name: Frontend - E2E Guardian Billing Governance (Playwright)
+  frontend-e2e-core-admin-billing-governance:
+    name: Frontend - E2E Core Admin Billing Governance (Playwright)
     runs-on: ubuntu-latest
     needs: frontend
 
@@ -862,8 +862,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Detectar mudancas relevantes (Guardian Billing Governance)
-        id: guardian_billing_governance_changes
+      - name: Detectar mudancas relevantes (Core Admin Billing Governance)
+        id: core_admin_billing_governance_changes
         run: |
           if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
             CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR HEAD^ HEAD || true)
@@ -871,81 +871,83 @@ jobs:
             CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r --diff-filter=ACMR HEAD || true)
           fi
 
-          if echo "$CHANGED_FILES" | grep -E '^(e2e/guardian-billing-governance.spec.ts|e2e/guardian-responsive-visual.spec.ts|playwright.config.ts|guardian-web/src/|backend/src/modules/guardian/|backend/src/modules/planos/|package\.json|package-lock\.json|guardian-web/package\.json|guardian-web/package-lock\.json)' >/dev/null; then
-            echo "guardian_billing_governance=true" >> $GITHUB_OUTPUT
+          if echo "$CHANGED_FILES" | grep -E '^(e2e/core-admin-billing-governance.spec.ts|e2e/core-admin-responsive-visual.spec.ts|playwright.config.ts|frontend-web/src/|backend/src/modules/core-admin/|backend/src/modules/planos/|package\.json|package-lock\.json|frontend-web/package\.json|frontend-web/package-lock\.json)' >/dev/null; then
+            echo "core_admin_billing_governance=true" >> $GITHUB_OUTPUT
           else
-            echo "guardian_billing_governance=false" >> $GITHUB_OUTPUT
+            echo "core_admin_billing_governance=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Pular E2E Guardian Billing Governance (sem mudancas relevantes)
-        if: steps.guardian_billing_governance_changes.outputs.guardian_billing_governance != 'true'
-        run: echo "Sem alteracoes no escopo guardian billing governance; job finalizado sem executar Playwright."
+      - name: Pular E2E Core Admin Billing Governance (sem mudancas relevantes)
+        if: steps.core_admin_billing_governance_changes.outputs.core_admin_billing_governance != 'true'
+        run: echo "Sem alteracoes no escopo core-admin billing governance; job finalizado sem executar Playwright."
 
       - name: Setup Node.js
-        if: steps.guardian_billing_governance_changes.outputs.guardian_billing_governance == 'true'
+        if: steps.core_admin_billing_governance_changes.outputs.core_admin_billing_governance == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '22.16.0'
           cache: npm
           cache-dependency-path: |
             package-lock.json
-            guardian-web/package-lock.json
+            frontend-web/package-lock.json
 
       - name: Instalar dependencias root (Playwright)
-        if: steps.guardian_billing_governance_changes.outputs.guardian_billing_governance == 'true'
+        if: steps.core_admin_billing_governance_changes.outputs.core_admin_billing_governance == 'true'
         run: npm ci
 
-      - name: Instalar dependencias guardian-web
-        if: steps.guardian_billing_governance_changes.outputs.guardian_billing_governance == 'true'
-        run: npm --prefix guardian-web ci
+      - name: Instalar dependencias frontend-web
+        if: steps.core_admin_billing_governance_changes.outputs.core_admin_billing_governance == 'true'
+        run: npm --prefix frontend-web ci
 
       - name: Instalar browser Chromium (Playwright)
-        if: steps.guardian_billing_governance_changes.outputs.guardian_billing_governance == 'true'
+        if: steps.core_admin_billing_governance_changes.outputs.core_admin_billing_governance == 'true'
         run: npx playwright install --with-deps chromium
 
-      - name: Subir guardian-web (modo CI)
-        if: steps.guardian_billing_governance_changes.outputs.guardian_billing_governance == 'true'
+      - name: Subir frontend-web (modo CI)
+        if: steps.core_admin_billing_governance_changes.outputs.core_admin_billing_governance == 'true'
         env:
           CI: 'true'
         run: |
-          nohup npm --prefix guardian-web run dev > guardian.log 2>&1 &
-          echo $! > guardian.pid
+          nohup npm --prefix frontend-web start > frontend-web.log 2>&1 &
+          echo $! > frontend-web.pid
 
           for i in $(seq 1 90); do
-            if curl -fsS http://localhost:3020 > /dev/null; then
-              echo "Guardian web disponivel em http://localhost:3020"
+            if curl -fsS http://localhost:3000 > /dev/null; then
+              echo "Frontend web disponivel em http://localhost:3000"
               exit 0
             fi
             sleep 2
           done
 
-          echo "Guardian web nao iniciou a tempo."
-          tail -n 200 guardian.log || true
+          echo "Frontend web nao iniciou a tempo."
+          tail -n 200 frontend-web.log || true
           exit 1
 
-      - name: Rodar E2E Guardian Billing Governance (Playwright)
-        if: steps.guardian_billing_governance_changes.outputs.guardian_billing_governance == 'true'
+      - name: Rodar E2E Core Admin Governance (Playwright)
+        if: steps.core_admin_billing_governance_changes.outputs.core_admin_billing_governance == 'true'
         env:
-          GUARDIAN_FRONTEND_URL: http://localhost:3020
-        run: npm run test:e2e:guardian:billing:governance
+          CORE_ADMIN_FRONTEND_URL: http://localhost:3000
+        run: |
+          npm run test:e2e:core-admin:billing:governance
+          npm run test:e2e:core-admin:visual
 
-      - name: Upload artefatos Playwright (Guardian Billing Governance)
-        if: ${{ !cancelled() && steps.guardian_billing_governance_changes.outputs.guardian_billing_governance == 'true' }}
+      - name: Upload artefatos Playwright (Core Admin Billing Governance)
+        if: ${{ !cancelled() && steps.core_admin_billing_governance_changes.outputs.core_admin_billing_governance == 'true' }}
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-guardian-billing-governance-artifacts
+          name: playwright-core-admin-billing-governance-artifacts
           path: |
             playwright-report/
             test-results/
-            guardian.log
+            frontend-web.log
           if-no-files-found: ignore
           retention-days: 14
 
-      - name: Encerrar guardian-web
-        if: ${{ always() && steps.guardian_billing_governance_changes.outputs.guardian_billing_governance == 'true' }}
+      - name: Encerrar frontend-web
+        if: ${{ always() && steps.core_admin_billing_governance_changes.outputs.core_admin_billing_governance == 'true' }}
         run: |
-          if [ -f guardian.pid ]; then
-            kill "$(cat guardian.pid)" || true
+          if [ -f frontend-web.pid ]; then
+            kill "$(cat frontend-web.pid)" || true
           fi
 
   security:
@@ -1006,7 +1008,7 @@ jobs:
   final-status:
     name: Status Final do CI
     runs-on: ubuntu-latest
-    needs: [encoding-guardrails, release-flags-guardrails, backend, backend-e2e-cotacao, backend-e2e-contas-pagar, backend-e2e-multi-tenancy, backend-e2e-vendas, backend-e2e-guardian-hardening, backend-e2e-guardian-security, frontend, frontend-e2e-pipeline-ui, frontend-e2e-billing-critical, frontend-guardian-exposure-scan, frontend-e2e-guardian-billing-governance, security, check-temp-files]
+    needs: [encoding-guardrails, release-flags-guardrails, backend, backend-e2e-cotacao, backend-e2e-contas-pagar, backend-e2e-multi-tenancy, backend-e2e-vendas, backend-e2e-core-admin-hardening, backend-e2e-core-admin-security, frontend, frontend-e2e-pipeline-ui, frontend-e2e-billing-critical, frontend-guardian-exposure-scan, frontend-e2e-core-admin-billing-governance, security, check-temp-files]
     if: always()
 
     steps:
@@ -1019,13 +1021,13 @@ jobs:
           echo "Backend E2E Contas Pagar: ${{ needs.backend-e2e-contas-pagar.result }}"
           echo "Backend E2E Multi-Tenancy: ${{ needs.backend-e2e-multi-tenancy.result }}"
           echo "Backend E2E Vendas: ${{ needs.backend-e2e-vendas.result }}"
-          echo "Backend E2E Guardian Hardening: ${{ needs.backend-e2e-guardian-hardening.result }}"
-          echo "Backend E2E Guardian Security: ${{ needs.backend-e2e-guardian-security.result }}"
+          echo "Backend E2E Core Admin Hardening: ${{ needs.backend-e2e-core-admin-hardening.result }}"
+          echo "Backend E2E Core Admin Security: ${{ needs.backend-e2e-core-admin-security.result }}"
           echo "Frontend: ${{ needs.frontend.result }}"
           echo "Frontend E2E Pipeline UI (escopo Comercial Core): ${{ needs.frontend-e2e-pipeline-ui.result }}"
           echo "Frontend E2E Billing Critical: ${{ needs.frontend-e2e-billing-critical.result }}"
           echo "Frontend Guardian Exposure Scan: ${{ needs.frontend-guardian-exposure-scan.result }}"
-          echo "Frontend E2E Guardian Billing Governance: ${{ needs.frontend-e2e-guardian-billing-governance.result }}"
+          echo "Frontend E2E Core Admin Billing Governance: ${{ needs.frontend-e2e-core-admin-billing-governance.result }}"
           echo "Security: ${{ needs.security.result }}"
           echo "Temp Files Check: ${{ needs.check-temp-files.result }}"
 
@@ -1036,13 +1038,13 @@ jobs:
              [ "${{ needs.backend-e2e-contas-pagar.result }}" != "success" ] || \
              [ "${{ needs.backend-e2e-multi-tenancy.result }}" != "success" ] || \
              [ "${{ needs.backend-e2e-vendas.result }}" != "success" ] || \
-             [ "${{ needs.backend-e2e-guardian-hardening.result }}" != "success" ] || \
-             [ "${{ needs.backend-e2e-guardian-security.result }}" != "success" ] || \
+             [ "${{ needs.backend-e2e-core-admin-hardening.result }}" != "success" ] || \
+             [ "${{ needs.backend-e2e-core-admin-security.result }}" != "success" ] || \
              [ "${{ needs.frontend.result }}" != "success" ] || \
              [ "${{ needs.frontend-e2e-pipeline-ui.result }}" != "success" ] || \
              [ "${{ needs.frontend-e2e-billing-critical.result }}" != "success" ] || \
              [ "${{ needs.frontend-guardian-exposure-scan.result }}" != "success" ] || \
-             [ "${{ needs.frontend-e2e-guardian-billing-governance.result }}" != "success" ] || \
+             [ "${{ needs.frontend-e2e-core-admin-billing-governance.result }}" != "success" ] || \
              [ "${{ needs.security.result }}" != "success" ] || \
              [ "${{ needs.check-temp-files.result }}" != "success" ]; then
             echo "CI falhou em um ou mais jobs"

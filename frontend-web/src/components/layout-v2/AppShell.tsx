@@ -16,7 +16,6 @@ import RouteTemplateFrame from './RouteTemplateFrame';
 import SystemMaintenanceBanner from './SystemMaintenanceBanner';
 import { shellSpacing, shellTokens } from './tokens';
 import { resolveAvatarUrl } from '../../utils/avatar';
-import { openGuardianPortal } from '../../utils/guardianPortal';
 
 type AppShellProps = {
   children: React.ReactNode;
@@ -282,7 +281,7 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
     roleKey === 'manager' ||
     roleKey === 'gerente';
   const isSuperAdmin = roleKey === 'superadmin';
-  const canAccessGuardian = isSuperAdmin;
+  const canAccessCoreAdmin = isSuperAdmin;
 
   const initials = useMemo(() => resolveInitials(user?.nome), [user?.nome]);
   const avatarUrl = useMemo(() => resolveAvatarUrl(user?.avatar_url || null), [user?.avatar_url]);
@@ -295,8 +294,8 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
     setShowProfileSelector(false);
   };
 
-  const handleOpenGuardianCompanies = () => {
-    openGuardianPortal('/governance/companies');
+  const handleOpenCoreAdmin = () => {
+    navigate('/core-admin');
   };
 
   return (
@@ -398,10 +397,10 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
                 {isSuperAdmin ? (
                   <button
                     type="button"
-                    onClick={handleOpenGuardianCompanies}
+                    onClick={handleOpenCoreAdmin}
                     className="hidden h-8 w-8 items-center justify-center rounded-lg border border-[#D7E4E9] bg-white text-[#5E7887] transition-colors hover:bg-[#F4FAFC] hover:text-[#234A5F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/30 sm:inline-flex"
-                    title="Abrir painel Guardian"
-                    aria-label="Abrir painel Guardian"
+                    title="Abrir Core Admin"
+                    aria-label="Abrir Core Admin"
                   >
                     <Shield className="h-4 w-4" />
                   </button>
@@ -464,17 +463,17 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
                         Configuracoes
                       </button>
 
-                      {canAccessGuardian ? (
+                      {canAccessCoreAdmin ? (
                         <button
                           type="button"
                           onClick={() => {
                             setShowUserMenu(false);
-                            openGuardianPortal('/governance/companies');
+                            navigate('/core-admin');
                           }}
                           className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-[#214251] hover:bg-[#EEF5F8]"
                         >
                           <Shield className="h-4 w-4 text-[#5F7B88]" />
-                          Painel Guardian
+                          Core Admin
                         </button>
                       ) : null}
 

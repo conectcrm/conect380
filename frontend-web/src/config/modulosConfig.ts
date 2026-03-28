@@ -68,6 +68,22 @@ export const MODULOS_INFO: Record<ModuloEnum, ModuloInfo> = {
     ],
   },
 
+  [ModuloEnum.COMPRAS]: {
+    id: ModuloEnum.COMPRAS,
+    nome: 'Compras',
+    descricao:
+      'Gestao do ciclo de compras com cotacoes, orcamentos, aprovacoes e acompanhamento de aquisicoes.',
+    preco: 'R$ 199',
+    recursos: [
+      'Gestao de cotacoes e orcamentos',
+      'Aprovacoes de compras por alcada',
+      'Historico de decisoes por solicitacao',
+      'Controle de status de aquisicao',
+      'Exportacao e compartilhamento de cotacoes',
+      'Integracao com contas a pagar',
+    ],
+  },
+
   [ModuloEnum.FINANCEIRO]: {
     id: ModuloEnum.FINANCEIRO,
     nome: 'Financeiro',

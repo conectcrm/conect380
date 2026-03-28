@@ -22,8 +22,8 @@ $checks = @()
 $notes = @()
 
 $requiredFiles = @(
-  (Join-Path $repoRoot 'backend/src/modules/guardian/entities/guardian-critical-audit.entity.ts'),
-  (Join-Path $repoRoot 'backend/src/modules/guardian/interceptors/guardian-critical-audit.interceptor.ts'),
+  (Join-Path $repoRoot 'backend/src/modules/core-admin/entities/core-admin-critical-audit.entity.ts'),
+  (Join-Path $repoRoot 'backend/src/modules/core-admin/interceptors/core-admin-critical-audit.interceptor.ts'),
   (Join-Path $repoRoot 'backend/src/migrations/1808106000000-CreateGuardianCriticalAudits.ts')
 )
 

@@ -15,6 +15,7 @@ const MVP_MODE_ENABLED = process.env.REACT_APP_MVP_MODE === 'true';
 const MVP_ALLOWED_TOP_LEVEL_MENU_IDS = new Set<string>([
   'dashboard',
   'comercial',
+  'compras',
   'financeiro',
   'configuracoes',
   'administracao',
@@ -106,21 +107,22 @@ const BLOCKED_ROUTE_RULES: MvpBlockedRouteRule[] = [
   { prefix: '/crm/interacoes', info: BLOCKED_RELATIONSHIP_INFO },
   { prefix: '/agenda', info: BLOCKED_RELATIONSHIP_INFO },
   { prefix: '/crm/agenda', info: BLOCKED_RELATIONSHIP_INFO },
+  { prefix: '/compras', info: BLOCKED_COMMERCIAL_INFO },
   { prefix: '/cotacoes', info: BLOCKED_COMMERCIAL_INFO },
-  { prefix: '/vendas/cotacoes', info: BLOCKED_COMMERCIAL_INFO },
+  { prefix: '/financeiro/cotacoes', info: BLOCKED_COMMERCIAL_INFO },
   { prefix: '/orcamentos', info: BLOCKED_COMMERCIAL_INFO },
   { prefix: '/aprovacoes/pendentes', info: BLOCKED_COMMERCIAL_INFO },
-  { prefix: '/vendas/aprovacoes', info: BLOCKED_COMMERCIAL_INFO },
+  { prefix: '/financeiro/compras/aprovacoes', info: BLOCKED_COMMERCIAL_INFO },
 ];
 
 const MVP_ALLOWED_ROUTE_PREFIXES: string[] = [
-  '/financeiro/cotacoes',
-  '/financeiro/compras/aprovacoes',
+  '/compras/cotacoes',
+  '/compras/aprovacoes',
   '/cotacoes',
-  '/vendas/cotacoes',
+  '/financeiro/cotacoes',
   '/orcamentos',
   '/aprovacoes/pendentes',
-  '/vendas/aprovacoes',
+  '/financeiro/compras/aprovacoes',
   '/contratos',
 ];
 

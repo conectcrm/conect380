@@ -5,7 +5,15 @@ import {
   type MenuConfig,
 } from '../menuConfig';
 
-const ALL_MODULES = ['ATENDIMENTO', 'CRM', 'VENDAS', 'FINANCEIRO', 'BILLING', 'ADMINISTRACAO'];
+const ALL_MODULES = [
+  'ATENDIMENTO',
+  'CRM',
+  'VENDAS',
+  'COMPRAS',
+  'FINANCEIRO',
+  'BILLING',
+  'ADMINISTRACAO',
+];
 
 const collectIds = (items: MenuConfig[]): string[] => {
   const ids: string[] = [];
@@ -52,7 +60,7 @@ describe('menuConfig permission filtering', () => {
     const menu = getMenuParaEmpresa(ALL_MODULES, {
       email: 'scoped-user@empresa.com',
       role: 'user',
-      permissions: ['atendimento.tickets.read', 'comercial.propostas.read', 'financeiro.pagamentos.read'],
+      permissions: ['atendimento.tickets.read', 'comercial.propostas.read', 'compras.cotacoes.read'],
     } as any);
 
     const ids = collectIds(menu);
@@ -132,7 +140,7 @@ describe('menuConfig permission filtering', () => {
     expect(ids).not.toContain('configuracoes-usuarios');
   });
 
-  it('treats owner legacy role alias as privileged for admin menu', () => {
+  it('does not treat owner legacy role alias as superadmin in admin menu', () => {
     const menu = getMenuParaEmpresa(ALL_MODULES, {
       email: 'dono@empresa.com',
       role: 'owner',
@@ -141,7 +149,19 @@ describe('menuConfig permission filtering', () => {
 
     const ids = collectIds(menu);
     expect(ids).toContain('administracao');
-    expect(ids).toContain('admin-sistema');
+    expect(ids).not.toContain('admin-sistema');
+    expect(ids).not.toContain('admin-core');
+  });
+
+  it('hides core-admin menu entry for non-superadmin roles', () => {
+    const menu = getMenuParaEmpresa(ALL_MODULES, {
+      email: 'admin@tenant.com',
+      role: 'admin',
+      permissions: ['admin.empresas.manage'],
+    } as any);
+
+    const ids = collectIds(menu);
+    expect(ids).not.toContain('admin-core');
   });
 
   it('shows branding global only for superadmin role and blocks admin role', () => {
@@ -578,47 +598,59 @@ describe('menuConfig permission filtering', () => {
     expect(templatesWithReply).toBe(true);
   });
 
-  it('requires financeiro.pagamentos.read for cotacoes routes and keeps legacy alias', () => {
-    const financeiroRead = canUserAccessPath('/financeiro/cotacoes', ALL_MODULES, {
+  it('requires compras.cotacoes.read for compras route and keeps legacy aliases', () => {
+    const comprasRead = canUserAccessPath('/compras/cotacoes', ALL_MODULES, {
       email: 'finance.read@empresa.com',
       role: 'custom',
-      permissions: ['financeiro.pagamentos.read'],
+      permissions: ['compras.cotacoes.read'],
     } as any);
-    const legacyAlias = canUserAccessPath('/vendas/cotacoes', ALL_MODULES, {
-      email: 'finance.alias@empresa.com',
+    const financeiroReadOnly = canUserAccessPath('/compras/cotacoes', ALL_MODULES, {
+      email: 'finance.legacy@empresa.com',
       role: 'custom',
       permissions: ['financeiro.pagamentos.read'],
     } as any);
-    const comercialReadOnly = canUserAccessPath('/financeiro/cotacoes', ALL_MODULES, {
+    const legacyAlias = canUserAccessPath('/cotacoes', ALL_MODULES, {
+      email: 'finance.alias@empresa.com',
+      role: 'custom',
+      permissions: ['compras.cotacoes.read'],
+    } as any);
+    const comercialReadOnly = canUserAccessPath('/compras/cotacoes', ALL_MODULES, {
       email: 'seller.read@empresa.com',
       role: 'custom',
       permissions: ['comercial.propostas.read'],
     } as any);
 
-    expect(financeiroRead).toBe(true);
+    expect(comprasRead).toBe(true);
+    expect(financeiroReadOnly).toBe(false);
     expect(legacyAlias).toBe(true);
     expect(comercialReadOnly).toBe(false);
   });
 
-  it('requires financeiro.pagamentos.manage for aprovacoes de compras routes', () => {
-    const readOnly = canUserAccessPath('/financeiro/compras/aprovacoes', ALL_MODULES, {
+  it('requires compras.aprovacoes.manage for aprovacoes route and keeps legacy aliases', () => {
+    const readOnly = canUserAccessPath('/compras/aprovacoes', ALL_MODULES, {
       email: 'finance.read@empresa.com',
       role: 'custom',
-      permissions: ['financeiro.pagamentos.read'],
+      permissions: ['compras.cotacoes.read'],
     } as any);
-    const manage = canUserAccessPath('/financeiro/compras/aprovacoes', ALL_MODULES, {
+    const comprasManage = canUserAccessPath('/compras/aprovacoes', ALL_MODULES, {
       email: 'finance.manage@empresa.com',
       role: 'custom',
-      permissions: ['financeiro.pagamentos.manage'],
+      permissions: ['compras.aprovacoes.manage'],
     } as any);
-    const legacyAlias = canUserAccessPath('/vendas/aprovacoes', ALL_MODULES, {
-      email: 'finance.alias@empresa.com',
+    const financeiroManageOnly = canUserAccessPath('/compras/aprovacoes', ALL_MODULES, {
+      email: 'finance.legacy.manage@empresa.com',
       role: 'custom',
       permissions: ['financeiro.pagamentos.manage'],
+    } as any);
+    const legacyAlias = canUserAccessPath('/aprovacoes/pendentes', ALL_MODULES, {
+      email: 'finance.alias@empresa.com',
+      role: 'custom',
+      permissions: ['compras.aprovacoes.manage'],
     } as any);
 
     expect(readOnly).toBe(false);
-    expect(manage).toBe(true);
+    expect(comprasManage).toBe(true);
+    expect(financeiroManageOnly).toBe(false);
     expect(legacyAlias).toBe(true);
   });
 
@@ -671,6 +703,16 @@ describe('menuConfig permission filtering', () => {
   });
 
   it('blocks legacy admin aliases in cliente app regardless of permission set', () => {
+    const adminRoot = canUserAccessPath('/admin', ALL_MODULES, {
+      email: 'owner@empresa.com',
+      role: 'superadmin',
+      permissions: ['admin.empresas.manage'],
+    } as any);
+    const adminWildcard = canUserAccessPath('/admin/qualquer-rota-legada', ALL_MODULES, {
+      email: 'owner@empresa.com',
+      role: 'superadmin',
+      permissions: ['admin.empresas.manage'],
+    } as any);
     const withoutManage = canUserAccessPath('/admin/empresas', ALL_MODULES, {
       email: 'viewer@empresa.com',
       role: 'custom',
@@ -686,16 +728,48 @@ describe('menuConfig permission filtering', () => {
       role: 'admin',
       permissions: ['admin.empresas.manage'],
     } as any);
+    const withGuardianAlias = canUserAccessPath('/guardian/bff/overview', ALL_MODULES, {
+      email: 'owner@empresa.com',
+      role: 'superadmin',
+      permissions: ['admin.empresas.manage'],
+    } as any);
     const withoutManageOnNucleo = canUserAccessPath('/nuclei/administracao', ALL_MODULES, {
       email: 'analyst@empresa.com',
       role: 'custom',
       permissions: ['relatorios.read'],
     } as any);
 
+    expect(adminRoot).toBe(false);
+    expect(adminWildcard).toBe(false);
     expect(withoutManage).toBe(false);
     expect(withManage).toBe(false);
     expect(withManageOnDetail).toBe(false);
+    expect(withGuardianAlias).toBe(false);
     expect(withoutManageOnNucleo).toBe(false);
+  });
+
+  it('allows /core-admin only for superadmin role', () => {
+    const withSuperAdminRole = canUserAccessPath('/core-admin', ALL_MODULES, {
+      email: 'platform@conect360.com',
+      role: 'superadmin',
+      permissions: ['admin.empresas.manage'],
+    } as any);
+
+    const withOwnerAlias = canUserAccessPath('/core-admin/bff/overview', ALL_MODULES, {
+      email: 'owner@conect360.com',
+      role: 'owner',
+      permissions: ['admin.empresas.manage'],
+    } as any);
+
+    const withoutSuperAdminRole = canUserAccessPath('/core-admin', ALL_MODULES, {
+      email: 'admin@tenant.com',
+      role: 'admin',
+      permissions: ['admin.empresas.manage'],
+    } as any);
+
+    expect(withSuperAdminRole).toBe(true);
+    expect(withOwnerAlias).toBe(false);
+    expect(withoutSuperAdminRole).toBe(false);
   });
 
   it('allows empresas minhas route only for admin.empresas.manage', () => {
@@ -706,7 +780,7 @@ describe('menuConfig permission filtering', () => {
     } as any);
     const withManage = canUserAccessPath('/empresas/minhas', ALL_MODULES, {
       email: 'superadmin@empresa.com',
-      role: 'super_admin',
+      role: 'superadmin',
       permissions: ['admin.empresas.manage'],
     } as any);
 
@@ -720,7 +794,7 @@ describe('menuConfig permission filtering', () => {
       ['ATENDIMENTO', 'CRM', 'VENDAS', 'FINANCEIRO', 'BILLING'],
       {
         email: 'superadmin@empresa.com',
-        role: 'super_admin',
+        role: 'superadmin',
         permissions: ['admin.empresas.manage'],
       } as any,
     );
@@ -728,18 +802,18 @@ describe('menuConfig permission filtering', () => {
     expect(withoutAdminModule).toBe(false);
   });
 
-  it('blocks financeiro routes when FINANCEIRO module is not active', () => {
-    const withoutFinanceiroModule = canUserAccessPath(
-      '/financeiro/cotacoes',
-      ['ATENDIMENTO', 'CRM', 'VENDAS', 'BILLING', 'ADMINISTRACAO'],
+  it('blocks compras routes when COMPRAS module is not active', () => {
+    const withoutComprasModule = canUserAccessPath(
+      '/compras/cotacoes',
+      ['ATENDIMENTO', 'CRM', 'VENDAS', 'FINANCEIRO', 'BILLING', 'ADMINISTRACAO'],
       {
         email: 'finance@empresa.com',
         role: 'custom',
-        permissions: ['financeiro.pagamentos.read'],
+        permissions: ['compras.cotacoes.read'],
       } as any,
     );
 
-    expect(withoutFinanceiroModule).toBe(false);
+    expect(withoutComprasModule).toBe(false);
   });
 
   it('keeps nested access for leaf routes when permission is present', () => {

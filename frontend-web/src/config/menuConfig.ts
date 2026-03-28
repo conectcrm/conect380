@@ -1,4 +1,4 @@
-import {
+﻿import {
   type LucideIcon,
   Home,
   Users,
@@ -27,6 +27,7 @@ import {
   ListChecks,
   Tag,
   Palette,
+  Shield,
 } from 'lucide-react';
 import { isMenuItemAllowedInMvp } from './mvpScope';
 import { isAtendimentoModuleVisible, isOmnichannelEnabled } from './featureFlags';
@@ -50,9 +51,13 @@ export interface MenuConfig {
   section?: string;
 }
 
+const hasActiveModule = (modulosAtivos: string[], requiredModule: string): boolean => {
+  return modulosAtivos.includes(requiredModule);
+};
+
 const filterMenuByModules = (items: MenuConfig[], modulosAtivos: string[]): MenuConfig[] => {
   return items.reduce<MenuConfig[]>((acc, item) => {
-    if (item.requiredModule && !modulosAtivos.includes(item.requiredModule)) {
+    if (item.requiredModule && !hasActiveModule(modulosAtivos, item.requiredModule)) {
       return acc;
     }
 
@@ -167,6 +172,10 @@ const ALL_PERMISSION_VALUES: string[] = [
   'financeiro.alertas.manage',
   'financeiro.aprovacoes.read',
   'financeiro.aprovacoes.manage',
+  'compras.cotacoes.read',
+  'compras.cotacoes.manage',
+  'compras.aprovacoes.read',
+  'compras.aprovacoes.manage',
   'config.empresa.read',
   'config.empresa.update',
   'config.integracoes.manage',
@@ -364,6 +373,7 @@ const LEGACY_PERMISSION_ALIASES: Record<string, string> = {
   ATENDIMENTO_DLQ_MANAGE: 'atendimento.dlq.manage',
   COMERCIAL: 'comercial.propostas.read',
   CRM: 'crm.clientes.read',
+  COMPRAS: 'compras.cotacoes.read',
   FINANCEIRO: 'financeiro.faturamento.read',
   CONFIGURACOES: 'config.empresa.read',
   DASHBOARD: 'dashboard.read',
@@ -376,10 +386,6 @@ const ROLE_ALIASES: Record<string, string> = {
   manager: 'gerente',
   gestor: 'gerente',
   administrador: 'admin',
-  super_admin: 'superadmin',
-  owner: 'superadmin',
-  proprietario: 'superadmin',
-  proprietário: 'superadmin',
   user: 'suporte',
   usuario: 'suporte',
   operacional: 'suporte',
@@ -417,6 +423,8 @@ const FINANCEIRO_MANAGE_TO_READ_EQUIVALENCES: Array<[string, string]> = [
   ['financeiro.centro-custos.manage', 'financeiro.centro-custos.read'],
   ['financeiro.alertas.manage', 'financeiro.alertas.read'],
   ['financeiro.aprovacoes.manage', 'financeiro.aprovacoes.read'],
+  ['compras.cotacoes.manage', 'compras.cotacoes.read'],
+  ['compras.aprovacoes.manage', 'compras.aprovacoes.read'],
 ];
 
 const normalizeRole = (role: unknown): string | null => {
@@ -478,6 +486,7 @@ const expandEquivalentPermissions = (target: Set<string>): void => {
   if (hasPagamentosManage) {
     FINANCEIRO_PAGAMENTOS_MANAGE_EQUIVALENCES.forEach((permission) => target.add(permission));
   }
+
 };
 
 function* iteratePermissionInputs(rawPermissions: unknown): Generator<unknown> {
@@ -926,6 +935,41 @@ export const menuConfig: MenuConfig[] = [
     ],
   },
   {
+    id: 'compras',
+    title: 'Compras',
+    shortTitle: 'Compras',
+    icon: Calculator,
+    href: '/compras/cotacoes',
+    color: 'orange',
+    permissions: ['compras.cotacoes.read', 'compras.aprovacoes.manage'],
+    requiredModule: 'COMPRAS',
+    section: 'Opera\u00e7\u00f5es',
+    children: [
+      {
+        id: 'comercial-cotacoes',
+        title: 'Cotacoes de Compras',
+        shortTitle: 'Cotacoes',
+        icon: Calculator,
+        href: '/compras/cotacoes',
+        color: 'orange',
+        permissions: ['compras.cotacoes.read'],
+        requiredModule: 'COMPRAS',
+        group: 'Compras',
+      },
+      {
+        id: 'comercial-aprovacoes',
+        title: 'Aprovacoes de Compras',
+        shortTitle: 'Aprovacoes',
+        icon: CheckCircle,
+        href: '/compras/aprovacoes',
+        color: 'orange',
+        permissions: ['compras.aprovacoes.manage'],
+        requiredModule: 'COMPRAS',
+        group: 'Compras',
+      },
+    ],
+  },
+  {
     id: 'financeiro',
     title: 'Financeiro',
     shortTitle: 'Fin.',
@@ -953,7 +997,7 @@ export const menuConfig: MenuConfig[] = [
         href: '/financeiro/faturamento',
         color: 'orange',
         permissions: ['financeiro.faturamento.read', 'financeiro.faturamento.manage'],
-        requiredModule: 'BILLING',
+        requiredModule: 'FINANCEIRO',
         group: 'Fluxo Financeiro',
       },
       {
@@ -965,28 +1009,6 @@ export const menuConfig: MenuConfig[] = [
         color: 'orange',
         permissions: ['financeiro.contas-pagar.read'],
         group: 'Fluxo Financeiro',
-      },
-      {
-        id: 'comercial-cotacoes',
-        title: 'Cotacoes de Compras',
-        shortTitle: 'Cotacoes',
-        icon: Calculator,
-        href: '/financeiro/cotacoes',
-        color: 'orange',
-        permissions: ['financeiro.contas-pagar.read'],
-        requiredModule: 'FINANCEIRO',
-        group: 'Compras',
-      },
-      {
-        id: 'comercial-aprovacoes',
-        title: 'Aprovacoes de Compras',
-        shortTitle: 'Aprovacoes',
-        icon: CheckCircle,
-        href: '/financeiro/compras/aprovacoes',
-        color: 'orange',
-        permissions: ['financeiro.aprovacoes.manage'],
-        requiredModule: 'FINANCEIRO',
-        group: 'Compras',
       },
       {
         id: 'financeiro-fornecedores',
@@ -1187,6 +1209,17 @@ export const menuConfig: MenuConfig[] = [
         superAdminOnly: true,
         group: 'Governan\u00e7a',
       },
+      {
+        id: 'admin-core',
+        title: 'Core Admin',
+        shortTitle: 'Core',
+        icon: Shield,
+        href: '/core-admin',
+        color: 'blue',
+        permissions: ['admin.empresas.manage'],
+        superAdminOnly: true,
+        group: 'Governan\u00e7a',
+      },
     ],
   },
 ];
@@ -1216,6 +1249,7 @@ type LicensedModule =
   | 'ATENDIMENTO'
   | 'CRM'
   | 'VENDAS'
+  | 'COMPRAS'
   | 'FINANCEIRO'
   | 'BILLING'
   | 'ADMINISTRACAO';
@@ -1288,20 +1322,12 @@ const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
   { pattern: '/nuclei/atendimento/atendentes', permissions: ['atendimento.filas.manage'] },
   { pattern: '/nuclei/atendimento/skills', permissions: ['atendimento.filas.manage'] },
   {
-    pattern: '/financeiro/cotacoes',
-    permissions: ['financeiro.contas-pagar.read'],
+    pattern: '/compras/cotacoes',
+    permissions: ['compras.cotacoes.read'],
   },
   {
-    pattern: '/financeiro/compras/aprovacoes',
-    permissions: ['financeiro.aprovacoes.manage'],
-  },
-  {
-    pattern: '/vendas/cotacoes',
-    permissions: ['financeiro.contas-pagar.read'],
-  },
-  {
-    pattern: '/vendas/aprovacoes',
-    permissions: ['financeiro.aprovacoes.manage'],
+    pattern: '/compras/aprovacoes',
+    permissions: ['compras.aprovacoes.manage'],
   },
   {
     pattern: '/veiculos',
@@ -1408,9 +1434,11 @@ const ROUTE_PATH_ALIASES: Record<string, string[]> = {
   '/funil-vendas': ['/crm/pipeline'],
   '/oportunidades': ['/crm/pipeline'],
   '/propostas': ['/vendas/propostas'],
-  '/cotacoes': ['/financeiro/cotacoes', '/vendas/cotacoes'],
-  '/orcamentos': ['/financeiro/cotacoes', '/vendas/cotacoes'],
-  '/aprovacoes/pendentes': ['/financeiro/compras/aprovacoes', '/vendas/aprovacoes'],
+  '/cotacoes': ['/compras/cotacoes'],
+  '/orcamentos': ['/compras/cotacoes'],
+  '/aprovacoes/pendentes': ['/compras/aprovacoes'],
+  '/financeiro/cotacoes': ['/compras/cotacoes'],
+  '/financeiro/compras/aprovacoes': ['/compras/aprovacoes'],
   '/produtos': ['/vendas/produtos'],
   '/produtos/categorias': ['/vendas/produtos'],
   '/veiculos': ['/vendas/veiculos'],
@@ -1445,11 +1473,12 @@ const ROUTE_PATH_ALIASES: Record<string, string[]> = {
 const ROUTE_MODULE_REQUIREMENTS: Array<{ pattern: string; module: LicensedModule }> = [
   { pattern: '/billing', module: 'BILLING' },
   { pattern: '/assinaturas', module: 'BILLING' },
-  { pattern: '/faturamento', module: 'BILLING' },
+  { pattern: '/faturamento', module: 'FINANCEIRO' },
 
   { pattern: '/financeiro', module: 'FINANCEIRO' },
-  { pattern: '/vendas/cotacoes', module: 'FINANCEIRO' },
-  { pattern: '/vendas/aprovacoes', module: 'FINANCEIRO' },
+  { pattern: '/compras', module: 'COMPRAS' },
+  { pattern: '/compras/cotacoes', module: 'COMPRAS' },
+  { pattern: '/compras/aprovacoes', module: 'COMPRAS' },
 
   { pattern: '/atendimento', module: 'ATENDIMENTO' },
   { pattern: '/nuclei/atendimento', module: 'ATENDIMENTO' },
@@ -1467,8 +1496,8 @@ const ROUTE_MODULE_REQUIREMENTS: Array<{ pattern: string; module: LicensedModule
   { pattern: '/pipeline', module: 'CRM' },
   { pattern: '/oportunidades', module: 'CRM' },
   { pattern: '/agenda', module: 'CRM' },
-  { pattern: '/veiculos', module: 'CRM' },
-  { pattern: '/produtos', module: 'CRM' },
+  { pattern: '/veiculos', module: 'VENDAS' },
+  { pattern: '/produtos', module: 'VENDAS' },
 
   { pattern: '/contratos', module: 'VENDAS' },
   { pattern: '/propostas', module: 'VENDAS' },
@@ -1692,7 +1721,7 @@ const ALL_PROTECTED_ROUTE_PREFIXES: string[] = (() => {
   return Array.from(all);
 })();
 
-const BLOCKED_LEGACY_ROUTE_PREFIXES = ['/admin'];
+const BLOCKED_LEGACY_ROUTE_PREFIXES = ['/admin', '/guardian'];
 
 export const canUserAccessPath = (
   pathname: string,
@@ -1700,6 +1729,11 @@ export const canUserAccessPath = (
   user?: PermissionAwareUser | null,
 ): boolean => {
   const normalizedPath = normalizePathname(pathname);
+  const normalizedRole = normalizeRole((user as { role?: unknown } | null | undefined)?.role);
+
+  if (normalizedPath === '/core-admin' || normalizedPath.startsWith('/core-admin/')) {
+    return normalizedRole === 'superadmin';
+  }
 
   const isBlockedLegacyNucleusAdministrationPath =
     normalizedPath.startsWith('/nuclei/') && normalizedPath.includes('administracao');
@@ -1712,7 +1746,7 @@ export const canUserAccessPath = (
   }
 
   const requiredModule = resolveRequiredModuleForPath(normalizedPath);
-  if (requiredModule && !modulosAtivos.includes(requiredModule)) {
+  if (requiredModule && !hasActiveModule(modulosAtivos, requiredModule)) {
     return false;
   }
 
@@ -1797,3 +1831,5 @@ export const getDefaultAuthorizedPath = (
 };
 
 export default menuConfig;
+
+

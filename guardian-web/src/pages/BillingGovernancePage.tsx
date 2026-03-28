@@ -367,6 +367,13 @@ const parseIntegerField = (raw: string): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const isValidPlanLimit = (value: number | null): value is number => {
+  if (value === null) {
+    return false;
+  }
+  return value === -1 || value >= 1;
+};
+
 const parseDecimalField = (raw: string): number | null => {
   const normalized = raw.trim().replace(',', '.');
   if (!normalized) {
@@ -417,7 +424,7 @@ export const BillingGovernancePage = () => {
         params.subscription_status = statusFilter;
       }
 
-      const response = await api.get('/guardian/bff/billing/subscriptions', { params });
+      const response = await api.get('/core-admin/bff/billing/subscriptions', { params });
       const payload = Array.isArray(response.data?.data) ? response.data.data : [];
 
       const nextRows = payload.map((entry: Record<string, unknown>) => {
@@ -488,8 +495,8 @@ export const BillingGovernancePage = () => {
 
     try {
       const [planResponse, moduleResponse] = await Promise.all([
-        api.get('/guardian/planos', { params: { include_inactive: true } }),
-        api.get('/guardian/planos/modulos'),
+        api.get('/core-admin/planos', { params: { include_inactive: true } }),
+        api.get('/core-admin/planos/modulos', { params: { include_inactive: true } }),
       ]);
 
       const planItemsRaw = Array.isArray(planResponse.data) ? planResponse.data : [];
@@ -642,20 +649,20 @@ export const BillingGovernancePage = () => {
       setCatalogError('Preco invalido. Informe um valor numerico maior ou igual a zero.');
       return;
     }
-    if (limiteUsuarios === null || limiteUsuarios < -1) {
-      setCatalogError('Limite de usuarios invalido. Use inteiro >= -1.');
+    if (!isValidPlanLimit(limiteUsuarios)) {
+      setCatalogError('Limite de usuarios invalido. Use -1 para ilimitado ou inteiro >= 1.');
       return;
     }
-    if (limiteClientes === null || limiteClientes < -1) {
-      setCatalogError('Limite de clientes invalido. Use inteiro >= -1.');
+    if (!isValidPlanLimit(limiteClientes)) {
+      setCatalogError('Limite de clientes invalido. Use -1 para ilimitado ou inteiro >= 1.');
       return;
     }
-    if (limiteStorage === null || limiteStorage < -1) {
-      setCatalogError('Limite de storage invalido. Use inteiro >= -1.');
+    if (!isValidPlanLimit(limiteStorage)) {
+      setCatalogError('Limite de storage invalido. Use -1 para ilimitado ou inteiro >= 1.');
       return;
     }
-    if (limiteApiCalls === null || limiteApiCalls < -1) {
-      setCatalogError('Limite de API calls invalido. Use inteiro >= -1.');
+    if (!isValidPlanLimit(limiteApiCalls)) {
+      setCatalogError('Limite de API calls invalido. Use -1 para ilimitado ou inteiro >= 1.');
       return;
     }
     if (ordem === null || ordem < 0) {
@@ -689,10 +696,10 @@ export const BillingGovernancePage = () => {
       };
 
       if (editingPlanId) {
-        await api.put(`/guardian/planos/${editingPlanId}`, payload);
+        await api.put(`/core-admin/planos/${editingPlanId}`, payload);
         setCatalogFeedback(`Plano ${nome} atualizado com sucesso.`);
       } else {
-        await api.post('/guardian/planos', payload);
+        await api.post('/core-admin/planos', payload);
         setCatalogFeedback(`Plano ${nome} criado com sucesso.`);
       }
 
@@ -709,7 +716,7 @@ export const BillingGovernancePage = () => {
     async (plan: PlanCatalogItem) => {
       const actionLabel = plan.ativo ? 'arquivado' : 'reativado';
       await runPlanAction(plan.id, `Plano ${plan.nome} ${actionLabel} com sucesso.`, async () => {
-        await api.put(`/guardian/planos/${plan.id}/toggle-status`);
+        await api.put(`/core-admin/planos/${plan.id}/toggle-status`);
       });
     },
     [runPlanAction],
@@ -780,7 +787,7 @@ export const BillingGovernancePage = () => {
           dialog.item.empresa.id,
           dialog.successMessage,
           async () => {
-            await api.patch(`/guardian/bff/billing/subscriptions/${dialog.item.empresa.id}/suspend`, {
+            await api.patch(`/core-admin/bff/billing/subscriptions/${dialog.item.empresa.id}/suspend`, {
               reason,
             });
           },
@@ -801,7 +808,7 @@ export const BillingGovernancePage = () => {
           dialog.item.empresa.id,
           dialog.successMessage,
           async () => {
-            await api.patch(`/guardian/bff/billing/subscriptions/${dialog.item.empresa.id}/reactivate`, {
+            await api.patch(`/core-admin/bff/billing/subscriptions/${dialog.item.empresa.id}/reactivate`, {
               reason,
             });
           },
@@ -1098,6 +1105,8 @@ export const BillingGovernancePage = () => {
               Limite usuarios (-1 ilimitado)
               <input
                 type="number"
+                min={-1}
+                step={1}
                 value={planForm.limiteUsuarios}
                 onChange={(event) =>
                   setPlanForm((current) => ({ ...current, limiteUsuarios: event.target.value }))
@@ -1110,6 +1119,8 @@ export const BillingGovernancePage = () => {
               Limite clientes (-1 ilimitado)
               <input
                 type="number"
+                min={-1}
+                step={1}
                 value={planForm.limiteClientes}
                 onChange={(event) =>
                   setPlanForm((current) => ({ ...current, limiteClientes: event.target.value }))
@@ -1122,6 +1133,8 @@ export const BillingGovernancePage = () => {
               Limite storage em bytes (-1 ilimitado)
               <input
                 type="number"
+                min={-1}
+                step={1}
                 value={planForm.limiteStorage}
                 onChange={(event) =>
                   setPlanForm((current) => ({ ...current, limiteStorage: event.target.value }))
@@ -1131,9 +1144,11 @@ export const BillingGovernancePage = () => {
             </label>
 
             <label>
-              Limite API calls/hora (-1 ilimitado)
+              Limite API calls/dia (-1 ilimitado)
               <input
                 type="number"
+                min={-1}
+                step={1}
                 value={planForm.limiteApiCalls}
                 onChange={(event) =>
                   setPlanForm((current) => ({ ...current, limiteApiCalls: event.target.value }))
@@ -1328,3 +1343,4 @@ export const BillingGovernancePage = () => {
     </>
   );
 };
+

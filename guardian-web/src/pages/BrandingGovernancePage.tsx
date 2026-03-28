@@ -187,7 +187,7 @@ export const BrandingGovernancePage = () => {
     setError(null);
 
     try {
-      const response = await api.get<BrandingAdminResponse>('/admin/system-branding');
+      const response = await api.get<BrandingAdminResponse>('/core-admin/system-branding');
       const data = response.data?.data;
       setForm({
         logoFullUrl: data?.logoFullUrl ?? '',
@@ -254,7 +254,7 @@ export const BrandingGovernancePage = () => {
         payload.append('file', file);
 
         const response = await api.post<BrandingAssetUploadResponse>(
-          `/admin/system-branding/assets/${asset.kind}`,
+          `/core-admin/system-branding/assets/${asset.kind}`,
           payload,
         );
 
@@ -287,7 +287,7 @@ export const BrandingGovernancePage = () => {
     setFeedback(null);
 
     try {
-      await api.put('/admin/system-branding', {
+      await api.put('/core-admin/system-branding', {
         logoFullUrl: toNullableTrimmed(form.logoFullUrl),
         logoFullLightUrl: toNullableTrimmed(form.logoFullLightUrl),
         logoIconUrl: toNullableTrimmed(form.logoIconUrl),
@@ -484,3 +484,4 @@ export const BrandingGovernancePage = () => {
     </div>
   );
 };
+

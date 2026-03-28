@@ -154,7 +154,7 @@ export const systemBrandingService = {
 
   async getAdminBranding(): Promise<SystemBrandingAdminResponse> {
     const response = await api.get<SystemBrandingAdminResponse | { data?: SystemBrandingAdminResponse }>(
-      '/admin/system-branding',
+      '/core-admin/system-branding',
     );
 
     return normalizeAdminBrandingResponse(response.data);
@@ -164,7 +164,7 @@ export const systemBrandingService = {
     payload: Partial<SystemBrandingAdminData>,
   ): Promise<SystemBrandingAdminResponse> {
     const response = await api.put<SystemBrandingAdminResponse | { data?: SystemBrandingAdminResponse }>(
-      '/admin/system-branding',
+      '/core-admin/system-branding',
       payload,
     );
 
@@ -178,7 +178,7 @@ export const systemBrandingService = {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await api.post(`/admin/system-branding/assets/${kind}`, formData);
+    const response = await api.post(`/core-admin/system-branding/assets/${kind}`, formData);
     const payload =
       (response.data as any)?.data?.branding ??
       (response.data as any)?.branding ??

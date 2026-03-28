@@ -118,7 +118,7 @@ export const LoginPage = () => {
             </label>
             <button type="submit" className="button primary" disabled={loading}>
               <ShieldCheck size={16} />
-              {loading ? 'Entrando...' : 'Entrar no guardian-web'}
+              {loading ? 'Entrando...' : 'Entrar no core-admin'}
             </button>
           </form>
         ) : (
@@ -167,3 +167,4 @@ export const LoginPage = () => {
     </div>
   );
 };
+

@@ -208,10 +208,11 @@ function CotacaoPage() {
   const [cotacoesSelecionadas, setCotacoesSelecionadas] = useState<string[]>([]);
   const selectAllRef = useRef<HTMLInputElement | null>(null);
 
-  const canCreateCotacao = userHasPermission(user as any, 'financeiro.pagamentos.manage');
-  const canUpdateCotacao = userHasPermission(user as any, 'financeiro.pagamentos.manage');
-  const canDeleteCotacao = userHasPermission(user as any, 'financeiro.pagamentos.manage');
-  const canSendCotacao = userHasPermission(user as any, 'financeiro.pagamentos.manage');
+  const canCreateCotacao = userHasPermission(user as any, 'compras.cotacoes.manage');
+  const canUpdateCotacao = userHasPermission(user as any, 'compras.cotacoes.manage');
+  const canDeleteCotacao = userHasPermission(user as any, 'compras.cotacoes.manage');
+  const canSendCotacao = userHasPermission(user as any, 'compras.cotacoes.manage');
+  const canManageAprovacoes = userHasPermission(user as any, 'compras.aprovacoes.manage');
 
   const resumo = useMemo(() => {
     const pendentes = cotacoes.filter((c) =>
@@ -400,7 +401,15 @@ function CotacaoPage() {
   };
 
   const alterarStatusSelecionadas = async (novoStatus: StatusCotacao) => {
-    if (!canUpdateCotacao) {
+    const isAcaoAprovacao =
+      novoStatus === StatusCotacao.APROVADA || novoStatus === StatusCotacao.REJEITADA;
+
+    if (isAcaoAprovacao && !canManageAprovacoes) {
+      toastService.warning('Voce nao possui permissao para aprovar/reprovar cotacoes');
+      return;
+    }
+
+    if (!isAcaoAprovacao && !canUpdateCotacao) {
       toastService.warning('Você não possui permissão para alterar status de cotações');
       return;
     }
@@ -770,7 +779,7 @@ function CotacaoPage() {
               </button>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {canUpdateCotacao && (
+              {canManageAprovacoes && (
                 <>
                   <button type="button" onClick={() => void alterarStatusSelecionadas(StatusCotacao.APROVADA)} className={btnPrimary}><Check className="h-4 w-4" />Aprovar</button>
                   <button type="button" onClick={() => void alterarStatusSelecionadas(StatusCotacao.REJEITADA)} className={btnSecondary}><X className="h-4 w-4" />Rejeitar</button>
@@ -1011,3 +1020,4 @@ function CotacaoPage() {
 }
 
 export default CotacaoPage;
+

@@ -119,11 +119,12 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
 
   const compraStatus = cotacao.metadados?.compra?.status;
   const compraMeta = cotacao.metadados?.compra;
-  const canUpdateCotacao = userHasPermission(user as any, 'financeiro.pagamentos.manage');
-  const canDeleteCotacao = userHasPermission(user as any, 'financeiro.pagamentos.manage');
-  const canSendCotacao = userHasPermission(user as any, 'financeiro.pagamentos.manage');
-  const canConverterPedido = userHasPermission(user as any, 'financeiro.pagamentos.manage');
-  const canMarcarAdquirido = userHasPermission(user as any, 'financeiro.pagamentos.manage');
+  const canUpdateCotacao = userHasPermission(user as any, 'compras.cotacoes.manage');
+  const canDeleteCotacao = userHasPermission(user as any, 'compras.cotacoes.manage');
+  const canSendCotacao = userHasPermission(user as any, 'compras.cotacoes.manage');
+  const canConverterPedido = userHasPermission(user as any, 'compras.cotacoes.manage');
+  const canMarcarAdquirido = userHasPermission(user as any, 'compras.cotacoes.manage');
+  const canManageAprovacoes = userHasPermission(user as any, 'compras.aprovacoes.manage');
   const statusBadgeClass =
     (cotacao.status === StatusCotacao.CONVERTIDA || cotacao.status === StatusCotacao.ADQUIRIDO) &&
     compraStatus === 'adquirido'
@@ -145,6 +146,13 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
 
   const handleStatusChange = async (novoStatus: StatusCotacao) => {
     if (!cotacao) return;
+    const isAcaoAprovacao =
+      novoStatus === StatusCotacao.APROVADA || novoStatus === StatusCotacao.REJEITADA;
+
+    if (isAcaoAprovacao && !canManageAprovacoes) {
+      toastService.warning('Voce nao possui permissao para aprovar/reprovar cotacoes');
+      return;
+    }
 
     let justificativa: string | undefined;
     if (novoStatus === StatusCotacao.REJEITADA) {
@@ -484,7 +492,7 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
               </button>
             )}
 
-            {canUpdateCotacao && [StatusCotacao.PENDENTE, StatusCotacao.EM_ANALISE].includes(cotacao.status) && (
+            {canManageAprovacoes && [StatusCotacao.PENDENTE, StatusCotacao.EM_ANALISE].includes(cotacao.status) && (
               <>
                 <button
                   onClick={() => handleStatusChange(StatusCotacao.APROVADA)}

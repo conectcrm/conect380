@@ -1,4 +1,4 @@
-﻿import { AxiosError } from 'axios';
+import { AxiosError } from 'axios';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ConfirmActionModal,
@@ -106,8 +106,8 @@ export const UsersGovernancePage = () => {
     setError(null);
     try {
       const [usersResponse, requestsResponse] = await Promise.all([
-        api.get('/guardian/bff/users', { params: { limite: 20, pagina: 1 } }),
-        api.get('/guardian/bff/access-change-requests', {
+        api.get('/core-admin/bff/users', { params: { limite: 20, pagina: 1 } }),
+        api.get('/core-admin/bff/access-change-requests', {
           params: { status: 'REQUESTED', limit: 20 },
         }),
       ]);
@@ -225,7 +225,7 @@ export const UsersGovernancePage = () => {
         const result = await runAction(
           dialog.actionKey,
           async () => {
-            await api.post(`/guardian/bff/access-change-requests/${dialog.requestId}/reject`, {
+            await api.post(`/core-admin/bff/access-change-requests/${dialog.requestId}/reject`, {
               reason: reason || undefined,
             });
           },
@@ -251,7 +251,7 @@ export const UsersGovernancePage = () => {
       await runAction(
         `approve:${requestId}`,
         async () => {
-          await api.post(`/guardian/bff/access-change-requests/${requestId}/approve`, {});
+          await api.post(`/core-admin/bff/access-change-requests/${requestId}/approve`, {});
         },
         'Solicitacao aprovada com sucesso.',
       );
@@ -385,4 +385,5 @@ export const UsersGovernancePage = () => {
     </>
   );
 };
+
 

@@ -300,6 +300,18 @@ const PERMISSOES_MODAL_GROUPS_FALLBACK: PermissaoModalGroup[] = [
     ],
   },
   {
+    id: 'compras',
+    label: 'Compras',
+    description: 'Cotacoes e aprovacoes do fluxo de compras',
+    roles: [UserRole.FINANCEIRO, UserRole.GERENTE, UserRole.ADMIN, UserRole.SUPERADMIN],
+    options: [
+      { value: 'compras.cotacoes.read', label: 'Cotacoes de compras: visualizar' },
+      { value: 'compras.cotacoes.manage', label: 'Cotacoes de compras: gerenciar' },
+      { value: 'compras.aprovacoes.read', label: 'Aprovacoes de compras: visualizar' },
+      { value: 'compras.aprovacoes.manage', label: 'Aprovacoes de compras: gerenciar' },
+    ],
+  },
+  {
     id: 'configuracoes',
     label: 'Configuracoes',
     description: 'Empresa, integracoes e automacoes',

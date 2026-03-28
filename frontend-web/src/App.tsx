@@ -196,11 +196,16 @@ const MinhasEmpresasPage = React.lazy(() =>
   import('./features/empresas/MinhasEmpresasPage').then((m) => ({ default: m.MinhasEmpresasPage })),
 );
 const SystemBrandingPage = React.lazy(() => import('./pages/configuracoes/SystemBrandingPage'));
+const CoreAdminPage = React.lazy(() => import('./features/core-admin/CoreAdminPage'));
 
 // Componente principal de rotas
 const AppRoutes: React.FC = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
+  const normalizedRole = String(user?.role || '')
+    .trim()
+    .toLowerCase();
+  const isSuperAdmin = ['superadmin'].includes(normalizedRole);
 
   // Exibir loading durante verificação inicial de autenticação
   if (isLoading) {
@@ -398,6 +403,10 @@ const AppRoutes: React.FC = () => {
                     element={protegerRota(ModuloEnum.ADMINISTRACAO, <SystemBrandingPage />)}
                   />
                   <Route
+                    path="/core-admin"
+                    element={isSuperAdmin ? <CoreAdminPage /> : <Navigate to="/dashboard" replace />}
+                  />
+                  <Route
                     path="/configuracoes/seguranca"
                     element={<Navigate to="/configuracoes/empresa" replace />}
                   />
@@ -485,10 +494,14 @@ const AppRoutes: React.FC = () => {
                     path="/gestao/empresas"
                     element={<Navigate to="/empresas/minhas" replace />}
                   />{' '}
-                  <Route path="/admin/empresas" element={<MinhasEmpresasPage />} />
+                  <Route path="/admin/empresas" element={<Navigate to="/empresas/minhas" replace />} />
                   <Route path="/admin/empresas/:id" element={<Navigate to="/empresas/minhas" replace />} />
-                  <Route path="/admin/usuarios" element={<GestaoUsuariosPage />} />
-                  <Route path="/admin/sistema" element={<SystemBrandingPage />} />
+                  <Route path="/admin/usuarios" element={<Navigate to="/configuracoes/usuarios" replace />} />
+                  <Route path="/admin/sistema" element={<Navigate to="/configuracoes/sistema" replace />} />
+                  <Route path="/admin" element={<Navigate to="/core-admin" replace />} />
+                  <Route path="/admin/*" element={<Navigate to="/core-admin" replace />} />
+                  <Route path="/guardian" element={<Navigate to="/core-admin" replace />} />
+                  <Route path="/guardian/*" element={<Navigate to="/core-admin" replace />} />
                   {/* Redirect legado para rota operacional */}
                   <Route
                     path="/nuclei/configuracoes/empresas"
@@ -676,7 +689,7 @@ const AppRoutes: React.FC = () => {
                   {/* Sistema de Faturamento - Protegido */}
                   <Route
                     path="/faturamento"
-                    element={protegerRota(ModuloEnum.BILLING, <FaturamentoPage />)}
+                    element={protegerRota(ModuloEnum.FINANCEIRO, <FaturamentoPage />)}
                   />
                   {/* Exemplo Modal Produto */}
                   <Route path="/exemplo-produto" element={<ExemploModalProduto />} />
@@ -722,32 +735,32 @@ const AppRoutes: React.FC = () => {
                     element={protegerRota(ModuloEnum.VENDAS, <PropostaDetalhePage />)}
                   />
                   <Route
+                    path="/compras/cotacoes"
+                    element={protegerRota(ModuloEnum.COMPRAS, <CotacaoPage />)}
+                  />
+                  <Route
+                    path="/compras/aprovacoes"
+                    element={protegerRota(ModuloEnum.COMPRAS, <MinhasAprovacoesPage />)}
+                  />
+                  <Route
                     path="/financeiro/cotacoes"
-                    element={protegerRota(ModuloEnum.FINANCEIRO, <CotacaoPage />)}
+                    element={<Navigate to="/compras/cotacoes" replace />}
                   />
                   <Route
                     path="/financeiro/compras/aprovacoes"
-                    element={protegerRota(ModuloEnum.FINANCEIRO, <MinhasAprovacoesPage />)}
+                    element={<Navigate to="/compras/aprovacoes" replace />}
                   />
                   <Route
                     path="/cotacoes"
-                    element={<Navigate to="/financeiro/cotacoes" replace />}
-                  />
-                  <Route
-                    path="/vendas/cotacoes"
-                    element={<Navigate to="/financeiro/cotacoes" replace />}
+                    element={<Navigate to="/compras/cotacoes" replace />}
                   />
                   <Route
                     path="/orcamentos"
-                    element={<Navigate to="/financeiro/cotacoes" replace />}
+                    element={<Navigate to="/compras/cotacoes" replace />}
                   />
                   <Route
                     path="/aprovacoes/pendentes"
-                    element={<Navigate to="/financeiro/compras/aprovacoes" replace />}
-                  />
-                  <Route
-                    path="/vendas/aprovacoes"
-                    element={<Navigate to="/financeiro/compras/aprovacoes" replace />}
+                    element={<Navigate to="/compras/aprovacoes" replace />}
                   />
                   <Route
                     path="/produtos"
@@ -870,7 +883,7 @@ const AppRoutes: React.FC = () => {
                   {/* Módulos financeiros - Protegidos */}
                   <Route
                     path="/financeiro/faturamento"
-                    element={protegerRota(ModuloEnum.BILLING, <FaturamentoPage />)}
+                    element={protegerRota(ModuloEnum.FINANCEIRO, <FaturamentoPage />)}
                   />
                   <Route
                     path="/financeiro/relatorios"

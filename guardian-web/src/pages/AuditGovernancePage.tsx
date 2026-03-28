@@ -1,4 +1,4 @@
-﻿import { AxiosError } from 'axios';
+import { AxiosError } from 'axios';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api';
 
@@ -138,7 +138,7 @@ export const AuditGovernancePage = () => {
         params.data_fim = toApiEndDate(appliedDateRange.endDate);
       }
 
-      const response = await api.get('/guardian/bff/audit/critical', { params });
+      const response = await api.get('/core-admin/bff/audit/critical', { params });
       const list = Array.isArray(response.data?.data) ? response.data.data : [];
       const responseMeta = response.data?.meta ?? {};
 
@@ -225,7 +225,7 @@ export const AuditGovernancePage = () => {
           params.data_fim = toApiEndDate(appliedDateRange.endDate);
         }
 
-        const response = await api.get('/guardian/bff/audit/critical/export', { params });
+        const response = await api.get('/core-admin/bff/audit/critical/export', { params });
         if (format === 'csv') {
           const csvContent = String(response.data?.data ?? '');
           triggerDownload(csvContent, 'text/csv;charset=utf-8', buildExportFilename('csv'));
@@ -311,7 +311,7 @@ export const AuditGovernancePage = () => {
               setRouteFilter(event.target.value);
               setCurrentPage(1);
             }}
-            placeholder="/guardian/empresas"
+            placeholder="/core-admin/empresas"
           />
         </label>
 
@@ -437,3 +437,4 @@ export const AuditGovernancePage = () => {
     </section>
   );
 };
+

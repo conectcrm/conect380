@@ -28,6 +28,8 @@ const runWithMvpMode = (value: string | undefined, callback: (module: MvpScopeMo
 describe('mvpScope', () => {
   it('keeps compras/fechamento routes available in MVP mode', () => {
     runWithMvpMode('true', ({ getMvpBlockedRouteInfo }) => {
+      expect(getMvpBlockedRouteInfo('/compras/cotacoes')).toBeNull();
+      expect(getMvpBlockedRouteInfo('/compras/aprovacoes')).toBeNull();
       expect(getMvpBlockedRouteInfo('/financeiro/cotacoes')).toBeNull();
       expect(getMvpBlockedRouteInfo('/financeiro/compras/aprovacoes')).toBeNull();
       expect(getMvpBlockedRouteInfo('/contratos/123')).toBeNull();

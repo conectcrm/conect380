@@ -173,7 +173,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       const normalizedRole = String(payload.user.role || '').toLowerCase() as GuardianRole;
       if (!isGuardianRole(normalizedRole)) {
         logout();
-        throw new Error('Acesso negado para este perfil no guardian-web.');
+        throw new Error('Acesso negado para este perfil no core-admin.');
       }
 
       saveSession(payload);
@@ -194,7 +194,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const normalizedRole = String(nextUser.role || '').toLowerCase() as GuardianRole;
     if (!isGuardianRole(normalizedRole)) {
       logout();
-      throw new Error('Acesso negado para este perfil no guardian-web.');
+      throw new Error('Acesso negado para este perfil no core-admin.');
     }
 
     localStorage.setItem(GUARDIAN_USER_DATA_KEY, JSON.stringify(nextUser));
@@ -315,3 +315,4 @@ export const useAuth = (): AuthContextValue => {
   }
   return context;
 };
+

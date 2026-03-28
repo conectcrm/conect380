@@ -1,4 +1,4 @@
-﻿import { AxiosError } from 'axios';
+import { AxiosError } from 'axios';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ConfirmActionModal,
@@ -167,14 +167,14 @@ export const SystemGovernancePage = () => {
 
       try {
       const [pendingResponse, activeResponse, runtimeResponse, runtimeHistoryResponse] = await Promise.all([
-        api.get('/guardian/bff/break-glass/requests', {
+        api.get('/core-admin/bff/break-glass/requests', {
           params: { status: 'REQUESTED', limit: 50 },
         }),
-        api.get('/guardian/bff/break-glass/active', {
+        api.get('/core-admin/bff/break-glass/active', {
           params: { limit: 50 },
         }),
-        api.get('/guardian/bff/runtime-context'),
-        api.get('/guardian/bff/runtime-history', {
+        api.get('/core-admin/bff/runtime-context'),
+        api.get('/core-admin/bff/runtime-history', {
           params: { limit: 8 },
         }),
       ]);
@@ -291,7 +291,7 @@ export const SystemGovernancePage = () => {
         const result = await runAction(
           dialog.actionKey,
           async () => {
-            await api.post(`/guardian/bff/break-glass/requests/${dialog.requestId}/approve`, {
+            await api.post(`/core-admin/bff/break-glass/requests/${dialog.requestId}/approve`, {
               reason: reason || undefined,
             });
           },
@@ -309,7 +309,7 @@ export const SystemGovernancePage = () => {
         const result = await runAction(
           dialog.actionKey,
           async () => {
-            await api.post(`/guardian/bff/break-glass/requests/${dialog.requestId}/reject`, {
+            await api.post(`/core-admin/bff/break-glass/requests/${dialog.requestId}/reject`, {
               reason,
             });
           },
@@ -326,7 +326,7 @@ export const SystemGovernancePage = () => {
       const result = await runAction(
         dialog.actionKey,
         async () => {
-          await api.post(`/guardian/bff/break-glass/${dialog.requestId}/revoke`, {
+          await api.post(`/core-admin/bff/break-glass/${dialog.requestId}/revoke`, {
             reason: reason || undefined,
           });
         },
@@ -566,4 +566,5 @@ export const SystemGovernancePage = () => {
     </>
   );
 };
+
 

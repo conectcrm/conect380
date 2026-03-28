@@ -1,4 +1,4 @@
-﻿import { AxiosError } from 'axios';
+import { AxiosError } from 'axios';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ConfirmActionModal,
@@ -257,10 +257,10 @@ export const CompaniesGovernancePage = () => {
 
     try {
       const [companiesResponse, plansResponse, modulesResponse, capabilitiesResponse] = await Promise.all([
-        api.get('/guardian/bff/companies', { params: { page: 1, limit: 20 } }),
-        api.get('/guardian/planos'),
-        api.get('/guardian/planos/modulos'),
-        api.get('/guardian/bff/capabilities'),
+        api.get('/core-admin/bff/companies', { params: { page: 1, limit: 20 } }),
+        api.get('/core-admin/planos'),
+        api.get('/core-admin/planos/modulos', { params: { include_inactive: true } }),
+        api.get('/core-admin/bff/capabilities'),
       ]);
 
       const companyItemsRaw = companiesResponse.data?.data ?? [];
@@ -380,9 +380,9 @@ export const CompaniesGovernancePage = () => {
         company.id,
         `Plano da empresa ${company.nome || company.id} atualizado para ${nextPlan}.`,
         async () => {
-          await api.patch(`/guardian/empresas/${company.id}/plano`, {
+          await api.patch(`/core-admin/empresas/${company.id}/plano`, {
             plano: nextPlan,
-            motivo: 'Ajuste de plano via guardian-web',
+            motivo: 'Ajuste de plano via core-admin',
           });
         },
       );
@@ -414,7 +414,7 @@ export const CompaniesGovernancePage = () => {
         company.id,
         `Limite de usuarios atualizado no modulo ${modulo} para ${company.nome || company.id}.`,
         async () => {
-          await api.patch(`/guardian/empresas/${company.id}/modulos/${encodeURIComponent(modulo)}`, {
+          await api.patch(`/core-admin/empresas/${company.id}/modulos/${encodeURIComponent(modulo)}`, {
             limites: {
               usuarios: usersLimit,
             },
@@ -437,7 +437,7 @@ export const CompaniesGovernancePage = () => {
     setFeedback(null);
 
     try {
-      const response = await api.get(`/guardian/empresas/${company.id}/usuarios`);
+      const response = await api.get(`/core-admin/empresas/${company.id}/usuarios`);
       const rawItems = Array.isArray(response.data) ? response.data : [];
       const users = rawItems.map((item: Record<string, unknown>) => ({
         id: String(item.id ?? ''),
@@ -583,7 +583,7 @@ export const CompaniesGovernancePage = () => {
           dialog.company.id,
           dialog.successMessage,
           async () => {
-            await api.patch(`/guardian/empresas/${dialog.company.id}/suspender`, {
+            await api.patch(`/core-admin/empresas/${dialog.company.id}/suspender`, {
               motivo: reason || 'N/A',
             });
           },
@@ -604,7 +604,7 @@ export const CompaniesGovernancePage = () => {
           dialog.company.id,
           dialog.successMessage,
           async () => {
-            await api.patch(`/guardian/empresas/${dialog.company.id}/reativar`);
+            await api.patch(`/core-admin/empresas/${dialog.company.id}/reativar`);
           },
         );
 
@@ -622,7 +622,7 @@ export const CompaniesGovernancePage = () => {
         dialog.actionKey,
         async () => {
           const response = await api.put(
-            `/guardian/empresas/${dialog.company.id}/usuarios/${dialog.user.id}/reset-senha`,
+            `/core-admin/empresas/${dialog.company.id}/usuarios/${dialog.user.id}/reset-senha`,
             {
               motivo: reason || undefined,
             },
@@ -977,3 +977,4 @@ export const CompaniesGovernancePage = () => {
     </>
   );
 };
+
