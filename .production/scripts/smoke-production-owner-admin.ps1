@@ -1,7 +1,7 @@
 param(
   [string]$ApiBaseUrl = "https://api.conect360.com",
   [string]$AppBaseUrl = "https://conect360.com",
-  [string]$GuardianBaseUrl = "https://guardian.conect360.com",
+  [string]$GuardianBaseUrl = "",
   [string]$SuperAdminEmail,
   [string]$SuperAdminPassword,
   [string]$SuperAdminMfaCode,
@@ -244,12 +244,10 @@ function Require-String {
 
 $normalizedApiBase = $ApiBaseUrl.TrimEnd('/')
 $normalizedAppBase = $AppBaseUrl.TrimEnd('/')
-$normalizedGuardianBase = $GuardianBaseUrl.TrimEnd('/')
 
 Write-Host "Smoke producao owner/admin"
 Write-Host "API: $normalizedApiBase"
 Write-Host "App: $normalizedAppBase"
-Write-Host "Guardian: $normalizedGuardianBase"
 Write-Host "SkipAuthChecks: $SkipAuthChecks"
 
 $accessToken = $null
@@ -269,44 +267,20 @@ Run-Step -Name "App url responde" -Action {
   }
 }
 
-Run-Step -Name "Guardian url responde" -Action {
-  $response = Invoke-JsonRequest -Method "GET" -Url $normalizedGuardianBase -ExpectedStatusCodes @(200)
-  if ($response.StatusCode -ne 200) {
-    throw "Guardian nao respondeu 200"
-  }
-}
-
-Run-Step -Name "CORS app -> admin/system-branding" -Action {
+Run-Step -Name "CORS app -> core-admin/system-branding" -Action {
   $corsHeaders = @{
     Origin = $normalizedAppBase
     "Access-Control-Request-Method" = "PUT"
     "Access-Control-Request-Headers" = "authorization,content-type"
   }
 
-  $response = Invoke-JsonRequest -Method "OPTIONS" -Url "$normalizedApiBase/admin/system-branding" -Headers $corsHeaders -ExpectedStatusCodes @(200, 204)
+  $response = Invoke-JsonRequest -Method "OPTIONS" -Url "$normalizedApiBase/core-admin/system-branding" -Headers $corsHeaders -ExpectedStatusCodes @(200, 204)
   $allowOrigin = $response.Headers["Access-Control-Allow-Origin"]
   if ([string]::IsNullOrWhiteSpace($allowOrigin)) {
     throw "Header Access-Control-Allow-Origin ausente para origem app"
   }
   if ($allowOrigin -ne $normalizedAppBase) {
     throw "CORS inesperado para app: $allowOrigin"
-  }
-}
-
-Run-Step -Name "CORS guardian -> admin/system-branding" -Action {
-  $corsHeaders = @{
-    Origin = $normalizedGuardianBase
-    "Access-Control-Request-Method" = "PUT"
-    "Access-Control-Request-Headers" = "authorization,content-type"
-  }
-
-  $response = Invoke-JsonRequest -Method "OPTIONS" -Url "$normalizedApiBase/admin/system-branding" -Headers $corsHeaders -ExpectedStatusCodes @(200, 204)
-  $allowOrigin = $response.Headers["Access-Control-Allow-Origin"]
-  if ([string]::IsNullOrWhiteSpace($allowOrigin)) {
-    throw "Header Access-Control-Allow-Origin ausente para origem guardian"
-  }
-  if ($allowOrigin -ne $normalizedGuardianBase) {
-    throw "CORS inesperado para guardian: $allowOrigin"
   }
 }
 
@@ -371,9 +345,9 @@ if (-not $SkipAuthChecks) {
     }
   }
 
-  Run-Step -Name "Admin branding autenticado" -MaxAttempts 6 -Action {
+  Run-Step -Name "Core Admin branding autenticado" -MaxAttempts 6 -Action {
     if ([string]::IsNullOrWhiteSpace($script:accessToken)) {
-      throw "Token ausente para rota admin/system-branding"
+      throw "Token ausente para rota core-admin/system-branding"
     }
 
     $headers = @{
@@ -385,16 +359,16 @@ if (-not $SkipAuthChecks) {
       $authenticatedRole = [string]$script:authenticatedUser.role
     }
 
-    $response = Invoke-JsonRequest -Method "GET" -Url "$normalizedApiBase/admin/system-branding" -Headers $headers -ExpectedStatusCodes @(200, 403)
+    $response = Invoke-JsonRequest -Method "GET" -Url "$normalizedApiBase/core-admin/system-branding" -Headers $headers -ExpectedStatusCodes @(200, 403)
     if ($response.StatusCode -eq 403) {
       if ([string]::IsNullOrWhiteSpace($authenticatedRole)) {
-        throw "Rota admin/system-branding retornou 403 e o papel do usuario autenticado nao foi identificado."
+        throw "Rota core-admin/system-branding retornou 403 e o papel do usuario autenticado nao foi identificado."
       }
       if ($authenticatedRole -eq 'superadmin') {
-        throw "Rota admin/system-branding retornou 403 para superadmin."
+        throw "Rota core-admin/system-branding retornou 403 para superadmin."
       }
 
-      Write-Host "Rota admin/system-branding bloqueada para role '$authenticatedRole' (esperado para perfis nao-superadmin)." -ForegroundColor Yellow
+      Write-Host "Rota core-admin/system-branding bloqueada para role '$authenticatedRole' (esperado para perfis nao-superadmin)." -ForegroundColor Yellow
       return
     }
 
@@ -407,22 +381,22 @@ if (-not $SkipAuthChecks) {
     $hasData = ($propertyNames -contains "data") -and ($null -ne $response.Body.data)
 
     if (-not ($hasSuccess -or $hasData)) {
-      throw "Resposta invalida em admin/system-branding"
+      throw "Resposta invalida em core-admin/system-branding"
     }
   }
 
-  Run-Step -Name "Admin bff companies autenticado" -MaxAttempts 4 -Action {
+  Run-Step -Name "Core Admin bff companies autenticado" -MaxAttempts 4 -Action {
     if ([string]::IsNullOrWhiteSpace($script:accessToken)) {
-      throw "Token ausente para rota admin/bff/companies"
+      throw "Token ausente para rota core-admin/bff/companies"
     }
 
     $headers = @{
       Authorization = "Bearer $($script:accessToken)"
     }
 
-    $response = Invoke-JsonRequest -Method "GET" -Url "$normalizedApiBase/admin/bff/companies?page=1&limit=1" -Headers $headers -ExpectedStatusCodes @(200)
+    $response = Invoke-JsonRequest -Method "GET" -Url "$normalizedApiBase/core-admin/bff/companies?page=1&limit=1" -Headers $headers -ExpectedStatusCodes @(200)
     if ($null -eq $response.Body -or $response.Body.success -ne $true) {
-      throw "Resposta invalida em admin/bff/companies"
+      throw "Resposta invalida em core-admin/bff/companies"
     }
   }
 
@@ -448,8 +422,8 @@ if (-not $SkipAuthChecks) {
 }
 else {
   Add-Result -Step "Login superadmin" -Status "SKIP" -Details "SkipAuthChecks enabled"
-  Add-Result -Step "Admin branding autenticado" -Status "SKIP" -Details "SkipAuthChecks enabled"
-  Add-Result -Step "Admin bff companies autenticado" -Status "SKIP" -Details "SkipAuthChecks enabled"
+  Add-Result -Step "Core Admin branding autenticado" -Status "SKIP" -Details "SkipAuthChecks enabled"
+  Add-Result -Step "Core Admin bff companies autenticado" -Status "SKIP" -Details "SkipAuthChecks enabled"
   Add-Result -Step "Owner tenant esperado (opcional)" -Status "SKIP" -Details "SkipAuthChecks enabled"
 }
 

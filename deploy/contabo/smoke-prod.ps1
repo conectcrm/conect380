@@ -3,7 +3,6 @@ param(
   [string]$ProfilePath,
   [string]$ApiBaseUrl,
   [string]$AppBaseUrl,
-  [string]$GuardianBaseUrl,
   [string]$SuperAdminEmail,
   [string]$SuperAdminPassword,
   [string]$SuperAdminMfaCode,
@@ -62,7 +61,6 @@ $profile = Load-ContaboProfile -ProfilePath $resolvedProfilePath -ProfileName $P
 $urlProfile = if (Has-OptionalProperty -Object $profile -PropertyName 'Urls') { $profile.Urls } else { $null }
 $resolvedApiBaseUrl = Get-TextValue -Primary $ApiBaseUrl -Fallback (Get-TextValue -Primary (Get-OptionalPropertyValue -Object $urlProfile -PropertyName 'Api') -Fallback 'https://api.conect360.com')
 $resolvedAppBaseUrl = Get-TextValue -Primary $AppBaseUrl -Fallback (Get-TextValue -Primary (Get-OptionalPropertyValue -Object $urlProfile -PropertyName 'App') -Fallback 'https://conect360.com')
-$resolvedGuardianBaseUrl = Get-TextValue -Primary $GuardianBaseUrl -Fallback (Get-TextValue -Primary (Get-OptionalPropertyValue -Object $urlProfile -PropertyName 'Guardian') -Fallback 'https://guardian.conect360.com')
 
 $smokeProfile = if (Has-OptionalProperty -Object $profile -PropertyName 'Smoke') { $profile.Smoke } else { $null }
 
@@ -87,7 +85,6 @@ if (-not (Test-Path $smokeScriptPath)) {
 $smokeParams = @{
   ApiBaseUrl = $resolvedApiBaseUrl
   AppBaseUrl = $resolvedAppBaseUrl
-  GuardianBaseUrl = $resolvedGuardianBaseUrl
 }
 
 if ($SkipAuthChecks) {
@@ -112,7 +109,6 @@ else {
 Write-Host "Executando smoke de producao..."
 Write-Host "API: $resolvedApiBaseUrl"
 Write-Host "App: $resolvedAppBaseUrl"
-Write-Host "Guardian: $resolvedGuardianBaseUrl"
 Write-Host "SkipAuthChecks: $SkipAuthChecks"
 
 & $smokeScriptPath @smokeParams

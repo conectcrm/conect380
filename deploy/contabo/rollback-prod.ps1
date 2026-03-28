@@ -175,11 +175,6 @@ if [ "`$role" = "api" ]; then
   wait_http http://127.0.0.1:3500/health 40 3
 else
   app_services="frontend"
-  if [ -d "`$release_dir/guardian-web" ]; then
-    app_services="`$app_services guardian-web"
-  else
-    echo "guardian-web ausente no release alvo `$target_release; rollback APP seguira somente com frontend."
-  fi
 
   if [ "`$no_cache" = "1" ]; then
     compose build --no-cache `$app_services
@@ -188,9 +183,6 @@ else
   fi
   compose up -d --no-deps `$app_services
   wait_http http://127.0.0.1:3000/health 50 3
-  if [[ " `$app_services " == *" guardian-web "* ]]; then
-    wait_http http://127.0.0.1:3020/ 50 3
-  fi
 fi
 
 compose ps

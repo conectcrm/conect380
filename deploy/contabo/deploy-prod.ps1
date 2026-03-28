@@ -533,11 +533,6 @@ if [ "`$role" = "api" ]; then
   wait_http http://127.0.0.1:3500/health 40 3
 else
   app_services="frontend"
-  if [ -d "`$release_dir/guardian-web" ]; then
-    app_services="`$app_services guardian-web"
-  else
-    echo "guardian-web ausente no release `$release_id; deploy APP seguira somente com frontend."
-  fi
 
   if [ "`$no_cache" = "1" ]; then
     compose build --no-cache `$app_services
@@ -546,9 +541,6 @@ else
   fi
   compose up -d --no-deps `$app_services
   wait_http http://127.0.0.1:3000/health 50 3
-  if [[ " `$app_services " == *" guardian-web "* ]]; then
-    wait_http http://127.0.0.1:3020/ 50 3
-  fi
 fi
 
 ls -1dt "`$remote_root/releases"/* 2>/dev/null | tail -n +6 | xargs -r rm -rf
@@ -639,11 +631,6 @@ if [ "`$role" = "api" ]; then
   wait_http http://127.0.0.1:3500/health 40 3
 else
   app_services="frontend"
-  if [ -d "`$release_dir/guardian-web" ]; then
-    app_services="`$app_services guardian-web"
-  else
-    echo "guardian-web ausente no release alvo `$target_release; rollback APP seguira somente com frontend."
-  fi
 
   if [ "`$no_cache" = "1" ]; then
     compose build --no-cache `$app_services
@@ -652,9 +639,6 @@ else
   fi
   compose up -d --no-deps `$app_services
   wait_http http://127.0.0.1:3000/health 50 3
-  if [[ " `$app_services " == *" guardian-web "* ]]; then
-    wait_http http://127.0.0.1:3020/ 50 3
-  fi
 fi
 "@
 
@@ -702,7 +686,6 @@ if ([string]::IsNullOrWhiteSpace($resolvedTargetRef)) {
 $urlProfile = if (Has-OptionalProperty -Object $profile -PropertyName 'Urls') { $profile.Urls } else { $null }
 $apiBaseUrl = Get-TextValue -Primary (Get-OptionalPropertyValue -Object $urlProfile -PropertyName 'Api') -Fallback 'https://api.conect360.com'
 $appBaseUrl = Get-TextValue -Primary (Get-OptionalPropertyValue -Object $urlProfile -PropertyName 'App') -Fallback 'https://conect360.com'
-$guardianBaseUrl = Get-TextValue -Primary (Get-OptionalPropertyValue -Object $urlProfile -PropertyName 'Guardian') -Fallback 'https://guardian.conect360.com'
 
 $smokeEnabledByProfile = $false
 $smokeProfile = if (Has-OptionalProperty -Object $profile -PropertyName 'Smoke') { $profile.Smoke } else { $null }
@@ -795,7 +778,7 @@ try {
       Write-Host "Runtime env NAO sera enviado (esperado no host em <remote>/$runtimeEnvRemoteRelativePath)"
     }
     Write-Host "Deploy API: redis + backend" 
-    Write-Host "Deploy APP: frontend + guardian-web"
+    Write-Host "Deploy APP: frontend"
     if (-not $SkipMigrations) {
       Write-Host "Migration: executa em API VM"
     }
@@ -878,13 +861,12 @@ rm -f "`$1"
     }
 
     if (-not $Execute) {
-      Write-Host "Dry-run: smoke seria executado com Api=$apiBaseUrl App=$appBaseUrl Guardian=$guardianBaseUrl"
+      Write-Host "Dry-run: smoke seria executado com Api=$apiBaseUrl App=$appBaseUrl"
     }
     else {
       $smokeParams = @{
         ApiBaseUrl = $apiBaseUrl
         AppBaseUrl = $appBaseUrl
-        GuardianBaseUrl = $guardianBaseUrl
       }
 
       if ($SkipSmokeAuthChecks) {

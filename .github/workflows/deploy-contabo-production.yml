@@ -40,7 +40,6 @@ on:
     paths:
       - "backend/**"
       - "frontend-web/**"
-      - "guardian-web/**"
       - "deploy/contabo/**"
       - ".production/scripts/**"
       - ".github/workflows/deploy-contabo-production.yml"

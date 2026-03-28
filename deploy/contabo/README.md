@@ -17,7 +17,6 @@ Use dedicated nginx files:
 Domain mapping:
 - `conect360.com` and `www.conect360.com` -> `srv_app`
 - `api.conect360.com` -> `srv_api`
-- `guardian.conect360.com` -> `srv_app`
 
 ## 1) DB VM bootstrap
 
@@ -73,16 +72,15 @@ Domain mapping:
    cp deploy/contabo/.env.app-vm.example deploy/contabo/.env.app-vm
    ```
    Fill all required secrets, especially database and JWT fields.
-   Ensure these entries are set for Guardian:
-   - `REACT_APP_GUARDIAN_WEB_URL=https://guardian.seudominio.com`
-   - `VITE_GUARDIAN_API_URL=https://api.seudominio.com`
-   - `CORS_ORIGINS` includes `https://guardian.seudominio.com`
+   Ensure `CORS_ORIGINS` includes at least:
+   - `https://conect360.com`
+   - `https://www.conect360.com`
 
 3. Build and start app stack:
    ```bash
    docker compose -f deploy/contabo/docker-compose.app-vm.yml --env-file deploy/contabo/.env.app-vm up -d --build redis
    docker compose -f deploy/contabo/docker-compose.app-vm.yml --env-file deploy/contabo/.env.app-vm run --rm backend npm run migration:run
-   docker compose -f deploy/contabo/docker-compose.app-vm.yml --env-file deploy/contabo/.env.app-vm up -d backend frontend guardian-web
+   docker compose -f deploy/contabo/docker-compose.app-vm.yml --env-file deploy/contabo/.env.app-vm up -d backend frontend
    docker compose -f deploy/contabo/docker-compose.app-vm.yml ps
    ```
 
@@ -90,18 +88,17 @@ Domain mapping:
    ```bash
    curl -f http://127.0.0.1:3500/health
    curl -I http://127.0.0.1:3000
-   curl -I http://127.0.0.1:3020
    ```
 
 ## 3) Nginx on App VM and API VM
 
-1. App VM (`conect360.com`, `www.conect360.com`, `guardian.conect360.com`):
+1. App VM (`conect360.com`, `www.conect360.com`):
    ```bash
    sudo cp deploy/contabo/nginx.app-only.conf /etc/nginx/sites-available/conect360-app
    sudo ln -s /etc/nginx/sites-available/conect360-app /etc/nginx/sites-enabled/conect360-app
    sudo nginx -t
    sudo systemctl reload nginx
-   sudo certbot --nginx -d conect360.com -d www.conect360.com -d guardian.conect360.com
+   sudo certbot --nginx -d conect360.com -d www.conect360.com
    ```
 
 2. API VM (`api.conect360.com`):
@@ -128,7 +125,6 @@ sudo ufw enable
 ```bash
 curl -I https://app.seudominio.com
 curl -f https://api.seudominio.com/health
-curl -I https://guardian.seudominio.com
 ```
 
 Then validate in UI:
@@ -142,7 +138,7 @@ Then validate in UI:
 
 The repo includes deploy scripts for the split setup:
 - API VM (`backend + redis`)
-- APP VM (`frontend + guardian-web`)
+- APP VM (`frontend-web`)
 
 Scripts:
 - `deploy/contabo/deploy-prod.ps1`

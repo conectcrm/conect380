@@ -24,7 +24,7 @@
         RemoteRoot = '/opt/conect360'
       }
 
-      # APP VM: frontend + guardian-web
+      # APP VM: frontend-web
       AppVm = @{
         Host = '147.93.3.241'
         User = 'root'
@@ -35,7 +35,6 @@
       Urls = @{
         Api = 'https://api.conect360.com'
         App = 'https://conect360.com'
-        Guardian = 'https://guardian.conect360.com'
       }
 
       Smoke = @{
