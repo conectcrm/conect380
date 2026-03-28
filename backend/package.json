@@ -42,8 +42,6 @@
     "test:e2e:vendas:permissoes": "jest --config ./test/jest-e2e.json --runInBand --forceExit ./permissoes/perfis-acesso-vendas.e2e-spec.ts",
     "test:e2e:core-admin:hardening": "jest --config ./test/jest-e2e.json --runInBand --forceExit ./core-admin/core-admin-unauthorized-access.e2e-spec.ts ./core-admin/core-admin-permission-action-matrix.e2e-spec.ts ./core-admin/core-admin-operations-suite.e2e-spec.ts ./core-admin/core-admin-bff-guard.e2e-spec.ts ./core-admin/core-admin-empresas-guard.e2e-spec.ts",
     "test:e2e:core-admin:security": "jest --config ./test/jest-e2e.json --runInBand --forceExit ./core-admin/core-admin-mfa-session.e2e-spec.ts ./core-admin/core-admin-backend-bypass.e2e-spec.ts",
-    "test:e2e:guardian:hardening": "npm run test:e2e:core-admin:hardening",
-    "test:e2e:guardian:security": "npm run test:e2e:core-admin:security",
     "migration:generate": "typeorm migration:generate -d ormconfig.js",
     "migration:create": "typeorm migration:create",
     "migration:run": "typeorm migration:run -d ormconfig.js -t each",

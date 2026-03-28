@@ -12,7 +12,6 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { RateLimitInterceptor } from './common/interceptors/rate-limit.interceptor';
 import { HttpsRedirectMiddleware } from './common/middleware/https-redirect.middleware';
 import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
-import { CoreAdminLegacyRoutesMiddleware } from './common/middleware/core-admin-legacy-routes.middleware';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { ClientesModule } from './modules/clientes/clientes.module';
@@ -150,10 +149,7 @@ const throttlerShortLimit = isProduction ? 10 : 200;
 })
 export class AppModule implements NestModule {
   private resolveCoreAdminDocsPath(): string {
-    const rawPath =
-      process.env.CORE_ADMIN_DOCS_PATH?.trim() ||
-      process.env.GUARDIAN_DOCS_PATH?.trim() ||
-      'core-admin-docs';
+    const rawPath = process.env.CORE_ADMIN_DOCS_PATH?.trim() || 'core-admin-docs';
 
     const sanitizedPath = rawPath.replace(/^\/+|\/+$/g, '').toLowerCase();
     return sanitizedPath || 'core-admin-docs';
@@ -165,9 +161,6 @@ export class AppModule implements NestModule {
 
     // 🔒 HTTPS Redirect (Força HTTPS em produção)
     consumer.apply(HttpsRedirectMiddleware).forRoutes('*');
-
-    // ♻️ Camada de transição: rotas legadas /admin e /guardian apontam para /core-admin
-    consumer.apply(CoreAdminLegacyRoutesMiddleware).forRoutes('*');
 
     const coreAdminDocsPath = this.resolveCoreAdminDocsPath();
 

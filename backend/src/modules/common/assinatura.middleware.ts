@@ -75,7 +75,6 @@ const PATH_PREFIX_TO_MODULE: Array<{ prefix: string; module: EntitlementModule }
 
   { prefix: '/ia', module: 'IA' },
 
-  { prefix: '/admin', module: 'ADMINISTRACAO' },
 ];
 
 const MODULE_ACCEPTED_CODES: Record<EntitlementModule, string[]> = {
@@ -242,10 +241,7 @@ export class AssinaturaMiddleware implements NestMiddleware {
   }
 
   private resolveCoreAdminDocsPath(): string {
-    const rawPath =
-      process.env.CORE_ADMIN_DOCS_PATH?.trim() ||
-      process.env.GUARDIAN_DOCS_PATH?.trim() ||
-      'core-admin-docs';
+    const rawPath = process.env.CORE_ADMIN_DOCS_PATH?.trim() || 'core-admin-docs';
 
     const sanitizedPath = rawPath.replace(/^\/+|\/+$/g, '').toLowerCase();
     return sanitizedPath || 'core-admin-docs';

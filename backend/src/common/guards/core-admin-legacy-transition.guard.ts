@@ -13,18 +13,9 @@ type CoreAdminLegacyTransitionMode = 'legacy' | 'dual' | 'canary' | 'guardian_on
 export class CoreAdminLegacyTransitionGuard implements CanActivate {
   private static readonly READ_ONLY_ALLOWED_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
   private static readonly ENV_KEYS = {
-    transitionMode: {
-      canonical: 'CORE_ADMIN_LEGACY_TRANSITION_MODE',
-      legacy: 'GUARDIAN_LEGACY_TRANSITION_MODE',
-    },
-    canaryPercent: {
-      canonical: 'CORE_ADMIN_LEGACY_CANARY_PERCENT',
-      legacy: 'GUARDIAN_LEGACY_CANARY_PERCENT',
-    },
-    readOnly: {
-      canonical: 'CORE_ADMIN_LEGACY_READ_ONLY',
-      legacy: 'GUARDIAN_LEGACY_READ_ONLY',
-    },
+    transitionMode: 'CORE_ADMIN_LEGACY_TRANSITION_MODE',
+    canaryPercent: 'CORE_ADMIN_LEGACY_CANARY_PERCENT',
+    readOnly: 'CORE_ADMIN_LEGACY_READ_ONLY',
   } as const;
 
   private readonly mode: CoreAdminLegacyTransitionMode;
@@ -32,23 +23,12 @@ export class CoreAdminLegacyTransitionGuard implements CanActivate {
   private readonly legacyReadOnly: boolean;
 
   constructor() {
-    this.mode = this.parseMode(
-      this.readLegacyEnvValue(
-        CoreAdminLegacyTransitionGuard.ENV_KEYS.transitionMode.canonical,
-        CoreAdminLegacyTransitionGuard.ENV_KEYS.transitionMode.legacy,
-      ),
-    );
+    this.mode = this.parseMode(process.env[CoreAdminLegacyTransitionGuard.ENV_KEYS.transitionMode]);
     this.canaryPercent = this.parseCanaryPercent(
-      this.readLegacyEnvValue(
-        CoreAdminLegacyTransitionGuard.ENV_KEYS.canaryPercent.canonical,
-        CoreAdminLegacyTransitionGuard.ENV_KEYS.canaryPercent.legacy,
-      ),
+      process.env[CoreAdminLegacyTransitionGuard.ENV_KEYS.canaryPercent],
     );
     this.legacyReadOnly = this.parseBooleanFlag(
-      this.readLegacyEnvValue(
-        CoreAdminLegacyTransitionGuard.ENV_KEYS.readOnly.canonical,
-        CoreAdminLegacyTransitionGuard.ENV_KEYS.readOnly.legacy,
-      ),
+      process.env[CoreAdminLegacyTransitionGuard.ENV_KEYS.readOnly],
       false,
     );
   }
@@ -76,7 +56,6 @@ export class CoreAdminLegacyTransitionGuard implements CanActivate {
         route: currentRoute,
         method,
         mode: this.mode,
-        guardianBasePath: '/core-admin',
         coreAdminBasePath: '/core-admin',
       });
     }
@@ -89,27 +68,21 @@ export class CoreAdminLegacyTransitionGuard implements CanActivate {
 
     if (this.mode === 'dual') {
       response?.setHeader?.('x-core-admin-transition-mode', 'dual');
-      response?.setHeader?.('x-guardian-transition-mode', 'dual');
       this.ensureWriteAllowed(method, currentRoute);
       this.applyReadOnlyHeader(response);
       return true;
     }
 
-    const migrateToGuardian =
+    const migrateToCoreAdmin =
       this.mode === 'guardian_only' ? true : this.shouldRedirectInCanary(this.resolveRolloutKey(request));
 
     response?.setHeader?.('x-core-admin-transition-mode', this.mode);
-    response?.setHeader?.('x-guardian-transition-mode', this.mode);
     response?.setHeader?.(
       'x-core-admin-transition-target',
-      migrateToGuardian ? 'core-admin' : 'legacy-admin',
-    );
-    response?.setHeader?.(
-      'x-guardian-transition-target',
-      migrateToGuardian ? 'core-admin' : 'legacy-admin',
+      migrateToCoreAdmin ? 'core-admin' : 'legacy-admin',
     );
 
-    if (!migrateToGuardian) {
+    if (!migrateToCoreAdmin) {
       this.ensureWriteAllowed(method, currentRoute);
       this.applyReadOnlyHeader(response);
       return true;
@@ -120,7 +93,6 @@ export class CoreAdminLegacyTransitionGuard implements CanActivate {
       message: 'Endpoint legado admin desativado para este ator. Use o namespace /core-admin/*.',
       route: currentRoute,
       mode: this.mode,
-      guardianBasePath: '/core-admin',
       coreAdminBasePath: '/core-admin',
     });
   }
@@ -144,14 +116,6 @@ export class CoreAdminLegacyTransitionGuard implements CanActivate {
       return coreAdminExplicitKey.trim();
     }
 
-    const explicitKey =
-      typeof request?.headers?.['x-guardian-transition-key'] === 'string'
-        ? request.headers['x-guardian-transition-key']
-        : undefined;
-    if (explicitKey && explicitKey.trim()) {
-      return explicitKey.trim();
-    }
-
     const userId = request?.user?.id;
     if (typeof userId === 'string' && userId.trim()) {
       return userId.trim();
@@ -171,8 +135,8 @@ export class CoreAdminLegacyTransitionGuard implements CanActivate {
   }
 
   private resolveRoute(request: { originalUrl?: string; url?: string }): string {
-    const route = request?.originalUrl || request?.url || '/admin';
-    return route.split('?')[0] || '/admin';
+    const route = request?.originalUrl || request?.url || '/core-admin';
+    return route.split('?')[0] || '/core-admin';
   }
 
   private resolveMethod(request: { method?: string }): string {
@@ -209,7 +173,6 @@ export class CoreAdminLegacyTransitionGuard implements CanActivate {
       route,
       method,
       mode: this.mode,
-      guardianBasePath: '/core-admin',
       coreAdminBasePath: '/core-admin',
     });
   }
@@ -220,7 +183,6 @@ export class CoreAdminLegacyTransitionGuard implements CanActivate {
     }
 
     response?.setHeader?.('x-core-admin-legacy-read-only', 'true');
-    response?.setHeader?.('x-guardian-legacy-read-only', 'true');
   }
 
   private parseMode(modeValue: string | undefined): CoreAdminLegacyTransitionMode {
@@ -265,20 +227,6 @@ export class CoreAdminLegacyTransitionGuard implements CanActivate {
     }
 
     return fallback;
-  }
-
-  private readLegacyEnvValue(canonicalKey: string, legacyKey: string): string | undefined {
-    const canonicalValue = process.env[canonicalKey];
-    if (typeof canonicalValue === 'string' && canonicalValue.trim()) {
-      return canonicalValue;
-    }
-
-    const legacyValue = process.env[legacyKey];
-    if (typeof legacyValue === 'string' && legacyValue.trim()) {
-      return legacyValue;
-    }
-
-    return undefined;
   }
 }
 

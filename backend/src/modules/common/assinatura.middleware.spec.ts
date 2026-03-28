@@ -203,7 +203,7 @@ describe('AssinaturaMiddleware', () => {
     try {
       await middleware.use(
         {
-          path: '/admin/empresas',
+          path: '/billing/cobrancas',
           method: 'GET',
           user: { empresaId: '11111111-1111-1111-1111-111111111111' },
         } as any,
@@ -485,39 +485,4 @@ describe('AssinaturaMiddleware', () => {
     expect(assinaturasService.buscarPorEmpresa).not.toHaveBeenCalled();
   });
 
-  it('mantem compatibilidade com GUARDIAN_DOCS_PATH legado', async () => {
-    const previousCoreAdminDocsPath = process.env.CORE_ADMIN_DOCS_PATH;
-    const previousGuardianDocsPath = process.env.GUARDIAN_DOCS_PATH;
-    delete process.env.CORE_ADMIN_DOCS_PATH;
-    process.env.GUARDIAN_DOCS_PATH = 'guardian-docs-legado';
-
-    const next = jest.fn();
-
-    try {
-      await middleware.use(
-        {
-          path: '/guardian-docs-legado-json',
-          method: 'GET',
-          user: { empresaId: '11111111-1111-1111-1111-111111111111' },
-        } as any,
-        {} as any,
-        next,
-      );
-    } finally {
-      if (previousCoreAdminDocsPath === undefined) {
-        delete process.env.CORE_ADMIN_DOCS_PATH;
-      } else {
-        process.env.CORE_ADMIN_DOCS_PATH = previousCoreAdminDocsPath;
-      }
-
-      if (previousGuardianDocsPath === undefined) {
-        delete process.env.GUARDIAN_DOCS_PATH;
-      } else {
-        process.env.GUARDIAN_DOCS_PATH = previousGuardianDocsPath;
-      }
-    }
-
-    expect(next).toHaveBeenCalledTimes(1);
-    expect(assinaturasService.buscarPorEmpresa).not.toHaveBeenCalled();
-  });
 });

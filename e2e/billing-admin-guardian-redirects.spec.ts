@@ -1,5 +1,5 @@
-﻿import type { Page } from '@playwright/test';
-import { test, expect } from './fixtures';
+import type { Page } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 const jsonResponse = (status: number, payload: unknown) => ({
   status,
@@ -7,10 +7,10 @@ const jsonResponse = (status: number, payload: unknown) => ({
   body: JSON.stringify(payload),
 });
 
-const mockGuardianAdminUser = {
-  id: 'user-e2e-guardian-admin-1',
-  nome: 'Guardian Admin E2E',
-  email: 'guardian-admin@conect360.com.br',
+const mockCoreAdminUser = {
+  id: 'user-e2e-core-admin-1',
+  nome: 'Core Admin E2E',
+  email: 'core-admin@conect360.com.br',
   role: 'superadmin',
   roles: ['superadmin'],
   permissoes: [
@@ -33,18 +33,7 @@ const mockGuardianAdminUser = {
   },
 };
 
-const installGuardianStubRoute = async (page: Page): Promise<void> => {
-  await page.route(/^https?:\/\/localhost:3020\/.*/i, async (route) => {
-    const requestUrl = new URL(route.request().url());
-    await route.fulfill({
-      status: 200,
-      contentType: 'text/html; charset=utf-8',
-      body: `<!doctype html><html><body>Guardian Stub ${requestUrl.pathname}${requestUrl.search}</body></html>`,
-    });
-  });
-};
-
-const elevateSessionToGuardianAdmin = async (page: Page): Promise<void> => {
+const elevateSessionToCoreAdmin = async (page: Page): Promise<void> => {
   await page.route('**/empresas/modulos/ativos', async (route) => {
     await route.fulfill(
       jsonResponse(200, {
@@ -57,23 +46,24 @@ const elevateSessionToGuardianAdmin = async (page: Page): Promise<void> => {
     await route.fulfill(
       jsonResponse(200, {
         success: true,
-        data: mockGuardianAdminUser,
+        data: mockCoreAdminUser,
       }),
     );
   });
 
   await page.evaluate((user) => {
     window.localStorage.setItem('user_data', JSON.stringify(user));
-  }, mockGuardianAdminUser);
+  }, mockCoreAdminUser);
 
   await page.goto('/dashboard');
   await page.waitForURL('**/dashboard', { timeout: 10000 });
 };
 
-test.describe('Billing legacy admin routes lockdown', () => {
-  test('bloqueia aliases admin no cliente e mantém apenas relay explicito para guardian', async ({ authenticatedPage }) => {
-    await installGuardianStubRoute(authenticatedPage);
-    await elevateSessionToGuardianAdmin(authenticatedPage);
+test.describe('Core Admin legacy routes lockdown', () => {
+  test('bloqueia aliases admin/guardian no cliente e evita relay externo legado', async ({
+    authenticatedPage,
+  }) => {
+    await elevateSessionToCoreAdmin(authenticatedPage);
 
     const blockedClientAliases = [
       '/admin/empresas',
@@ -82,14 +72,15 @@ test.describe('Billing legacy admin routes lockdown', () => {
       '/admin/sistema',
       '/admin/branding',
       '/nuclei/administracao',
+      '/guardian/bff/overview',
     ];
 
     for (const source of blockedClientAliases) {
       await authenticatedPage.goto(source, { waitUntil: 'domcontentloaded' }).catch(() => undefined);
-      await authenticatedPage.waitForTimeout(400);
+      await authenticatedPage.waitForTimeout(300);
       const currentUrl = authenticatedPage.url();
-      expect(currentUrl).not.toContain('/governance/');
       expect(currentUrl).not.toContain(':3020/');
+      expect(currentUrl).not.toContain('/core-admin');
       await expect(authenticatedPage.locator('body')).not.toContainText('Guardian Stub');
     }
 
@@ -97,8 +88,8 @@ test.describe('Billing legacy admin routes lockdown', () => {
     await expect
       .poll(() => authenticatedPage.url(), {
         timeout: 10000,
-        message: 'Redirecionamento autorizado de /sistema/backup nao ocorreu.',
+        message: 'Rota legada /sistema/backup deveria permanecer dentro do app principal.',
       })
-      .toMatch(/(:3020\/(governance\/system|login)|\/configuracoes\/empresa\?tab=backup)/);
+      .toMatch(/\/sistema\/backup|\/dashboard|\/configuracoes\/empresa/);
   });
 });

@@ -25,17 +25,17 @@ export class CoreAdminCapabilitiesService {
   getCapabilities(): CoreAdminCapabilities {
     return {
       allowBreakGlassRequestCreation: this.readBooleanFlag(
-        'GUARDIAN_ALLOW_BREAK_GLASS_REQUEST_CREATION',
+        'CORE_ADMIN_ALLOW_BREAK_GLASS_REQUEST_CREATION',
       ),
       allowManualBillingDueDateCycle: this.readBooleanFlag(
-        'GUARDIAN_ALLOW_MANUAL_BILLING_DUE_DATE_CYCLE',
+        'CORE_ADMIN_ALLOW_MANUAL_BILLING_DUE_DATE_CYCLE',
       ),
-      allowPlanDeletion: this.readBooleanFlag('GUARDIAN_ALLOW_PLAN_DELETION'),
+      allowPlanDeletion: this.readBooleanFlag('CORE_ADMIN_ALLOW_PLAN_DELETION'),
       allowDirectAccessRecertification: this.readBooleanFlag(
-        'GUARDIAN_ALLOW_DIRECT_ACCESS_RECERTIFICATION',
+        'CORE_ADMIN_ALLOW_DIRECT_ACCESS_RECERTIFICATION',
       ),
       allowCompanyModuleManagement: this.readBooleanFlag(
-        'GUARDIAN_ALLOW_COMPANY_MODULE_MANAGEMENT',
+        'CORE_ADMIN_ALLOW_COMPANY_MODULE_MANAGEMENT',
       ),
     };
   }
@@ -154,15 +154,6 @@ export class CoreAdminCapabilitiesService {
 
   private readLegacyTransitionModeValue(fallback: string): string {
     const canonical = this.readOptionalStringValue('CORE_ADMIN_LEGACY_TRANSITION_MODE');
-    if (canonical) {
-      return canonical;
-    }
-
-    const legacy = this.readOptionalStringValue('GUARDIAN_LEGACY_TRANSITION_MODE');
-    if (legacy) {
-      return legacy;
-    }
-
-    return fallback;
+    return canonical || fallback;
   }
 }

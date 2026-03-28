@@ -493,15 +493,7 @@ const AppRoutes: React.FC = () => {
                   <Route
                     path="/gestao/empresas"
                     element={<Navigate to="/empresas/minhas" replace />}
-                  />{' '}
-                  <Route path="/admin/empresas" element={<Navigate to="/empresas/minhas" replace />} />
-                  <Route path="/admin/empresas/:id" element={<Navigate to="/empresas/minhas" replace />} />
-                  <Route path="/admin/usuarios" element={<Navigate to="/configuracoes/usuarios" replace />} />
-                  <Route path="/admin/sistema" element={<Navigate to="/configuracoes/sistema" replace />} />
-                  <Route path="/admin" element={<Navigate to="/core-admin" replace />} />
-                  <Route path="/admin/*" element={<Navigate to="/core-admin" replace />} />
-                  <Route path="/guardian" element={<Navigate to="/core-admin" replace />} />
-                  <Route path="/guardian/*" element={<Navigate to="/core-admin" replace />} />
+                  />
                   {/* Redirect legado para rota operacional */}
                   <Route
                     path="/nuclei/configuracoes/empresas"

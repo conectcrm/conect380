@@ -5,26 +5,18 @@ describe('CoreAdminLegacyTransitionGuard', () => {
   const originalMode = process.env.CORE_ADMIN_LEGACY_TRANSITION_MODE;
   const originalCanary = process.env.CORE_ADMIN_LEGACY_CANARY_PERCENT;
   const originalReadOnly = process.env.CORE_ADMIN_LEGACY_READ_ONLY;
-  const originalLegacyMode = process.env.GUARDIAN_LEGACY_TRANSITION_MODE;
-  const originalLegacyCanary = process.env.GUARDIAN_LEGACY_CANARY_PERCENT;
-  const originalLegacyReadOnly = process.env.GUARDIAN_LEGACY_READ_ONLY;
 
   const createContext = (options?: {
     userId?: string;
     empresaId?: string;
     key?: string;
-    useLegacyTransitionKeyHeader?: boolean;
     route?: string;
     ip?: string;
     method?: string;
   }) => {
     const headers: Record<string, unknown> = {};
     if (options?.key) {
-      if (options.useLegacyTransitionKeyHeader) {
-        headers['x-guardian-transition-key'] = options.key;
-      } else {
-        headers['x-core-admin-transition-key'] = options.key;
-      }
+      headers['x-core-admin-transition-key'] = options.key;
     }
 
     const setHeader = jest.fn();
@@ -69,23 +61,6 @@ describe('CoreAdminLegacyTransitionGuard', () => {
       process.env.CORE_ADMIN_LEGACY_READ_ONLY = originalReadOnly;
     }
 
-    if (originalLegacyMode === undefined) {
-      delete process.env.GUARDIAN_LEGACY_TRANSITION_MODE;
-    } else {
-      process.env.GUARDIAN_LEGACY_TRANSITION_MODE = originalLegacyMode;
-    }
-
-    if (originalLegacyCanary === undefined) {
-      delete process.env.GUARDIAN_LEGACY_CANARY_PERCENT;
-    } else {
-      process.env.GUARDIAN_LEGACY_CANARY_PERCENT = originalLegacyCanary;
-    }
-
-    if (originalLegacyReadOnly === undefined) {
-      delete process.env.GUARDIAN_LEGACY_READ_ONLY;
-    } else {
-      process.env.GUARDIAN_LEGACY_READ_ONLY = originalLegacyReadOnly;
-    }
   });
 
   it('permite rotas admin no modo legacy', () => {
@@ -110,7 +85,6 @@ describe('CoreAdminLegacyTransitionGuard', () => {
 
     expect(guard.canActivate(context)).toBe(true);
     expect(setHeader).toHaveBeenCalledWith('x-core-admin-transition-mode', 'dual');
-    expect(setHeader).toHaveBeenCalledWith('x-guardian-transition-mode', 'dual');
   });
 
   it('bloqueia rotas admin no modo guardian_only', () => {
@@ -128,7 +102,6 @@ describe('CoreAdminLegacyTransitionGuard', () => {
       expect(error).toBeInstanceOf(GoneException);
       const payload = (error as GoneException).getResponse() as Record<string, unknown>;
       expect(String(payload?.message || '')).toContain('/core-admin/*');
-      expect(payload?.guardianBasePath).toBe('/core-admin');
       expect(payload?.coreAdminBasePath).toBe('/core-admin');
     }
   });
@@ -137,42 +110,11 @@ describe('CoreAdminLegacyTransitionGuard', () => {
     delete process.env.CORE_ADMIN_LEGACY_TRANSITION_MODE;
     process.env.CORE_ADMIN_LEGACY_CANARY_PERCENT = '0';
     delete process.env.CORE_ADMIN_LEGACY_READ_ONLY;
-    delete process.env.GUARDIAN_LEGACY_TRANSITION_MODE;
-    delete process.env.GUARDIAN_LEGACY_CANARY_PERCENT;
-    delete process.env.GUARDIAN_LEGACY_READ_ONLY;
 
     const guard = new CoreAdminLegacyTransitionGuard();
     const { context } = createContext({ userId: 'user-default-legacy' });
 
     expect(guard.canActivate(context)).toBe(true);
-  });
-
-  it('mantem retrocompatibilidade quando apenas GUARDIAN_LEGACY_* estiver definido', () => {
-    delete process.env.CORE_ADMIN_LEGACY_TRANSITION_MODE;
-    delete process.env.CORE_ADMIN_LEGACY_CANARY_PERCENT;
-    delete process.env.CORE_ADMIN_LEGACY_READ_ONLY;
-    process.env.GUARDIAN_LEGACY_TRANSITION_MODE = 'guardian_only';
-    process.env.GUARDIAN_LEGACY_CANARY_PERCENT = '0';
-    process.env.GUARDIAN_LEGACY_READ_ONLY = 'false';
-
-    const guard = new CoreAdminLegacyTransitionGuard();
-    const { context } = createContext({ userId: 'legacy-only-env-user' });
-
-    expect(() => guard.canActivate(context)).toThrow(GoneException);
-  });
-
-  it('aceita x-guardian-transition-key como fallback para rollout canary', () => {
-    process.env.CORE_ADMIN_LEGACY_TRANSITION_MODE = 'canary';
-    process.env.CORE_ADMIN_LEGACY_CANARY_PERCENT = '100';
-    process.env.CORE_ADMIN_LEGACY_READ_ONLY = 'false';
-
-    const guard = new CoreAdminLegacyTransitionGuard();
-    const { context } = createContext({
-      key: 'tenant-canary-legacy-header',
-      useLegacyTransitionKeyHeader: true,
-    });
-
-    expect(() => guard.canActivate(context)).toThrow(GoneException);
   });
 
   it('aplica rollout canary conforme percentual configurado', () => {
@@ -212,7 +154,6 @@ describe('CoreAdminLegacyTransitionGuard', () => {
       expect(error).toBeInstanceOf(MethodNotAllowedException);
       const payload = (error as MethodNotAllowedException).getResponse() as Record<string, unknown>;
       expect(String(payload?.message || '')).toContain('/core-admin/*');
-      expect(payload?.guardianBasePath).toBe('/core-admin');
       expect(payload?.coreAdminBasePath).toBe('/core-admin');
     }
   });
@@ -231,7 +172,6 @@ describe('CoreAdminLegacyTransitionGuard', () => {
 
     expect(guard.canActivate(context)).toBe(true);
     expect(setHeader).toHaveBeenCalledWith('x-core-admin-legacy-read-only', 'true');
-    expect(setHeader).toHaveBeenCalledWith('x-guardian-legacy-read-only', 'true');
   });
 
   it('bloqueia escrita em canary quando request permanece no legado e read-only ativo', () => {

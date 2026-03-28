@@ -18,9 +18,6 @@ export class CoreAdminRuntimeAlertService implements OnModuleInit {
   private readonly runInTest =
     String(process.env.CORE_ADMIN_RUNTIME_ALERT_RUN_IN_TEST || '')
       .trim()
-      .toLowerCase() === 'true' ||
-    String(process.env.GUARDIAN_RUNTIME_ALERT_RUN_IN_TEST || '')
-      .trim()
       .toLowerCase() === 'true';
 
   constructor(
@@ -104,7 +101,7 @@ export class CoreAdminRuntimeAlertService implements OnModuleInit {
     enabledCapabilities: string[],
   ): Promise<void> {
     const recipients = String(
-      process.env.CORE_ADMIN_POLICY_ALERT_EMAILS || process.env.GUARDIAN_POLICY_ALERT_EMAILS || '',
+      process.env.CORE_ADMIN_POLICY_ALERT_EMAILS || '',
     )
       .split(',')
       .map((item) => item.trim())

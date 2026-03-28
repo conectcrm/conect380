@@ -131,10 +131,10 @@ export class CoreAdminCriticalAuditInterceptor implements NestInterceptor {
   }
 
   private resolveTargetType(routeLower: string): string | null {
-    if (routeLower.includes('/core-admin/empresas') || routeLower.includes('/guardian/empresas')) {
+    if (routeLower.includes('/core-admin/empresas')) {
       return 'empresa';
     }
-    if (routeLower.includes('/core-admin/planos') || routeLower.includes('/guardian/planos')) {
+    if (routeLower.includes('/core-admin/planos')) {
       return 'plan_catalog';
     }
     if (routeLower.includes('/billing/subscriptions')) {

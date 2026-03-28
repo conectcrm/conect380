@@ -15,30 +15,4 @@ module.exports = function setupProxy(app) {
       logLevel: 'warn',
     }),
   );
-
-  // Compatibilidade transitoria para clientes/automacoes que ainda usam /api/admin.
-  app.use(
-    '/api/admin',
-    createProxyMiddleware({
-      target,
-      changeOrigin: true,
-      pathRewrite: {
-        '^/api/admin': '/core-admin',
-      },
-      logLevel: 'warn',
-    }),
-  );
-
-  // Compatibilidade transitoria para clientes/automacoes que ainda usam /api/guardian.
-  app.use(
-    '/api/guardian',
-    createProxyMiddleware({
-      target,
-      changeOrigin: true,
-      pathRewrite: {
-        '^/api/guardian': '/core-admin',
-      },
-      logLevel: 'warn',
-    }),
-  );
 };

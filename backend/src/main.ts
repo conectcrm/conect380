@@ -484,42 +484,18 @@ async function bootstrap() {
     const publicDocument = filterOpenApiByAdminScope(fullDocument, 'exclude_admin');
     SwaggerModule.setup('api-docs', app, publicDocument as any);
 
-    const adminDocsEnabled =
-      process.env.CORE_ADMIN_DOCS_ENABLED === 'true' ||
-      process.env.GUARDIAN_DOCS_ENABLED === 'true';
-    const adminDocsUser =
-      process.env.CORE_ADMIN_DOCS_USER?.trim() ||
-      process.env.GUARDIAN_DOCS_USER?.trim() ||
-      '';
-    const adminDocsPassword =
-      process.env.CORE_ADMIN_DOCS_PASSWORD?.trim() ||
-      process.env.GUARDIAN_DOCS_PASSWORD?.trim() ||
-      '';
-    const adminDocsPath = (
-      process.env.CORE_ADMIN_DOCS_PATH ||
-      process.env.GUARDIAN_DOCS_PATH ||
-      'core-admin-docs'
-    ).replace(
+    const adminDocsEnabled = process.env.CORE_ADMIN_DOCS_ENABLED === 'true';
+    const adminDocsUser = process.env.CORE_ADMIN_DOCS_USER?.trim() || '';
+    const adminDocsPassword = process.env.CORE_ADMIN_DOCS_PASSWORD?.trim() || '';
+    const adminDocsPath = (process.env.CORE_ADMIN_DOCS_PATH || 'core-admin-docs').replace(
       /^\/+|\/+$/g,
       '',
     );
-    const usingGuardianDocsLegacyVars = Boolean(
-      process.env.GUARDIAN_DOCS_ENABLED ||
-        process.env.GUARDIAN_DOCS_USER ||
-        process.env.GUARDIAN_DOCS_PASSWORD ||
-        process.env.GUARDIAN_DOCS_PATH,
-    );
-
-    if (usingGuardianDocsLegacyVars) {
-      console.warn(
-        '⚠️ [Swagger] Variaveis GUARDIAN_DOCS_* estao em modo legado. Migre para CORE_ADMIN_DOCS_*.',
-      );
-    }
 
     if (adminDocsEnabled) {
       if (!adminDocsUser || !adminDocsPassword) {
         console.warn(
-          '⚠️ [Swagger] Core Admin docs habilitado sem credenciais (CORE_ADMIN_DOCS_USER/CORE_ADMIN_DOCS_PASSWORD ou legado GUARDIAN_DOCS_*). Endpoint nao sera publicado.',
+          '⚠️ [Swagger] Core Admin docs habilitado sem credenciais (CORE_ADMIN_DOCS_USER/CORE_ADMIN_DOCS_PASSWORD). Endpoint nao sera publicado.',
         );
       } else {
         const adminDocument = filterOpenApiByAdminScope(fullDocument, 'only_admin');
