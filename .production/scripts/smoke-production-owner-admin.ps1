@@ -458,7 +458,24 @@ if (-not $SkipAuthChecks) {
       Authorization = "Bearer $($script:accessToken)"
     }
 
-    $response = Invoke-JsonRequest -Method "GET" -Url "$normalizedApiBase/core-admin/bff/companies?page=1&limit=1" -Headers $headers -ExpectedStatusCodes @(200)
+    $authenticatedRole = ''
+    if ($null -ne $script:authenticatedUser -and $null -ne $script:authenticatedUser.role) {
+      $authenticatedRole = [string]$script:authenticatedUser.role
+    }
+
+    $response = Invoke-JsonRequest -Method "GET" -Url "$normalizedApiBase/core-admin/bff/companies?page=1&limit=1" -Headers $headers -ExpectedStatusCodes @(200, 403)
+    if ($response.StatusCode -eq 403) {
+      if ([string]::IsNullOrWhiteSpace($authenticatedRole)) {
+        throw "Rota core-admin/bff/companies retornou 403 e o papel do usuario autenticado nao foi identificado."
+      }
+      if ($authenticatedRole -eq 'superadmin') {
+        throw "Rota core-admin/bff/companies retornou 403 para superadmin."
+      }
+
+      Write-Host "Rota core-admin/bff/companies bloqueada para role '$authenticatedRole' (esperado para perfis nao-superadmin)." -ForegroundColor Yellow
+      return
+    }
+
     if ($null -eq $response.Body -or $response.Body.success -ne $true) {
       throw "Resposta invalida em core-admin/bff/companies"
     }
