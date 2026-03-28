@@ -70,6 +70,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       }
 
       const tenantBillingPolicy = await this.assinaturasService.obterPoliticaTenant(user.empresa_id);
+      (user as User & { platform_owner_access?: boolean }).platform_owner_access = Boolean(
+        tenantBillingPolicy.isPlatformOwner,
+      );
 
       const empresaStatus = String(empresa.status || '')
         .trim()

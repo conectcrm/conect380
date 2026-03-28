@@ -234,7 +234,7 @@ describe('Admin BFF - AppModule Integration (E2E)', () => {
 
   it('retorna overview consolidado para perfil administrativo', async () => {
     const response = await request(app.getHttpServer())
-      .get('/admin/bff/overview')
+      .get('/core-admin/bff/overview')
       .set('Authorization', `Bearer ${tokens.admin}`)
       .expect(200);
 
@@ -246,14 +246,14 @@ describe('Admin BFF - AppModule Integration (E2E)', () => {
 
   it('bloqueia acesso ao overview para perfil nao administrativo', async () => {
     await request(app.getHttpServer())
-      .get('/admin/bff/overview')
+      .get('/core-admin/bff/overview')
       .set('Authorization', `Bearer ${tokens.vendedor}`)
       .expect(403);
   });
 
   it('registra evento admin_bff_audit na trilha administrativa', async () => {
     await request(app.getHttpServer())
-      .get('/admin/bff/overview')
+      .get('/core-admin/bff/overview')
       .set('Authorization', `Bearer ${tokens.admin}`)
       .expect(200);
 
@@ -261,7 +261,7 @@ describe('Admin BFF - AppModule Integration (E2E)', () => {
 
     for (let attempt = 0; attempt < 12; attempt += 1) {
       const response = await request(app.getHttpServer())
-        .get('/admin/bff/audit/activities?limit=100&admin_only=true')
+        .get('/core-admin/bff/audit/activities?limit=100&admin_only=true')
         .set('Authorization', `Bearer ${tokens.admin}`)
         .expect(200);
 
@@ -271,7 +271,7 @@ describe('Admin BFF - AppModule Integration (E2E)', () => {
         return (
           details?.categoria === 'admin_bff_audit' &&
           details?.evento === 'gateway_request' &&
-          details?.route === '/admin/bff/overview'
+          details?.route === '/core-admin/bff/overview'
         );
       });
 
@@ -287,14 +287,14 @@ describe('Admin BFF - AppModule Integration (E2E)', () => {
 
   it('bloqueia acesso de gerente ao endpoint de empresas sem elevacao emergencial', async () => {
     await request(app.getHttpServer())
-      .get('/admin/bff/companies?page=1&limit=10')
+      .get('/core-admin/bff/companies?page=1&limit=10')
       .set('Authorization', `Bearer ${tokens.gerente}`)
       .expect(403);
   });
 
   it('aplica break-glass aprovado e remove acesso apos expiracao automatica', async () => {
     const requestResponse = await request(app.getHttpServer())
-      .post('/admin/bff/break-glass/requests')
+      .post('/core-admin/bff/break-glass/requests')
       .set('Authorization', `Bearer ${tokens.admin}`)
       .send({
         target_user_id: users.gerente.id,
@@ -308,7 +308,7 @@ describe('Admin BFF - AppModule Integration (E2E)', () => {
     expect(requestResponse.body?.data?.status).toBe('REQUESTED');
 
     const approveResponse = await request(app.getHttpServer())
-      .post(`/admin/bff/break-glass/requests/${breakGlassRequestId}/approve`)
+      .post(`/core-admin/bff/break-glass/requests/${breakGlassRequestId}/approve`)
       .set('Authorization', `Bearer ${tokens.superadmin}`)
       .send({
         reason: 'Aprovacao emergencial em janela controlada',
@@ -318,7 +318,7 @@ describe('Admin BFF - AppModule Integration (E2E)', () => {
     expect(approveResponse.body?.data?.status).toBe('APPROVED');
 
     await request(app.getHttpServer())
-      .get('/admin/bff/companies?page=1&limit=10')
+      .get('/core-admin/bff/companies?page=1&limit=10')
       .set('Authorization', `Bearer ${tokens.gerente}`)
       .expect(200);
 
@@ -332,7 +332,7 @@ describe('Admin BFF - AppModule Integration (E2E)', () => {
     );
 
     const activeAfterExpiryResponse = await request(app.getHttpServer())
-      .get(`/admin/bff/break-glass/active?limit=20&target_user_id=${users.gerente.id}`)
+      .get(`/core-admin/bff/break-glass/active?limit=20&target_user_id=${users.gerente.id}`)
       .set('Authorization', `Bearer ${tokens.admin}`)
       .expect(200);
 
@@ -344,7 +344,7 @@ describe('Admin BFF - AppModule Integration (E2E)', () => {
     );
 
     await request(app.getHttpServer())
-      .get('/admin/bff/companies?page=1&limit=10')
+      .get('/core-admin/bff/companies?page=1&limit=10')
       .set('Authorization', `Bearer ${tokens.gerente}`)
       .expect(403);
   });

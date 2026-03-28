@@ -1,8 +1,11 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import { isPlatformUser } from '../auth/is-platform-user';
 
 type OwnerUserShape = {
   empresa_id?: string | null;
   empresaId?: string | null;
+  platform_owner_access?: boolean | null;
+  platformOwnerAccess?: boolean | null;
   empresa?: {
     id?: string | null;
   } | null;
@@ -25,6 +28,11 @@ export class PlatformOwnerGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<{ user?: OwnerUserShape }>();
     const user = request?.user;
     const userEmpresaIds = this.extractUserEmpresaIds(user);
+    const hasOwnerPolicyAccess = isPlatformUser(user);
+
+    if (hasOwnerPolicyAccess) {
+      return true;
+    }
 
     if (this.ownerEmpresaIds.size === 0) {
       if (this.enforceWhenOwnerListEmpty) {

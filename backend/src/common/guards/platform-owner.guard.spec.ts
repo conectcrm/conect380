@@ -5,12 +5,16 @@ describe('PlatformOwnerGuard', () => {
   const originalOwnerIds = process.env.PLATFORM_OWNER_EMPRESA_IDS;
   const originalEnforceWhenEmpty = process.env.PLATFORM_OWNER_ENFORCE_WHEN_EMPTY;
 
-  const createContext = (empresaId?: string) =>
+  const createContext = (
+    empresaId?: string,
+    options?: { platformOwnerAccess?: boolean },
+  ) =>
     ({
       switchToHttp: () => ({
         getRequest: () => ({
           user: {
             empresa_id: empresaId,
+            platform_owner_access: options?.platformOwnerAccess,
           },
         }),
       }),
@@ -60,5 +64,15 @@ describe('PlatformOwnerGuard', () => {
 
     const guard = new PlatformOwnerGuard();
     expect(guard.canActivate(createContext('qualquer-tenant'))).toBe(true);
+  });
+
+  it('permite acesso quando JWT indica tenant proprietario pela politica resolvida', () => {
+    delete process.env.PLATFORM_OWNER_EMPRESA_IDS;
+    process.env.PLATFORM_OWNER_ENFORCE_WHEN_EMPTY = 'true';
+
+    const guard = new PlatformOwnerGuard();
+    expect(
+      guard.canActivate(createContext('tenant-nao-listado', { platformOwnerAccess: true })),
+    ).toBe(true);
   });
 });

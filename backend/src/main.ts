@@ -39,24 +39,24 @@ const swallowBrokenPipe = (stream: NodeJS.WritableStream | undefined) => {
 swallowBrokenPipe(process.stdout);
 swallowBrokenPipe(process.stderr);
 
-const isGuardianOpenApiPath = (path: string): boolean => {
+const isAdministrativeOpenApiPath = (path: string): boolean => {
   const normalized = String(path || '').toLowerCase();
   return (
-    normalized === '/guardian' ||
-    normalized.startsWith('/guardian/') ||
-    normalized === 'guardian' ||
-    normalized.startsWith('guardian/')
+    normalized === '/core-admin' ||
+    normalized.startsWith('/core-admin/') ||
+    normalized === 'core-admin' ||
+    normalized.startsWith('core-admin/')
   );
 };
 
-const filterOpenApiByGuardianScope = (
+const filterOpenApiByAdminScope = (
   document: Record<string, any>,
-  mode: 'exclude_guardian' | 'only_guardian',
+  mode: 'exclude_admin' | 'only_admin',
 ): Record<string, any> => {
   const sourcePaths = document?.paths || {};
   const filteredEntries = Object.entries(sourcePaths).filter(([routePath]) => {
-    const isGuardianPath = isGuardianOpenApiPath(routePath);
-    return mode === 'exclude_guardian' ? !isGuardianPath : isGuardianPath;
+    const isAdminPath = isAdministrativeOpenApiPath(routePath);
+    return mode === 'exclude_admin' ? !isAdminPath : isAdminPath;
   });
 
   const filteredPaths = Object.fromEntries(filteredEntries);
@@ -481,31 +481,55 @@ async function bootstrap() {
       .build();
 
     const fullDocument = SwaggerModule.createDocument(app, config);
-    const publicDocument = filterOpenApiByGuardianScope(fullDocument, 'exclude_guardian');
+    const publicDocument = filterOpenApiByAdminScope(fullDocument, 'exclude_admin');
     SwaggerModule.setup('api-docs', app, publicDocument as any);
 
-    const guardianDocsEnabled = process.env.GUARDIAN_DOCS_ENABLED === 'true';
-    const guardianDocsUser = process.env.GUARDIAN_DOCS_USER?.trim() || '';
-    const guardianDocsPassword = process.env.GUARDIAN_DOCS_PASSWORD?.trim() || '';
-    const guardianDocsPath = (process.env.GUARDIAN_DOCS_PATH || 'guardian-docs').replace(
+    const adminDocsEnabled =
+      process.env.CORE_ADMIN_DOCS_ENABLED === 'true' ||
+      process.env.GUARDIAN_DOCS_ENABLED === 'true';
+    const adminDocsUser =
+      process.env.CORE_ADMIN_DOCS_USER?.trim() ||
+      process.env.GUARDIAN_DOCS_USER?.trim() ||
+      '';
+    const adminDocsPassword =
+      process.env.CORE_ADMIN_DOCS_PASSWORD?.trim() ||
+      process.env.GUARDIAN_DOCS_PASSWORD?.trim() ||
+      '';
+    const adminDocsPath = (
+      process.env.CORE_ADMIN_DOCS_PATH ||
+      process.env.GUARDIAN_DOCS_PATH ||
+      'core-admin-docs'
+    ).replace(
       /^\/+|\/+$/g,
       '',
     );
+    const usingGuardianDocsLegacyVars = Boolean(
+      process.env.GUARDIAN_DOCS_ENABLED ||
+        process.env.GUARDIAN_DOCS_USER ||
+        process.env.GUARDIAN_DOCS_PASSWORD ||
+        process.env.GUARDIAN_DOCS_PATH,
+    );
 
-    if (guardianDocsEnabled) {
-      if (!guardianDocsUser || !guardianDocsPassword) {
+    if (usingGuardianDocsLegacyVars) {
+      console.warn(
+        '⚠️ [Swagger] Variaveis GUARDIAN_DOCS_* estao em modo legado. Migre para CORE_ADMIN_DOCS_*.',
+      );
+    }
+
+    if (adminDocsEnabled) {
+      if (!adminDocsUser || !adminDocsPassword) {
         console.warn(
-          '⚠️ [Swagger] Guardian docs habilitado sem credenciais (GUARDIAN_DOCS_USER/GUARDIAN_DOCS_PASSWORD). Endpoint nao sera publicado.',
+          '⚠️ [Swagger] Core Admin docs habilitado sem credenciais (CORE_ADMIN_DOCS_USER/CORE_ADMIN_DOCS_PASSWORD ou legado GUARDIAN_DOCS_*). Endpoint nao sera publicado.',
         );
       } else {
-        const guardianDocument = filterOpenApiByGuardianScope(fullDocument, 'only_guardian');
+        const adminDocument = filterOpenApiByAdminScope(fullDocument, 'only_admin');
 
         app.use(
-          [`/${guardianDocsPath}`, `/${guardianDocsPath}-json`],
+          [`/${adminDocsPath}`, `/${adminDocsPath}-json`],
           (req: any, res: any, next: any) => {
             const authHeader = String(req.headers?.authorization || '');
             if (!authHeader.startsWith('Basic ')) {
-              res.setHeader('WWW-Authenticate', 'Basic realm="Guardian Docs"');
+              res.setHeader('WWW-Authenticate', 'Basic realm="Core Admin Docs"');
               return res.status(401).send('Unauthorized');
             }
 
@@ -514,7 +538,7 @@ async function bootstrap() {
             try {
               decoded = Buffer.from(encoded, 'base64').toString('utf8');
             } catch {
-              res.setHeader('WWW-Authenticate', 'Basic realm="Guardian Docs"');
+              res.setHeader('WWW-Authenticate', 'Basic realm="Core Admin Docs"');
               return res.status(401).send('Unauthorized');
             }
 
@@ -522,8 +546,8 @@ async function bootstrap() {
             const username = separatorIndex >= 0 ? decoded.slice(0, separatorIndex) : '';
             const password = separatorIndex >= 0 ? decoded.slice(separatorIndex + 1) : '';
 
-            if (username !== guardianDocsUser || password !== guardianDocsPassword) {
-              res.setHeader('WWW-Authenticate', 'Basic realm="Guardian Docs"');
+            if (username !== adminDocsUser || password !== adminDocsPassword) {
+              res.setHeader('WWW-Authenticate', 'Basic realm="Core Admin Docs"');
               return res.status(401).send('Unauthorized');
             }
 
@@ -531,8 +555,8 @@ async function bootstrap() {
           },
         );
 
-        SwaggerModule.setup(guardianDocsPath, app, guardianDocument as any, {
-          customSiteTitle: 'Conect Guardian API Docs',
+        SwaggerModule.setup(adminDocsPath, app, adminDocument as any, {
+          customSiteTitle: 'Conect Core Admin API Docs',
           swaggerOptions: {
             persistAuthorization: true,
           },
@@ -552,9 +576,9 @@ async function bootstrap() {
     const protocol = sslEnabled && httpsOptions ? 'https' : 'http';
     console.log(`🚀 Conect CRM Backend rodando na porta ${port} (${protocol.toUpperCase()})`);
     console.log(`📖 Documentação pública disponível em: ${protocol}://localhost:${port}/api-docs`);
-    if (guardianDocsEnabled && guardianDocsUser && guardianDocsPassword) {
+    if (adminDocsEnabled && adminDocsUser && adminDocsPassword) {
       console.log(
-        `🔐 Documentação Guardian disponível em: ${protocol}://localhost:${port}/${guardianDocsPath}`,
+        `🔐 Documentação Core Admin disponível em: ${protocol}://localhost:${port}/${adminDocsPath}`,
       );
     }
 

@@ -13,10 +13,8 @@ export enum UserRole {
   SUPERADMIN = 'superadmin',
   ADMIN = 'admin',
   GERENTE = 'gerente',
-  MANAGER = 'gerente', // alias legado
   VENDEDOR = 'vendedor',
   SUPORTE = 'suporte',
-  USER = 'suporte', // alias legado
   FINANCEIRO = 'financeiro',
 }
 

@@ -132,7 +132,7 @@ export class SystemBrandingController {
     return this.systemBrandingService.getRuntimeBrandingForEmpresa(empresaId);
   }
 
-  @Get('admin/system-branding')
+  @Get(['core-admin/system-branding', 'admin/system-branding'])
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, PlatformOwnerGuard)
   @Roles(UserRole.SUPERADMIN)
   @Permissions(Permission.ADMIN_EMPRESAS_MANAGE)
@@ -140,7 +140,7 @@ export class SystemBrandingController {
     return this.systemBrandingService.getAdminBranding();
   }
 
-  @Put('admin/system-branding')
+  @Put(['core-admin/system-branding', 'admin/system-branding'])
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, PlatformOwnerGuard)
   @Roles(UserRole.SUPERADMIN)
   @Permissions(Permission.ADMIN_EMPRESAS_MANAGE)
@@ -149,7 +149,7 @@ export class SystemBrandingController {
     return this.systemBrandingService.updateBranding(dto, updatedBy);
   }
 
-  @Post('admin/system-branding/assets/:kind')
+  @Post(['core-admin/system-branding/assets/:kind', 'admin/system-branding/assets/:kind'])
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, PlatformOwnerGuard)
   @Roles(UserRole.SUPERADMIN)
   @Permissions(Permission.ADMIN_EMPRESAS_MANAGE)

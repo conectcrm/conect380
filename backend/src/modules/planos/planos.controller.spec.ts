@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
-import { LegacyAdminTransitionGuard } from '../admin/guards/legacy-admin-transition.guard';
+import { CoreAdminLegacyTransitionGuard } from '../../common/guards/core-admin-legacy-transition.guard';
 import { PlanosController } from './planos.controller';
 
 describe('PlanosController (legacy write transition)', () => {
@@ -15,11 +15,11 @@ describe('PlanosController (legacy write transition)', () => {
   ];
 
   it.each(methodNames)(
-    'aplica LegacyAdminTransitionGuard no metodo de escrita %s',
+    'aplica CoreAdminLegacyTransitionGuard no metodo de escrita %s',
     (methodName) => {
       const guards = Reflect.getMetadata(GUARDS_METADATA, PlanosController.prototype[methodName]);
       expect(Array.isArray(guards)).toBe(true);
-      expect(guards).toContain(LegacyAdminTransitionGuard);
+      expect(guards).toContain(CoreAdminLegacyTransitionGuard);
     },
   );
 });

@@ -11,7 +11,7 @@ import { Plano } from './entities/plano.entity';
 import { ModuloSistema } from './entities/modulo-sistema.entity';
 import { UserRole } from '../users/user.entity';
 import { Permission } from '../../common/permissions/permissions.constants';
-import { LegacyAdminTransitionGuard } from '../admin/guards/legacy-admin-transition.guard';
+import { CoreAdminLegacyTransitionGuard } from '../../common/guards/core-admin-legacy-transition.guard';
 import { PlatformOwnerGuard } from '../../common/guards/platform-owner.guard';
 
 @Controller('planos')
@@ -42,7 +42,7 @@ export class PlanosController {
   }
 
   @Post()
-  @UseGuards(PlatformOwnerGuard, LegacyAdminTransitionGuard)
+  @UseGuards(PlatformOwnerGuard, CoreAdminLegacyTransitionGuard)
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   @Permissions(Permission.PLANOS_MANAGE)
   async criar(@Body() dados: CriarPlanoDto): Promise<Plano> {
@@ -64,7 +64,7 @@ export class PlanosController {
   }
 
   @Put(':id')
-  @UseGuards(PlatformOwnerGuard, LegacyAdminTransitionGuard)
+  @UseGuards(PlatformOwnerGuard, CoreAdminLegacyTransitionGuard)
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   @Permissions(Permission.PLANOS_MANAGE)
   async atualizar(@Param('id') id: string, @Body() dados: AtualizarPlanoDto): Promise<Plano> {
@@ -87,7 +87,7 @@ export class PlanosController {
   }
 
   @Delete(':id')
-  @UseGuards(PlatformOwnerGuard, LegacyAdminTransitionGuard)
+  @UseGuards(PlatformOwnerGuard, CoreAdminLegacyTransitionGuard)
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   @Permissions(Permission.PLANOS_MANAGE)
   async remover(@Param('id') id: string): Promise<{ message: string }> {
@@ -97,7 +97,7 @@ export class PlanosController {
   }
 
   @Put(':id/desativar')
-  @UseGuards(PlatformOwnerGuard, LegacyAdminTransitionGuard)
+  @UseGuards(PlatformOwnerGuard, CoreAdminLegacyTransitionGuard)
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   @Permissions(Permission.PLANOS_MANAGE)
   async desativar(@Param('id') id: string): Promise<Plano> {
@@ -107,7 +107,7 @@ export class PlanosController {
   }
 
   @Put(':id/ativar')
-  @UseGuards(PlatformOwnerGuard, LegacyAdminTransitionGuard)
+  @UseGuards(PlatformOwnerGuard, CoreAdminLegacyTransitionGuard)
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   @Permissions(Permission.PLANOS_MANAGE)
   async ativar(@Param('id') id: string): Promise<Plano> {
@@ -117,7 +117,7 @@ export class PlanosController {
   }
 
   @Put(':id/toggle-status')
-  @UseGuards(PlatformOwnerGuard, LegacyAdminTransitionGuard)
+  @UseGuards(PlatformOwnerGuard, CoreAdminLegacyTransitionGuard)
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   @Permissions(Permission.PLANOS_MANAGE)
   async toggleStatus(@Param('id') id: string): Promise<Plano> {
@@ -138,7 +138,7 @@ export class PlanosController {
   }
 
   @Post('bootstrap-defaults')
-  @UseGuards(PlatformOwnerGuard, LegacyAdminTransitionGuard)
+  @UseGuards(PlatformOwnerGuard, CoreAdminLegacyTransitionGuard)
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   @Permissions(Permission.PLANOS_MANAGE)
   async bootstrapDefaults(@Body() body?: { overwrite?: boolean }) {

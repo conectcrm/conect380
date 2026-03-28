@@ -470,7 +470,7 @@ export class MailService {
               <p>Data da alteracao: <strong>${new Date().toISOString()}</strong></p>
             </div>
             <div class="footer">
-              Conect CRM - Notificacao automatica de governanca guardian.
+              Conect CRM - Notificacao automatica de governanca Core Admin.
             </div>
           </div>
         </div>

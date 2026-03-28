@@ -12,6 +12,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { RateLimitInterceptor } from './common/interceptors/rate-limit.interceptor';
 import { HttpsRedirectMiddleware } from './common/middleware/https-redirect.middleware';
 import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
+import { CoreAdminLegacyRoutesMiddleware } from './common/middleware/core-admin-legacy-routes.middleware';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { ClientesModule } from './modules/clientes/clientes.module';
@@ -45,8 +46,7 @@ import { PagamentosModule } from './modules/pagamentos/pagamentos.module';
 import { NotificationModule } from './notifications/notification.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
 import { SystemBrandingModule } from './modules/system-branding/system-branding.module';
-import { AdminModule } from './modules/admin/admin.module';
-import { GuardianModule } from './modules/guardian/guardian.module';
+import { CoreAdminModule } from './modules/core-admin/core-admin.module';
 import { CatalogoModule } from './modules/catalogo/catalogo.module';
 import { VehicleInventoryModule } from './modules/vehicle-inventory/vehicle-inventory.module';
 
@@ -123,8 +123,7 @@ const throttlerShortLimit = isProduction ? 10 : 200;
     NotificationModule,
     MetricsModule, // 📊 Prometheus metrics endpoint
     SystemBrandingModule,
-    AdminModule,
-    GuardianModule,
+    CoreAdminModule,
     CatalogoModule,
     VehicleInventoryModule,
   ],
@@ -150,12 +149,27 @@ const throttlerShortLimit = isProduction ? 10 : 200;
   ],
 })
 export class AppModule implements NestModule {
+  private resolveCoreAdminDocsPath(): string {
+    const rawPath =
+      process.env.CORE_ADMIN_DOCS_PATH?.trim() ||
+      process.env.GUARDIAN_DOCS_PATH?.trim() ||
+      'core-admin-docs';
+
+    const sanitizedPath = rawPath.replace(/^\/+|\/+$/g, '').toLowerCase();
+    return sanitizedPath || 'core-admin-docs';
+  }
+
   configure(consumer: MiddlewareConsumer) {
     // 🔗 Correlation ID (primeiro middleware - gera ID para toda requisição)
     consumer.apply(CorrelationIdMiddleware).forRoutes('*');
 
     // 🔒 HTTPS Redirect (Força HTTPS em produção)
     consumer.apply(HttpsRedirectMiddleware).forRoutes('*');
+
+    // ♻️ Camada de transição: rotas legadas /admin e /guardian apontam para /core-admin
+    consumer.apply(CoreAdminLegacyRoutesMiddleware).forRoutes('*');
+
+    const coreAdminDocsPath = this.resolveCoreAdminDocsPath();
 
     // Middleware de verificação de assinatura
     consumer
@@ -164,11 +178,12 @@ export class AppModule implements NestModule {
         '/auth/(.*)',
         '/planos/(.*)',
         '/assinaturas/(.*)',
-        '/guardian/(.*)',
+        '/core-admin',
+        '/core-admin/(.*)',
         '/health',
         '/api-docs',
-        '/guardian-docs',
-        '/guardian-docs-json',
+        `/${coreAdminDocsPath}`,
+        `/${coreAdminDocsPath}-json`,
         '/docs',
       )
       .forRoutes('*');
