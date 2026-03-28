@@ -1,4 +1,4 @@
-param(
+﻿param(
   [switch]$DryRun = $false,
   [string]$OutputFile = ''
 )
@@ -38,9 +38,9 @@ if ($status -eq 'PASS') {
   $envContent = Get-Content -Path $envPath -Raw
 
   $guardChecks = @(
-    @{ Name = 'guard usa flag GUARDIAN_LEGACY_READ_ONLY'; Result = ($guardContent -match 'GUARDIAN_LEGACY_READ_ONLY') },
+    @{ Name = 'guard usa flag CORE_ADMIN_LEGACY_READ_ONLY'; Result = ($guardContent -match 'CORE_ADMIN_LEGACY_READ_ONLY') },
     @{ Name = 'guard retorna codigo LEGACY_ADMIN_READ_ONLY'; Result = ($guardContent -match 'LEGACY_ADMIN_READ_ONLY') },
-    @{ Name = 'guard sinaliza header read-only'; Result = ($guardContent -match 'x-guardian-legacy-read-only') }
+    @{ Name = 'guard sinaliza header read-only'; Result = ($guardContent -match 'x-core-admin-legacy-read-only') }
   )
   foreach ($check in $guardChecks) {
     [void]$checks.Add([pscustomobject]@{
@@ -68,14 +68,14 @@ if ($status -eq 'PASS') {
     }
   }
 
-  $envCheck = ($envContent -match '(?m)^GUARDIAN_LEGACY_READ_ONLY=')
+  $envCheck = ($envContent -match '(?m)^CORE_ADMIN_LEGACY_READ_ONLY=')
   [void]$checks.Add([pscustomobject]@{
-      Name = 'env example declara GUARDIAN_LEGACY_READ_ONLY'
+      Name = 'env example declara CORE_ADMIN_LEGACY_READ_ONLY'
       Status = if ($envCheck) { 'PASS' } else { 'FAIL' }
     })
   if (-not $envCheck) {
     $status = 'FAIL'
-    $notes += 'Flag GUARDIAN_LEGACY_READ_ONLY ausente em backend/.env.example'
+    $notes += 'Flag CORE_ADMIN_LEGACY_READ_ONLY ausente em backend/.env.example'
   }
 }
 
@@ -173,3 +173,4 @@ if ($status -ne 'PASS') {
 }
 
 exit 0
+

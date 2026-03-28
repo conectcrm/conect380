@@ -13,13 +13,13 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 if ([string]::IsNullOrWhiteSpace($Email) -or [string]::IsNullOrWhiteSpace($Senha)) {
-  throw 'Informe Email e Senha para discovery de endpoints guardian.'
+  throw 'Informe Email e Senha para discovery de endpoints core-admin.'
 }
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $runId = Get-Date -Format 'yyyyMMdd-HHmmss'
 if ([string]::IsNullOrWhiteSpace($OutputFile)) {
-  $OutputFile = Join-Path $repoRoot "docs/features/evidencias/GUARDIAN_ENDPOINT_DISCOVERY_$runId.md"
+  $OutputFile = Join-Path $repoRoot "docs/features/evidencias/CORE_ADMIN_ENDPOINT_DISCOVERY_$runId.md"
 } elseif (-not [System.IO.Path]::IsPathRooted($OutputFile)) {
   $OutputFile = Join-Path $repoRoot $OutputFile
 }
@@ -107,21 +107,15 @@ function Try-ResolveAccessToken {
   }
 
   $challengeIdProp = $null
-  if ($null -ne $data) {
-    $challengeIdProp = $data.PSObject.Properties['challengeId']
-  }
-  $challengeId = if ($null -ne $challengeIdProp) { [string]$challengeIdProp.Value } else { '' }
-
   $devCodeProp = $null
-  if ($null -ne $data) {
-    $devCodeProp = $data.PSObject.Properties['devCode']
-  }
-  $devCode = if ($null -ne $devCodeProp) { [string]$devCodeProp.Value } else { '' }
-
   $deliveryChannelProp = $null
   if ($null -ne $data) {
+    $challengeIdProp = $data.PSObject.Properties['challengeId']
+    $devCodeProp = $data.PSObject.Properties['devCode']
     $deliveryChannelProp = $data.PSObject.Properties['deliveryChannel']
   }
+  $challengeId = if ($null -ne $challengeIdProp) { [string]$challengeIdProp.Value } else { '' }
+  $devCode = if ($null -ne $devCodeProp) { [string]$devCodeProp.Value } else { '' }
   $deliveryChannel = if ($null -ne $deliveryChannelProp) { [string]$deliveryChannelProp.Value } else { '' }
 
   if ([string]::IsNullOrWhiteSpace($challengeId) -or [string]::IsNullOrWhiteSpace($devCode)) {
@@ -191,7 +185,7 @@ function Try-ResolveAccessToken {
 }
 
 $rows = @()
-$foundGuardian = $false
+$foundCoreAdmin = $false
 
 foreach ($base in $BaseUrls) {
   $normalizedBase = $base.TrimEnd('/')
@@ -212,12 +206,12 @@ foreach ($base in $BaseUrls) {
 
   if (-not [string]::IsNullOrWhiteSpace($token)) {
     $headers = @{ Authorization = "Bearer $token" }
-    $overviewRoot = Invoke-Req -Method 'GET' -Url "$normalizedBase/guardian/bff/overview" -Headers $headers
-    $overviewApi = Invoke-Req -Method 'GET' -Url "$normalizedBase/api/guardian/bff/overview" -Headers $headers
+    $overviewRoot = Invoke-Req -Method 'GET' -Url "$normalizedBase/core-admin/bff/overview" -Headers $headers
+    $overviewApi = Invoke-Req -Method 'GET' -Url "$normalizedBase/api/core-admin/bff/overview" -Headers $headers
   }
 
   if ($overviewRoot.success -or $overviewApi.success) {
-    $foundGuardian = $true
+    $foundCoreAdmin = $true
   }
 
   $rows += [PSCustomObject]@{
@@ -225,9 +219,9 @@ foreach ($base in $BaseUrls) {
     login_status = $login.statusCode
     mfa_step = $authState.mfaStep
     mfa_verify_status = $authState.mfaVerifyStatus
-    guardian_overview_status = $overviewRoot.statusCode
-    api_guardian_overview_status = $overviewApi.statusCode
-    guardian_available = if ($overviewRoot.success -or $overviewApi.success) { 'yes' } else { 'no' }
+    core_admin_overview_status = $overviewRoot.statusCode
+    api_core_admin_overview_status = $overviewApi.statusCode
+    core_admin_available = if ($overviewRoot.success -or $overviewApi.success) { 'yes' } else { 'no' }
   }
 }
 
@@ -237,29 +231,29 @@ if (-not (Test-Path -Path $outDir)) {
 }
 
 $md = @()
-$md += '# Guardian endpoint discovery report'
+$md += '# Core Admin endpoint discovery report'
 $md += ''
 $md += "- RunId: $runId"
 $md += "- GeneratedAt: $((Get-Date).ToString('yyyy-MM-dd HH:mm:ss'))"
-$md += "- Status: $(if ($foundGuardian) { 'PASS' } else { 'FAIL' })"
+$md += "- Status: $(if ($foundCoreAdmin) { 'PASS' } else { 'FAIL' })"
 $md += ''
-$md += '| BaseUrl | LoginStatus | MfaStep | MfaVerifyStatus | /guardian/bff/overview | /api/guardian/bff/overview | GuardianAvailable |'
+$md += '| BaseUrl | LoginStatus | MfaStep | MfaVerifyStatus | /core-admin/bff/overview | /api/core-admin/bff/overview | CoreAdminAvailable |'
 $md += '| --- | ---: | --- | ---: | ---: | ---: | --- |'
 foreach ($row in $rows) {
-  $md += "| $($row.base_url) | $($row.login_status) | $($row.mfa_step) | $($row.mfa_verify_status) | $($row.guardian_overview_status) | $($row.api_guardian_overview_status) | $($row.guardian_available) |"
+  $md += "| $($row.base_url) | $($row.login_status) | $($row.mfa_step) | $($row.mfa_verify_status) | $($row.core_admin_overview_status) | $($row.api_core_admin_overview_status) | $($row.core_admin_available) |"
 }
 $md += ''
 $md += '## Resultado'
-if ($foundGuardian) {
-  $md += '- Ao menos um endpoint Guardian encontrado com sucesso.'
+if ($foundCoreAdmin) {
+  $md += '- Ao menos um endpoint Core Admin encontrado com sucesso.'
 } else {
-  $md += '- Nenhum endpoint Guardian encontrado. Backoffice Guardian nao esta publicado no ambiente consultado.'
+  $md += '- Nenhum endpoint Core Admin encontrado no ambiente consultado.'
 }
 
 Set-Content -Path $OutputFile -Value $md -Encoding UTF8
 Write-Host "Relatorio salvo em: $OutputFile"
 
-if (-not $foundGuardian) {
+if (-not $foundCoreAdmin) {
   exit 1
 }
 

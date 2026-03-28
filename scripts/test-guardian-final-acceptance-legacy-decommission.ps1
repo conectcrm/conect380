@@ -37,18 +37,18 @@ $status = 'PASS'
 $steps = @()
 
 $steps += Invoke-Step -Name 'legacy_decommission_phases' -ScriptPath 'scripts/ci/guardian-legacy-decommission-phases-check.ps1'
-$steps += Invoke-Step -Name 'guardian_only_transition_mode' -ScriptPath 'scripts/ci/guardian-transition-flags-check.ps1' -Arguments @('-Mode', 'guardian_only', '-CanaryPercent', '0')
-$steps += Invoke-Step -Name 'guardian_operational_smoke' -ScriptPath 'scripts/ci/guardian-daily-smoke-production-check.ps1'
+$steps += Invoke-Step -Name 'core_admin_only_transition_mode' -ScriptPath 'scripts/ci/guardian-transition-flags-check.ps1' -Arguments @('-Mode', 'guardian_only', '-CanaryPercent', '0')
+$steps += Invoke-Step -Name 'core_admin_operational_smoke' -ScriptPath 'scripts/ci/guardian-daily-smoke-production-check.ps1'
 
-$guardianRefsOutput = & rg -n "/admin|admin/" guardian-web deploy/guardian-web.host-nginx.conf docker-compose.guardian-web.yml 2>&1
-$guardianRefsExit = $LASTEXITCODE
-$guardianRefStep = [PSCustomObject]@{
-  Name = 'guardian_surface_without_admin_routes'
-  Pass = ($guardianRefsExit -eq 1)
-  ExitCode = $guardianRefsExit
-  Output = ($guardianRefsOutput | Out-String).Trim()
+$legacyRefsOutput = & rg -n "/api/guardian|/guardian/bff|/api/admin|/admin/system-branding" backend/src frontend-web/src --glob "!**/*.spec.ts" --glob "!**/*.spec.tsx" --glob "!**/*.test.ts" --glob "!**/*.test.tsx" --glob "!**/__tests__/**" 2>&1
+$legacyRefsExit = $LASTEXITCODE
+$legacyRefStep = [PSCustomObject]@{
+  Name = 'runtime_surface_without_legacy_routes'
+  Pass = ($legacyRefsExit -eq 1)
+  ExitCode = $legacyRefsExit
+  Output = ($legacyRefsOutput | Out-String).Trim()
 }
-$steps += $guardianRefStep
+$steps += $legacyRefStep
 
 $legacyBackupPageExists = Test-Path -Path (Join-Path $repoRoot 'frontend-web/src/pages/empresas/BackupSincronizacaoPage.tsx')
 $backupStep = [PSCustomObject]@{

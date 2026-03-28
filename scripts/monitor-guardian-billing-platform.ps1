@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string]$BaseUrl = 'http://localhost:3001',
   [string]$Token = '',
   [string]$Email = '',
@@ -380,12 +380,12 @@ while ($true) {
 
   $healthStep = Invoke-TimedRequest -Name 'health' -Method 'GET' -Url "$normalizedBaseUrl/health" -SkipNetwork:$DryRun
   $healthDetailedStep = Invoke-TimedRequest -Name 'health-detailed' -Method 'GET' -Url "$normalizedBaseUrl/health/detailed" -SkipNetwork:$DryRun
-  $overviewStep = Invoke-TimedRequest -Name 'guardian-overview' -Method 'GET' -Url "$normalizedBaseUrl/guardian/bff/overview" -Headers $headers -SkipNetwork:$DryRun
-  $billingStep = Invoke-TimedRequest -Name 'guardian-billing-subscriptions' -Method 'GET' -Url "$normalizedBaseUrl/guardian/bff/billing/subscriptions" -Headers $headers -SkipNetwork:$DryRun
+  $overviewStep = Invoke-TimedRequest -Name 'guardian-overview' -Method 'GET' -Url "$normalizedBaseUrl/core-admin/bff/overview" -Headers $headers -SkipNetwork:$DryRun
+  $billingStep = Invoke-TimedRequest -Name 'guardian-billing-subscriptions' -Method 'GET' -Url "$normalizedBaseUrl/core-admin/bff/billing/subscriptions" -Headers $headers -SkipNetwork:$DryRun
 
   $auditSince = [Uri]::EscapeDataString($monitorStartIso)
   $auditUntil = [Uri]::EscapeDataString($cycleIso)
-  $auditUrl = "$normalizedBaseUrl/guardian/bff/audit/critical?target_type=billing_subscription&limit=200&data_inicio=$auditSince&data_fim=$auditUntil"
+  $auditUrl = "$normalizedBaseUrl/core-admin/bff/audit/critical?target_type=billing_subscription&limit=200&data_inicio=$auditSince&data_fim=$auditUntil"
   $auditStep = Invoke-TimedRequest -Name 'guardian-audit-critical-billing' -Method 'GET' -Url $auditUrl -Headers $headers -SkipNetwork:$DryRun
 
   $requestLog += @($healthStep, $healthDetailedStep, $overviewStep, $billingStep, $auditStep)
@@ -616,3 +616,4 @@ if ($FailOnAnomaly -and $anomalies.Count -gt 0 -and -not $DryRun) {
 }
 
 exit 0
+

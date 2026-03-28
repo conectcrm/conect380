@@ -20,8 +20,8 @@ $content = Get-Content -Path $reportPath -Raw
 if ($content -notmatch [regex]::Escape('- Status: PASS')) {
   throw "Relatorio sem status PASS: $reportPath"
 }
-if ($content -notmatch [regex]::Escape('guardian_surface_without_admin_routes')) {
-  throw "Relatorio sem evidencia de ausencia de /admin no Guardian: $reportPath"
+if ($content -notmatch [regex]::Escape('runtime_surface_without_legacy_routes')) {
+  throw "Relatorio sem evidencia de ausencia de rotas legadas no runtime: $reportPath"
 }
 
 Write-Host '[GDN-516] Aceite final de descomissionamento legado validado com sucesso.' -ForegroundColor Green

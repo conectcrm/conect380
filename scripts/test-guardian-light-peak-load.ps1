@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string]$BaseUrl = 'http://localhost:3001',
   [string]$Token = '',
   [string]$Email = '',
@@ -201,9 +201,9 @@ if (-not [string]::IsNullOrWhiteSpace($auth.AccessToken)) {
 
 $endpointDefs = @(
   @{ name = 'health'; method = 'GET'; path = '/health'; thresholdP95 = 800 },
-  @{ name = 'guardian-overview'; method = 'GET'; path = '/guardian/bff/overview'; thresholdP95 = 1500 },
-  @{ name = 'guardian-billing-subscriptions'; method = 'GET'; path = '/guardian/bff/billing/subscriptions'; thresholdP95 = 1800 },
-  @{ name = 'guardian-audit-critical'; method = 'GET'; path = '/guardian/bff/audit/critical?page=1&limit=20'; thresholdP95 = 2000 }
+  @{ name = 'guardian-overview'; method = 'GET'; path = '/core-admin/bff/overview'; thresholdP95 = 1500 },
+  @{ name = 'guardian-billing-subscriptions'; method = 'GET'; path = '/core-admin/bff/billing/subscriptions'; thresholdP95 = 1800 },
+  @{ name = 'guardian-audit-critical'; method = 'GET'; path = '/core-admin/bff/audit/critical?page=1&limit=20'; thresholdP95 = 2000 }
 )
 
 Write-Host ''
@@ -340,3 +340,4 @@ if ($FailOnAnomaly -and $anomalies.Count -gt 0 -and -not $DryRun) {
 }
 
 exit 0
+

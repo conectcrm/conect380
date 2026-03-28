@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string]$BaseUrl = 'http://localhost:3001',
   [string]$Token = '',
   [string]$Email = '',
@@ -219,10 +219,10 @@ if (-not [string]::IsNullOrWhiteSpace($auth.AccessToken)) {
 }
 
 $steps += Invoke-ApiStep -Id 'PILOT-001' -Nome 'Health check' -Method 'GET' -Url "$normalizedBaseUrl/health" -Headers $headers -SkipNetwork:$DryRun
-$steps += Invoke-ApiStep -Id 'PILOT-002' -Nome 'Guardian overview' -Method 'GET' -Url "$normalizedBaseUrl/guardian/bff/overview" -Headers $headers -SkipNetwork:$DryRun
-$steps += Invoke-ApiStep -Id 'PILOT-003' -Nome 'Guardian companies' -Method 'GET' -Url "$normalizedBaseUrl/guardian/bff/companies" -Headers $headers -SkipNetwork:$DryRun
-$steps += Invoke-ApiStep -Id 'PILOT-004' -Nome 'Guardian billing subscriptions' -Method 'GET' -Url "$normalizedBaseUrl/guardian/bff/billing/subscriptions" -Headers $headers -SkipNetwork:$DryRun
-$steps += Invoke-ApiStep -Id 'PILOT-005' -Nome 'Guardian critical audit list' -Method 'GET' -Url "$normalizedBaseUrl/guardian/bff/audit/critical?page=1&limit=10" -Headers $headers -SkipNetwork:$DryRun
+$steps += Invoke-ApiStep -Id 'PILOT-002' -Nome 'Guardian overview' -Method 'GET' -Url "$normalizedBaseUrl/core-admin/bff/overview" -Headers $headers -SkipNetwork:$DryRun
+$steps += Invoke-ApiStep -Id 'PILOT-003' -Nome 'Guardian companies' -Method 'GET' -Url "$normalizedBaseUrl/core-admin/bff/companies" -Headers $headers -SkipNetwork:$DryRun
+$steps += Invoke-ApiStep -Id 'PILOT-004' -Nome 'Guardian billing subscriptions' -Method 'GET' -Url "$normalizedBaseUrl/core-admin/bff/billing/subscriptions" -Headers $headers -SkipNetwork:$DryRun
+$steps += Invoke-ApiStep -Id 'PILOT-005' -Nome 'Guardian critical audit list' -Method 'GET' -Url "$normalizedBaseUrl/core-admin/bff/audit/critical?page=1&limit=10" -Headers $headers -SkipNetwork:$DryRun
 
 if ($DryRun) {
   $steps += New-StepResult -Id 'PILOT-100' -Nome 'Cohort selection check' -Method 'CHECK' -Url $CohortFile -Resultado 'PASS' -StatusCode 200 -Erro 'Dry-run: validacao de coorte real nao aplicada.'
@@ -328,3 +328,4 @@ if (-not $DryRun -and $fail -gt 0) {
 }
 
 exit 0
+

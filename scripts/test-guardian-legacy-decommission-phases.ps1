@@ -50,15 +50,19 @@ $startedAt = Get-Date
 $steps = @()
 $steps += New-StepResult -Id 'DCP-001' -Name 'phase1_read_only_freeze'
 $steps += New-StepResult -Id 'DCP-002' -Name 'phase2_canary_cutover_100'
-$steps += New-StepResult -Id 'DCP-003' -Name 'phase3_guardian_only'
+$steps += New-StepResult -Id 'DCP-003' -Name 'phase3_core_admin_only'
 $steps += New-StepResult -Id 'DCP-004' -Name 'phase4_legacy_route_protection_tests'
 $steps += New-StepResult -Id 'DCP-005' -Name 'phase5_retire_legacy_infra_checks'
 
 $transitionCheckScript = Join-Path $repoRoot 'scripts/ci/guardian-transition-flags-check.ps1'
 $readOnlyCheckScript = Join-Path $repoRoot 'scripts/ci/guardian-legacy-read-only-freeze-check.ps1'
 $guardSpecCommand = 'npm --prefix backend run test -- common/guards/core-admin-legacy-transition.guard.spec.ts'
-$nginxConfigPath = Join-Path $repoRoot 'deploy/guardian-web.host-nginx.conf'
-$guardianComposePath = Join-Path $repoRoot 'docker-compose.guardian-web.yml'
+$legacyInfraPaths = @(
+  (Join-Path $repoRoot 'deploy/guardian-web.host-nginx.conf'),
+  (Join-Path $repoRoot 'docker-compose.guardian-web.yml'),
+  (Join-Path $repoRoot 'deploy/admin-web.host-nginx.conf'),
+  (Join-Path $repoRoot 'docker-compose.admin-web.yml')
+)
 
 Write-Host ''
 Write-Host '===============================================' -ForegroundColor Cyan
@@ -93,15 +97,15 @@ if ($steps[0].status -eq 'PASS') {
   $steps[1].detail = 'Dependencia da fase 1 nao concluida.'
 }
 
-# Phase 3: guardian only
+# Phase 3: core-admin only (valor operacional mantido em guardian_only por compatibilidade de flag)
 if ($steps[1].status -eq 'PASS') {
   $phase3Result = Invoke-ScriptStep -ScriptPath $transitionCheckScript -Arguments @('-Mode', 'guardian_only', '-CanaryPercent', '0')
   if ($phase3Result.exitCode -eq 0) {
     $steps[2].status = 'PASS'
-    $steps[2].detail = 'Guardian only validado; legado pode ser desligado.'
+    $steps[2].detail = 'Core-admin only validado; legado pode ser desligado.'
   } else {
     $steps[2].status = 'FAIL'
-    $steps[2].detail = "Falha guardian_only: $($phase3Result.output)"
+    $steps[2].detail = "Falha core-admin only: $($phase3Result.output)"
   }
 } else {
   $steps[2].status = 'SKIPPED'
@@ -142,31 +146,19 @@ if ($steps[2].status -eq 'PASS') {
   $steps[3].detail = 'Dependencia da fase 3 nao concluida.'
 }
 
-# Phase 5: infra checks
+# Phase 5: infra checks (arquivos legados devem estar removidos)
 if ($steps[3].status -eq 'PASS') {
   $infraIssues = @()
 
-  if (-not (Test-Path -Path $nginxConfigPath)) {
-    $infraIssues += "Arquivo nginx nao encontrado: $nginxConfigPath"
-  } else {
-    $nginxContent = Get-Content -Path $nginxConfigPath -Raw
-    if ($nginxContent -match '/admin') {
-      $infraIssues += 'Config nginx guardian ainda contem rota /admin.'
-    }
-  }
-
-  if (-not (Test-Path -Path $guardianComposePath)) {
-    $infraIssues += "Arquivo compose guardian nao encontrado: $guardianComposePath"
-  } else {
-    $composeContent = Get-Content -Path $guardianComposePath -Raw
-    if ($composeContent -match 'admin-web') {
-      $infraIssues += 'Compose guardian ainda referencia admin-web.'
+  foreach ($legacyPath in $legacyInfraPaths) {
+    if (Test-Path -Path $legacyPath) {
+      $infraIssues += "Arquivo legado ainda presente: $legacyPath"
     }
   }
 
   if ($infraIssues.Count -eq 0) {
     $steps[4].status = 'PASS'
-    $steps[4].detail = 'Checks de infraestrutura sem dependencias do legado.'
+    $steps[4].detail = 'Checks de infraestrutura confirmaram remocao completa dos artefatos legados.'
   } else {
     $steps[4].status = 'FAIL'
     $steps[4].detail = ($infraIssues -join ' | ')

@@ -132,8 +132,8 @@ if ($Action -eq 'enable') {
     maintenanceExpectedEndAt = $(if ($ExpectedEndAt) { $ExpectedEndAt } else { $null })
   }
 
-  Write-Step "Ativando aviso de manutencao em $BaseUrl/admin/system-branding"
-  [void](Invoke-JsonRequest -Method 'PUT' -Url "$BaseUrl/admin/system-branding" -Headers $headers -Body $payload)
+  Write-Step "Ativando aviso de manutencao em $BaseUrl/core-admin/system-branding"
+  [void](Invoke-JsonRequest -Method 'PUT' -Url "$BaseUrl/core-admin/system-branding" -Headers $headers -Body $payload)
 }
 elseif ($Action -eq 'disable') {
   $payload = @{
@@ -148,8 +148,8 @@ elseif ($Action -eq 'disable') {
     $payload.maintenanceSeverity = 'warning'
   }
 
-  Write-Step "Desativando aviso de manutencao em $BaseUrl/admin/system-branding"
-  [void](Invoke-JsonRequest -Method 'PUT' -Url "$BaseUrl/admin/system-branding" -Headers $headers -Body $payload)
+  Write-Step "Desativando aviso de manutencao em $BaseUrl/core-admin/system-branding"
+  [void](Invoke-JsonRequest -Method 'PUT' -Url "$BaseUrl/core-admin/system-branding" -Headers $headers -Body $payload)
 }
 
 Write-Step "Validando status atual"

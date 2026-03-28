@@ -21,8 +21,8 @@ $content = Get-Content -Path $reportPath -Raw
 if ($content -notmatch [regex]::Escape('- Status: PASS')) {
   throw "Relatorio sem status PASS: $reportPath"
 }
-if ($content -notmatch [regex]::Escape('phase3_guardian_only')) {
-  throw "Relatorio sem evidencia da fase guardian_only: $reportPath"
+if ($content -notmatch [regex]::Escape('phase3_core_admin_only')) {
+  throw "Relatorio sem evidencia da fase core_admin_only: $reportPath"
 }
 
 Write-Host '[GDN-504] Decommission legado validado com sucesso.' -ForegroundColor Green

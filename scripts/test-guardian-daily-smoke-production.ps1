@@ -375,7 +375,7 @@ if ($DryRun) {
       $status = 'FAIL'
     }
 
-    $overviewResult = Invoke-EndpointWithFallback -Method 'GET' -BaseCandidates $baseCandidates -Path '/guardian/bff/overview' -Headers $headers
+    $overviewResult = Invoke-EndpointWithFallback -Method 'GET' -BaseCandidates $baseCandidates -Path '/core-admin/bff/overview' -Headers $headers
     if ($overviewResult.success) {
       $steps += [PSCustomObject]@{ Name = 'smoke_guardian_overview'; Status = 'PASS'; Detail = "base=$($overviewResult.usedBase) status=$($overviewResult.statusCode)" }
     } else {
@@ -383,7 +383,7 @@ if ($DryRun) {
       $status = 'FAIL'
     }
 
-    $companiesResult = Invoke-EndpointWithFallback -Method 'GET' -BaseCandidates $baseCandidates -Path '/guardian/bff/companies' -Headers $headers
+    $companiesResult = Invoke-EndpointWithFallback -Method 'GET' -BaseCandidates $baseCandidates -Path '/core-admin/bff/companies' -Headers $headers
     if ($companiesResult.success) {
       $steps += [PSCustomObject]@{ Name = 'smoke_guardian_companies'; Status = 'PASS'; Detail = "base=$($companiesResult.usedBase) status=$($companiesResult.statusCode)" }
     } else {
@@ -391,7 +391,7 @@ if ($DryRun) {
       $status = 'FAIL'
     }
 
-    $subscriptionsResult = Invoke-EndpointWithFallback -Method 'GET' -BaseCandidates $baseCandidates -Path '/guardian/bff/billing/subscriptions' -Headers $headers
+    $subscriptionsResult = Invoke-EndpointWithFallback -Method 'GET' -BaseCandidates $baseCandidates -Path '/core-admin/bff/billing/subscriptions' -Headers $headers
     if ($subscriptionsResult.success) {
       $steps += [PSCustomObject]@{ Name = 'smoke_guardian_billing_subscriptions'; Status = 'PASS'; Detail = "base=$($subscriptionsResult.usedBase) status=$($subscriptionsResult.statusCode)" }
     } else {
@@ -399,7 +399,7 @@ if ($DryRun) {
       $status = 'FAIL'
     }
 
-    $auditResult = Invoke-EndpointWithFallback -Method 'GET' -BaseCandidates $baseCandidates -Path '/guardian/bff/audit/critical?page=1&limit=10' -Headers $headers
+    $auditResult = Invoke-EndpointWithFallback -Method 'GET' -BaseCandidates $baseCandidates -Path '/core-admin/bff/audit/critical?page=1&limit=10' -Headers $headers
     if ($auditResult.success) {
       $steps += [PSCustomObject]@{ Name = 'smoke_guardian_critical_audit'; Status = 'PASS'; Detail = "base=$($auditResult.usedBase) status=$($auditResult.statusCode)" }
     } else {
@@ -433,8 +433,8 @@ if ($DryRun) {
         }
         $notes += 'Fluxo suspend/reactivate nao executado por ausencia de empresa elegivel. Informe -TargetEmpresaId para validar mutacao.'
       } else {
-        $suspend = Invoke-EndpointWithFallback -Method 'PATCH' -BaseCandidates $baseCandidates -Path "/guardian/bff/billing/subscriptions/$empresaId/suspend" -Headers $headers -Body @{ reason = 'daily-smoke-guardian-suspend-validation' }
-        $reactivate = Invoke-EndpointWithFallback -Method 'PATCH' -BaseCandidates $baseCandidates -Path "/guardian/bff/billing/subscriptions/$empresaId/reactivate" -Headers $headers -Body @{ reason = 'daily-smoke-guardian-reactivate-validation' }
+        $suspend = Invoke-EndpointWithFallback -Method 'PATCH' -BaseCandidates $baseCandidates -Path "/core-admin/bff/billing/subscriptions/$empresaId/suspend" -Headers $headers -Body @{ reason = 'daily-smoke-guardian-suspend-validation' }
+        $reactivate = Invoke-EndpointWithFallback -Method 'PATCH' -BaseCandidates $baseCandidates -Path "/core-admin/bff/billing/subscriptions/$empresaId/reactivate" -Headers $headers -Body @{ reason = 'daily-smoke-guardian-reactivate-validation' }
 
         if ($suspend.success -and $reactivate.success) {
           $steps += [PSCustomObject]@{
@@ -503,3 +503,4 @@ if ($status -ne 'PASS') {
 }
 
 exit 0
+
