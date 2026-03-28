@@ -21,8 +21,8 @@ $notes = @()
 $checks = New-Object System.Collections.Generic.List[object]
 $commandEvidence = @()
 
-$guardPath = Join-Path $repoRoot 'backend/src/modules/admin/guards/legacy-admin-transition.guard.ts'
-$specPath = Join-Path $repoRoot 'backend/src/modules/admin/guards/legacy-admin-transition.guard.spec.ts'
+$guardPath = Join-Path $repoRoot 'backend/src/common/guards/core-admin-legacy-transition.guard.ts'
+$specPath = Join-Path $repoRoot 'backend/src/common/guards/core-admin-legacy-transition.guard.spec.ts'
 $envPath = Join-Path $repoRoot 'backend/.env.example'
 
 foreach ($path in @($guardPath, $specPath, $envPath)) {
@@ -80,7 +80,7 @@ if ($status -eq 'PASS') {
 }
 
 if (-not $DryRun -and $status -eq 'PASS') {
-  $cmd = 'npm --prefix backend run test -- modules/admin/guards/legacy-admin-transition.guard.spec.ts'
+  $cmd = 'npm --prefix backend run test -- common/guards/core-admin-legacy-transition.guard.spec.ts'
   Write-Host "[GDN-503] Executando: $cmd" -ForegroundColor Cyan
   $tempStdout = New-TemporaryFile
   $tempStderr = New-TemporaryFile

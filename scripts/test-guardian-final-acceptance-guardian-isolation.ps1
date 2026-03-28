@@ -20,12 +20,13 @@ $status = 'PASS'
 $checks = @()
 $notes = @()
 
-$controllerPath = Join-Path $repoRoot 'backend/src/modules/guardian/guardian-bff.controller.ts'
-$guardPath = Join-Path $repoRoot 'backend/src/modules/guardian/guardian-mfa.guard.ts'
-$legacyTransitionGuardPath = Join-Path $repoRoot 'backend/src/modules/admin/guards/legacy-admin-transition.guard.ts'
-$testCommand = 'npm --prefix backend run test -- modules/guardian/guardian-mfa.guard.spec.ts modules/guardian/guardian-bff.controller.spec.ts modules/admin/guards/legacy-admin-transition.guard.spec.ts'
+$controllerPath = Join-Path $repoRoot 'backend/src/modules/core-admin/core-admin-bff.controller.ts'
+$guardPath = Join-Path $repoRoot 'backend/src/modules/core-admin/guards/core-admin-mfa.guard.ts'
+$coreAdminTransitionGuardPath = Join-Path $repoRoot 'backend/src/common/guards/core-admin-legacy-transition.guard.ts'
+$coreAdminTransitionGuardSpecPath = Join-Path $repoRoot 'backend/src/common/guards/core-admin-legacy-transition.guard.spec.ts'
+$testCommand = 'npm --prefix backend run test -- modules/core-admin/core-admin-bff.controller.spec.ts modules/core-admin/core-admin.controller.spec.ts common/guards/core-admin-legacy-transition.guard.spec.ts'
 
-foreach ($file in @($controllerPath, $guardPath, $legacyTransitionGuardPath)) {
+foreach ($file in @($controllerPath, $guardPath, $coreAdminTransitionGuardPath, $coreAdminTransitionGuardSpecPath)) {
   $exists = Test-Path -Path $file
   $checks += [PSCustomObject]@{
     Name = "arquivo presente: $file"
@@ -41,32 +42,32 @@ foreach ($file in @($controllerPath, $guardPath, $legacyTransitionGuardPath)) {
 if ($status -eq 'PASS') {
   $controllerContent = Get-Content -Path $controllerPath -Raw
   $guardContent = Get-Content -Path $guardPath -Raw
-  $legacyGuardContent = Get-Content -Path $legacyTransitionGuardPath -Raw
+  $coreAdminTransitionGuardContent = Get-Content -Path $coreAdminTransitionGuardPath -Raw
 
   $staticChecks = @(
     [PSCustomObject]@{
-      Name = 'guardian namespace usa path guardian/bff'
-      Pass = ($controllerContent -match [regex]::Escape("Controller('guardian/bff')"))
-      Detail = 'path guardian/bff'
+      Name = 'core-admin namespace usa path core-admin/bff'
+      Pass = ($controllerContent -match [regex]::Escape("Controller('core-admin/bff')"))
+      Detail = 'path core-admin/bff'
     },
     [PSCustomObject]@{
-      Name = 'guardian exige role SUPERADMIN'
+      Name = 'core-admin exige role SUPERADMIN'
       Pass = ($controllerContent -match [regex]::Escape('@Roles(UserRole.SUPERADMIN)'))
       Detail = 'role superadmin'
     },
     [PSCustomObject]@{
-      Name = 'guardian aplica GuardianMfaGuard'
-      Pass = ($controllerContent -match [regex]::Escape('GuardianMfaGuard'))
+      Name = 'core-admin aplica CoreAdminMfaGuard'
+      Pass = ($controllerContent -match [regex]::Escape('CoreAdminMfaGuard'))
       Detail = 'mfa guard no controller'
     },
     [PSCustomObject]@{
-      Name = 'GuardianMfaGuard valida mfa_verified'
+      Name = 'CoreAdminMfaGuard valida mfa_verified'
       Pass = ($guardContent -match [regex]::Escape('mfa_verified'))
       Detail = 'mfa_verified check'
     },
     [PSCustomObject]@{
-      Name = 'legado possui modo guardian_only'
-      Pass = ($legacyGuardContent -match [regex]::Escape('guardian_only'))
+      Name = 'core-admin transition guard possui modo guardian_only'
+      Pass = ($coreAdminTransitionGuardContent -match [regex]::Escape('guardian_only'))
       Detail = 'transition guard guardian_only'
     }
   )

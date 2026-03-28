@@ -56,7 +56,7 @@ $steps += New-StepResult -Id 'DCP-005' -Name 'phase5_retire_legacy_infra_checks'
 
 $transitionCheckScript = Join-Path $repoRoot 'scripts/ci/guardian-transition-flags-check.ps1'
 $readOnlyCheckScript = Join-Path $repoRoot 'scripts/ci/guardian-legacy-read-only-freeze-check.ps1'
-$guardSpecCommand = 'npm --prefix backend run test -- modules/admin/guards/legacy-admin-transition.guard.spec.ts'
+$guardSpecCommand = 'npm --prefix backend run test -- common/guards/core-admin-legacy-transition.guard.spec.ts'
 $nginxConfigPath = Join-Path $repoRoot 'deploy/guardian-web.host-nginx.conf'
 $guardianComposePath = Join-Path $repoRoot 'docker-compose.guardian-web.yml'
 
