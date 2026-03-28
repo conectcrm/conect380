@@ -19,6 +19,7 @@ import { canTransitionSubscriptionStatus, hasSubscriptionAccess } from './subscr
 import { User } from '../users/user.entity';
 import { Cliente } from '../clientes/cliente.entity';
 import { TenantBillingPolicy, TenantBillingPolicyService } from './tenant-billing-policy.service';
+import { EmpresaModuloService } from '../empresas/services/empresa-modulo.service';
 
 type TransitionOptions = {
   dataFim?: Date | null;
@@ -42,6 +43,7 @@ export class AssinaturasService {
     @InjectRepository(Cliente)
     private clienteRepository: Repository<Cliente>,
     private readonly tenantBillingPolicyService: TenantBillingPolicyService,
+    private readonly empresaModuloService: EmpresaModuloService,
   ) {}
 
   private isUnlimitedLimit(limit: number): boolean {
@@ -151,6 +153,12 @@ export class AssinaturasService {
     assinatura.observacoes = assinatura.observacoes
       ? `${assinatura.observacoes}\n${note}`
       : note;
+  }
+
+  private extractPlanoModuleCodes(plano: Plano): string[] {
+    return (plano.modulosInclusos || [])
+      .map((item) => String(item?.modulo?.codigo || '').trim())
+      .filter(Boolean);
   }
 
   private async buscarAssinaturaMaisRecente(
@@ -378,6 +386,7 @@ export class AssinaturasService {
 
     const novoPlano = await this.planoRepository.findOne({
       where: { id: novoPlanoId },
+      relations: ['modulosInclusos', 'modulosInclusos.modulo'],
     });
 
     if (!novoPlano) {
@@ -387,7 +396,19 @@ export class AssinaturasService {
     assinatura.plano = novoPlano;
     assinatura.valorMensal = novoPlano.preco;
 
+    const modulosNovoPlano = this.extractPlanoModuleCodes(novoPlano);
+    if (modulosNovoPlano.length === 0) {
+      throw new BadRequestException(
+        `Plano ${novoPlano.codigo || novoPlano.id} sem modulos vinculados no catalogo`,
+      );
+    }
+
     const assinaturaAtualizada = await this.assinaturaRepository.save(assinatura);
+    await this.empresaModuloService.sincronizarModulosPlano(
+      empresaId,
+      modulosNovoPlano,
+      novoPlano.codigo,
+    );
     return this.applyTenantBillingPolicy(assinaturaAtualizada, policy) as AssinaturaEmpresa;
   }
 

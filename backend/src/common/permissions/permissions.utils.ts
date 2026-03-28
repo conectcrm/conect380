@@ -55,6 +55,8 @@ const FINANCEIRO_MANAGE_TO_READ_EQUIVALENCES: Array<[Permission, Permission]> = 
   [Permission.FINANCEIRO_CENTRO_CUSTOS_MANAGE, Permission.FINANCEIRO_CENTRO_CUSTOS_READ],
   [Permission.FINANCEIRO_ALERTAS_MANAGE, Permission.FINANCEIRO_ALERTAS_READ],
   [Permission.FINANCEIRO_APROVACOES_MANAGE, Permission.FINANCEIRO_APROVACOES_READ],
+  [Permission.COMPRAS_COTACOES_MANAGE, Permission.COMPRAS_COTACOES_READ],
+  [Permission.COMPRAS_APROVACOES_MANAGE, Permission.COMPRAS_APROVACOES_READ],
 ];
 
 function normalizeRole(role: unknown): string | null {
@@ -116,6 +118,7 @@ function expandEquivalentPermissions(target: Set<Permission>): void {
   if (hasPagamentosManage) {
     FINANCEIRO_PAGAMENTOS_MANAGE_EQUIVALENCES.forEach((permission) => target.add(permission));
   }
+
 }
 
 function* iteratePermissionInputs(rawPermissions: unknown): Generator<unknown> {

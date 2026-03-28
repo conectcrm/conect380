@@ -11,8 +11,17 @@ import { EmpresaModulo, ModuloEnum, PlanoEnum } from '../entities/empresa-modulo
 import { CreateEmpresaModuloDto } from '../dto/create-empresa-modulo.dto';
 import { UpdateEmpresaModuloDto } from '../dto/update-empresa-modulo.dto';
 import { TenantBillingPolicyService } from '../../planos/tenant-billing-policy.service';
+import { DEFAULT_ESSENTIAL_MODULE_CODES, DEFAULT_PLANOS_SISTEMA } from '../../planos/planos.defaults';
 
 const ALL_PLATFORM_MODULES = Object.values(ModuloEnum) as ModuloEnum[];
+const ESSENTIAL_MODULES = DEFAULT_ESSENTIAL_MODULE_CODES.map((codigo) =>
+  String(codigo).trim().toUpperCase(),
+);
+const PLANO_ENUM_TO_DEFAULT_CODE: Record<PlanoEnum, string> = {
+  [PlanoEnum.STARTER]: 'starter',
+  [PlanoEnum.BUSINESS]: 'business',
+  [PlanoEnum.ENTERPRISE]: 'enterprise',
+};
 
 @Injectable()
 export class EmpresaModuloService {
@@ -83,6 +92,12 @@ export class EmpresaModuloService {
       ),
     );
 
+    ESSENTIAL_MODULES.forEach((codigoEssencial) => {
+      if (!codigosNormalizados.includes(codigoEssencial)) {
+        codigosNormalizados.push(codigoEssencial);
+      }
+    });
+
     if (codigosNormalizados.length === 0) {
       throw new BadRequestException('Plano sem modulos validos para sincronizacao');
     }
@@ -151,6 +166,11 @@ export class EmpresaModuloService {
    */
   async isModuloAtivo(empresa_id: string, modulo: ModuloEnum): Promise<boolean> {
     try {
+      const moduloNormalizado = this.normalizeModuloCode(String(modulo || ''));
+      if (ESSENTIAL_MODULES.includes(moduloNormalizado)) {
+        return true;
+      }
+
       const hasFullModuleAccess = await this.tenantHasFullModuleAccess(empresa_id);
       if (hasFullModuleAccess) {
         return true;
@@ -207,8 +227,13 @@ export class EmpresaModuloService {
 
         modulosValidos.push(registro.modulo);
       }
+      ESSENTIAL_MODULES.forEach((codigoEssencial) => {
+        if ((Object.values(ModuloEnum) as string[]).includes(codigoEssencial)) {
+          modulosValidos.push(codigoEssencial as ModuloEnum);
+        }
+      });
 
-      return modulosValidos;
+      return Array.from(new Set(modulosValidos));
     } catch (error) {
       console.error(`Erro ao listar módulos ativos da empresa ${empresa_id}:`, error);
       return [];
@@ -275,6 +300,11 @@ export class EmpresaModuloService {
    * @param modulo Módulo a desativar
    */
   async desativar(empresa_id: string, modulo: ModuloEnum): Promise<void> {
+    const moduloNormalizado = this.normalizeModuloCode(String(modulo || ''));
+    if (ESSENTIAL_MODULES.includes(moduloNormalizado)) {
+      throw new BadRequestException(`Modulo essencial ${moduloNormalizado} nao pode ser desativado`);
+    }
+
     const registro = await this.empresaModuloRepository.findOne({
       where: { empresaId: empresa_id, modulo },
     });
@@ -315,25 +345,15 @@ export class EmpresaModuloService {
    * @param plano Plano a ativar
    */
   async ativarPlano(empresa_id: string, plano: PlanoEnum): Promise<void> {
-    const modulosPorPlano = {
-      [PlanoEnum.STARTER]: [ModuloEnum.CRM, ModuloEnum.ATENDIMENTO],
-      [PlanoEnum.BUSINESS]: [
-        ModuloEnum.CRM,
-        ModuloEnum.ATENDIMENTO,
-        ModuloEnum.VENDAS,
-        ModuloEnum.FINANCEIRO,
-      ],
-      [PlanoEnum.ENTERPRISE]: [
-        ModuloEnum.CRM,
-        ModuloEnum.ATENDIMENTO,
-        ModuloEnum.VENDAS,
-        ModuloEnum.FINANCEIRO,
-        ModuloEnum.BILLING,
-        ModuloEnum.ADMINISTRACAO,
-      ],
-    };
-
-    const modulos = modulosPorPlano[plano] || [];
+    const planoDefaultCode = PLANO_ENUM_TO_DEFAULT_CODE[plano];
+    const planoDefault = DEFAULT_PLANOS_SISTEMA.find(
+      (entry) => entry.codigo === planoDefaultCode,
+    );
+    const modulos = (planoDefault?.modulosCodigos || [])
+      .map((codigo) => this.normalizeModuloCode(codigo))
+      .filter((codigo): codigo is ModuloEnum =>
+        (Object.values(ModuloEnum) as string[]).includes(codigo),
+      );
 
     if (modulos.length === 0) {
       this.logger.warn(`Nenhum módulo encontrado para plano ${plano}`);

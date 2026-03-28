@@ -76,6 +76,11 @@ export enum Permission {
   FINANCEIRO_APROVACOES_READ = 'financeiro.aprovacoes.read',
   FINANCEIRO_APROVACOES_MANAGE = 'financeiro.aprovacoes.manage',
 
+  COMPRAS_COTACOES_READ = 'compras.cotacoes.read',
+  COMPRAS_COTACOES_MANAGE = 'compras.cotacoes.manage',
+  COMPRAS_APROVACOES_READ = 'compras.aprovacoes.read',
+  COMPRAS_APROVACOES_MANAGE = 'compras.aprovacoes.manage',
+
   CONFIG_EMPRESA_READ = 'config.empresa.read',
   CONFIG_EMPRESA_UPDATE = 'config.empresa.update',
   CONFIG_INTEGRACOES_MANAGE = 'config.integracoes.manage',
@@ -209,6 +214,13 @@ const FINANCEIRO_DEFAULT_PERMISSIONS: Permission[] = [
   Permission.CRM_CLIENTES_READ,
 ];
 
+const COMPRAS_DEFAULT_PERMISSIONS: Permission[] = [
+  Permission.COMPRAS_COTACOES_READ,
+  Permission.COMPRAS_COTACOES_MANAGE,
+  Permission.COMPRAS_APROVACOES_READ,
+  Permission.COMPRAS_APROVACOES_MANAGE,
+];
+
 const ADMIN_GOVERNANCE_PERMISSIONS: Permission[] = [
   ...USER_MANAGEMENT_PERMISSIONS,
   ...BASIC_PROFILE_PERMISSIONS,
@@ -223,6 +235,7 @@ const ADMIN_OPERATIONAL_PERMISSIONS: Permission[] = [
   ...COMERCIAL_FULL_PERMISSIONS,
   ...ATENDIMENTO_MANAGER_PERMISSIONS,
   ...FINANCEIRO_DEFAULT_PERMISSIONS,
+  ...COMPRAS_DEFAULT_PERMISSIONS,
 ];
 
 export const ROLE_DEFAULT_PERMISSIONS: Record<string, Permission[]> = {
@@ -254,6 +267,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<string, Permission[]> = {
     ...BASIC_PROFILE_PERMISSIONS,
     ...INSIGHTS_PERMISSIONS,
     ...FINANCEIRO_DEFAULT_PERMISSIONS,
+    ...COMPRAS_DEFAULT_PERMISSIONS,
   ],
 };
 
@@ -282,6 +296,7 @@ export const LEGACY_PERMISSION_ALIASES: Record<string, Permission> = {
   ATENDIMENTO_DLQ_MANAGE: Permission.ATENDIMENTO_DLQ_MANAGE,
   COMERCIAL: Permission.COMERCIAL_PROPOSTAS_READ,
   CRM: Permission.CRM_CLIENTES_READ,
+  COMPRAS: Permission.COMPRAS_COTACOES_READ,
   FINANCEIRO: Permission.FINANCEIRO_FATURAMENTO_READ,
   CONFIGURACOES: Permission.CONFIG_EMPRESA_READ,
   DASHBOARD: Permission.DASHBOARD_READ,
@@ -431,6 +446,19 @@ export const PERMISSION_CATALOG_GROUPS: PermissionCatalogGroup[] = [
     ],
   },
   {
+    id: 'compras',
+    label: 'Compras',
+    description: 'Cotacoes, orcamentos e aprovacoes de compras',
+    roles: [UserRole.FINANCEIRO, ...ROLE_GERENTE_KEYS, UserRole.ADMIN, UserRole.SUPERADMIN],
+    options: [
+      { value: Permission.COMPRAS_COTACOES_READ, label: 'Cotacoes de compras: visualizar' },
+      { value: Permission.COMPRAS_COTACOES_MANAGE, label: 'Cotacoes de compras: gerenciar' },
+      { value: Permission.COMPRAS_APROVACOES_READ, label: 'Aprovacoes de compras: visualizar' },
+      { value: Permission.COMPRAS_APROVACOES_MANAGE, label: 'Aprovacoes de compras: gerenciar' },
+      { value: 'COMPRAS', label: 'Compras (legado)', legacy: true },
+    ],
+  },
+  {
     id: 'financeiro',
     label: 'Financeiro',
     description: 'Faturamento, contas a pagar, fornecedores, bancos, conciliacao e alertas',
@@ -506,7 +534,7 @@ const ROLE_DEFAULT_PERMISSION_ALIAS_MAP: Record<string, UserRole> = {
   [UserRole.FINANCEIRO]: UserRole.FINANCEIRO,
 };
 
-const LEGACY_ASSIGNABLE_PERMISSION_VALUES = ['ATENDIMENTO'];
+const LEGACY_ASSIGNABLE_PERMISSION_VALUES = ['ATENDIMENTO', 'COMPRAS'];
 
 const toUniquePermissionList = (permissions: Permission[]): string[] =>
   Array.from(new Set(permissions));
@@ -522,7 +550,7 @@ const buildRoleDefaultPermissionsWithAliases = (): Record<string, string[]> => {
 };
 
 export const PERMISSION_CATALOG: PermissionCatalog = {
-  version: '2026-03-23',
+  version: '2026-03-27',
   groups: PERMISSION_CATALOG_GROUPS,
   defaultsByRole: buildRoleDefaultPermissionsWithAliases(),
   allPermissions: [...ALL_PERMISSIONS],

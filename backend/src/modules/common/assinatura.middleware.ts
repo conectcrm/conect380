@@ -18,10 +18,10 @@ type EntitlementModule =
   | 'CRM'
   | 'ATENDIMENTO'
   | 'VENDAS'
+  | 'COMPRAS'
   | 'FINANCEIRO'
   | 'BILLING'
   | 'ADMINISTRACAO'
-  | 'DASHBOARD'
   | 'IA';
 
 const PATH_PREFIX_TO_MODULE: Array<{ prefix: string; module: EntitlementModule }> = [
@@ -30,12 +30,7 @@ const PATH_PREFIX_TO_MODULE: Array<{ prefix: string; module: EntitlementModule }
   { prefix: '/contatos', module: 'CRM' },
   { prefix: '/leads', module: 'CRM' },
   { prefix: '/oportunidades', module: 'CRM' },
-  { prefix: '/produtos', module: 'CRM' },
-  { prefix: '/categorias-produtos', module: 'CRM' },
-  { prefix: '/configuracoes-produtos', module: 'CRM' },
-  { prefix: '/subcategorias-produtos', module: 'CRM' },
   { prefix: '/eventos', module: 'CRM' },
-  { prefix: '/vehicle-inventory', module: 'CRM' },
   { prefix: '/agenda-eventos', module: 'CRM' },
   { prefix: '/interacoes', module: 'CRM' },
 
@@ -43,6 +38,14 @@ const PATH_PREFIX_TO_MODULE: Array<{ prefix: string; module: EntitlementModule }
   { prefix: '/contratos', module: 'VENDAS' },
   { prefix: '/metas', module: 'VENDAS' },
   { prefix: '/email', module: 'VENDAS' },
+  { prefix: '/produtos', module: 'VENDAS' },
+  { prefix: '/categorias-produtos', module: 'VENDAS' },
+  { prefix: '/configuracoes-produtos', module: 'VENDAS' },
+  { prefix: '/subcategorias-produtos', module: 'VENDAS' },
+  { prefix: '/vehicle-inventory', module: 'VENDAS' },
+
+  { prefix: '/cotacao', module: 'COMPRAS' },
+  { prefix: '/orcamento', module: 'COMPRAS' },
 
   { prefix: '/financeiro', module: 'FINANCEIRO' },
   { prefix: '/faturamento', module: 'FINANCEIRO' },
@@ -70,15 +73,9 @@ const PATH_PREFIX_TO_MODULE: Array<{ prefix: string; module: EntitlementModule }
   { prefix: '/notas', module: 'ATENDIMENTO' },
   { prefix: '/redmine', module: 'ATENDIMENTO' },
 
-  { prefix: '/dashboard', module: 'DASHBOARD' },
-  { prefix: '/orquestrador', module: 'DASHBOARD' },
-
   { prefix: '/ia', module: 'IA' },
 
   { prefix: '/admin', module: 'ADMINISTRACAO' },
-  { prefix: '/users', module: 'ADMINISTRACAO' },
-  { prefix: '/users-debug', module: 'ADMINISTRACAO' },
-  { prefix: '/empresas/config', module: 'ADMINISTRACAO' },
 ];
 
 const MODULE_ACCEPTED_CODES: Record<EntitlementModule, string[]> = {
@@ -93,11 +90,20 @@ const MODULE_ACCEPTED_CODES: Record<EntitlementModule, string[]> = {
     'INTERACOES',
   ],
   ATENDIMENTO: ['ATENDIMENTO', 'SUPORTE', 'WHATSAPP', 'CHAT', 'TRIAGEM'],
-  VENDAS: ['VENDAS', 'PROPOSTAS', 'CONTRATOS', 'METAS'],
-  FINANCEIRO: ['FINANCEIRO', 'FATURAMENTO', 'PAGAMENTOS', 'BILLING'],
+  VENDAS: ['VENDAS', 'PROPOSTAS', 'CONTRATOS', 'METAS', 'PRODUTOS', 'VEICULOS'],
+  COMPRAS: ['COMPRAS', 'COTACAO', 'ORCAMENTO'],
+  FINANCEIRO: [
+    'FINANCEIRO',
+    'FATURAMENTO',
+    'PAGAMENTOS',
+    'FORNECEDORES',
+    'CONTAS_PAGAR',
+    'CENTROS_CUSTO',
+    'CONTAS_BANCARIAS',
+    'CONCILIACAO_BANCARIA',
+  ],
   BILLING: ['BILLING', 'ASSINATURAS', 'PLANOS', 'COBRANCAS'],
   ADMINISTRACAO: ['ADMINISTRACAO', 'ADMIN', 'USUARIOS', 'USERS', 'EMPRESAS'],
-  DASHBOARD: ['DASHBOARD', 'ANALYTICS', 'CRM', 'VENDAS', 'FINANCEIRO', 'ATENDIMENTO'],
   IA: ['IA', 'CRM', 'ATENDIMENTO'],
 };
 
@@ -106,18 +112,21 @@ export class AssinaturaMiddleware implements NestMiddleware {
   constructor(private readonly assinaturasService: AssinaturasService) {}
 
   async use(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    const coreAdminDocsPath = this.resolveCoreAdminDocsPath();
+    const normalizedPath = String(req.path || '').toLowerCase();
     const skipRoutes = [
       '/auth/',
       '/planos',
       '/assinaturas',
+      '/core-admin',
       '/health',
       '/docs',
       '/api-docs',
-      '/guardian-docs',
-      '/guardian-docs-json',
+      `/${coreAdminDocsPath}`,
+      `/${coreAdminDocsPath}-json`,
       '/metrics',
     ];
-    const shouldSkip = skipRoutes.some((route) => req.path.startsWith(route));
+    const shouldSkip = skipRoutes.some((route) => normalizedPath.startsWith(route.toLowerCase()));
     if (shouldSkip) {
       return next();
     }
@@ -230,6 +239,16 @@ export class AssinaturaMiddleware implements NestMiddleware {
         HttpStatus.SERVICE_UNAVAILABLE,
       );
     }
+  }
+
+  private resolveCoreAdminDocsPath(): string {
+    const rawPath =
+      process.env.CORE_ADMIN_DOCS_PATH?.trim() ||
+      process.env.GUARDIAN_DOCS_PATH?.trim() ||
+      'core-admin-docs';
+
+    const sanitizedPath = rawPath.replace(/^\/+|\/+$/g, '').toLowerCase();
+    return sanitizedPath || 'core-admin-docs';
   }
 
   private resolveRequiredModuleFromPath(path: string): EntitlementModule | null {

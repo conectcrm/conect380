@@ -3,6 +3,7 @@ import {
   IsArray,
   IsBoolean,
   IsNumber,
+  NotEquals,
   IsOptional,
   IsString,
   IsUUID,
@@ -26,18 +27,30 @@ export class CriarPlanoDto {
 
   @IsNumber()
   @Min(-1) // -1 representa ilimitado
+  @NotEquals(0, {
+    message: 'limiteUsuarios nao pode ser 0. Use -1 para ilimitado ou inteiro >= 1.',
+  })
   limiteUsuarios: number;
 
   @IsNumber()
   @Min(-1) // -1 representa ilimitado
+  @NotEquals(0, {
+    message: 'limiteClientes nao pode ser 0. Use -1 para ilimitado ou inteiro >= 1.',
+  })
   limiteClientes: number;
 
   @IsNumber()
   @Min(-1) // -1 representa ilimitado
+  @NotEquals(0, {
+    message: 'limiteStorage nao pode ser 0. Use -1 para ilimitado ou inteiro >= 1.',
+  })
   limiteStorage: number;
 
   @IsNumber()
   @Min(-1) // -1 representa ilimitado
+  @NotEquals(0, {
+    message: 'limiteApiCalls nao pode ser 0. Use -1 para ilimitado ou inteiro >= 1.',
+  })
   limiteApiCalls: number;
 
   @IsOptional()

@@ -92,6 +92,7 @@ export class EmpresaModuloController {
   @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
   @Permissions(Permission.CONFIG_EMPRESA_UPDATE)
   async ativarModulo(@EmpresaId() empresaId: string, @Body() dto: CreateEmpresaModuloDto) {
+    ensureDevelopmentOnly('POST /empresas/modulos/ativar');
     const modulo = await this.empresaModuloService.ativar(empresaId, dto);
 
     return {
@@ -105,6 +106,7 @@ export class EmpresaModuloController {
   @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
   @Permissions(Permission.CONFIG_EMPRESA_UPDATE)
   async desativarModulo(@EmpresaId() empresaId: string, @Param('modulo') modulo: ModuloEnum) {
+    ensureDevelopmentOnly('DELETE /empresas/modulos/:modulo');
     await this.empresaModuloService.desativar(empresaId, modulo);
 
     return {
@@ -121,6 +123,7 @@ export class EmpresaModuloController {
     @Param('modulo') modulo: ModuloEnum,
     @Body() dto: UpdateEmpresaModuloDto,
   ) {
+    ensureDevelopmentOnly('PATCH /empresas/modulos/:modulo');
     const moduloAtualizado = await this.empresaModuloService.atualizar(empresaId, modulo, dto);
 
     return {
@@ -134,6 +137,7 @@ export class EmpresaModuloController {
   @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
   @Permissions(Permission.CONFIG_EMPRESA_UPDATE)
   async ativarPlano(@EmpresaId() empresaId: string, @Param('plano') plano: PlanoEnum) {
+    ensureDevelopmentOnly('POST /empresas/modulos/plano/:plano');
     await this.empresaModuloService.ativarPlano(empresaId, plano);
 
     return {

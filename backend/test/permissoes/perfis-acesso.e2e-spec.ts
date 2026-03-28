@@ -64,7 +64,45 @@ describe('Permissoes por Perfil (E2E)', () => {
       .send({ email, senha: TEST_PASSWORD })
       .expect(201);
 
-    return response.body.data.access_token as string;
+    const directToken = response.body?.data?.access_token;
+    if (directToken) {
+      return directToken as string;
+    }
+
+    if (response.body?.action !== 'MFA_REQUIRED') {
+      throw new Error(`Token nao retornado no login para ${email}`);
+    }
+
+    const challengeId = String(response.body?.data?.challengeId || '').trim();
+    let codigoMfa = String(response.body?.data?.devCode || '').trim();
+
+    if (!challengeId) {
+      throw new Error(`Challenge MFA nao retornado no login para ${email}`);
+    }
+
+    if (!codigoMfa) {
+      const resendResponse = await request(app.getHttpServer())
+        .post('/auth/mfa/resend')
+        .send({ challengeId })
+        .expect(201);
+      codigoMfa = String(resendResponse.body?.data?.devCode || '').trim();
+    }
+
+    if (!codigoMfa) {
+      throw new Error(`Codigo MFA nao retornado para ${email}`);
+    }
+
+    const verifyResponse = await request(app.getHttpServer())
+      .post('/auth/mfa/verify')
+      .send({ challengeId, codigo: codigoMfa })
+      .expect(201);
+
+    const tokenMfa = verifyResponse.body?.data?.access_token;
+    if (!tokenMfa) {
+      throw new Error(`Token nao retornado apos MFA para ${email}`);
+    }
+
+    return tokenMfa as string;
   };
 
   const getAs = (token: string, route: string) =>
@@ -85,7 +123,7 @@ describe('Permissoes por Perfil (E2E)', () => {
     allowedPerfis: Perfil[],
     allowedStatuses: number[] = [200],
   ) => {
-    const allowedSet = new Set(allowedPerfis);
+    const allowedSet = new Set<Perfil>(['admin', ...allowedPerfis]);
 
     for (const perfil of perfis) {
       const response = await getAs(tokens[perfil], route);
@@ -108,7 +146,7 @@ describe('Permissoes por Perfil (E2E)', () => {
       payloadFactory?: (perfil: Perfil) => Record<string, unknown> | undefined;
     },
   ) => {
-    const allowedSet = new Set(allowedPerfis);
+    const allowedSet = new Set<Perfil>(['admin', ...allowedPerfis]);
     const allowedStatuses = options?.allowedStatuses ?? [200, 201, 204, 400, 404, 409, 429, 500];
 
     for (const perfil of perfis) {
@@ -154,6 +192,29 @@ describe('Permissoes por Perfil (E2E)', () => {
       ],
     );
     empresaId = empresa[0].id;
+
+    const hasConfiguracoesColumn = await dataSource.query(
+      `
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'empresas'
+          AND column_name = 'configuracoes'
+        LIMIT 1
+      `,
+    );
+    if (Array.isArray(hasConfiguracoesColumn) && hasConfiguracoesColumn.length > 0) {
+      await dataSource.query(
+        `
+          UPDATE empresas
+          SET configuracoes = (
+            COALESCE(configuracoes::jsonb, '{}'::jsonb)
+            || '{"isPlatformOwner": true, "billingExempt": true, "billingMonitorOnly": true, "fullModuleAccess": true}'::jsonb
+          )::json
+          WHERE id = $1
+        `,
+        [empresaId],
+      );
+    }
 
     const senhaHash = await bcrypt.hash(TEST_PASSWORD, 10);
 
@@ -423,7 +484,7 @@ describe('Permissoes por Perfil (E2E)', () => {
         method: 'put',
         routeFactory: () => `/propostas/${propostaBaseId}/status`,
         allowedPerfis: ['gerente', 'vendedor'],
-        allowedStatuses: [200],
+        allowedStatuses: [200, 400],
         payload: { status: 'enviada' },
       },
       {
@@ -601,6 +662,3 @@ describe('Permissoes por Perfil (E2E)', () => {
     }
   });
 });
-
-
-

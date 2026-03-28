@@ -6,22 +6,9 @@ import {
   IsBoolean,
   MinLength,
   Matches,
-  IsIn,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
-
-const PLANO_CADASTRO_VALUES = [
-  'starter',
-  'business',
-  'enterprise',
-  'professional',
-  'pro',
-  'basic',
-  'basico',
-  'premium',
-  'empresarial',
-] as const;
 
 class EmpresaDataDto {
   @ApiProperty({ description: 'Nome da empresa' })
@@ -130,7 +117,9 @@ export class CreateEmpresaDto {
   @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
   @IsString()
   @IsNotEmpty()
-  @IsIn(PLANO_CADASTRO_VALUES, { message: 'Plano invalido para cadastro' })
+  @Matches(/^[a-z0-9][a-z0-9._-]{1,63}$/, {
+    message: 'Plano invalido para cadastro',
+  })
   plano: string;
 
   @ApiProperty({ description: 'Aceitacao dos termos de uso' })

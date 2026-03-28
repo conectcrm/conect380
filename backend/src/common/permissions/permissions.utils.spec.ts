@@ -125,6 +125,8 @@ describe('permissions.utils', () => {
       expect(resolved.has(Permission.FINANCEIRO_FORNECEDORES_READ)).toBe(true);
       expect(resolved.has(Permission.FINANCEIRO_CONCILIACAO_READ)).toBe(true);
       expect(resolved.has(Permission.FINANCEIRO_APROVACOES_READ)).toBe(true);
+      expect(resolved.has(Permission.COMPRAS_COTACOES_READ)).toBe(false);
+      expect(resolved.has(Permission.COMPRAS_APROVACOES_READ)).toBe(false);
       expect(resolved.has(Permission.FINANCEIRO_CONTAS_PAGAR_MANAGE)).toBe(false);
     });
 
@@ -139,6 +141,8 @@ describe('permissions.utils', () => {
       expect(resolved.has(Permission.FINANCEIRO_CONTAS_PAGAR_READ)).toBe(true);
       expect(resolved.has(Permission.FINANCEIRO_ALERTAS_MANAGE)).toBe(true);
       expect(resolved.has(Permission.FINANCEIRO_ALERTAS_READ)).toBe(true);
+      expect(resolved.has(Permission.COMPRAS_COTACOES_MANAGE)).toBe(false);
+      expect(resolved.has(Permission.COMPRAS_APROVACOES_MANAGE)).toBe(false);
     });
 
     it('deve promover leitura quando permissao explicita de submodulo for manage', () => {

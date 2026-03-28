@@ -11,7 +11,11 @@ import { ModuloSistema } from './entities/modulo-sistema.entity';
 import { PlanoModulo } from './entities/plano-modulo.entity';
 import { CriarPlanoDto } from './dto/criar-plano.dto';
 import { AtualizarPlanoDto } from './dto/atualizar-plano.dto';
-import { DEFAULT_MODULOS_SISTEMA, DEFAULT_PLANOS_SISTEMA } from './planos.defaults';
+import {
+  DEFAULT_ESSENTIAL_MODULE_CODES,
+  DEFAULT_MODULOS_SISTEMA,
+  DEFAULT_PLANOS_SISTEMA,
+} from './planos.defaults';
 
 @Injectable()
 export class PlanosService {
@@ -102,6 +106,8 @@ export class PlanosService {
       throw new ConflictException(`Plano com codigo ${dados.codigo} ja existe`);
     }
 
+    this.validarLimitesPlano(dados, { required: true });
+
     const modulosInclusos = await this.validarModulosInclusos(dados.modulosInclusos);
 
     const plano = this.planoRepository.create({
@@ -137,6 +143,8 @@ export class PlanosService {
         throw new ConflictException(`Plano com codigo ${dados.codigo} ja existe`);
       }
     }
+
+    this.validarLimitesPlano(dados, { required: false });
 
     const modulosInclusos = await this.validarModulosInclusos(dados.modulosInclusos);
     const { modulosInclusos: _ignored, ...dadosPlano } = dados;
@@ -183,6 +191,58 @@ export class PlanosService {
     return this.planoRepository.save(plano);
   }
 
+  private validarLimitesPlano(
+    dados: Partial<
+      Pick<CriarPlanoDto, 'limiteUsuarios' | 'limiteClientes' | 'limiteStorage' | 'limiteApiCalls'>
+    >,
+    options: { required: boolean },
+  ): void {
+    this.validarLimiteNumerico('limiteUsuarios', dados.limiteUsuarios, options.required);
+    this.validarLimiteNumerico('limiteClientes', dados.limiteClientes, options.required);
+    this.validarLimiteNumerico('limiteStorage', dados.limiteStorage, options.required);
+    this.validarLimiteNumerico('limiteApiCalls', dados.limiteApiCalls, options.required);
+  }
+
+  private validarLimiteNumerico(
+    campo: 'limiteUsuarios' | 'limiteClientes' | 'limiteStorage' | 'limiteApiCalls',
+    valor: number | null | undefined,
+    required: boolean,
+  ): void {
+    if (valor === undefined || valor === null) {
+      if (required) {
+        throw new BadRequestException(`${this.getCampoLabel(campo)} e obrigatorio`);
+      }
+      return;
+    }
+
+    if (!Number.isInteger(valor)) {
+      throw new BadRequestException(`${this.getCampoLabel(campo)} invalido. Use numero inteiro.`);
+    }
+
+    if (valor === 0 || valor < -1) {
+      throw new BadRequestException(
+        `${this.getCampoLabel(campo)} invalido. Use -1 para ilimitado ou inteiro >= 1.`,
+      );
+    }
+  }
+
+  private getCampoLabel(
+    campo: 'limiteUsuarios' | 'limiteClientes' | 'limiteStorage' | 'limiteApiCalls',
+  ): string {
+    switch (campo) {
+      case 'limiteUsuarios':
+        return 'Limite de usuarios';
+      case 'limiteClientes':
+        return 'Limite de clientes';
+      case 'limiteStorage':
+        return 'Limite de storage';
+      case 'limiteApiCalls':
+        return 'Limite de API calls';
+      default:
+        return 'Limite do plano';
+    }
+  }
+
   private async validarModulosInclusos(modulosIds: string[]): Promise<string[]> {
     const moduloIdsNormalizados = Array.from(
       new Set((modulosIds || []).map((id) => String(id).trim()).filter(Boolean)),
@@ -192,18 +252,48 @@ export class PlanosService {
       throw new BadRequestException('Plano deve possuir ao menos um modulo vinculado');
     }
 
-    const modulosExistentes = await this.moduloSistemaRepository.find({
+    const modulosInformados = await this.moduloSistemaRepository.find({
       where: { id: In(moduloIdsNormalizados) },
-      select: ['id'],
+      select: ['id', 'codigo'],
     });
 
-    const existentes = new Set(modulosExistentes.map((modulo) => modulo.id));
+    const existentes = new Set(modulosInformados.map((modulo) => modulo.id));
     const modulosInvalidos = moduloIdsNormalizados.filter((id) => !existentes.has(id));
 
     if (modulosInvalidos.length > 0) {
       throw new BadRequestException(
         `Modulos informados nao existem no catalogo: ${modulosInvalidos.join(', ')}`,
       );
+    }
+
+    const modulosEssenciaisAtivos = await this.moduloSistemaRepository.find({
+      where: { essencial: true, ativo: true },
+      select: ['codigo'],
+    });
+    const codigosEssenciais = Array.from(
+      new Set(
+        (modulosEssenciaisAtivos.length > 0
+          ? modulosEssenciaisAtivos.map((modulo) => modulo.codigo)
+          : DEFAULT_ESSENTIAL_MODULE_CODES
+        )
+          .map((codigo) => String(codigo || '').trim().toUpperCase())
+          .filter(Boolean),
+      ),
+    );
+
+    if (codigosEssenciais.length > 0) {
+      const codigosInformados = new Set(
+        modulosInformados
+          .map((modulo) => String(modulo.codigo || '').trim().toUpperCase())
+          .filter(Boolean),
+      );
+      const essenciaisFaltantes = codigosEssenciais.filter((codigo) => !codigosInformados.has(codigo));
+
+      if (essenciaisFaltantes.length > 0) {
+        throw new BadRequestException(
+          `Plano deve incluir os modulos essenciais: ${essenciaisFaltantes.join(', ')}`,
+        );
+      }
     }
 
     return moduloIdsNormalizados;
@@ -224,10 +314,12 @@ export class PlanosService {
     await this.planoModuloRepository.save(vinculos);
   }
 
-  async listarModulosDisponiveis(): Promise<ModuloSistema[]> {
+  async listarModulosDisponiveis(includeInactive = false): Promise<ModuloSistema[]> {
     await this.seedDefaultsIfEmpty();
+    const where = includeInactive ? undefined : { ativo: true };
+
     return this.moduloSistemaRepository.find({
-      where: { ativo: true },
+      where,
       order: { ordem: 'ASC', nome: 'ASC' },
     });
   }
@@ -372,21 +464,30 @@ export class PlanosService {
     const planosExistentes = await this.planoRepository.find({
       select: ['codigo'],
     });
+    const modulosExistentes = await this.moduloSistemaRepository.find({
+      select: ['codigo'],
+    });
 
-    if (planosExistentes.length === 0) {
+    if (planosExistentes.length === 0 || modulosExistentes.length === 0) {
       await this.bootstrapDefaults({ overwrite: false });
       return;
     }
 
-    const codigosExistentes = new Set(
+    const codigosPlanosExistentes = new Set(
       planosExistentes.map((plano) => String(plano.codigo || '').trim().toLowerCase()),
+    );
+    const codigosModulosExistentes = new Set(
+      modulosExistentes.map((modulo) => String(modulo.codigo || '').trim().toLowerCase()),
     );
 
     const faltamPlanosCanonicos = DEFAULT_PLANOS_SISTEMA.some(
-      (planoDefault) => !codigosExistentes.has(String(planoDefault.codigo).toLowerCase()),
+      (planoDefault) => !codigosPlanosExistentes.has(String(planoDefault.codigo).toLowerCase()),
+    );
+    const faltamModulosCanonicos = DEFAULT_MODULOS_SISTEMA.some(
+      (moduloDefault) => !codigosModulosExistentes.has(String(moduloDefault.codigo).toLowerCase()),
     );
 
-    if (!faltamPlanosCanonicos) {
+    if (!faltamPlanosCanonicos && !faltamModulosCanonicos) {
       return;
     }
 

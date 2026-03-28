@@ -26,6 +26,9 @@ describe('MercadoPagoService', () => {
   const pagamentoService = {
     processarPagamento: jest.fn(),
   };
+  const empresaModuloService = {
+    sincronizarModulosPlano: jest.fn(),
+  };
 
   let service: MercadoPagoService;
 
@@ -44,6 +47,7 @@ describe('MercadoPagoService', () => {
       faturaRepository as any,
       pagamentoRepository as any,
       pagamentoService as any,
+      empresaModuloService as any,
     );
   });
 
@@ -140,6 +144,51 @@ describe('MercadoPagoService', () => {
         status: 'active',
         renovacaoAutomatica: true,
       }),
+    );
+  });
+
+  it('sincroniza modulos da empresa quando pagamento aprovado ativa a assinatura', async () => {
+    const payment = {
+      id: 'pay-mod-sync-1',
+      status: 'approved',
+      external_reference:
+        'conectcrm:empresa:11111111-1111-1111-1111-111111111111:assinatura:99999999-9999-9999-9999-999999999999',
+    };
+
+    const assinaturaTrialComModulos = {
+      id: '99999999-9999-9999-9999-999999999999',
+      status: 'trial',
+      observacoes: null,
+      dataInicio: new Date('2026-01-01'),
+      dataFim: null,
+      proximoVencimento: new Date('2026-02-01'),
+      renovacaoAutomatica: false,
+      plano: {
+        codigo: 'business',
+        modulosInclusos: [
+          { modulo: { codigo: 'CRM' } },
+          { modulo: { codigo: 'VENDAS' } },
+          { modulo: { codigo: 'FINANCEIRO' } },
+        ],
+      },
+    };
+
+    jest.spyOn(service as any, 'getPayment').mockResolvedValue(payment);
+    pagamentoService.processarPagamento.mockResolvedValue(undefined);
+    assinaturaRepository.findOne.mockResolvedValueOnce(assinaturaTrialComModulos);
+    assinaturaRepository.save.mockImplementation(async (value: any) => value);
+    billingEventRepository.insert.mockResolvedValueOnce({});
+
+    await service.processWebhook({
+      type: 'payment',
+      data: { id: 'pay-mod-sync-1' },
+      action: 'updated',
+    });
+
+    expect(empresaModuloService.sincronizarModulosPlano).toHaveBeenCalledWith(
+      '11111111-1111-1111-1111-111111111111',
+      ['CRM', 'VENDAS', 'FINANCEIRO'],
+      'business',
     );
   });
 
@@ -299,6 +348,7 @@ describe('MercadoPagoService', () => {
       faturaRepository as any,
       pagamentoRepository as any,
       pagamentoService as any,
+      empresaModuloService as any,
     );
 
     const result = await service.validateWebhookSignature(
@@ -324,6 +374,7 @@ describe('MercadoPagoService', () => {
       faturaRepository as any,
       pagamentoRepository as any,
       pagamentoService as any,
+      empresaModuloService as any,
     );
 
     expect(() => service.assertCheckoutReady()).toThrow('Checkout Mercado Pago indisponivel');

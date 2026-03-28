@@ -180,4 +180,60 @@ describe('EmpresasService - normalizacao em atualizarEmpresa', () => {
       expect.arrayContaining(['starter', 'plano-teste']),
     );
   });
+
+  it('formata limites ilimitados sem expor valores tecnicos nos recursos', async () => {
+    planosService.listarTodos.mockResolvedValue([
+      {
+        codigo: 'ilimitado',
+        nome: 'Plano ilimitado',
+        preco: 999,
+        descricao: 'Plano com limites ilimitados',
+        limiteUsuarios: -1,
+        limiteClientes: -1,
+        limiteStorage: -1,
+        limiteApiCalls: -1,
+        whiteLabel: false,
+        suportePrioritario: false,
+        modulosInclusos: [{ modulo: { nome: 'CRM' } }],
+      },
+    ]);
+
+    const [plano] = await service.listarPlanos();
+
+    expect(plano.recursos).toEqual(
+      expect.arrayContaining([
+        'Usuarios ilimitados',
+        'Clientes ilimitados',
+        'Armazenamento ilimitado',
+        'API calls ilimitadas/dia',
+      ]),
+    );
+    expect(plano.recursos).not.toEqual(expect.arrayContaining(['-1 API calls/dia']));
+    expect(plano.limites.armazenamento).toBe('Ilimitado');
+  });
+
+  it('sinaliza quando storage ou API calls estao sem configuracao valida', async () => {
+    planosService.listarTodos.mockResolvedValue([
+      {
+        codigo: 'invalido-legado',
+        nome: 'Plano legado',
+        preco: 99,
+        descricao: 'Plano com dados legados inconsistentes',
+        limiteUsuarios: 5,
+        limiteClientes: 500,
+        limiteStorage: 0,
+        limiteApiCalls: 0,
+        whiteLabel: false,
+        suportePrioritario: false,
+        modulosInclusos: [{ modulo: { nome: 'CRM' } }],
+      },
+    ]);
+
+    const [plano] = await service.listarPlanos();
+
+    expect(plano.recursos).toEqual(
+      expect.arrayContaining(['Armazenamento nao configurado', 'API calls/dia nao configuradas']),
+    );
+    expect(plano.limites.armazenamento).toBe('Nao configurado');
+  });
 });

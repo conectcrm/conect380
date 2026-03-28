@@ -8,11 +8,13 @@ import { BillingEvent } from '../faturamento/entities/billing-event.entity';
 import { Fatura } from '../faturamento/entities/fatura.entity';
 import { Pagamento } from '../faturamento/entities/pagamento.entity';
 import { FaturamentoModule } from '../faturamento/faturamento.module';
+import { EmpresasModule } from '../../empresas/empresas.module';
 
 @Module({
   imports: [
     ConfigModule,
     forwardRef(() => FaturamentoModule),
+    forwardRef(() => EmpresasModule),
     TypeOrmModule.forFeature([AssinaturaEmpresa, BillingEvent, Fatura, Pagamento]),
   ],
   controllers: [MercadoPagoController],

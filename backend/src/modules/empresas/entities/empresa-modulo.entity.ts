@@ -14,6 +14,7 @@ export enum ModuloEnum {
   ATENDIMENTO = 'ATENDIMENTO',
   CRM = 'CRM',
   VENDAS = 'VENDAS',
+  COMPRAS = 'COMPRAS',
   FINANCEIRO = 'FINANCEIRO',
   BILLING = 'BILLING',
   ADMINISTRACAO = 'ADMINISTRACAO',
@@ -41,7 +42,7 @@ export class EmpresaModulo {
   @Column({
     type: 'varchar',
     length: 50,
-    comment: 'ATENDIMENTO, CRM, VENDAS, FINANCEIRO, BILLING, ADMINISTRACAO',
+    comment: 'ATENDIMENTO, CRM, VENDAS, COMPRAS, FINANCEIRO, BILLING, ADMINISTRACAO',
   })
   modulo: ModuloEnum;
 

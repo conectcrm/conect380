@@ -267,8 +267,16 @@ export class EmpresasService {
 
   private formatStorageLimit(bytes: number): string {
     const parsed = Number(bytes);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      return '0GB';
+    if (!Number.isFinite(parsed)) {
+      return 'Nao configurado';
+    }
+
+    if (parsed === -1) {
+      return 'Ilimitado';
+    }
+
+    if (parsed <= 0) {
+      return 'Nao configurado';
     }
 
     const gb = parsed / (1024 * 1024 * 1024);
@@ -763,6 +771,20 @@ export class EmpresasService {
 
     if (planosCatalogo.length > 0) {
       return planosCatalogo.map((plano) => {
+        const storageRecurso =
+          plano.limiteStorage === -1
+            ? 'Armazenamento ilimitado'
+            : plano.limiteStorage > 0
+              ? `${this.formatStorageLimit(plano.limiteStorage)} de armazenamento`
+              : 'Armazenamento nao configurado';
+
+        const apiCallsRecurso =
+          plano.limiteApiCalls === -1
+            ? 'API calls ilimitadas/dia'
+            : plano.limiteApiCalls > 0
+              ? `${Number(plano.limiteApiCalls).toLocaleString('pt-BR')} API calls/dia`
+              : 'API calls/dia nao configuradas';
+
         const recursos: string[] = [
           plano.limiteUsuarios === -1
             ? 'Usuarios ilimitados'
@@ -770,8 +792,8 @@ export class EmpresasService {
           plano.limiteClientes === -1
             ? 'Clientes ilimitados'
             : `Ate ${plano.limiteClientes.toLocaleString('pt-BR')} clientes`,
-          `${this.formatStorageLimit(plano.limiteStorage)} de armazenamento`,
-          `${Number(plano.limiteApiCalls).toLocaleString('pt-BR')} API calls/dia`,
+          storageRecurso,
+          apiCallsRecurso,
         ];
 
         if (plano.whiteLabel) {

@@ -41,7 +41,6 @@ export const DEFAULT_MODULOS_SISTEMA: DefaultModuloSeed[] = [
     descricao: 'Atendimento omnichannel com filas, tickets e SLA.',
     icone: 'MessageSquare',
     cor: '#0F7B7D',
-    essencial: true,
     ordem: 2,
   },
   {
@@ -61,12 +60,20 @@ export const DEFAULT_MODULOS_SISTEMA: DefaultModuloSeed[] = [
     ordem: 4,
   },
   {
+    nome: 'Compras',
+    codigo: 'COMPRAS',
+    descricao: 'Cotacoes, orcamentos e aprovacoes de compras.',
+    icone: 'Calculator',
+    cor: '#C77900',
+    ordem: 5,
+  },
+  {
     nome: 'Billing',
     codigo: 'BILLING',
     descricao: 'Assinaturas, cobrancas recorrentes e self-service.',
     icone: 'CreditCard',
     cor: '#6D4C41',
-    ordem: 5,
+    ordem: 6,
   },
   {
     nome: 'Administracao',
@@ -74,9 +81,13 @@ export const DEFAULT_MODULOS_SISTEMA: DefaultModuloSeed[] = [
     descricao: 'Governanca, seguranca e administracao corporativa.',
     icone: 'ShieldCheck',
     cor: '#5E35B1',
-    ordem: 6,
+    ordem: 7,
   },
 ];
+
+export const DEFAULT_ESSENTIAL_MODULE_CODES: string[] = DEFAULT_MODULOS_SISTEMA
+  .filter((modulo) => Boolean(modulo.essencial))
+  .map((modulo) => modulo.codigo);
 
 export const DEFAULT_PLANOS_SISTEMA: DefaultPlanoSeed[] = [
   {
@@ -105,7 +116,7 @@ export const DEFAULT_PLANOS_SISTEMA: DefaultPlanoSeed[] = [
     whiteLabel: true,
     suportePrioritario: true,
     ordem: 2,
-    modulosCodigos: ['CRM', 'ATENDIMENTO', 'VENDAS', 'FINANCEIRO'],
+    modulosCodigos: ['CRM', 'ATENDIMENTO', 'VENDAS', 'COMPRAS', 'FINANCEIRO'],
   },
   {
     nome: 'Enterprise',
@@ -119,6 +130,14 @@ export const DEFAULT_PLANOS_SISTEMA: DefaultPlanoSeed[] = [
     whiteLabel: true,
     suportePrioritario: true,
     ordem: 3,
-    modulosCodigos: ['CRM', 'ATENDIMENTO', 'VENDAS', 'FINANCEIRO', 'BILLING', 'ADMINISTRACAO'],
+    modulosCodigos: [
+      'CRM',
+      'ATENDIMENTO',
+      'VENDAS',
+      'COMPRAS',
+      'FINANCEIRO',
+      'BILLING',
+      'ADMINISTRACAO',
+    ],
   },
 ];

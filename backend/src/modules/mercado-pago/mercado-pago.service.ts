@@ -22,6 +22,7 @@ import { BillingEvent } from '../faturamento/entities/billing-event.entity';
 import { Fatura, FormaPagamento } from '../faturamento/entities/fatura.entity';
 import { Pagamento, StatusPagamento, TipoPagamento } from '../faturamento/entities/pagamento.entity';
 import { PagamentoService } from '../faturamento/services/pagamento.service';
+import { EmpresaModuloService } from '../empresas/services/empresa-modulo.service';
 
 type ReconciliationSource = 'manual' | 'batch' | 'webhook_duplicate';
 type ReconciliationAction = 'updated' | 'aligned' | 'skipped' | 'error';
@@ -61,8 +62,36 @@ export class MercadoPagoService {
     private readonly pagamentoRepository: Repository<Pagamento>,
     @Inject(forwardRef(() => PagamentoService))
     private readonly pagamentoService: PagamentoService,
+    @Inject(forwardRef(() => EmpresaModuloService))
+    private readonly empresaModuloService: EmpresaModuloService,
   ) {
     this.initializeMercadoPago();
+  }
+
+  private extractPlanoModuleCodes(assinatura: AssinaturaEmpresa): string[] {
+    return (assinatura?.plano?.modulosInclusos || [])
+      .map((item: any) => String(item?.modulo?.codigo || '').trim())
+      .filter(Boolean);
+  }
+
+  private async sincronizarModulosAssinatura(
+    empresaId: string,
+    assinatura: AssinaturaEmpresa,
+    origem: string,
+  ): Promise<void> {
+    const modulosPlano = this.extractPlanoModuleCodes(assinatura);
+    if (modulosPlano.length === 0) {
+      this.logger.warn(
+        `Assinatura ${assinatura?.id || 'n/a'} sem modulos vinculados para sincronizacao (${origem})`,
+      );
+      return;
+    }
+
+    await this.empresaModuloService.sincronizarModulosPlano(
+      empresaId,
+      modulosPlano,
+      assinatura?.plano?.codigo || null,
+    );
   }
 
   private parseExternalReference(externalReference?: string):
@@ -521,6 +550,7 @@ export class MercadoPagoService {
     await runWithTenant(empresaId, async () => {
       const assinatura = await this.assinaturaRepository.findOne({
         where: { id: assinaturaId },
+        relations: ['plano', 'plano.modulosInclusos', 'plano.modulosInclusos.modulo'],
       });
 
       if (!assinatura) {
@@ -588,6 +618,9 @@ export class MercadoPagoService {
         : observacao;
 
       await this.assinaturaRepository.save(assinatura);
+      if (targetStatus === 'active') {
+        await this.sincronizarModulosAssinatura(empresaId, assinatura, 'payment_reconciliation');
+      }
 
       result = {
         paymentId,
@@ -1275,7 +1308,7 @@ export class MercadoPagoService {
     await runWithTenant(empresaId, async () => {
       const assinatura = await this.assinaturaRepository.findOne({
         where: { id: assinaturaId },
-        relations: ['plano'],
+        relations: ['plano', 'plano.modulosInclusos', 'plano.modulosInclusos.modulo'],
       });
 
       if (!assinatura) {
@@ -1314,6 +1347,7 @@ export class MercadoPagoService {
         : linha;
 
       await this.assinaturaRepository.save(assinatura);
+      await this.sincronizarModulosAssinatura(empresaId, assinatura, 'payment_approved');
       this.logger.log(`✅ Assinatura ${assinatura.id} ativada com sucesso`);
     });
   }
@@ -1481,6 +1515,7 @@ export class MercadoPagoService {
       await runWithTenant(empresaId, async () => {
         const assinatura = await this.assinaturaRepository.findOne({
           where: { id: assinaturaId },
+          relations: ['plano', 'plano.modulosInclusos', 'plano.modulosInclusos.modulo'],
         });
 
         if (!assinatura) {
@@ -1530,6 +1565,13 @@ export class MercadoPagoService {
           : linha;
 
         await this.assinaturaRepository.save(assinatura);
+        if (targetStatus === 'active') {
+          await this.sincronizarModulosAssinatura(
+            empresaId,
+            assinatura,
+            'subscription_preapproval_active',
+          );
+        }
       });
     } catch (error) {
       this.logger.error('Erro ao processar webhook de assinatura:', error);

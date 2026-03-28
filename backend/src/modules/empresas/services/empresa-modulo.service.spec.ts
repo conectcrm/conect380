@@ -33,6 +33,7 @@ describe('EmpresaModuloService', () => {
       ModuloEnum.ATENDIMENTO,
       ModuloEnum.CRM,
       ModuloEnum.VENDAS,
+      ModuloEnum.COMPRAS,
       ModuloEnum.FINANCEIRO,
       ModuloEnum.BILLING,
       ModuloEnum.ADMINISTRACAO,
@@ -88,5 +89,18 @@ describe('EmpresaModuloService', () => {
 
     expect(result).toBe(true);
     expect(repositoryMock.findOne).toHaveBeenCalled();
+  });
+
+  it('impede desativacao de modulo essencial', async () => {
+    await expect(service.desativar('tenant-id', ModuloEnum.CRM)).rejects.toThrow(
+      'Modulo essencial CRM nao pode ser desativado',
+    );
+    expect(repositoryMock.findOne).not.toHaveBeenCalled();
+  });
+
+  it('considera CRM como modulo essencial ativo mesmo sem registro', async () => {
+    const result = await service.isModuloAtivo('tenant-id', ModuloEnum.CRM);
+    expect(result).toBe(true);
+    expect(repositoryMock.findOne).not.toHaveBeenCalled();
   });
 });
