@@ -22,15 +22,15 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permission } from '../../common/permissions/permissions.constants';
 import { CriarAssinaturaDto } from './dto/criar-assinatura.dto';
 import { CriarCheckoutDto } from './dto/criar-checkout.dto';
-import { MercadoPagoService } from '../mercado-pago/mercado-pago.service';
 import { EmpresaId } from '../../common/decorators/empresa.decorator';
 import { UserRole } from '../users/user.entity';
 import type { Request } from 'express';
 import { AssinaturaStatus, toCanonicalAssinaturaStatus } from './entities/assinatura-empresa.entity';
 import { AssinaturaDueDateSchedulerService } from './assinatura-due-date-scheduler.service';
-import { LegacyAdminTransitionGuard } from '../admin/guards/legacy-admin-transition.guard';
+import { CoreAdminLegacyTransitionGuard } from '../../common/guards/core-admin-legacy-transition.guard';
 import { GatewayProvider } from '../pagamentos/entities/configuracao-gateway.entity';
 import { assertGatewayProviderEnabled } from '../pagamentos/services/gateway-provider-support.util';
+import { PaymentProviderRegistryService } from '../pagamentos/services/payment-provider-registry.service';
 
 @Controller('assinaturas')
 @UseGuards(JwtAuthGuard, EmpresaGuard, RolesGuard, PermissionsGuard)
@@ -40,7 +40,7 @@ export class AssinaturasController {
 
   constructor(
     private readonly assinaturasService: AssinaturasService,
-    private readonly mercadoPagoService: MercadoPagoService,
+    private readonly paymentProviderRegistryService: PaymentProviderRegistryService,
     private readonly assinaturaDueDateSchedulerService: AssinaturaDueDateSchedulerService,
   ) {}
 
@@ -136,7 +136,7 @@ export class AssinaturasController {
   }
 
   @Post()
-  @UseGuards(LegacyAdminTransitionGuard)
+  @UseGuards(CoreAdminLegacyTransitionGuard)
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async criar(@EmpresaId() empresaId: string, @Body() dados: CriarAssinaturaDto) {
     return this.assinaturasService.criar({
@@ -153,7 +153,10 @@ export class AssinaturasController {
     @Req() req: Request,
   ) {
     assertGatewayProviderEnabled(GatewayProvider.MERCADO_PAGO);
-    this.mercadoPagoService.assertCheckoutReady();
+    const paymentProvider = this.paymentProviderRegistryService.getProvider(
+      GatewayProvider.MERCADO_PAGO,
+    );
+    paymentProvider.assertCheckoutReady();
 
     const originHeader = req.headers.origin;
     const originCandidate = typeof originHeader === 'string' ? originHeader.trim() : '';
@@ -196,7 +199,7 @@ export class AssinaturasController {
     );
 
     const externalReference = `conectcrm:empresa:${empresaId}:assinatura:${assinatura.id}`;
-    const preference = await this.mercadoPagoService.createPreference({
+    const preference = await paymentProvider.createPreference({
       items: [
         {
           id: assinatura.id,
@@ -257,21 +260,21 @@ export class AssinaturasController {
   }
 
   @Patch('empresa/:empresaId/suspender')
-  @UseGuards(LegacyAdminTransitionGuard)
+  @UseGuards(CoreAdminLegacyTransitionGuard)
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async suspender(@EmpresaId() empresaId: string, @Param('empresaId') _empresaIdIgnorado: string) {
     return this.assinaturasService.suspender(empresaId);
   }
 
   @Patch('empresa/:empresaId/reativar')
-  @UseGuards(LegacyAdminTransitionGuard)
+  @UseGuards(CoreAdminLegacyTransitionGuard)
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async reativar(@EmpresaId() empresaId: string, @Param('empresaId') _empresaIdIgnorado: string) {
     return this.assinaturasService.reativar(empresaId);
   }
 
   @Patch('empresa/:empresaId/contadores')
-  @UseGuards(LegacyAdminTransitionGuard)
+  @UseGuards(CoreAdminLegacyTransitionGuard)
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async atualizarContadores(
     @EmpresaId() empresaId: string,
@@ -287,7 +290,7 @@ export class AssinaturasController {
   }
 
   @Post('empresa/:empresaId/api-call')
-  @UseGuards(LegacyAdminTransitionGuard)
+  @UseGuards(CoreAdminLegacyTransitionGuard)
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async registrarChamadaApi(
     @EmpresaId() empresaId: string,
@@ -303,7 +306,7 @@ export class AssinaturasController {
   }
 
   @Post('jobs/vencimento/executar')
-  @UseGuards(LegacyAdminTransitionGuard)
+  @UseGuards(CoreAdminLegacyTransitionGuard)
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async executarJobVencimento() {
     return this.assinaturaDueDateSchedulerService.runDueDateStatusCycle();

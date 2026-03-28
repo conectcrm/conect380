@@ -1,14 +1,17 @@
 import { AssinaturasController } from './assinaturas.controller';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
-import { LegacyAdminTransitionGuard } from '../admin/guards/legacy-admin-transition.guard';
+import { CoreAdminLegacyTransitionGuard } from '../../common/guards/core-admin-legacy-transition.guard';
 
 describe('AssinaturasController', () => {
   const assinaturasService = {
     criarAssinaturaPendenteParaCheckout: jest.fn(),
   };
-  const mercadoPagoService = {
+  const paymentProvider = {
     assertCheckoutReady: jest.fn(),
     createPreference: jest.fn(),
+  };
+  const paymentProviderRegistryService = {
+    getProvider: jest.fn(),
   };
   const assinaturaDueDateSchedulerService = {
     runDueDateStatusCycle: jest.fn(),
@@ -21,12 +24,13 @@ describe('AssinaturasController', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    paymentProviderRegistryService.getProvider.mockReturnValue(paymentProvider);
     process.env.FRONTEND_URL = originalFrontendUrl;
     process.env.WEBHOOK_BASE_URL = originalWebhookBaseUrl;
     process.env.MERCADO_PAGO_MOCK = originalMercadoPagoMock;
     controller = new AssinaturasController(
       assinaturasService as any,
-      mercadoPagoService as any,
+      paymentProviderRegistryService as any,
       assinaturaDueDateSchedulerService as any,
     );
   });
@@ -43,7 +47,7 @@ describe('AssinaturasController', () => {
       plano: { nome: 'Business' },
       valorMensal: 549,
     });
-    mercadoPagoService.createPreference.mockResolvedValueOnce({
+    paymentProvider.createPreference.mockResolvedValueOnce({
       id: 'pref-123',
       init_point: 'https://checkout.example/pref-123',
       sandbox_init_point: 'https://sandbox.checkout.example/pref-123',
@@ -62,7 +66,8 @@ describe('AssinaturasController', () => {
       req,
     );
 
-    expect(mercadoPagoService.assertCheckoutReady).toHaveBeenCalledTimes(1);
+    expect(paymentProviderRegistryService.getProvider).toHaveBeenCalledTimes(1);
+    expect(paymentProvider.assertCheckoutReady).toHaveBeenCalledTimes(1);
 
     expect(result).toEqual(
       expect.objectContaining({
@@ -72,7 +77,7 @@ describe('AssinaturasController', () => {
         preferenceId: 'pref-123',
       }),
     );
-    expect(mercadoPagoService.createPreference).toHaveBeenCalledWith(
+    expect(paymentProvider.createPreference).toHaveBeenCalledWith(
       expect.objectContaining({
         notification_url: 'https://api.conectcrm.com/mercadopago/webhooks',
       }),
@@ -80,7 +85,7 @@ describe('AssinaturasController', () => {
   });
 
   it('nao cria assinatura pendente quando checkout do provedor esta indisponivel', async () => {
-    mercadoPagoService.assertCheckoutReady.mockImplementationOnce(() => {
+    paymentProvider.assertCheckoutReady.mockImplementationOnce(() => {
       throw new Error('checkout indisponivel');
     });
 
@@ -100,7 +105,7 @@ describe('AssinaturasController', () => {
     ).rejects.toThrow('checkout indisponivel');
 
     expect(assinaturasService.criarAssinaturaPendenteParaCheckout).not.toHaveBeenCalled();
-    expect(mercadoPagoService.createPreference).not.toHaveBeenCalled();
+    expect(paymentProvider.createPreference).not.toHaveBeenCalled();
   });
 
   it('prioriza FRONTEND_URL e WEBHOOK_BASE_URL configurados quando origin e local', async () => {
@@ -113,7 +118,7 @@ describe('AssinaturasController', () => {
       plano: { nome: 'Business' },
       valorMensal: 549,
     });
-    mercadoPagoService.createPreference.mockResolvedValueOnce({
+    paymentProvider.createPreference.mockResolvedValueOnce({
       id: 'pref-123',
       init_point: 'https://checkout.example/pref-123',
       sandbox_init_point: 'https://sandbox.checkout.example/pref-123',
@@ -132,7 +137,7 @@ describe('AssinaturasController', () => {
       req,
     );
 
-    expect(mercadoPagoService.createPreference).toHaveBeenCalledWith(
+    expect(paymentProvider.createPreference).toHaveBeenCalledWith(
       expect.objectContaining({
         back_urls: {
           success: 'https://5794-187-58-58-31.ngrok-free.app/billing?status=success',
@@ -167,7 +172,7 @@ describe('AssinaturasController', () => {
     );
 
     expect(assinaturasService.criarAssinaturaPendenteParaCheckout).not.toHaveBeenCalled();
-    expect(mercadoPagoService.createPreference).not.toHaveBeenCalled();
+    expect(paymentProvider.createPreference).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -178,11 +183,11 @@ describe('AssinaturasController', () => {
     'registrarChamadaApi',
     'executarJobVencimento',
   ] as const)(
-    'aplica LegacyAdminTransitionGuard no metodo sensivel %s',
+    'aplica CoreAdminLegacyTransitionGuard no metodo sensivel %s',
     (methodName) => {
       const guards = Reflect.getMetadata(GUARDS_METADATA, AssinaturasController.prototype[methodName]);
       expect(Array.isArray(guards)).toBe(true);
-      expect(guards).toContain(LegacyAdminTransitionGuard);
+      expect(guards).toContain(CoreAdminLegacyTransitionGuard);
     },
   );
 });

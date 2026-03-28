@@ -17,8 +17,11 @@ describe('AssinaturaDueDateSchedulerService', () => {
     suspender: jest.fn(),
   };
 
-  const mercadoPagoService = {
+  const paymentProvider = {
     reconcileRecentPayments: jest.fn(),
+  };
+  const paymentProviderRegistryService = {
+    getProvider: jest.fn(),
   };
 
   let service: AssinaturaDueDateSchedulerService;
@@ -32,10 +35,11 @@ describe('AssinaturaDueDateSchedulerService', () => {
       ASSINATURA_PAST_DUE_SUSPEND_AFTER_DAYS: '3',
     };
 
-    mercadoPagoService.reconcileRecentPayments.mockResolvedValue({
+    paymentProvider.reconcileRecentPayments.mockResolvedValue({
       processed: 2,
       errors: 0,
     });
+    paymentProviderRegistryService.getProvider.mockReturnValue(paymentProvider);
     assinaturasService.obterPoliticaTenant.mockResolvedValue({
       isPlatformOwner: false,
       billingExempt: false,
@@ -49,7 +53,7 @@ describe('AssinaturaDueDateSchedulerService', () => {
     service = new AssinaturaDueDateSchedulerService(
       assinaturaRepository as any,
       assinaturasService as any,
-      mercadoPagoService as any,
+      paymentProviderRegistryService as any,
     );
   });
 
@@ -70,7 +74,8 @@ describe('AssinaturaDueDateSchedulerService', () => {
 
     const summary = await service.runDueDateStatusCycle();
 
-    expect(mercadoPagoService.reconcileRecentPayments).toHaveBeenCalled();
+    expect(paymentProviderRegistryService.getProvider).toHaveBeenCalled();
+    expect(paymentProvider.reconcileRecentPayments).toHaveBeenCalled();
     expect(assinaturasService.marcarPastDue).toHaveBeenCalledWith(
       '11111111-1111-1111-1111-111111111111',
     );
@@ -139,7 +144,7 @@ describe('AssinaturaDueDateSchedulerService', () => {
   });
 
   it('mantem transicoes de vencimento mesmo com falha na reconciliacao do provedor', async () => {
-    mercadoPagoService.reconcileRecentPayments.mockRejectedValueOnce(
+    paymentProvider.reconcileRecentPayments.mockRejectedValueOnce(
       new Error('provider_temporarily_unavailable'),
     );
     assinaturaRepository.manager.query.mockResolvedValueOnce([

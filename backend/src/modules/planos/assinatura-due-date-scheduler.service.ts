@@ -2,13 +2,14 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { runWithTenant } from '../../common/tenant/tenant-context';
-import { MercadoPagoService } from '../mercado-pago/mercado-pago.service';
 import {
   AssinaturaEmpresa,
   getAssinaturaStatusAliases,
   toCanonicalAssinaturaStatus,
 } from './entities/assinatura-empresa.entity';
 import { AssinaturasService } from './assinaturas.service';
+import { GatewayProvider } from '../pagamentos/entities/configuracao-gateway.entity';
+import { PaymentProviderRegistryService } from '../pagamentos/services/payment-provider-registry.service';
 
 type DueDateStatusJobSummary = {
   checked: number;
@@ -67,7 +68,7 @@ export class AssinaturaDueDateSchedulerService implements OnModuleInit, OnModule
     @InjectRepository(AssinaturaEmpresa)
     private readonly assinaturaRepository: Repository<AssinaturaEmpresa>,
     private readonly assinaturasService: AssinaturasService,
-    private readonly mercadoPagoService: MercadoPagoService,
+    private readonly paymentProviderRegistryService: PaymentProviderRegistryService,
   ) {}
 
   onModuleInit(): void {
@@ -123,7 +124,10 @@ export class AssinaturaDueDateSchedulerService implements OnModuleInit, OnModule
 
     try {
       try {
-        const reconciliation = await this.mercadoPagoService.reconcileRecentPayments({
+        const paymentProvider = this.paymentProviderRegistryService.getProvider(
+          GatewayProvider.MERCADO_PAGO,
+        );
+        const reconciliation = await paymentProvider.reconcileRecentPayments({
           lookbackHours: this.reconciliationLookbackHours,
           limit: this.reconciliationLimit,
         });
