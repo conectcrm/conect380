@@ -15,6 +15,8 @@ describe('Guardian MFA and session hardening (E2E)', () => {
     nome: 'Superadmin MFA Session',
     role: 'superadmin',
   };
+  const previousAuthAdminMfaRequired = process.env.AUTH_ADMIN_MFA_REQUIRED;
+  const previousAuthMfaDevFallback = process.env.AUTH_MFA_DEV_FALLBACK_ENABLED;
 
   let app: INestApplication;
   let dataSource: DataSource;
@@ -29,6 +31,9 @@ describe('Guardian MFA and session hardening (E2E)', () => {
   };
 
   beforeAll(async () => {
+    process.env.AUTH_ADMIN_MFA_REQUIRED = 'true';
+    process.env.AUTH_MFA_DEV_FALLBACK_ENABLED = 'true';
+
     const moduleFixture: TestingModule = await withE2EBootstrapLock(() =>
       Test.createTestingModule({
         imports: [AppModule],
@@ -117,6 +122,18 @@ describe('Guardian MFA and session hardening (E2E)', () => {
 
   afterAll(async () => {
     await app.close();
+
+    if (previousAuthAdminMfaRequired === undefined) {
+      delete process.env.AUTH_ADMIN_MFA_REQUIRED;
+    } else {
+      process.env.AUTH_ADMIN_MFA_REQUIRED = previousAuthAdminMfaRequired;
+    }
+
+    if (previousAuthMfaDevFallback === undefined) {
+      delete process.env.AUTH_MFA_DEV_FALLBACK_ENABLED;
+    } else {
+      process.env.AUTH_MFA_DEV_FALLBACK_ENABLED = previousAuthMfaDevFallback;
+    }
   });
 
   it('exige MFA no login de superadmin e preserva mfa_verified no refresh', async () => {

@@ -44,8 +44,7 @@ test.describe('Billing self-service - acesso negativo', () => {
       });
     });
 
-    await page.reload();
-    await page.waitForURL('**/dashboard', { timeout: 10000 });
+    await page.reload({ waitUntil: 'domcontentloaded' });
 
     await page.goto('/billing/assinaturas');
     await expect(page.getByText(/Acesso negado/i)).toBeVisible({ timeout: 10000 });

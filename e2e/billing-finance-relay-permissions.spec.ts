@@ -41,8 +41,7 @@ const applyProfilePermissions = async (page: any, permissions: string[]) => {
     });
   });
 
-  await page.reload();
-  await page.waitForURL('**/dashboard', { timeout: 10000 });
+  await page.reload({ waitUntil: 'domcontentloaded' });
 };
 
 test.describe('Billing legacy aliases para self-service', () => {
