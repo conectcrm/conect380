@@ -1,6 +1,6 @@
 # Matriz Modulo x Permissao x Plano
 
-Gerado automaticamente em: 2026-03-29T22:07:06.771Z
+Gerado automaticamente em: 2026-03-29T22:12:56.366Z
 Fontes:
 - `backend/src/common/permissions/permissions.constants.ts`
 - `backend/src/modules/planos/planos.defaults.ts`
