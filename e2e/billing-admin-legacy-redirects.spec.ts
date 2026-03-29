@@ -60,7 +60,7 @@ const elevateSessionToCoreAdmin = async (page: Page): Promise<void> => {
 };
 
 test.describe('Core Admin legacy routes lockdown', () => {
-  test('bloqueia aliases admin/guardian no cliente e evita relay externo legado', async ({
+  test('bloqueia aliases legados no cliente e evita relay externo legado', async ({
     authenticatedPage,
   }) => {
     await elevateSessionToCoreAdmin(authenticatedPage);

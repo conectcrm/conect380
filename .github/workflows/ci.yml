@@ -818,7 +818,7 @@ jobs:
           filters: |
             legacy_exposure:
               - '.github/workflows/ci.yml'
-              - 'scripts/ci/guardian-exposure-scan.ps1'
+              - 'scripts/ci/legacy-admin-exposure-scan.ps1'
               - 'frontend-web/src/**'
               - 'package.json'
               - 'package-lock.json'
@@ -849,7 +849,7 @@ jobs:
 
       - name: Rodar Legacy exposure scan
         if: steps.legacy_exposure_changes.outputs.legacy_exposure == 'true'
-        run: pwsh -NoLogo -NoProfile -File ./scripts/ci/guardian-exposure-scan.ps1
+        run: pwsh -NoLogo -NoProfile -File ./scripts/ci/legacy-admin-exposure-scan.ps1
 
   frontend-e2e-core-admin-billing-governance:
     name: Frontend - E2E Core Admin Billing Governance (Playwright)
