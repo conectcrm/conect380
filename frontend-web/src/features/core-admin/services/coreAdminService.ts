@@ -301,7 +301,8 @@ export const coreAdminService = {
     const response = await api.get('/core-admin/bff/runtime-history', {
       params: { limit },
     });
-    return unwrapData<CoreAdminRuntimeHistoryItem[]>(response.data, []);
+    const payload = unwrapData<unknown>(response.data, []);
+    return Array.isArray(payload) ? (payload as CoreAdminRuntimeHistoryItem[]) : [];
   },
 
   async listUsers(params?: {
@@ -680,15 +681,19 @@ export const coreAdminService = {
   },
 
   async listFeatureFlags(empresaId: string): Promise<CoreAdminFeatureFlag[]> {
-    const response = await api.get('/core-admin/feature-flags', {
-      params: { empresaId },
-    });
-    return unwrapData<CoreAdminFeatureFlag[]>(response.data, []);
+    const response = await api.get(`/core-admin/feature-flags/${empresaId}`);
+    const payload = unwrapData<unknown>(response.data, []);
+    return Array.isArray(payload) ? (payload as CoreAdminFeatureFlag[]) : [];
   },
 
   async listFeatureFlagCatalog(): Promise<string[]> {
     const response = await api.get('/core-admin/feature-flags/catalog');
-    return unwrapData<string[]>(response.data, []);
+    const payload = unwrapData<unknown>(response.data, []);
+    return Array.isArray(payload)
+      ? payload
+          .map((item) => String(item || '').trim())
+          .filter((item) => item.length > 0)
+      : [];
   },
 
   async upsertFeatureFlags(
@@ -699,6 +704,7 @@ export const coreAdminService = {
       empresaId,
       flags,
     });
-    return unwrapData<CoreAdminFeatureFlag[]>(response.data, []);
+    const payload = unwrapData<unknown>(response.data, []);
+    return Array.isArray(payload) ? (payload as CoreAdminFeatureFlag[]) : [];
   },
 };

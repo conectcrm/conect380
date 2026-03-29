@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -28,8 +28,8 @@ export class CoreAdminFeatureFlagsController {
     };
   }
 
-  @Get()
-  async listByEmpresa(@Query('empresaId') empresaId: string) {
+  @Get(':empresaId')
+  async listByEmpresa(@Param('empresaId') empresaId: string) {
     return {
       success: true,
       data: await this.coreAdminFeatureFlagService.listByEmpresa(empresaId),

@@ -111,7 +111,7 @@ const installCoreAdminMocks = async (page: Page) => {
     );
   });
 
-  await page.route('**/core-admin/planos', async (route) => {
+  await page.route('**/core-admin/planos**', async (route) => {
     if (route.request().method().toUpperCase() !== 'GET') {
       await route.fallback();
       return;
@@ -173,20 +173,22 @@ test.describe('Core Admin billing governance - core panel baseline', () => {
     await expect(page.getByText('Solicitacoes de acesso')).toBeVisible();
     await expect(page.getByText('7')).toBeVisible();
 
-    const companiesSection = page.locator('div.rounded-xl', {
-      has: page.getByRole('heading', { name: 'Empresas (amostra)' }),
+    await page.getByRole('button', { name: 'Empresas e Flags' }).click();
+    const companiesPanel = page.locator('section.rounded-xl', {
+      has: page.getByRole('heading', { name: 'Empresas' }),
     });
-    await expect(companiesSection).toContainText('Empresa Alfa');
-    await expect(companiesSection).toContainText('professional');
-    await expect(companiesSection).toContainText('Empresa Beta');
+    await expect(companiesPanel).toContainText('Empresa Alfa');
+    await expect(companiesPanel).toContainText('professional');
+    await expect(companiesPanel).toContainText('Empresa Beta');
 
-    const plansSection = page.locator('div.rounded-xl', {
+    await page.getByRole('button', { name: 'Planos' }).click();
+    const plansSection = page.locator('section.rounded-xl', {
       has: page.getByRole('heading', { name: 'Catalogo de planos' }),
     });
     await expect(plansSection).toContainText('Starter');
     await expect(plansSection).toContainText('Professional');
-    await expect(plansSection).toContainText('R$ 99.00');
-    await expect(plansSection).toContainText('R$ 249.00');
+    await expect(plansSection).toContainText(/R\$\s*99,00/);
+    await expect(plansSection).toContainText(/R\$\s*249,00/);
   });
 });
 

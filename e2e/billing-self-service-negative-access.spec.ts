@@ -49,10 +49,14 @@ test.describe('Billing self-service - acesso negativo', () => {
 
     await page.goto('/billing/assinaturas');
     await expect(page.getByText(/Acesso negado/i)).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('link', { name: /Voltar ao dashboard/i })).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: /Voltar ao dashboard|Ir para tela inicial/i }),
+    ).toBeVisible();
 
     await page.goto('/billing/planos');
     await expect(page.getByText(/Acesso negado/i)).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('link', { name: /Voltar ao dashboard/i })).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: /Voltar ao dashboard|Ir para tela inicial/i }),
+    ).toBeVisible();
   });
 });

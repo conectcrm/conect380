@@ -12,7 +12,7 @@ test.describe('Billing - seguranca de sessao', () => {
   }) => {
     await login(page, adminUser.email, adminUser.senha);
 
-    await page.route('**/assinaturas/empresa/**', async (route) => {
+    await page.route('**/billing/self-service/overview', async (route) => {
       await route.fulfill({
         status: 401,
         ...jsonResponse({ success: false, message: 'Unauthorized' }),
@@ -44,7 +44,7 @@ test.describe('Billing - seguranca de sessao', () => {
   }) => {
     await login(page, adminUser.email, adminUser.senha);
 
-    await page.route('**/assinaturas/empresa/**', async (route) => {
+    await page.route('**/billing/self-service/overview', async (route) => {
       await route.fulfill({
         status: 401,
         ...jsonResponse({ success: false, message: 'Unauthorized' }),
