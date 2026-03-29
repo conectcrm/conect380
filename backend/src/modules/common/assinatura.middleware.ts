@@ -56,8 +56,6 @@ const PATH_PREFIX_TO_MODULE: Array<{ prefix: string; module: EntitlementModule }
   { prefix: '/centros-custo', module: 'FINANCEIRO' },
   { prefix: '/contas-bancarias', module: 'FINANCEIRO' },
   { prefix: '/conciliacao-bancaria', module: 'FINANCEIRO' },
-  { prefix: '/billing', module: 'BILLING' },
-
   { prefix: '/atendimento', module: 'ATENDIMENTO' },
   { prefix: '/filas', module: 'ATENDIMENTO' },
   { prefix: '/triagem', module: 'ATENDIMENTO' },

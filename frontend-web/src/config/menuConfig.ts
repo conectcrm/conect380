@@ -1079,7 +1079,6 @@ export const menuConfig: MenuConfig[] = [
     href: '/billing/assinaturas',
     color: 'green',
     permissions: ['planos.manage'],
-    requiredModule: 'BILLING', //  Requer licenca de Billing
     section: 'Opera\u00e7\u00f5es',
   },
   {
@@ -1471,8 +1470,6 @@ const ROUTE_PATH_ALIASES: Record<string, string[]> = {
 };
 
 const ROUTE_MODULE_REQUIREMENTS: Array<{ pattern: string; module: LicensedModule }> = [
-  { pattern: '/billing', module: 'BILLING' },
-  { pattern: '/assinaturas', module: 'BILLING' },
   { pattern: '/faturamento', module: 'FINANCEIRO' },
 
   { pattern: '/financeiro', module: 'FINANCEIRO' },

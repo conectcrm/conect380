@@ -73,6 +73,7 @@ export const DEFAULT_MODULOS_SISTEMA: DefaultModuloSeed[] = [
     descricao: 'Assinaturas, cobrancas recorrentes e self-service.',
     icone: 'CreditCard',
     cor: '#6D4C41',
+    essencial: true,
     ordem: 6,
   },
   {
@@ -102,7 +103,7 @@ export const DEFAULT_PLANOS_SISTEMA: DefaultPlanoSeed[] = [
     whiteLabel: false,
     suportePrioritario: false,
     ordem: 1,
-    modulosCodigos: ['CRM', 'ATENDIMENTO'],
+    modulosCodigos: ['CRM', 'ATENDIMENTO', 'BILLING'],
   },
   {
     nome: 'Business',
@@ -116,7 +117,7 @@ export const DEFAULT_PLANOS_SISTEMA: DefaultPlanoSeed[] = [
     whiteLabel: true,
     suportePrioritario: true,
     ordem: 2,
-    modulosCodigos: ['CRM', 'ATENDIMENTO', 'VENDAS', 'COMPRAS', 'FINANCEIRO'],
+    modulosCodigos: ['CRM', 'ATENDIMENTO', 'VENDAS', 'COMPRAS', 'FINANCEIRO', 'BILLING'],
   },
   {
     nome: 'Enterprise',

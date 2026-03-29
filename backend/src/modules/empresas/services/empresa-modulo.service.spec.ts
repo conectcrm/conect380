@@ -72,7 +72,7 @@ describe('EmpresaModuloService', () => {
 
     const result = await service.listarModulosAtivos('tenant-id');
 
-    expect(result).toEqual([ModuloEnum.CRM]);
+    expect(result).toEqual([ModuloEnum.CRM, ModuloEnum.BILLING]);
     expect(repositoryMock.update).toHaveBeenCalledWith('module-2', { ativo: false });
   });
 

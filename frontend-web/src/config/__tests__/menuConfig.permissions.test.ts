@@ -1035,7 +1035,7 @@ describe('menuConfig permission filtering', () => {
     expect(withoutPermission).toBe(false);
   });
 
-  it('blocks billing self-service routes when BILLING module is not active', () => {
+  it('allows billing self-service routes without depending on BILLING module entitlement', () => {
     const withoutBillingModule = canUserAccessPath(
       '/billing/assinaturas',
       ['ATENDIMENTO', 'CRM', 'VENDAS', 'FINANCEIRO', 'ADMINISTRACAO'],
@@ -1046,7 +1046,7 @@ describe('menuConfig permission filtering', () => {
       } as any,
     );
 
-    expect(withoutBillingModule).toBe(false);
+    expect(withoutBillingModule).toBe(true);
   });
 
   it('maps legacy billing faturas/pagamentos aliases to billing self-service permission', () => {

@@ -648,24 +648,10 @@ const AppRoutes: React.FC = () => {
                   />
                   {/* Perfil do Usuário */}
                   <Route path="/perfil" element={<PerfilPage />} />
-                  {/* Sistema de Billing e Assinaturas - Protegido */}
-                  <Route
-                    path="/billing"
-                    element={
-                      protegerRota(
-                        ModuloEnum.BILLING,
-                        <Navigate to="/billing/assinaturas" replace />,
-                      )
-                    }
-                  />
-                  <Route
-                    path="/billing/assinaturas"
-                    element={protegerRota(ModuloEnum.BILLING, <BillingPage />)}
-                  />
-                  <Route
-                    path="/billing/planos"
-                    element={protegerRota(ModuloEnum.BILLING, <BillingPage />)}
-                  />
+                  {/* Sistema de Billing e Assinaturas - controlado por permissao */}
+                  <Route path="/billing" element={<Navigate to="/billing/assinaturas" replace />} />
+                  <Route path="/billing/assinaturas" element={<BillingPage />} />
+                  <Route path="/billing/planos" element={<BillingPage />} />
                   <Route
                     path="/billing/faturas"
                     element={<Navigate to="/billing/assinaturas" replace />}

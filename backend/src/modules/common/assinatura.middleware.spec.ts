@@ -182,7 +182,7 @@ describe('AssinaturaMiddleware', () => {
     });
   });
 
-  it('bloqueia modulo sensivel nao incluido no plano', async () => {
+  it('nao bloqueia billing por entitlement de modulo do plano', async () => {
     assinaturasService.buscarPorEmpresa.mockResolvedValueOnce({
       status: 'active',
       usuariosAtivos: 1,
@@ -200,21 +200,17 @@ describe('AssinaturaMiddleware', () => {
     });
 
     const next = jest.fn();
-    try {
-      await middleware.use(
-        {
-          path: '/billing/cobrancas',
-          method: 'GET',
-          user: { empresaId: '11111111-1111-1111-1111-111111111111' },
-        } as any,
-        {} as any,
-        next,
-      );
-      fail('expected middleware to throw HttpException');
-    } catch (error) {
-      expect(error).toBeInstanceOf(HttpException);
-      expect((error as HttpException).getStatus()).toBe(HttpStatus.FORBIDDEN);
-    }
+    await middleware.use(
+      {
+        path: '/billing/cobrancas',
+        method: 'GET',
+        user: { empresaId: '11111111-1111-1111-1111-111111111111' },
+      } as any,
+      {} as any,
+      next,
+    );
+
+    expect(next).toHaveBeenCalled();
   });
 
   it('bloqueia rota de vendas nao incluida no plano', async () => {
