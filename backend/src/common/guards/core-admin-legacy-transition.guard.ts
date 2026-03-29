@@ -186,7 +186,7 @@ export class CoreAdminLegacyTransitionGuard implements CanActivate {
   }
 
   private parseMode(modeValue: string | undefined): CoreAdminLegacyTransitionMode {
-    const normalized = (modeValue || 'legacy').trim().toLowerCase();
+    const normalized = (modeValue || 'guardian_only').trim().toLowerCase();
     if (
       normalized === 'legacy' ||
       normalized === 'dual' ||
@@ -196,7 +196,7 @@ export class CoreAdminLegacyTransitionGuard implements CanActivate {
       return normalized;
     }
 
-    return 'legacy';
+    return 'guardian_only';
   }
 
   private parseCanaryPercent(rawValue: string | undefined): number {

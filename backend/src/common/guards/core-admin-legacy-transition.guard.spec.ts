@@ -106,7 +106,7 @@ describe('CoreAdminLegacyTransitionGuard', () => {
     }
   });
 
-  it('usa legacy como padrao quando variavel de modo nao estiver definida', () => {
+  it('usa guardian_only como padrao quando variavel de modo nao estiver definida', () => {
     delete process.env.CORE_ADMIN_LEGACY_TRANSITION_MODE;
     process.env.CORE_ADMIN_LEGACY_CANARY_PERCENT = '0';
     delete process.env.CORE_ADMIN_LEGACY_READ_ONLY;
@@ -114,7 +114,7 @@ describe('CoreAdminLegacyTransitionGuard', () => {
     const guard = new CoreAdminLegacyTransitionGuard();
     const { context } = createContext({ userId: 'user-default-legacy' });
 
-    expect(guard.canActivate(context)).toBe(true);
+    expect(() => guard.canActivate(context)).toThrow(GoneException);
   });
 
   it('aplica rollout canary conforme percentual configurado', () => {
