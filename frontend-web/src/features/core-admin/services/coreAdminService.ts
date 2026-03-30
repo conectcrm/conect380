@@ -55,12 +55,44 @@ export type CoreAdminPlan = {
   codigo: string;
   descricao?: string;
   preco: number;
+  periodicidadeCobranca?: 'mensal' | 'anual';
+  diasTrial?: number;
+  gatewayPriceId?: string | null;
+  publicadoCheckout?: boolean;
   limiteUsuarios: number;
   limiteClientes: number;
   limiteStorage: number;
   limiteApiCalls: number;
+  whiteLabel?: boolean;
+  suportePrioritario?: boolean;
   ativo: boolean;
-  modulosInclusos?: Array<{ id: string; nome?: string; codigo?: string }>;
+  ordem?: number;
+  modulosInclusos?: Array<{
+    id?: string;
+    nome?: string;
+    codigo?: string;
+    modulo?: { id?: string; nome?: string; codigo?: string };
+  }>;
+};
+
+export type CoreAdminPlanUpsertPayload = {
+  nome: string;
+  codigo: string;
+  descricao?: string;
+  preco: number;
+  periodicidadeCobranca: 'mensal' | 'anual';
+  diasTrial: number;
+  gatewayPriceId?: string;
+  publicadoCheckout: boolean;
+  limiteUsuarios: number;
+  limiteClientes: number;
+  limiteStorage: number;
+  limiteApiCalls: number;
+  whiteLabel?: boolean;
+  suportePrioritario?: boolean;
+  ativo?: boolean;
+  ordem?: number;
+  modulosInclusos: string[];
 };
 
 export type CoreAdminBillingItem = {
@@ -553,11 +585,24 @@ export const coreAdminService = {
     return response.data;
   },
 
-  async listPlans(includeInactive = true): Promise<CoreAdminPlan[]> {
+  async listPlans(includeInactive = true, includeUnpublished = true): Promise<CoreAdminPlan[]> {
     const response = await api.get('/core-admin/planos', {
-      params: { include_inactive: includeInactive },
+      params: {
+        include_inactive: includeInactive,
+        include_unpublished: includeUnpublished,
+      },
     });
     return Array.isArray(response.data) ? response.data : [];
+  },
+
+  async createPlan(payload: CoreAdminPlanUpsertPayload): Promise<CoreAdminPlan> {
+    const response = await api.post('/core-admin/planos', payload);
+    return response.data as CoreAdminPlan;
+  },
+
+  async updatePlan(planId: string, payload: CoreAdminPlanUpsertPayload): Promise<CoreAdminPlan> {
+    const response = await api.put(`/core-admin/planos/${planId}`, payload);
+    return response.data as CoreAdminPlan;
   },
 
   async togglePlanStatus(planId: string) {

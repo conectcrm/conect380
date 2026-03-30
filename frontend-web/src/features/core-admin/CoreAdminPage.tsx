@@ -33,6 +33,96 @@ type CoreAdminTab =
   | 'audit';
 type UsersActiveFilter = 'all' | 'active' | 'inactive';
 
+type PlanFormMode = 'create' | 'edit';
+
+type PlanFormState = {
+  nome: string;
+  codigo: string;
+  descricao: string;
+  preco: string;
+  periodicidadeCobranca: 'mensal' | 'anual';
+  diasTrial: string;
+  gatewayPriceId: string;
+  publicadoCheckout: boolean;
+  limiteUsuarios: string;
+  limiteClientes: string;
+  ativo: boolean;
+  ordem: string;
+  modulosInclusos: string[];
+};
+
+type ModuleLinkedScreen = {
+  label: string;
+  path: string;
+};
+
+const DEFAULT_PLAN_FORM: PlanFormState = {
+  nome: '',
+  codigo: '',
+  descricao: '',
+  preco: '0',
+  periodicidadeCobranca: 'mensal',
+  diasTrial: '0',
+  gatewayPriceId: '',
+  publicadoCheckout: true,
+  limiteUsuarios: '-1',
+  limiteClientes: '-1',
+  ativo: true,
+  ordem: '0',
+  modulosInclusos: [],
+};
+
+const CORE_ADMIN_CANONICAL_ESSENTIAL_MODULE_CODES = new Set(['CRM', 'BILLING']);
+
+const CORE_ADMIN_MODULE_LINKED_SCREENS: Record<string, ModuleLinkedScreen[]> = {
+  CRM: [
+    { label: 'Clientes', path: '/crm/clientes' },
+    { label: 'Leads', path: '/crm/leads' },
+    { label: 'Contatos', path: '/crm/contatos' },
+    { label: 'Pipeline', path: '/crm/pipeline' },
+    { label: 'Agenda', path: '/agenda' },
+    { label: 'Relatorios comerciais', path: '/relatorios/comercial' },
+  ],
+  ATENDIMENTO: [
+    { label: 'Inbox omnichannel', path: '/atendimento/inbox' },
+    { label: 'Tickets', path: '/atendimento/tickets' },
+    { label: 'Automacoes', path: '/atendimento/automacoes' },
+    { label: 'Equipe', path: '/atendimento/equipe' },
+    { label: 'Distribuicao', path: '/atendimento/distribuicao' },
+    { label: 'Analytics', path: '/atendimento/analytics' },
+  ],
+  VENDAS: [
+    { label: 'Propostas', path: '/propostas' },
+    { label: 'Contratos', path: '/contratos' },
+    { label: 'Produtos', path: '/produtos' },
+    { label: 'Veiculos', path: '/veiculos' },
+    { label: 'Categorias de produtos', path: '/produtos/categorias' },
+    { label: 'Relatorio propostas e contratos', path: '/relatorios/comercial/propostas-contratos' },
+  ],
+  FINANCEIRO: [
+    { label: 'Contas a pagar', path: '/financeiro/contas-pagar' },
+    { label: 'Fornecedores', path: '/financeiro/fornecedores' },
+    { label: 'Contas bancarias', path: '/financeiro/contas-bancarias' },
+    { label: 'Aprovacoes', path: '/financeiro/aprovacoes' },
+    { label: 'Faturamento', path: '/financeiro/faturamento' },
+    { label: 'Relatorios financeiros', path: '/financeiro/relatorios' },
+  ],
+  COMPRAS: [
+    { label: 'Cotacoes e orcamentos', path: '/compras/cotacoes' },
+    { label: 'Aprovacoes de compras', path: '/compras/aprovacoes' },
+  ],
+  BILLING: [
+    { label: 'Assinaturas', path: '/billing/assinaturas' },
+    { label: 'Planos e upgrade', path: '/billing/planos' },
+  ],
+  ADMINISTRACAO: [
+    { label: 'Minhas empresas', path: '/empresas/minhas' },
+    { label: 'Configuracoes da empresa', path: '/configuracoes/empresa' },
+    { label: 'Usuarios e permissoes', path: '/configuracoes/usuarios' },
+    { label: 'Branding do sistema', path: '/configuracoes/sistema' },
+  ],
+};
+
 const SUPER_ADMIN_ALIASES = new Set(['superadmin']);
 
 const CoreAdminPage: React.FC = () => {
@@ -101,6 +191,13 @@ const CoreAdminPage: React.FC = () => {
   const [companyFlags, setCompanyFlags] = useState<CoreAdminFeatureFlag[]>([]);
   const [featureFlagCatalog, setFeatureFlagCatalog] = useState<string[]>([]);
   const [busyActions, setBusyActions] = useState<Record<string, boolean>>({});
+  const [planFormMode, setPlanFormMode] = useState<PlanFormMode>('create');
+  const [planEditingId, setPlanEditingId] = useState<string | null>(null);
+  const [planForm, setPlanForm] = useState<PlanFormState>(DEFAULT_PLAN_FORM);
+  const [showPlanForm, setShowPlanForm] = useState(false);
+  const [expandedPlanModuleCodes, setExpandedPlanModuleCodes] = useState<Record<string, boolean>>(
+    {},
+  );
 
   const isSuperAdmin = useMemo(() => {
     const role = String(user?.role || '')
@@ -136,6 +233,7 @@ const CoreAdminPage: React.FC = () => {
         companiesData,
         plansData,
         billingData,
+        modulesData,
       ] = await Promise.all([
         coreAdminService.getOverview(),
         coreAdminService.getCapabilities(),
@@ -144,6 +242,7 @@ const CoreAdminPage: React.FC = () => {
         coreAdminService.listCompanies({ page: 1, limit: 20 }),
         coreAdminService.listPlans(true),
         coreAdminService.listBillingSubscriptions({ page: 1, limit: 20 }),
+        coreAdminService.listSystemModules(true),
       ]);
 
       setOverview(overviewData);
@@ -153,6 +252,7 @@ const CoreAdminPage: React.FC = () => {
       setCompanies(companiesData.data || []);
       setPlans(plansData || []);
       setBillingItems(billingData.data || []);
+      setSystemModules(modulesData || []);
 
       setSelectedCompanyId((current) =>
         current || (companiesData.data?.length ? companiesData.data[0].id : ''),
@@ -437,6 +537,257 @@ const CoreAdminPage: React.FC = () => {
     },
     [loadCoreAdminData, runAction],
   );
+
+  const resolvePlanModuleIds = useCallback(
+    (plan: CoreAdminPlan): string[] => {
+      const availableModulesByCode = new Map<string, string>();
+      systemModules.forEach((moduleItem) => {
+        const code = String(moduleItem.codigo || '').trim().toLowerCase();
+        if (code && moduleItem.id) {
+          availableModulesByCode.set(code, moduleItem.id);
+        }
+      });
+
+      const collectedIds = (plan.modulosInclusos || [])
+        .map((moduleItem) => {
+          const nestedId = String(moduleItem?.modulo?.id || '').trim();
+          if (nestedId) {
+            return nestedId;
+          }
+
+          const directCode = String(moduleItem?.codigo || moduleItem?.modulo?.codigo || '')
+            .trim()
+            .toLowerCase();
+          if (directCode && availableModulesByCode.has(directCode)) {
+            return String(availableModulesByCode.get(directCode));
+          }
+
+          const directId = String(moduleItem?.id || '').trim();
+          return directId || '';
+        })
+        .filter(Boolean);
+
+      return Array.from(new Set(collectedIds));
+    },
+    [systemModules],
+  );
+
+  const buildEmptyPlanForm = useCallback((): PlanFormState => {
+    const activeModules = systemModules.filter((moduleItem) => moduleItem.ativo);
+    const moduleCatalog = activeModules.length > 0 ? activeModules : systemModules;
+    const essentialModuleIds = moduleCatalog
+      .filter((moduleItem) =>
+        CORE_ADMIN_CANONICAL_ESSENTIAL_MODULE_CODES.has(
+          String(moduleItem.codigo || '').trim().toUpperCase(),
+        ),
+      )
+      .map((moduleItem) => moduleItem.id);
+
+    return {
+      ...DEFAULT_PLAN_FORM,
+      modulosInclusos: essentialModuleIds,
+    };
+  }, [systemModules]);
+
+  const resetPlanForm = useCallback(() => {
+    setPlanFormMode('create');
+    setPlanEditingId(null);
+    setPlanForm(buildEmptyPlanForm());
+    setShowPlanForm(false);
+  }, [buildEmptyPlanForm]);
+
+  const handleOpenCreatePlanForm = useCallback(() => {
+    setPlanFormMode('create');
+    setPlanEditingId(null);
+    setPlanForm(buildEmptyPlanForm());
+    setShowPlanForm(true);
+  }, [buildEmptyPlanForm]);
+
+  const handleEditPlan = useCallback(
+    (plan: CoreAdminPlan) => {
+      setPlanFormMode('edit');
+      setPlanEditingId(plan.id);
+      setShowPlanForm(true);
+      setPlanForm({
+        nome: String(plan.nome || ''),
+        codigo: String(plan.codigo || ''),
+        descricao: String(plan.descricao || ''),
+        preco: String(plan.preco ?? 0),
+        periodicidadeCobranca:
+          plan.periodicidadeCobranca === 'anual' ? 'anual' : 'mensal',
+        diasTrial: String(Math.max(0, Number(plan.diasTrial || 0))),
+        gatewayPriceId: String(plan.gatewayPriceId || ''),
+        publicadoCheckout: plan.publicadoCheckout !== false,
+        limiteUsuarios: String(plan.limiteUsuarios ?? -1),
+        limiteClientes: String(plan.limiteClientes ?? -1),
+        ativo: Boolean(plan.ativo),
+        ordem: String(plan.ordem ?? 0),
+        modulosInclusos: resolvePlanModuleIds(plan),
+      });
+    },
+    [resolvePlanModuleIds],
+  );
+
+  const togglePlanFormModule = useCallback(
+    (moduleId: string) => {
+      setPlanForm((current) => {
+        const currentModuleIds = new Set(current.modulosInclusos);
+        const activeModules = systemModules.filter((moduleItem) => moduleItem.ativo);
+        const moduleCatalog = activeModules.length > 0 ? activeModules : systemModules;
+        const essentialModuleIds = new Set(
+          moduleCatalog
+            .filter((moduleItem) =>
+              CORE_ADMIN_CANONICAL_ESSENTIAL_MODULE_CODES.has(
+                String(moduleItem.codigo || '').trim().toUpperCase(),
+              ),
+            )
+            .map((moduleItem) => moduleItem.id),
+        );
+
+        if (currentModuleIds.has(moduleId)) {
+          if (essentialModuleIds.has(moduleId)) {
+            return current;
+          }
+          currentModuleIds.delete(moduleId);
+        } else {
+          currentModuleIds.add(moduleId);
+        }
+
+        return {
+          ...current,
+          modulosInclusos: Array.from(currentModuleIds),
+        };
+      });
+    },
+    [systemModules],
+  );
+
+  const toggleModuleLinkedScreens = useCallback((moduleCode: string) => {
+    setExpandedPlanModuleCodes((current) => ({
+      ...current,
+      [moduleCode]: !current[moduleCode],
+    }));
+  }, []);
+
+  const handleSavePlan = useCallback(async () => {
+    const nome = planForm.nome.trim();
+    const codigo = planForm.codigo.trim().toLowerCase();
+    const descricao = planForm.descricao.trim();
+
+    if (!nome || !codigo) {
+      toast.error('Informe nome e codigo do plano');
+      return;
+    }
+
+    if (!planForm.modulosInclusos.length) {
+      toast.error('Selecione ao menos um modulo para o plano');
+      return;
+    }
+
+    const codigoJaExiste = plans.some((plan) => {
+      const codigoPlan = String(plan.codigo || '')
+        .trim()
+        .toLowerCase();
+      if (!codigoPlan || codigoPlan !== codigo) {
+        return false;
+      }
+
+      if (planFormMode === 'edit' && planEditingId) {
+        return plan.id !== planEditingId;
+      }
+
+      return true;
+    });
+
+    if (codigoJaExiste) {
+      toast.error(`Ja existe um plano com o codigo "${codigo}".`);
+      return;
+    }
+
+    const parseNumber = (rawValue: string, fieldLabel: string): number => {
+      const normalizedValue = String(rawValue || '')
+        .trim()
+        .replace(',', '.');
+      const parsed = Number(normalizedValue);
+      if (!Number.isFinite(parsed)) {
+        throw new Error(`${fieldLabel} invalido`);
+      }
+      return parsed;
+    };
+
+    const parseInteger = (
+      rawValue: string,
+      fieldLabel: string,
+      options?: { min?: number; allowNegativeOne?: boolean },
+    ): number => {
+      const parsed = parseNumber(rawValue, fieldLabel);
+      if (!Number.isInteger(parsed)) {
+        throw new Error(`${fieldLabel} invalido. Use numero inteiro.`);
+      }
+
+      if (options?.allowNegativeOne && parsed === -1) {
+        return parsed;
+      }
+
+      if (options?.min !== undefined && parsed < options.min) {
+        throw new Error(`${fieldLabel} invalido.`);
+      }
+
+      return parsed;
+    };
+
+    let payload: Parameters<typeof coreAdminService.createPlan>[0];
+    try {
+      const gatewayPriceId = planForm.gatewayPriceId.trim();
+      payload = {
+        nome,
+        codigo,
+        descricao: descricao || undefined,
+        preco: parseNumber(planForm.preco, 'Preco'),
+        periodicidadeCobranca: planForm.periodicidadeCobranca,
+        diasTrial: parseInteger(planForm.diasTrial, 'Dias de trial', { min: 0 }),
+        gatewayPriceId: gatewayPriceId || undefined,
+        publicadoCheckout: planForm.publicadoCheckout,
+        limiteUsuarios: parseInteger(planForm.limiteUsuarios, 'Limite de usuarios', {
+          min: 1,
+          allowNegativeOne: true,
+        }),
+        limiteClientes: parseInteger(planForm.limiteClientes, 'Limite de clientes', {
+          min: 1,
+          allowNegativeOne: true,
+        }),
+        // Campos legados mantidos para compatibilidade contratual do backend.
+        limiteStorage: -1,
+        limiteApiCalls: -1,
+        whiteLabel: false,
+        suportePrioritario: false,
+        ativo: planForm.ativo,
+        ordem: parseInteger(planForm.ordem, 'Ordem', { min: 0 }),
+        modulosInclusos: planForm.modulosInclusos,
+      };
+    } catch (parseError: any) {
+      toast.error(parseError?.message || 'Valores numericos invalidos');
+      return;
+    }
+
+    const actionKey =
+      planFormMode === 'edit' && planEditingId
+        ? `plan:save:${planEditingId}`
+        : 'plan:save:new';
+
+    await runAction(actionKey, async () => {
+      if (planFormMode === 'edit' && planEditingId) {
+        await coreAdminService.updatePlan(planEditingId, payload);
+        toast.success('Plano atualizado com sucesso');
+      } else {
+        await coreAdminService.createPlan(payload);
+        toast.success('Plano criado com sucesso');
+      }
+
+      await loadCoreAdminData();
+      resetPlanForm();
+    });
+  }, [loadCoreAdminData, planEditingId, planForm, planFormMode, plans, resetPlanForm, runAction]);
 
   const handleToggleBillingStatus = useCallback(
     async (item: CoreAdminBillingItem) => {
@@ -823,6 +1174,38 @@ const CoreAdminPage: React.FC = () => {
     return plans.filter((plan) => plan.ativo);
   }, [plans]);
 
+  const sortedPlans = useMemo(() => {
+    return [...plans].sort((left, right) => {
+      const leftOrder = Number(left.ordem ?? 0);
+      const rightOrder = Number(right.ordem ?? 0);
+      if (leftOrder !== rightOrder) {
+        return leftOrder - rightOrder;
+      }
+
+      return String(left.nome || '').localeCompare(String(right.nome || ''), 'pt-BR');
+    });
+  }, [plans]);
+
+  const selectablePlanModules = useMemo(() => {
+    const activeModules = systemModules.filter((moduleItem) => moduleItem.ativo);
+    return activeModules.length > 0 ? activeModules : systemModules;
+  }, [systemModules]);
+
+  const selectedPlanModuleIds = useMemo(() => {
+    return new Set(planForm.modulosInclusos);
+  }, [planForm.modulosInclusos]);
+
+  const formatPlanLimitValue = useCallback((value: number | string | null | undefined) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return 'n/d';
+    }
+    if (parsed < 0) {
+      return 'Ilimitado';
+    }
+    return parsed.toLocaleString('pt-BR');
+  }, []);
+
   const usersTotalPages = useMemo(() => {
     return Math.max(1, Math.ceil(usersTotal / usersPageSize || 1));
   }, [usersPageSize, usersTotal]);
@@ -903,6 +1286,40 @@ const CoreAdminPage: React.FC = () => {
     return alerts;
   }, [governanceCapabilities, runtimeContext.adminMfaRequired, runtimeContext.environment, runtimeContext.legacyTransitionMode]);
 
+  const companiesActiveCount = useMemo(() => {
+    return companies.filter((company) => company.ativo).length;
+  }, [companies]);
+
+  const checkoutPublishedPlansCount = useMemo(() => {
+    return plans.filter((plan) => plan.ativo && plan.publicadoCheckout !== false).length;
+  }, [plans]);
+
+  const overviewSummaryCards = useMemo(
+    () => [
+      {
+        label: 'Empresas ativas',
+        value: `${companiesActiveCount}/${companies.length || 0}`,
+        hint: 'Empresas habilitadas para operar no SaaS.',
+      },
+      {
+        label: 'Planos publicados',
+        value: String(checkoutPublishedPlansCount),
+        hint: 'Planos ativos e disponiveis no checkout.',
+      },
+      {
+        label: 'Solicitacoes pendentes',
+        value: String(overview.pending_access_requests ?? 0),
+        hint: 'Demandas aguardando decisao de acesso.',
+      },
+      {
+        label: 'Break-glass ativos',
+        value: String(overview.active_break_glass_accesses ?? 0),
+        hint: 'Acessos emergenciais temporarios em andamento.',
+      },
+    ],
+    [checkoutPublishedPlansCount, companies.length, companiesActiveCount, overview.active_break_glass_accesses, overview.pending_access_requests],
+  );
+
   const handleRefreshRuntimeGovernance = useCallback(async () => {
     await runAction('governance:refresh', async () => {
       const [runtimeContextData, runtimeHistoryData, capabilitiesData] = await Promise.all([
@@ -920,7 +1337,7 @@ const CoreAdminPage: React.FC = () => {
 
   if (!isSuperAdmin) {
     return (
-      <div className="p-6">
+      <div className="mx-auto w-full max-w-7xl space-y-4">
         <div className="rounded-xl border border-red-100 bg-white p-6">
           <h1 className="text-xl font-semibold text-[#002333]">Acesso restrito</h1>
           <p className="mt-2 text-sm text-[#587285]">
@@ -933,7 +1350,7 @@ const CoreAdminPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="p-6">
+      <div className="mx-auto w-full max-w-7xl space-y-4">
         <div className="rounded-xl border border-[#D9E6EC] bg-white p-6 text-sm text-[#587285]">
           Carregando Core Admin...
         </div>
@@ -942,7 +1359,7 @@ const CoreAdminPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-4 p-6">
+    <div className="mx-auto w-full max-w-7xl space-y-4">
       <header className="rounded-xl border border-[#D9E6EC] bg-white p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -966,22 +1383,6 @@ const CoreAdminPage: React.FC = () => {
           {error}
         </div>
       ) : null}
-
-      <section className="grid gap-4 md:grid-cols-4">
-        <MetricCard label="Usuarios totais" value={String(overview.users?.total ?? 0)} />
-        <MetricCard
-          label="Solicitacoes de acesso"
-          value={String(overview.pending_access_requests ?? 0)}
-        />
-        <MetricCard
-          label="Alertas de seguranca"
-          value={String(overview.admin_security_alerts ?? 0)}
-        />
-        <MetricCard
-          label="Break-glass ativos"
-          value={String(overview.active_break_glass_accesses ?? 0)}
-        />
-      </section>
 
       <section className="rounded-xl border border-[#D9E6EC] bg-white p-3">
         <div className="flex flex-wrap gap-2">
@@ -1010,6 +1411,14 @@ const CoreAdminPage: React.FC = () => {
           ))}
         </div>
       </section>
+
+      {activeTab === 'overview' ? (
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {overviewSummaryCards.map((card) => (
+            <MetricCard key={card.label} label={card.label} value={card.value} hint={card.hint} />
+          ))}
+        </section>
+      ) : null}
 
       {activeTab === 'overview' && (
         <section className="grid gap-4 lg:grid-cols-2">
@@ -1487,49 +1896,480 @@ const CoreAdminPage: React.FC = () => {
       )}
 
       {activeTab === 'plans' && (
-        <Panel title="Catalogo de planos">
-          <div className="mb-3 rounded-lg border border-[#E3EDF2] bg-[#F8FCFD] p-3 text-xs text-[#587285]">
-            Publicacao e manutencao de defaults do catalogo devem ser feitas por processo controlado
-            de deploy, nao via acao direta da interface.
+        <Panel
+          title="Catalogo de planos"
+          extra={
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-[#F1F7FA] px-2 py-1 text-xs font-semibold text-[#335B6D]">
+                {sortedPlans.length} plano(s)
+              </span>
+              <button
+                type="button"
+                onClick={showPlanForm ? resetPlanForm : handleOpenCreatePlanForm}
+                className={[
+                  'rounded-md px-3 py-1.5 text-xs font-semibold',
+                  showPlanForm
+                    ? 'border border-[#BCD3DE] text-[#0F5A6B] hover:bg-[#F3FAFC]'
+                    : 'bg-[#149CA0] text-white hover:bg-[#11888B]',
+                ].join(' ')}
+              >
+                {showPlanForm ? 'Fechar editor' : 'Novo plano'}
+              </button>
+            </div>
+          }
+        >
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#E3EDF2] bg-[#F8FCFD] px-3 py-2.5">
+            <p className="text-xs text-[#587285]">
+              Monte planos comerciais com modulos e limites de uso. Modulos essenciais permanecem vinculados automaticamente.
+            </p>
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-[#335B6D]">
+              Visao unificada
+            </span>
           </div>
-          <div className="grid gap-3 lg:grid-cols-2">
-            {plans.map((plan) => {
-              const modules = (plan.modulosInclusos || [])
-                .map((moduleItem) => moduleItem.nome || moduleItem.codigo || moduleItem.id)
-                .filter((value): value is string => Boolean(value));
-              return (
-                <div key={plan.id} className="rounded-lg border border-[#E3EDF2] p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold text-[#002333]">{plan.nome}</p>
-                      <p className="text-xs text-[#587285]">{plan.codigo}</p>
-                    </div>
-                    <StatusBadge active={plan.ativo} activeLabel="Ativo" inactiveLabel="Inativo" />
-                  </div>
-                  <p className="mt-2 text-sm font-medium text-[#0F5A6B]">
-                    R$ {Number(plan.preco || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+
+          {showPlanForm ? (
+            <section className="mb-5 rounded-xl border border-[#D9E6EC] bg-white p-4 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-semibold text-[#002333]">
+                    {planFormMode === 'edit' ? 'Editar plano' : 'Novo plano'}
+                  </h3>
+                  <p className="text-xs text-[#587285]">
+                    Campos com * sao obrigatorios. Use -1 nos limites para comportamento ilimitado.
                   </p>
-                  <p className="mt-1 text-xs text-[#587285]">
-                    Usuarios: {plan.limiteUsuarios} - Clientes: {plan.limiteClientes}
-                  </p>
-                  <p className="mt-1 text-xs text-[#587285]">
-                    Storage: {plan.limiteStorage}GB - API/dia: {plan.limiteApiCalls}
-                  </p>
-                  <p className="mt-2 text-xs text-[#335B6D]">
-                    Modulos: {modules.length ? modules.join(', ') : 'Nao definidos'}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => void handleTogglePlan(plan.id)}
-                    disabled={busyActions[`plan:${plan.id}`]}
-                    className="mt-3 rounded-md border border-[#BCD3DE] px-3 py-1 text-xs font-medium text-[#0F5A6B] hover:bg-[#F3FAFC] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {plan.ativo ? 'Desativar plano' : 'Ativar plano'}
-                  </button>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+
+              <div className="mt-4 grid gap-4 xl:grid-cols-[1.35fr_1fr]">
+                <div className="space-y-3">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <label className="grid gap-1 text-xs font-medium text-[#335B6D]">
+                      Nome do plano *
+                      <input
+                        type="text"
+                        value={planForm.nome}
+                        onChange={(event) =>
+                          setPlanForm((current) => ({ ...current, nome: event.target.value }))
+                        }
+                        placeholder="Ex.: Business"
+                        className="rounded-md border border-[#C9DCE5] px-2 py-1.5 text-sm font-normal text-[#002333] outline-none focus:border-[#149CA0]"
+                      />
+                    </label>
+
+                    <label className="grid gap-1 text-xs font-medium text-[#335B6D]">
+                      Codigo *
+                      <input
+                        type="text"
+                        value={planForm.codigo}
+                        onChange={(event) =>
+                          setPlanForm((current) => ({
+                            ...current,
+                            codigo: event.target.value
+                              .toLowerCase()
+                              .replace(/\s+/g, '-')
+                              .replace(/[^a-z0-9_-]/g, ''),
+                          }))
+                        }
+                        placeholder="Ex.: business"
+                        className="rounded-md border border-[#C9DCE5] px-2 py-1.5 text-sm font-normal text-[#002333] outline-none focus:border-[#149CA0]"
+                      />
+                    </label>
+
+                    <label className="grid gap-1 text-xs font-medium text-[#335B6D] md:col-span-2">
+                      Descricao
+                      <textarea
+                        value={planForm.descricao}
+                        onChange={(event) =>
+                          setPlanForm((current) => ({ ...current, descricao: event.target.value }))
+                        }
+                        rows={2}
+                        placeholder="Resumo do valor do plano para a equipe comercial"
+                        className="rounded-md border border-[#C9DCE5] px-2 py-1.5 text-sm font-normal text-[#002333] outline-none focus:border-[#149CA0]"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="rounded-lg border border-[#E3EDF2] bg-white p-3">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#587285]">
+                      Limites e precificacao
+                    </p>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="grid gap-1 text-xs font-medium text-[#335B6D]">
+                        Preco (R$)
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={planForm.preco}
+                          onChange={(event) =>
+                            setPlanForm((current) => ({ ...current, preco: event.target.value }))
+                          }
+                          className="rounded-md border border-[#C9DCE5] px-2 py-1.5 text-sm font-normal text-[#002333] outline-none focus:border-[#149CA0]"
+                        />
+                      </label>
+
+                      <label className="grid gap-1 text-xs font-medium text-[#335B6D]">
+                        Periodicidade
+                        <select
+                          value={planForm.periodicidadeCobranca}
+                          onChange={(event) =>
+                            setPlanForm((current) => ({
+                              ...current,
+                              periodicidadeCobranca:
+                                event.target.value === 'anual' ? 'anual' : 'mensal',
+                            }))
+                          }
+                          className="rounded-md border border-[#C9DCE5] px-2 py-1.5 text-sm font-normal text-[#002333] outline-none focus:border-[#149CA0]"
+                        >
+                          <option value="mensal">Mensal</option>
+                          <option value="anual">Anual</option>
+                        </select>
+                      </label>
+
+                      <label className="grid gap-1 text-xs font-medium text-[#335B6D]">
+                        Dias de trial
+                        <input
+                          type="number"
+                          min={0}
+                          value={planForm.diasTrial}
+                          onChange={(event) =>
+                            setPlanForm((current) => ({ ...current, diasTrial: event.target.value }))
+                          }
+                          className="rounded-md border border-[#C9DCE5] px-2 py-1.5 text-sm font-normal text-[#002333] outline-none focus:border-[#149CA0]"
+                        />
+                      </label>
+
+                      <label className="grid gap-1 text-xs font-medium text-[#335B6D]">
+                        Ordem de exibicao
+                        <input
+                          type="number"
+                          value={planForm.ordem}
+                          onChange={(event) =>
+                            setPlanForm((current) => ({ ...current, ordem: event.target.value }))
+                          }
+                          className="rounded-md border border-[#C9DCE5] px-2 py-1.5 text-sm font-normal text-[#002333] outline-none focus:border-[#149CA0]"
+                        />
+                      </label>
+
+                      <label className="grid gap-1 text-xs font-medium text-[#335B6D]">
+                        Limite de usuarios
+                        <input
+                          type="number"
+                          value={planForm.limiteUsuarios}
+                          onChange={(event) =>
+                            setPlanForm((current) => ({
+                              ...current,
+                              limiteUsuarios: event.target.value,
+                            }))
+                          }
+                          className="rounded-md border border-[#C9DCE5] px-2 py-1.5 text-sm font-normal text-[#002333] outline-none focus:border-[#149CA0]"
+                        />
+                      </label>
+
+                      <label className="grid gap-1 text-xs font-medium text-[#335B6D]">
+                        Limite de clientes
+                        <input
+                          type="number"
+                          value={planForm.limiteClientes}
+                          onChange={(event) =>
+                            setPlanForm((current) => ({
+                              ...current,
+                              limiteClientes: event.target.value,
+                            }))
+                          }
+                          className="rounded-md border border-[#C9DCE5] px-2 py-1.5 text-sm font-normal text-[#002333] outline-none focus:border-[#149CA0]"
+                        />
+                      </label>
+
+                      <label className="grid gap-1 text-xs font-medium text-[#335B6D] md:col-span-2">
+                        Gateway Price ID (opcional)
+                        <input
+                          type="text"
+                          value={planForm.gatewayPriceId}
+                          onChange={(event) =>
+                            setPlanForm((current) => ({
+                              ...current,
+                              gatewayPriceId: event.target.value,
+                            }))
+                          }
+                          placeholder="Ex.: MP-BASIC-MONTHLY-001"
+                          className="rounded-md border border-[#C9DCE5] px-2 py-1.5 text-sm font-normal text-[#002333] outline-none focus:border-[#149CA0]"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="rounded-lg border border-[#E3EDF2] bg-white p-3">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#587285]">
+                      Recursos do plano
+                    </p>
+                    <div className="grid gap-2">
+                      <label className="flex items-center gap-2 rounded-md border border-[#E3EDF2] px-2 py-1.5 text-xs text-[#335B6D]">
+                        <input
+                          type="checkbox"
+                          checked={planForm.ativo}
+                          onChange={(event) =>
+                            setPlanForm((current) => ({ ...current, ativo: event.target.checked }))
+                          }
+                        />
+                        Plano ativo
+                      </label>
+                      <label className="flex items-center gap-2 rounded-md border border-[#E3EDF2] px-2 py-1.5 text-xs text-[#335B6D]">
+                        <input
+                          type="checkbox"
+                          checked={planForm.publicadoCheckout}
+                          onChange={(event) =>
+                            setPlanForm((current) => ({
+                              ...current,
+                              publicadoCheckout: event.target.checked,
+                            }))
+                          }
+                        />
+                        Publicado no checkout
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-[#E3EDF2] bg-white p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#587285]">
+                      Modulos do plano *
+                    </p>
+                    <p className="mb-2 text-xs text-[#587285]">
+                      Modulos essenciais permanecem selecionados para evitar quebra do baseline.
+                    </p>
+                    <div className="grid max-h-52 gap-2 overflow-auto pr-1 sm:grid-cols-2">
+                      {selectablePlanModules.map((moduleItem) => {
+                        const isSelected = selectedPlanModuleIds.has(moduleItem.id);
+                        const moduleCode = String(moduleItem.codigo || '').trim().toUpperCase();
+                        const isEssentialModule =
+                          CORE_ADMIN_CANONICAL_ESSENTIAL_MODULE_CODES.has(moduleCode);
+                        const isEssentialLocked = Boolean(isEssentialModule && isSelected);
+                        const isExpanded = Boolean(expandedPlanModuleCodes[moduleCode]);
+                        const linkedScreens = CORE_ADMIN_MODULE_LINKED_SCREENS[moduleCode] || [];
+                        return (
+                          <div
+                            key={moduleItem.id}
+                            className={[
+                              'rounded-md border px-2 py-1.5 text-xs',
+                              isSelected
+                                ? 'border-[#B7D8E3] bg-[#F5FBFD] text-[#1C4A5A]'
+                                : 'border-[#E3EDF2] bg-white text-[#335B6D]',
+                            ].join(' ')}
+                          >
+                            <div className="flex items-start gap-2">
+                              <button
+                                type="button"
+                                onClick={() => toggleModuleLinkedScreens(moduleCode)}
+                                className="rounded-md border border-[#BCD3DE] px-1.5 py-0.5 text-[11px] font-semibold text-[#0F5A6B] hover:bg-[#F3FAFC]"
+                                title={isExpanded ? 'Ocultar telas vinculadas' : 'Ver telas vinculadas'}
+                                aria-label={
+                                  isExpanded
+                                    ? `Ocultar telas vinculadas ao modulo ${moduleItem.nome}`
+                                    : `Exibir telas vinculadas ao modulo ${moduleItem.nome}`
+                                }
+                              >
+                                {isExpanded ? '-' : '+'}
+                              </button>
+                              <label className="flex items-start gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => togglePlanFormModule(moduleItem.id)}
+                                  disabled={isEssentialLocked}
+                                />
+                                <span>
+                                  <strong className="text-[#002333]">{moduleItem.nome}</strong>
+                                  <br />
+                                  {moduleItem.codigo}
+                                  {isEssentialModule ? (
+                                    <span className="ml-1 rounded-full bg-[#E8F2F7] px-1.5 py-0.5 text-[10px] font-semibold text-[#335B6D]">
+                                      Essencial
+                                    </span>
+                                  ) : null}
+                                </span>
+                              </label>
+                            </div>
+                            {isExpanded ? (
+                              <div className="mt-2 rounded-md border border-[#E3EDF2] bg-white px-2 py-1.5">
+                                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[#587285]">
+                                  Telas vinculadas
+                                </p>
+                                {linkedScreens.length === 0 ? (
+                                  <p className="text-[11px] text-[#587285]">
+                                    Sem mapeamento de telas para este modulo.
+                                  </p>
+                                ) : (
+                                  <ul className="space-y-1 text-[11px] text-[#335B6D]">
+                                    {linkedScreens.map((screen) => (
+                                      <li key={`${moduleCode}:${screen.path}`}>
+                                        {screen.label} - {screen.path}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={resetPlanForm}
+                  className="rounded-md border border-[#C9DCE5] px-3 py-2 text-xs font-medium text-[#335B6D] hover:bg-white"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleSavePlan()}
+                  disabled={
+                    busyActions[
+                      planFormMode === 'edit' && planEditingId
+                        ? `plan:save:${planEditingId}`
+                        : 'plan:save:new'
+                    ]
+                  }
+                  className="rounded-md bg-[#149CA0] px-3 py-2 text-xs font-semibold text-white hover:bg-[#11888B] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {planFormMode === 'edit' ? 'Salvar alteracoes' : 'Criar plano'}
+                </button>
+              </div>
+            </section>
+          ) : null}
+
+          <section>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-[#002333]">Planos cadastrados</h3>
+              <p className="text-xs text-[#587285]">Clique em um plano para editar ou alterar status.</p>
+            </div>
+
+            {sortedPlans.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-[#D9E6EC] bg-[#FAFCFD] px-4 py-6 text-center">
+                <p className="text-sm text-[#587285]">
+                  Nenhum plano cadastrado ainda. Crie o primeiro para iniciar a comercializacao.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-4 lg:grid-cols-2">
+                {sortedPlans.map((plan) => {
+                  const modules = (plan.modulosInclusos || [])
+                    .map(
+                      (moduleItem) =>
+                        moduleItem?.modulo?.nome ||
+                        moduleItem?.nome ||
+                        moduleItem?.modulo?.codigo ||
+                        moduleItem?.codigo ||
+                        moduleItem?.modulo?.id ||
+                        moduleItem?.id,
+                    )
+                    .filter((value): value is string => Boolean(value));
+
+                  return (
+                    <article
+                      key={plan.id}
+                      className="rounded-xl border border-[#E3EDF2] bg-white p-4 transition hover:border-[#BFD5DF] hover:shadow-[0_6px_20px_rgba(0,35,51,0.06)]"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-base font-semibold text-[#002333]">{plan.nome}</p>
+                          <p className="text-xs text-[#587285]">{plan.codigo}</p>
+                        </div>
+                        <StatusBadge active={plan.ativo} activeLabel="Ativo" inactiveLabel="Inativo" />
+                      </div>
+
+                      {plan.descricao ? (
+                        <p className="mt-2 text-xs text-[#587285]">{plan.descricao}</p>
+                      ) : null}
+
+                      <div className="mt-3 flex items-end gap-1">
+                        <p className="text-xl font-semibold text-[#0F5A6B]">
+                          R$ {Number(plan.preco || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                        <span className="pb-0.5 text-xs text-[#587285]">
+                          /{plan.periodicidadeCobranca === 'anual' ? 'ano' : 'mes'}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 grid gap-x-4 gap-y-2 rounded-lg border border-[#EEF4F7] bg-[#FBFDFE] px-3 py-2.5 text-sm sm:grid-cols-2">
+                        <p className="text-[#335B6D]">
+                          <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-[#6A8697]">
+                            Usuarios
+                          </span>
+                          {formatPlanLimitValue(plan.limiteUsuarios)}
+                        </p>
+                        <p className="text-[#335B6D]">
+                          <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-[#6A8697]">
+                            Clientes
+                          </span>
+                          {formatPlanLimitValue(plan.limiteClientes)}
+                        </p>
+                        <p className="text-[#335B6D]">
+                          <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-[#6A8697]">
+                            Trial
+                          </span>
+                          {Math.max(0, Number(plan.diasTrial || 0))} dia(s)
+                        </p>
+                        <p className="text-[#335B6D]">
+                          <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-[#6A8697]">
+                            Checkout
+                          </span>
+                          {plan.publicadoCheckout === false ? 'Oculto' : 'Publicado'}
+                        </p>
+                      </div>
+
+                      {plan.gatewayPriceId ? (
+                        <p className="mt-2 text-xs text-[#587285]">
+                          Gateway Price ID: <span className="font-medium text-[#335B6D]">{plan.gatewayPriceId}</span>
+                        </p>
+                      ) : null}
+
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {modules.length === 0 ? (
+                          <span className="rounded-full border border-[#E3EDF2] px-2 py-1 text-xs text-[#587285]">
+                            Sem modulos definidos
+                          </span>
+                        ) : (
+                          modules.map((moduleName) => (
+                            <span
+                              key={`${plan.id}:${moduleName}`}
+                              className="rounded-full border border-[#D9E6EC] bg-[#F7FBFD] px-2 py-1 text-xs text-[#335B6D]"
+                            >
+                              {moduleName}
+                            </span>
+                          ))
+                        )}
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleEditPlan(plan)}
+                          className="rounded-md border border-[#BCD3DE] px-3 py-1.5 text-xs font-medium text-[#0F5A6B] hover:bg-[#F3FAFC]"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleTogglePlan(plan.id)}
+                          disabled={busyActions[`plan:${plan.id}`]}
+                          className="rounded-md border border-[#BCD3DE] px-3 py-1.5 text-xs font-medium text-[#0F5A6B] hover:bg-[#F3FAFC] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {plan.ativo ? 'Desativar plano' : 'Ativar plano'}
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
         </Panel>
       )}
 
@@ -2159,10 +2999,15 @@ const Panel: React.FC<{ title: string; children: React.ReactNode; extra?: React.
   </section>
 );
 
-const MetricCard: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="rounded-xl border border-[#D9E6EC] bg-white p-4">
+const MetricCard: React.FC<{ label: string; value: string; hint?: string }> = ({
+  label,
+  value,
+  hint,
+}) => (
+  <div className="rounded-xl border border-[#D9E6EC] bg-white p-4 shadow-[0_10px_20px_-18px_rgba(16,57,74,0.35)]">
     <p className="text-xs uppercase tracking-wide text-[#587285]">{label}</p>
     <p className="mt-2 text-2xl font-semibold text-[#002333]">{value}</p>
+    {hint ? <p className="mt-1.5 text-xs text-[#587285]">{hint}</p> : null}
   </div>
 );
 
