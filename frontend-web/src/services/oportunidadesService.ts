@@ -279,7 +279,33 @@ class OportunidadesService {
   // Atividades
   async listarAtividades(oportunidadeId: number): Promise<Atividade[]> {
     const response = await api.get(this.getUrl(`/${oportunidadeId}/atividades`));
-    return response.data;
+    const data = Array.isArray(response.data) ? response.data : [];
+    return data.map((item: any) => ({
+      id: Number(item.id),
+      tipo: item.tipo,
+      descricao: item.descricao,
+      dataAtividade: item.dataAtividade ? new Date(item.dataAtividade) : new Date(),
+      oportunidadeId: Number(item.oportunidadeId ?? item.oportunidade_id ?? oportunidadeId),
+      responsavelId: item.responsavelId ?? item.responsavel_id ?? item.responsavel?.id,
+      criadoPor: item.criadoPor
+        ? {
+            id: item.criadoPor.id,
+            nome: item.criadoPor.nome,
+            avatar: item.criadoPor.avatar || item.criadoPor.avatar_url,
+          }
+        : {
+            id: item.criado_por_id || '',
+            nome: 'Sistema',
+          },
+      responsavel: item.responsavel
+        ? {
+            id: item.responsavel.id,
+            nome: item.responsavel.nome,
+            avatar: item.responsavel.avatar || item.responsavel.avatar_url,
+          }
+        : undefined,
+      createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
+    }));
   }
 
   async listarHistoricoEstagios(
@@ -305,11 +331,51 @@ class OportunidadesService {
   }
 
   async criarAtividade(atividade: NovaAtividade): Promise<Atividade> {
+    const payload = {
+      tipo: atividade.tipo,
+      descricao: atividade.descricao,
+      dataAtividade: atividade.dataAtividade
+        ? new Date(atividade.dataAtividade).toISOString()
+        : undefined,
+      responsavel_id: atividade.responsavelId,
+    };
     const response = await api.post(
       this.getUrl(`/${atividade.oportunidadeId}/atividades`),
-      atividade,
+      payload,
     );
-    return response.data;
+    return {
+      id: Number(response.data?.id ?? 0),
+      tipo: response.data?.tipo ?? atividade.tipo,
+      descricao: response.data?.descricao ?? atividade.descricao,
+      dataAtividade: response.data?.dataAtividade
+        ? new Date(response.data.dataAtividade)
+        : atividade.dataAtividade || new Date(),
+      oportunidadeId: Number(
+        response.data?.oportunidadeId ?? response.data?.oportunidade_id ?? atividade.oportunidadeId,
+      ),
+      responsavelId:
+        response.data?.responsavelId ??
+        response.data?.responsavel_id ??
+        atividade.responsavelId,
+      criadoPor: response.data?.criadoPor
+        ? {
+            id: response.data.criadoPor.id,
+            nome: response.data.criadoPor.nome,
+            avatar: response.data.criadoPor.avatar || response.data.criadoPor.avatar_url,
+          }
+        : {
+            id: response.data?.criado_por_id || '',
+            nome: 'Sistema',
+          },
+      responsavel: response.data?.responsavel
+        ? {
+            id: response.data.responsavel.id,
+            nome: response.data.responsavel.nome,
+            avatar: response.data.responsavel.avatar || response.data.responsavel.avatar_url,
+          }
+        : undefined,
+      createdAt: response.data?.createdAt ? new Date(response.data.createdAt) : new Date(),
+    };
   }
 
   async excluirAtividade(oportunidadeId: number, atividadeId: number): Promise<void> {

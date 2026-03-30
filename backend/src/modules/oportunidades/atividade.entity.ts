@@ -44,6 +44,13 @@ export class Atividade {
   @Column('uuid', { name: 'criado_por_id' })
   criado_por_id: string;
 
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'responsavel_id' })
+  responsavel?: User;
+
+  @Column('uuid', { name: 'responsavel_id', nullable: true })
+  responsavel_id?: string | null;
+
   @Column({ type: 'varchar' })
   tipo: TipoAtividade;
 

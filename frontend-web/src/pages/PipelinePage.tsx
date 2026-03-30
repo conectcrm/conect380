@@ -283,6 +283,21 @@ const CORES_GRAFICOS = [
   '#DC2626',
 ];
 
+const TIPO_ATIVIDADE_LABEL: Record<TipoAtividade, string> = {
+  [TipoAtividade.LIGACAO]: 'Ligacao',
+  [TipoAtividade.EMAIL]: 'E-mail',
+  [TipoAtividade.REUNIAO]: 'Reuniao',
+  [TipoAtividade.NOTA]: 'Nota',
+  [TipoAtividade.TAREFA]: 'Tarefa',
+};
+
+interface ProximaAcaoAgendada {
+  data: Date;
+  tipoEvento: TipoAtividade;
+  responsavelId: string;
+  responsavelNome: string;
+}
+
 const PipelinePage: React.FC = () => {
   const { confirm } = useGlobalConfirmation();
   const navigate = useNavigate();
@@ -328,6 +343,7 @@ const PipelinePage: React.FC = () => {
     oportunidade: Oportunidade;
     novoEstagio: EstagioOportunidade;
   } | null>(null);
+  const [dragOverStage, setDragOverStage] = useState<EstagioOportunidade | null>(null);
   const [loadingMudancaEstagio, setLoadingMudancaEstagio] = useState(false);
   const [erroMudancaEstagio, setErroMudancaEstagio] = useState<string | null>(null);
 
@@ -1438,17 +1454,42 @@ const PipelinePage: React.FC = () => {
       return;
     }
 
+    setDragOverStage(null);
     setDraggedItem(oportunidade);
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = (e: React.DragEvent<HTMLElement>, estagio: EstagioOportunidade) => {
+    if (!draggedItem || !canManipulateKanban) return;
     e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'move';
+    }
+    if (dragOverStage !== estagio) {
+      setDragOverStage(estagio);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLElement>, estagio: EstagioOportunidade) => {
+    const currentTarget = e.currentTarget;
+    const relatedTarget = e.relatedTarget as Node | null;
+    if (!relatedTarget || !currentTarget.contains(relatedTarget)) {
+      if (dragOverStage === estagio) {
+        setDragOverStage(null);
+      }
+    }
   };
 
   const getNomeEstagio = (estagio: EstagioOportunidade): string =>
     ESTAGIOS_CONFIG.find((item) => item.id === estagio)?.nome || estagio;
 
-  const handleDrop = async (novoEstagio: EstagioOportunidade) => {
+  const handleDrop = async (
+    e: React.DragEvent<HTMLElement>,
+    novoEstagio: EstagioOportunidade,
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverStage(null);
     if (!draggedItem) return;
 
     if (!canManipulateKanban) {
@@ -1522,7 +1563,7 @@ const PipelinePage: React.FC = () => {
   const handleConfirmarMudancaEstagio = async (
     motivo: string,
     comentario: string,
-    proximaAcao?: Date,
+    proximaAcao?: ProximaAcaoAgendada,
   ) => {
     if (!mudancaEstagioData) return;
 
@@ -1544,7 +1585,7 @@ const PipelinePage: React.FC = () => {
         `Motivo: ${motivo}`,
         comentario ? `\nDetalhes: ${comentario}` : '',
         proximaAcao
-          ? `\nPróxima ação agendada para: ${new Date(proximaAcao).toLocaleDateString('pt-BR')}`
+          ? `\nProxima acao: ${TIPO_ATIVIDADE_LABEL[proximaAcao.tipoEvento]} em ${new Date(proximaAcao.data).toLocaleDateString('pt-BR')} (responsavel: ${proximaAcao.responsavelNome})`
           : '',
       ]
         .filter(Boolean)
@@ -1557,6 +1598,22 @@ const PipelinePage: React.FC = () => {
           descricao: descricaoAtividade,
           dataAtividade: new Date(),
         });
+
+        if (proximaAcao) {
+          const descricaoProximaAcao = [
+            `Atividade planejada apos mudanca de estagio para "${ESTAGIOS_CONFIG.find((e) => e.id === novoEstagio)?.nome}".`,
+            `Responsavel planejado: ${proximaAcao.responsavelNome}.`,
+            'Origem: movimentacao de estagio no pipeline.',
+          ].join('\n');
+
+          await oportunidadesService.criarAtividade({
+            oportunidadeId: oportunidade.id,
+            tipo: proximaAcao.tipoEvento,
+            descricao: descricaoProximaAcao,
+            dataAtividade: proximaAcao.data,
+            responsavelId: proximaAcao.responsavelId,
+          });
+        }
       } catch (err) {
         console.warn('Erro ao criar atividade de histórico:', err);
         // Continua mesmo se falhar ao criar atividade
@@ -2668,10 +2725,15 @@ const PipelinePage: React.FC = () => {
               className={
                 kanbanExpanded
                   ? 'flex-shrink-0 w-[min(18rem,calc(100vw-5rem))] sm:w-72 flex flex-col h-full'
-                  : 'flex-shrink-0 w-[min(18rem,calc(100vw-5rem))] sm:w-72 flex flex-col self-start'
+                  : 'flex-shrink-0 w-[min(18rem,calc(100vw-5rem))] sm:w-72 flex flex-col min-h-[26rem]'
               }
               role="region"
               aria-labelledby={`pipeline-column-title-${estagio.id}`}
+              onDragOver={canManipulateKanban ? (event) => handleDragOver(event, estagio.id) : undefined}
+              onDragLeave={
+                canManipulateKanban ? (event) => handleDragLeave(event, estagio.id) : undefined
+              }
+              onDrop={canManipulateKanban ? (event) => handleDrop(event, estagio.id) : undefined}
             >
               {/* Header da Coluna */}
               <div className={`${estagio.headerClass} rounded-t-lg p-2.5 sm:p-3`}>
@@ -2737,11 +2799,22 @@ const PipelinePage: React.FC = () => {
                 }}
                 className={
                   kanbanExpanded
-                    ? 'bg-[#DEEFE7]/35 rounded-b-lg p-2 space-y-2 border border-[#B4BEC9]/40 border-t-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]'
-                    : 'bg-[#DEEFE7]/35 rounded-b-lg p-2 space-y-2 border border-[#B4BEC9]/40 border-t-0'
+                    ? `bg-[#DEEFE7]/35 rounded-b-lg p-2 space-y-2 border border-[#B4BEC9]/40 border-t-0 flex-1 overflow-y-auto [scrollbar-gutter:stable] min-h-[16rem] ${
+                        dragOverStage === estagio.id
+                          ? 'ring-2 ring-[#159A9C]/45 bg-[#DEEFE7]/65'
+                          : ''
+                      }`
+                    : `bg-[#DEEFE7]/35 rounded-b-lg p-2 space-y-2 border border-[#B4BEC9]/40 border-t-0 min-h-[16rem] ${
+                        dragOverStage === estagio.id
+                          ? 'ring-2 ring-[#159A9C]/45 bg-[#DEEFE7]/65'
+                          : ''
+                      }`
                 }
-                onDragOver={canManipulateKanban ? handleDragOver : undefined}
-                onDrop={canManipulateKanban ? () => handleDrop(estagio.id) : undefined}
+                onDragOver={canManipulateKanban ? (event) => handleDragOver(event, estagio.id) : undefined}
+                onDragLeave={
+                  canManipulateKanban ? (event) => handleDragLeave(event, estagio.id) : undefined
+                }
+                onDrop={canManipulateKanban ? (event) => handleDrop(event, estagio.id) : undefined}
               >
                 {estagio.oportunidades.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -2842,7 +2915,10 @@ const PipelinePage: React.FC = () => {
                           handleDragStart(oportunidade);
                         }}
                         onClick={() => handleVerDetalhes(oportunidade)}
-                        onDragEnd={() => setDraggedItem(null)}
+                        onDragEnd={() => {
+                          setDraggedItem(null);
+                          setDragOverStage(null);
+                        }}
                         onKeyDown={(e) => {
                           if (e.currentTarget !== e.target) return;
                           if (e.key === 'Enter' || e.key === ' ') {
@@ -4036,6 +4112,12 @@ const PipelinePage: React.FC = () => {
           estagioOrigem={mudancaEstagioData.oportunidade.estagio}
           estagioDestino={mudancaEstagioData.novoEstagio}
           tituloOportunidade={mudancaEstagioData.oportunidade.titulo}
+          responsaveis={usuarios.map((item) => ({
+            id: item.id,
+            nome: item.nome,
+            email: item.email,
+          }))}
+          responsavelPadraoId={mudancaEstagioData.oportunidade.responsavel?.id || user?.id}
           loading={loadingMudancaEstagio}
           errorMessage={erroMudancaEstagio}
         />

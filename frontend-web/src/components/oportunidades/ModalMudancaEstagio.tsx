@@ -1,15 +1,30 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Calendar, MessageSquare, TrendingUp } from 'lucide-react';
-import { EstagioOportunidade } from '../../types/oportunidades';
+import { EstagioOportunidade, TipoAtividade } from '../../types/oportunidades';
 import { BaseModal } from '../base/BaseModal';
+
+interface ResponsavelOpcao {
+  id: string;
+  nome: string;
+  email?: string;
+}
+
+interface AgendamentoProximaAcao {
+  data: Date;
+  tipoEvento: TipoAtividade;
+  responsavelId: string;
+  responsavelNome: string;
+}
 
 interface ModalMudancaEstagioProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (motivo: string, comentario: string, proximaAcao?: Date) => void;
+  onConfirm: (motivo: string, comentario: string, agendamento?: AgendamentoProximaAcao) => void;
   estagioOrigem: string;
   estagioDestino: string;
   tituloOportunidade: string;
+  responsaveis: ResponsavelOpcao[];
+  responsavelPadraoId?: string;
   loading?: boolean;
   errorMessage?: string | null;
 }
@@ -34,6 +49,13 @@ const ESTAGIOS_LABELS: Record<EstagioOportunidade, string> = {
   [EstagioOportunidade.GANHO]: 'Ganho',
   [EstagioOportunidade.PERDIDO]: 'Perdido',
 };
+
+const PROXIMOS_EVENTOS_OPCOES: Array<{ value: TipoAtividade; label: string }> = [
+  { value: TipoAtividade.LIGACAO, label: 'Ligacao' },
+  { value: TipoAtividade.EMAIL, label: 'E-mail' },
+  { value: TipoAtividade.REUNIAO, label: 'Reuniao' },
+  { value: TipoAtividade.TAREFA, label: 'Tarefa' },
+];
 
 const formatarDataInputHoje = (): string => {
   const hoje = new Date();
@@ -63,19 +85,45 @@ const ModalMudancaEstagio: React.FC<ModalMudancaEstagioProps> = ({
   estagioOrigem,
   estagioDestino,
   tituloOportunidade,
+  responsaveis,
+  responsavelPadraoId,
   loading = false,
   errorMessage = null,
 }) => {
   const [motivo, setMotivo] = useState('');
   const [comentario, setComentario] = useState('');
   const [proximaAcao, setProximaAcao] = useState('');
+  const [tipoProximoEvento, setTipoProximoEvento] = useState('');
+  const [responsavelProximaAcao, setResponsavelProximaAcao] = useState('');
   const [tentouConfirmar, setTentouConfirmar] = useState(false);
+
+  const responsavelPadraoSelecionado = useMemo(() => {
+    if (!responsaveis.length) return '';
+
+    if (responsavelPadraoId && responsaveis.some((item) => item.id === responsavelPadraoId)) {
+      return responsavelPadraoId;
+    }
+
+    return responsaveis[0]?.id ?? '';
+  }, [responsaveis, responsavelPadraoId]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setResponsavelProximaAcao(responsavelPadraoSelecionado);
+  }, [isOpen, responsavelPadraoSelecionado]);
 
   const mostrarOutroMotivo = motivo === 'outro';
   const comentarioLimpo = comentario.trim();
+  const precisaConfigurarProximaAcao = Boolean(proximaAcao);
   const motivoInvalido = tentouConfirmar && !motivo;
   const comentarioObrigatorioInvalido = tentouConfirmar && mostrarOutroMotivo && !comentarioLimpo;
-  const isFormValid = Boolean(motivo) && (!mostrarOutroMotivo || Boolean(comentarioLimpo));
+  const tipoProximoEventoInvalido = tentouConfirmar && precisaConfigurarProximaAcao && !tipoProximoEvento;
+  const responsavelProximaAcaoInvalido =
+    tentouConfirmar && precisaConfigurarProximaAcao && !responsavelProximaAcao;
+  const isFormValid =
+    Boolean(motivo) &&
+    (!mostrarOutroMotivo || Boolean(comentarioLimpo)) &&
+    (!precisaConfigurarProximaAcao || (Boolean(tipoProximoEvento) && Boolean(responsavelProximaAcao)));
 
   const handleClose = useCallback(() => {
     if (loading) return;
@@ -89,8 +137,20 @@ const ModalMudancaEstagio: React.FC<ModalMudancaEstagioProps> = ({
     const motivoSelecionadoLabel = MOTIVOS_MUDANCA.find((item) => item.value === motivo)?.label;
     const motivoFinal = mostrarOutroMotivo ? comentarioLimpo : motivoSelecionadoLabel || motivo;
     const comentarioFinal = mostrarOutroMotivo ? '' : comentarioLimpo;
+    const dataAgendada = converterDataInputParaDate(proximaAcao);
+    const responsavelSelecionado = responsaveis.find((item) => item.id === responsavelProximaAcao);
 
-    onConfirm(motivoFinal, comentarioFinal, converterDataInputParaDate(proximaAcao));
+    const agendamento: AgendamentoProximaAcao | undefined =
+      dataAgendada && tipoProximoEvento && responsavelSelecionado
+        ? {
+            data: dataAgendada,
+            tipoEvento: tipoProximoEvento as TipoAtividade,
+            responsavelId: responsavelSelecionado.id,
+            responsavelNome: responsavelSelecionado.nome,
+          }
+        : undefined;
+
+    onConfirm(motivoFinal, comentarioFinal, agendamento);
   };
 
   return (
@@ -215,6 +275,75 @@ const ModalMudancaEstagio: React.FC<ModalMudancaEstagioProps> = ({
               Data para follow-up ou proxima atividade.
             </p>
           </div>
+
+          {precisaConfigurarProximaAcao && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label
+                  htmlFor="modal-mudanca-estagio-tipo-proximo-evento"
+                  className="mb-2 block text-sm font-medium text-[#002333]"
+                >
+                  Proximo evento <span className="text-red-600">*</span>
+                </label>
+                <select
+                  id="modal-mudanca-estagio-tipo-proximo-evento"
+                  value={tipoProximoEvento}
+                  onChange={(event) => setTipoProximoEvento(event.target.value)}
+                  disabled={loading}
+                  aria-invalid={tipoProximoEventoInvalido}
+                  className={`w-full rounded-lg border bg-white px-4 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50 ${
+                    tipoProximoEventoInvalido
+                      ? 'border-red-300 focus:border-red-500 focus:ring-red-500/20'
+                      : 'border-[#B4BEC9] focus:border-transparent focus:ring-2 focus:ring-[#159A9C]'
+                  }`}
+                >
+                  <option value="">Selecione o tipo...</option>
+                  {PROXIMOS_EVENTOS_OPCOES.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+                {tipoProximoEventoInvalido && (
+                  <p className="mt-1 text-xs text-red-600">Selecione o tipo do proximo evento.</p>
+                )}
+              </div>
+
+              <div>
+                <label
+                  htmlFor="modal-mudanca-estagio-responsavel-proxima-acao"
+                  className="mb-2 block text-sm font-medium text-[#002333]"
+                >
+                  Responsavel <span className="text-red-600">*</span>
+                </label>
+                <select
+                  id="modal-mudanca-estagio-responsavel-proxima-acao"
+                  value={responsavelProximaAcao}
+                  onChange={(event) => setResponsavelProximaAcao(event.target.value)}
+                  disabled={loading}
+                  aria-invalid={responsavelProximaAcaoInvalido}
+                  className={`w-full rounded-lg border bg-white px-4 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50 ${
+                    responsavelProximaAcaoInvalido
+                      ? 'border-red-300 focus:border-red-500 focus:ring-red-500/20'
+                      : 'border-[#B4BEC9] focus:border-transparent focus:ring-2 focus:ring-[#159A9C]'
+                  }`}
+                >
+                  <option value="">Selecione o responsavel...</option>
+                  {responsaveis.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.nome}
+                      {item.email ? ` (${item.email})` : ''}
+                    </option>
+                  ))}
+                </select>
+                {responsavelProximaAcaoInvalido && (
+                  <p className="mt-1 text-xs text-red-600">
+                    Selecione quem vai executar a proxima acao.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
             <p className="text-xs text-blue-800">

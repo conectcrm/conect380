@@ -106,7 +106,13 @@ export interface Atividade {
   descricao: string;
   dataAtividade: Date;
   oportunidadeId: number;
+  responsavelId?: string;
   criadoPor: {
+    id: string;
+    nome: string;
+    avatar?: string;
+  };
+  responsavel?: {
     id: string;
     nome: string;
     avatar?: string;
@@ -169,6 +175,7 @@ export interface NovaAtividade {
   descricao: string;
   dataAtividade?: Date;
   oportunidadeId: number;
+  responsavelId?: string;
 }
 
 export interface OportunidadeHistoricoEstagioItem {

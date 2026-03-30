@@ -835,6 +835,12 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                                 {atividade.criadoPor?.nome || 'Sistema'} •{' '}
                                 {formatarData(atividade.dataAtividade || atividade.createdAt)}
                               </p>
+                              {atividade.responsavel?.nome && (
+                                <p className="text-xs text-[#002333]/55 flex items-center gap-1 mt-1">
+                                  <User className="h-3 w-3" />
+                                  Responsável da ação: {atividade.responsavel.nome}
+                                </p>
+                              )}
                             </div>
                           </div>
                           <p className="text-[#002333]/80 text-sm whitespace-pre-wrap">

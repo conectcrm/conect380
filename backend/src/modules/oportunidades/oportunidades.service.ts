@@ -1480,6 +1480,7 @@ export class OportunidadesService {
     return {
       columns,
       userColumn: columns.has('usuario_id') ? 'usuario_id' : 'criado_por_id',
+      responsavelColumn: columns.has('responsavel_id') ? 'responsavel_id' : null,
       dateColumn: columns.has('data') ? 'data' : 'dataAtividade',
       createdAtColumn: columns.has('criado_em') ? 'criado_em' : 'createdAt',
       titleColumn: columns.has('titulo') ? 'titulo' : null,
@@ -4090,6 +4091,25 @@ export class OportunidadesService {
       );
     }
 
+    let responsavelAtividadeId: string | null = null;
+    if (atividadeSchema.responsavelColumn && createAtividadeDto.responsavel_id) {
+      const responsavel = await this.userRepository.findOne({
+        where: {
+          id: createAtividadeDto.responsavel_id,
+          empresa_id: context.empresaId,
+        },
+        select: ['id'],
+      });
+
+      if (!responsavel) {
+        throw new BadRequestException(
+          'Responsavel informado para a atividade nao pertence a empresa atual.',
+        );
+      }
+
+      responsavelAtividadeId = responsavel.id;
+    }
+
     const columns: string[] = [
       'tipo',
       'descricao',
@@ -4106,6 +4126,11 @@ export class OportunidadesService {
       context.userId ?? (oportunidade as any).responsavel_id,
       createAtividadeDto.dataAtividade ? new Date(createAtividadeDto.dataAtividade) : new Date(),
     ];
+
+    if (atividadeSchema.responsavelColumn) {
+      columns.push(atividadeSchema.responsavelColumn);
+      values.push(responsavelAtividadeId);
+    }
 
     if (atividadeSchema.titleColumn) {
       columns.splice(1, 0, atividadeSchema.titleColumn);
@@ -4124,6 +4149,11 @@ export class OportunidadesService {
           "descricao",
           "oportunidade_id",
           ${this.quoteIdentifier(atividadeSchema.userColumn)} AS "criado_por_id",
+          ${
+            atividadeSchema.responsavelColumn
+              ? `${this.quoteIdentifier(atividadeSchema.responsavelColumn)} AS "responsavel_id",`
+              : 'NULL::uuid AS "responsavel_id",'
+          }
           ${this.quoteIdentifier(atividadeSchema.dateColumn)} AS "dataAtividade",
           ${this.quoteIdentifier(atividadeSchema.createdAtColumn)} AS "createdAt"
       `,
@@ -4138,9 +4168,11 @@ export class OportunidadesService {
       descricao: atividade.descricao,
       oportunidade_id: atividade.oportunidade_id,
       criado_por_id: atividade.criado_por_id,
+      responsavel_id: atividade.responsavel_id,
       dataAtividade: atividade.dataAtividade,
       createdAt: atividade.createdAt,
       criadoPor: undefined,
+      responsavel: undefined,
     } as Atividade;
   }
 
@@ -4154,11 +4186,15 @@ export class OportunidadesService {
     }
 
     const userRef = `atividade.${this.quoteIdentifier(atividadeSchema.userColumn)}`;
+    const responsavelRef = atividadeSchema.responsavelColumn
+      ? `atividade.${this.quoteIdentifier(atividadeSchema.responsavelColumn)}`
+      : null;
     const dateRef = `atividade.${this.quoteIdentifier(atividadeSchema.dateColumn)}`;
     const createdRef = `atividade.${this.quoteIdentifier(atividadeSchema.createdAtColumn)}`;
     const usuarioAvatarExpr = usersColumns.has('avatar_url') ? 'usuario.avatar_url' : 'NULL';
+    const responsavelAvatarExpr = usersColumns.has('avatar_url') ? 'responsavel.avatar_url' : 'NULL';
 
-    const rows = await this.atividadeRepository
+    const queryBuilder = this.atividadeRepository
       .createQueryBuilder('atividade')
       .leftJoin('users', 'usuario', `usuario.id = ${userRef}`)
       .select('atividade.id', 'id')
@@ -4171,7 +4207,24 @@ export class OportunidadesService {
       .addSelect(createdRef, 'createdAt')
       .addSelect('usuario.id', 'usuario__id')
       .addSelect('usuario.nome', 'usuario__nome')
-      .addSelect(usuarioAvatarExpr, 'usuario__avatar_url')
+      .addSelect(usuarioAvatarExpr, 'usuario__avatar_url');
+
+    if (responsavelRef) {
+      queryBuilder
+        .leftJoin('users', 'responsavel', `responsavel.id = ${responsavelRef}`)
+        .addSelect(responsavelRef, 'responsavel_id')
+        .addSelect('responsavel.id', 'responsavel__id')
+        .addSelect('responsavel.nome', 'responsavel__nome')
+        .addSelect(responsavelAvatarExpr, 'responsavel__avatar_url');
+    } else {
+      queryBuilder
+        .addSelect('NULL::uuid', 'responsavel_id')
+        .addSelect('NULL::uuid', 'responsavel__id')
+        .addSelect('NULL', 'responsavel__nome')
+        .addSelect('NULL', 'responsavel__avatar_url');
+    }
+
+    const rows = await queryBuilder
       .where('atividade.oportunidade_id::text = :oportunidadeId', { oportunidadeId })
       .andWhere('atividade.empresa_id = :empresaId', { empresaId })
       .orderBy(dateRef, 'DESC')
@@ -4184,6 +4237,7 @@ export class OportunidadesService {
       descricao: row.descricao,
       oportunidade_id: row.oportunidade_id,
       criado_por_id: row.criado_por_id,
+      responsavel_id: row.responsavel_id ?? null,
       dataAtividade: row.dataAtividade,
       createdAt: row.createdAt,
       criadoPor: row.usuario__id
@@ -4191,6 +4245,13 @@ export class OportunidadesService {
             id: row.usuario__id,
             nome: row.usuario__nome,
             avatar_url: row.usuario__avatar_url,
+          }
+        : undefined,
+      responsavel: row.responsavel__id
+        ? {
+            id: row.responsavel__id,
+            nome: row.responsavel__nome,
+            avatar_url: row.responsavel__avatar_url,
           }
         : undefined,
     })) as Atividade[];

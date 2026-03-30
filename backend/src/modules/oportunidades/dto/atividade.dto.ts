@@ -18,5 +18,9 @@ export class CreateAtividadeDto {
 
   @IsOptional()
   @IsUUID('4')
+  responsavel_id?: string;
+
+  @IsOptional()
+  @IsUUID('4')
   oportunidade_id?: string;
 }
