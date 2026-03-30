@@ -25,6 +25,7 @@ interface SearchSelectProps {
   inputClassName?: string;
   dropdownClassName?: string;
   error?: string;
+  inputTestId?: string;
 }
 
 export default function SearchSelect({
@@ -43,6 +44,7 @@ export default function SearchSelect({
   inputClassName = '',
   dropdownClassName = '',
   error,
+  inputTestId,
 }: SearchSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -145,6 +147,7 @@ export default function SearchSelect({
           onFocus={handleInputFocus}
           placeholder={value ? value.label : placeholder}
           disabled={disabled}
+          data-testid={inputTestId}
           className={clsx(
             'w-full rounded-md border py-2 pl-10 pr-10 focus:outline-none focus:ring-2',
             error

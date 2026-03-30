@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
@@ -45,50 +45,133 @@ import leadsService, {
   ImportLeadResult,
 } from '../services/leadsService';
 import usersService, { User as UsuarioResponsavel } from '../services/usersService';
+import {
+  DEFAULT_PHONE_COUNTRY_ISO,
+  PHONE_COUNTRIES,
+  getPhoneCountryByIso,
+  isValidE164Phone,
+  parsePhoneValue,
+  sanitizePhoneDigits,
+  toE164,
+} from '../utils/phone';
+import SearchSelect from '../components/common/SearchSelect';
+
+type SearchSelectOptionValue = {
+  id: string | number;
+  label: string;
+  subtitle?: string;
+  extra?: string;
+};
+type LeadOriginOption = {
+  value: OrigemLead;
+  label: string;
+  allowManualSelection: boolean;
+};
+
+const LEAD_ORIGIN_OPTIONS: LeadOriginOption[] = [
+  { value: OrigemLead.MANUAL, label: 'Manual', allowManualSelection: true },
+  { value: OrigemLead.FORMULARIO, label: 'Formulário', allowManualSelection: true },
+  { value: OrigemLead.WHATSAPP, label: 'WhatsApp', allowManualSelection: true },
+  { value: OrigemLead.INDICACAO, label: 'Indicação', allowManualSelection: true },
+  { value: OrigemLead.OUTRO, label: 'Outro', allowManualSelection: true },
+  { value: OrigemLead.IMPORTACAO, label: 'Importação', allowManualSelection: false },
+  { value: OrigemLead.API, label: 'API', allowManualSelection: false },
+];
+
+const LEAD_ORIGIN_LABELS = LEAD_ORIGIN_OPTIONS.reduce<Record<string, string>>(
+  (acc, option) => {
+    acc[option.value] = option.label;
+    return acc;
+  },
+  {},
+);
+
+const getLeadOriginFormOptions = (
+  currentOrigin?: OrigemLead | string | null,
+): LeadOriginOption[] => {
+  const baseOptions = LEAD_ORIGIN_OPTIONS.filter((option) => option.allowManualSelection);
+  const normalizedOrigin = String(currentOrigin || '').trim().toLowerCase();
+
+  if (!normalizedOrigin) {
+    return baseOptions;
+  }
+
+  const alreadyExists = baseOptions.some((option) => option.value === normalizedOrigin);
+  if (alreadyExists) {
+    return baseOptions;
+  }
+
+  const systemOption = LEAD_ORIGIN_OPTIONS.find((option) => option.value === normalizedOrigin);
+  if (systemOption) {
+    return [...baseOptions, systemOption];
+  }
+
+  return baseOptions;
+};
 
 // Schema de validação para o modal de Lead
-const leadSchema = yup.object().shape({
-  nome: yup
-    .string()
-    .transform((value) => (typeof value === 'string' ? value.trim() : value))
-    .required('Nome é obrigatório')
-    .min(3, 'Nome deve ter pelo menos 3 caracteres'),
-  email: yup
-    .string()
-    .transform((value) => {
-      if (typeof value !== 'string') return value;
-      const trimmed = value.trim();
-      return trimmed === '' ? undefined : trimmed;
-    })
-    .email('Email inválido')
-    .optional(),
-  telefone: yup
-    .string()
-    .transform((value) => {
-      if (typeof value !== 'string') return value;
-      const trimmed = value.trim();
-      return trimmed === '' ? undefined : trimmed;
-    })
-    .optional(),
-  empresa_nome: yup
-    .string()
-    .transform((value) => {
-      if (typeof value !== 'string') return value;
-      const trimmed = value.trim();
-      return trimmed === '' ? undefined : trimmed;
-    })
-    .optional(),
-  origem: yup.string().required('Origem é obrigatória'),
-  observacoes: yup
-    .string()
-    .transform((value) => {
-      if (typeof value !== 'string') return value;
-      const trimmed = value.trim();
-      return trimmed === '' ? undefined : trimmed;
-    })
-    .optional(),
-});
+const leadSchema = yup
+  .object()
+  .shape({
+    nome: yup
+      .string()
+      .transform((value) => (typeof value === 'string' ? value.trim() : value))
+      .required('Nome é obrigatório')
+      .min(3, 'Nome deve ter pelo menos 3 caracteres'),
+    email: yup
+      .string()
+      .transform((value) => {
+        if (typeof value !== 'string') return value;
+        const trimmed = value.trim();
+        return trimmed === '' ? undefined : trimmed;
+      })
+      .email('Email inválido')
+      .optional(),
+    telefone: yup
+      .string()
+      .transform((value) => {
+        if (typeof value !== 'string') return value;
+        const trimmed = value.trim();
+        return trimmed === '' ? undefined : trimmed;
+      })
+      .test(
+        'telefone-formato',
+        'Telefone internacional inválido para o país selecionado.',
+        (value) => !value || isValidE164Phone(value),
+      )
+      .optional(),
+    empresa_nome: yup
+      .string()
+      .transform((value) => {
+        if (typeof value !== 'string') return value;
+        const trimmed = value.trim();
+        return trimmed === '' ? undefined : trimmed;
+      })
+      .optional(),
+    origem: yup.string().required('Origem é obrigatória'),
+    observacoes: yup
+      .string()
+      .transform((value) => {
+        if (typeof value !== 'string') return value;
+        const trimmed = value.trim();
+        return trimmed === '' ? undefined : trimmed;
+      })
+      .optional(),
+  })
+  .test(
+    'contato-obrigatorio',
+    'Informe pelo menos um contato: e-mail ou telefone.',
+    function validateContato(value) {
+      if (value?.email?.trim() || value?.telefone?.trim()) {
+        return true;
+      }
 
+      return this.createError({
+        path: 'telefone',
+        message: 'Informe pelo menos um contato: e-mail ou telefone.',
+      });
+    },
+  );
 // Schema de validação para conversão
 const convertSchema = yup.object().shape({
   titulo_oportunidade: yup
@@ -115,6 +198,7 @@ interface LeadsSavedView {
   busca: string;
   status: string;
   origem: string;
+  responsavelCriacao: string;
   dataInicio: string;
   dataFim: string;
   itensPorPagina: number;
@@ -131,18 +215,30 @@ const readLeadsSavedViews = (): LeadsSavedView[] => {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
 
-    return parsed.filter((view) => {
-      return (
-        typeof view?.id === 'string' &&
-        typeof view?.nome === 'string' &&
-        typeof view?.busca === 'string' &&
-        typeof view?.status === 'string' &&
-        typeof view?.origem === 'string' &&
-        typeof view?.dataInicio === 'string' &&
-        typeof view?.dataFim === 'string' &&
-        typeof view?.itensPorPagina === 'number'
-      );
-    });
+    return parsed
+      .filter(
+        (view) =>
+          typeof view?.id === 'string' &&
+          typeof view?.nome === 'string' &&
+          typeof view?.busca === 'string' &&
+          typeof view?.status === 'string' &&
+          typeof view?.origem === 'string' &&
+          typeof view?.dataInicio === 'string' &&
+          typeof view?.dataFim === 'string' &&
+          typeof view?.itensPorPagina === 'number',
+      )
+      .map((view) => ({
+        id: view.id,
+        nome: view.nome,
+        busca: view.busca,
+        status: view.status,
+        origem: view.origem,
+        responsavelCriacao:
+          typeof view?.responsavelCriacao === 'string' ? view.responsavelCriacao : 'todos',
+        dataInicio: view.dataInicio,
+        dataFim: view.dataFim,
+        itensPorPagina: view.itensPorPagina,
+      }));
   } catch {
     return [];
   }
@@ -175,6 +271,7 @@ const LeadsPage: React.FC = () => {
   const [buscaDebounced, setBuscaDebounced] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<string>('operacionais');
   const [filtroOrigem, setFiltroOrigem] = useState<string>('todas');
+  const [filtroResponsavelCriacao, setFiltroResponsavelCriacao] = useState<string>('todos');
   const [filtroDataInicio, setFiltroDataInicio] = useState('');
   const [filtroDataFim, setFiltroDataFim] = useState('');
   const [paginaAtual, setPaginaAtual] = useState(1);
@@ -210,6 +307,8 @@ const LeadsPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const hasLoadedOnceRef = useRef(false);
   const previousBuscaDebouncedRef = useRef('');
+  const [leadPhoneCountryIso, setLeadPhoneCountryIso] = useState(DEFAULT_PHONE_COUNTRY_ISO);
+  const [leadPhoneNationalNumber, setLeadPhoneNationalNumber] = useState('');
 
   // React Hook Form para modal de Lead
   const {
@@ -218,6 +317,7 @@ const LeadsPage: React.FC = () => {
     formState: { errors: leadErrors, isValid: isLeadValid },
     reset: resetLeadForm,
     setValue: setLeadValue,
+    watch: watchLeadForm,
   } = useForm<CreateLeadDto>({
     resolver: yupResolver(leadSchema),
     mode: 'onChange',
@@ -230,6 +330,53 @@ const LeadsPage: React.FC = () => {
       observacoes: '',
     },
   });
+
+  const watchedLeadEmail = watchLeadForm('email') || '';
+  const watchedLeadTelefone = watchLeadForm('telefone') || '';
+
+  const selectedLeadPhoneCountry = useMemo(
+    () => getPhoneCountryByIso(leadPhoneCountryIso),
+    [leadPhoneCountryIso],
+  );
+
+  const leadOriginFormOptions = useMemo(
+    () => getLeadOriginFormOptions(editingLead?.origem),
+    [editingLead?.origem],
+  );
+
+  const responsavelCriacaoOptions = useMemo<SearchSelectOptionValue[]>(
+    () =>
+      responsaveis
+        .filter((responsavel) => Boolean(responsavel?.id))
+        .map((responsavel) => {
+          const nome = (responsavel.nome || responsavel.username || responsavel.email || '').trim();
+          const email = (responsavel.email || '').trim();
+          const username = (responsavel.username || '').trim();
+
+          return {
+            id: responsavel.id,
+            label: nome || email || username || String(responsavel.id),
+            subtitle:
+              username && email
+                ? `${username} • ${email}`
+                : username || email || undefined,
+            extra: responsavel.id,
+          };
+        }),
+    [responsaveis],
+  );
+
+  const responsavelCriacaoSelecionado = useMemo<SearchSelectOptionValue | null>(() => {
+    if (filtroResponsavelCriacao === 'todos') {
+      return null;
+    }
+
+    return (
+      responsavelCriacaoOptions.find(
+        (option) => String(option.id) === String(filtroResponsavelCriacao),
+      ) || null
+    );
+  }, [filtroResponsavelCriacao, responsavelCriacaoOptions]);
 
   // React Hook Form para modal de Conversão
   const {
@@ -285,6 +432,10 @@ const LeadsPage: React.FC = () => {
 
       if (filtroOrigem !== 'todas') {
         filtros.origem = filtroOrigem;
+      }
+
+      if (filtroResponsavelCriacao !== 'todos') {
+        filtros.responsavel_id = filtroResponsavelCriacao;
       }
 
       if (filtroDataInicio) {
@@ -358,6 +509,7 @@ const LeadsPage: React.FC = () => {
     buscaDebounced,
     filtroStatus,
     filtroOrigem,
+    filtroResponsavelCriacao,
     filtroDataInicio,
     filtroDataFim,
   ]);
@@ -405,16 +557,21 @@ const LeadsPage: React.FC = () => {
         lead.origem && Object.values(OrigemLead).includes(lead.origem as OrigemLead)
           ? (lead.origem as OrigemLead)
           : OrigemLead.MANUAL;
+      const parsedPhone = parsePhoneValue(lead.telefone ?? '');
+      setLeadPhoneCountryIso(parsedPhone.country.iso2);
+      setLeadPhoneNationalNumber(parsedPhone.nationalNumber);
       resetLeadForm({
         nome: lead.nome ?? '',
         email: lead.email ?? '',
-        telefone: lead.telefone ?? '',
+        telefone: toE164(parsedPhone.country, parsedPhone.nationalNumber),
         empresa_nome: lead.empresa_nome ?? '',
         origem: safeOrigin,
         observacoes: lead.observacoes ?? '',
       });
     } else {
       setEditingLead(null);
+      setLeadPhoneCountryIso(DEFAULT_PHONE_COUNTRY_ISO);
+      setLeadPhoneNationalNumber('');
       resetLeadForm({
         nome: '',
         email: '',
@@ -452,6 +609,8 @@ const LeadsPage: React.FC = () => {
 
       setShowDialog(false);
       setEditingLead(null);
+      setLeadPhoneCountryIso(DEFAULT_PHONE_COUNTRY_ISO);
+      setLeadPhoneNationalNumber('');
       resetLeadForm();
       await carregarDados();
     } catch (err: unknown) {
@@ -472,6 +631,8 @@ const LeadsPage: React.FC = () => {
   const handleCloseDialog = () => {
     setShowDialog(false);
     setEditingLead(null);
+    setLeadPhoneCountryIso(DEFAULT_PHONE_COUNTRY_ISO);
+    setLeadPhoneNationalNumber('');
     resetLeadForm();
   };
 
@@ -880,16 +1041,9 @@ const LeadsPage: React.FC = () => {
     if (!origem) {
       return 'Origem não informada';
     }
-    const labels: Record<OrigemLead, string> = {
-      [OrigemLead.FORMULARIO]: 'Formulário',
-      [OrigemLead.IMPORTACAO]: 'Importação',
-      [OrigemLead.API]: 'API',
-      [OrigemLead.WHATSAPP]: 'WhatsApp',
-      [OrigemLead.MANUAL]: 'Manual',
-      [OrigemLead.INDICACAO]: 'Indicação',
-      [OrigemLead.OUTRO]: 'Outro',
-    };
-    return labels[origem as OrigemLead] || origem;
+
+    const normalized = String(origem).trim().toLowerCase();
+    return LEAD_ORIGIN_LABELS[normalized] || origem;
   };
 
   // Cores de status
@@ -958,16 +1112,19 @@ const LeadsPage: React.FC = () => {
     Boolean(busca.trim()) ||
     filtroStatus !== 'operacionais' ||
     filtroOrigem !== 'todas' ||
+    filtroResponsavelCriacao !== 'todos' ||
     Boolean(filtroDataInicio) ||
     Boolean(filtroDataFim);
   const hasAdvancedFilters =
     filtroOrigem !== 'todas' ||
+    filtroResponsavelCriacao !== 'todos' ||
     Boolean(filtroDataInicio) ||
     Boolean(filtroDataFim) ||
     itensPorPagina !== 12 ||
     Boolean(activeViewId);
   const advancedFiltersCount = [
     filtroOrigem !== 'todas',
+    filtroResponsavelCriacao !== 'todos',
     Boolean(filtroDataInicio),
     Boolean(filtroDataFim),
     itensPorPagina !== 12,
@@ -979,6 +1136,7 @@ const LeadsPage: React.FC = () => {
     setBusca('');
     setFiltroStatus('operacionais');
     setFiltroOrigem('todas');
+    setFiltroResponsavelCriacao('todos');
     setFiltroDataInicio('');
     setFiltroDataFim('');
     setItensPorPagina(12);
@@ -987,6 +1145,16 @@ const LeadsPage: React.FC = () => {
     setActiveViewId('');
     setViewNameInput('');
     setShowAdvancedFilters(false);
+  };
+
+  const handleResponsavelCriacaoSelectChange = (option: SearchSelectOptionValue | null) => {
+    const nextValue = option ? String(option.id) : 'todos';
+    if (nextValue === filtroResponsavelCriacao) {
+      return;
+    }
+
+    setFiltroResponsavelCriacao(nextValue);
+    setPaginaAtual(1);
   };
 
   const activeSavedView = savedViews.find((view) => view.id === activeViewId) || null;
@@ -1101,6 +1269,7 @@ const LeadsPage: React.FC = () => {
     setBusca(view.busca);
     setFiltroStatus(view.status || 'operacionais');
     setFiltroOrigem(view.origem || 'todas');
+    setFiltroResponsavelCriacao(view.responsavelCriacao || 'todos');
     setFiltroDataInicio(view.dataInicio || '');
     setFiltroDataFim(view.dataFim || '');
     setItensPorPagina(view.itensPorPagina || 12);
@@ -1139,6 +1308,7 @@ const LeadsPage: React.FC = () => {
       busca: busca.trim(),
       status: filtroStatus,
       origem: filtroOrigem,
+      responsavelCriacao: filtroResponsavelCriacao,
       dataInicio: filtroDataInicio,
       dataFim: filtroDataFim,
       itensPorPagina,
@@ -1339,7 +1509,7 @@ const LeadsPage: React.FC = () => {
 
             {showAdvancedFilters && (
               <div className="rounded-xl border border-[#DCE8EC] bg-[#F8FBFC] p-3 sm:p-4">
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                   <div className="w-full">
                     <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
                       Origem
@@ -1354,14 +1524,32 @@ const LeadsPage: React.FC = () => {
                       className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
                     >
                       <option value="todas">Todas as origens</option>
-                      <option value={OrigemLead.MANUAL}>Manual</option>
-                      <option value={OrigemLead.FORMULARIO}>Formulário</option>
-                      <option value={OrigemLead.WHATSAPP}>WhatsApp</option>
-                      <option value={OrigemLead.IMPORTACAO}>Importação</option>
-                      <option value={OrigemLead.INDICACAO}>Indicação</option>
-                      <option value={OrigemLead.API}>API</option>
-                      <option value={OrigemLead.OUTRO}>Outro</option>
+                      {LEAD_ORIGIN_OPTIONS.map((originOption) => (
+                        <option key={originOption.value} value={originOption.value}>
+                          {originOption.label}
+                        </option>
+                      ))}
                     </select>
+                  </div>
+
+                  <div className="w-full">
+                    <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                      Responsável da criação
+                    </label>
+                    <SearchSelect
+                      options={responsavelCriacaoOptions}
+                      value={responsavelCriacaoSelecionado}
+                      onChange={handleResponsavelCriacaoSelectChange}
+                      placeholder="Busque por nome, usuário ou email..."
+                      disabled={loadingResponsaveis}
+                      loading={loadingResponsaveis}
+                      icon="user"
+                      emptyMessage="Nenhum responsável encontrado"
+                      inputTestId="leads-filter-responsavel-criacao"
+                      className="w-full"
+                      inputClassName="h-10 rounded-xl border-[#D4E2E7] bg-white text-sm text-[#244455] focus:border-[#1A9E87]/45 focus:ring-[#1A9E87]/15"
+                      dropdownClassName="max-h-64 rounded-xl border-[#D4E2E7]"
+                    />
                   </div>
 
                   <div className="w-full">
@@ -1472,76 +1660,80 @@ const LeadsPage: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {leadsFiltrados.length > 0 && hasBulkLeadActions && (
+              <div className="rounded-xl border border-[#DCE8EC] bg-[#F8FBFC] p-3">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex items-center gap-3">
+                    <label className="inline-flex items-center gap-2 text-sm font-medium text-[#244455]">
+                      <input
+                        type="checkbox"
+                        checked={allVisibleSelected}
+                        onChange={toggleSelectAllVisible}
+                        className="h-4 w-4 rounded border-[#BFD2DB] text-[#159A9C] focus:ring-[#159A9C]/30"
+                      />
+                      Selecionar página
+                    </label>
+                    <span className="rounded-full bg-[#F2F8FA] px-3 py-1 text-xs font-medium text-[#4C6575]">
+                      {bulkSelectedCount} selecionado(s)
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {canAssignLead && (
+                      <>
+                        <select
+                          value={bulkResponsavelId}
+                          onChange={(e) => setBulkResponsavelId(e.target.value)}
+                          disabled={loadingResponsaveis || bulkActionLoading !== null}
+                          className="h-9 min-w-[220px] rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <option value="">Atribuir responsável em lote</option>
+                          {responsaveis.map((responsavel) => (
+                            <option key={responsavel.id} value={responsavel.id}>
+                              {responsavel.nome || responsavel.username}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={handleBulkAtribuirResponsavel}
+                          disabled={
+                            !bulkSelectedCount || !bulkResponsavelId || bulkActionLoading !== null
+                          }
+                          className="inline-flex h-9 items-center rounded-lg border border-[#D4E2E7] px-3 text-xs font-medium text-[#244455] transition-colors hover:bg-[#F8FCFC] disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {bulkActionLoading === 'atribuir' ? 'Aplicando...' : 'Aplicar responsável'}
+                        </button>
+                      </>
+                    )}
+                    {canManageLeadLifecycle && (
+                      <button
+                        type="button"
+                        onClick={handleBulkQualificar}
+                        disabled={!bulkSelectedCount || bulkActionLoading !== null}
+                        className="inline-flex h-9 items-center rounded-lg bg-green-600 px-3 text-xs font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {bulkActionLoading === 'qualificar' ? 'Processando...' : 'Qualificar em lote'}
+                      </button>
+                    )}
+                    {canManageLeadLifecycle && (
+                      <button
+                        type="button"
+                        onClick={handleBulkDesqualificar}
+                        disabled={!bulkSelectedCount || bulkActionLoading !== null}
+                        className="inline-flex h-9 items-center rounded-lg border border-[#F3CFD1] bg-[#FFF5F5] px-3 text-xs font-medium text-[#B03A48] transition-colors hover:bg-[#FFE9EA] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {bulkActionLoading === 'desqualificar'
+                          ? 'Processando...'
+                          : 'Desqualificar em lote'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </FiltersBar>
-
-        {leadsFiltrados.length > 0 && hasBulkLeadActions && (
-          <div className="flex flex-col gap-3 rounded-xl border border-[#D4E2E7] bg-white p-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-3">
-              <label className="inline-flex items-center gap-2 text-sm font-medium text-[#244455]">
-                <input
-                  type="checkbox"
-                  checked={allVisibleSelected}
-                  onChange={toggleSelectAllVisible}
-                  className="h-4 w-4 rounded border-[#BFD2DB] text-[#159A9C] focus:ring-[#159A9C]/30"
-                />
-                Selecionar página
-              </label>
-              <span className="rounded-full bg-[#F2F8FA] px-3 py-1 text-xs font-medium text-[#4C6575]">
-                {bulkSelectedCount} selecionado(s)
-              </span>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {canAssignLead && (
-                <>
-                  <select
-                    value={bulkResponsavelId}
-                    onChange={(e) => setBulkResponsavelId(e.target.value)}
-                    disabled={loadingResponsaveis || bulkActionLoading !== null}
-                    className="h-9 min-w-[220px] rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <option value="">Atribuir responsável em lote</option>
-                    {responsaveis.map((responsavel) => (
-                      <option key={responsavel.id} value={responsavel.id}>
-                        {responsavel.nome || responsavel.username}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={handleBulkAtribuirResponsavel}
-                    disabled={!bulkSelectedCount || !bulkResponsavelId || bulkActionLoading !== null}
-                    className="inline-flex h-9 items-center rounded-lg border border-[#D4E2E7] px-3 text-xs font-medium text-[#244455] transition-colors hover:bg-[#F8FCFC] disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {bulkActionLoading === 'atribuir' ? 'Aplicando...' : 'Aplicar responsável'}
-                  </button>
-                </>
-              )}
-              {canManageLeadLifecycle && (
-                <button
-                  type="button"
-                  onClick={handleBulkQualificar}
-                  disabled={!bulkSelectedCount || bulkActionLoading !== null}
-                  className="inline-flex h-9 items-center rounded-lg bg-green-600 px-3 text-xs font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {bulkActionLoading === 'qualificar' ? 'Processando...' : 'Qualificar em lote'}
-                </button>
-              )}
-              {canManageLeadLifecycle && (
-                <button
-                  type="button"
-                  onClick={handleBulkDesqualificar}
-                  disabled={!bulkSelectedCount || bulkActionLoading !== null}
-                  className="inline-flex h-9 items-center rounded-lg border border-[#F3CFD1] bg-[#FFF5F5] px-3 text-xs font-medium text-[#B03A48] transition-colors hover:bg-[#FFE9EA] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {bulkActionLoading === 'desqualificar'
-                    ? 'Processando...'
-                    : 'Desqualificar em lote'}
-                </button>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* Error Alert */}
         {error && (
@@ -2227,7 +2419,7 @@ const LeadsPage: React.FC = () => {
 
                   {/* Email */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input
@@ -2251,16 +2443,71 @@ const LeadsPage: React.FC = () => {
                   {/* Telefone */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input type="hidden" {...register('telefone')} />
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-[190px_1fr]">
+                      <select
+                        value={leadPhoneCountryIso}
+                        onChange={(event) => {
+                          const nextCountry = getPhoneCountryByIso(event.target.value);
+                          setLeadPhoneCountryIso(nextCountry.iso2);
+                          setLeadValue('telefone', toE164(nextCountry, leadPhoneNationalNumber), {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          });
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors"
+                        disabled={isSubmitting}
+                      >
+                        {PHONE_COUNTRIES.map((country) => (
+                          <option key={country.iso2} value={country.iso2}>
+                            {country.flag ? `${country.flag} ` : ''}+{country.dialCode} {country.name}
+                          </option>
+                        ))}
+                      </select>
                       <input
-                        {...register('telefone')}
                         type="tel"
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors"
-                        placeholder="(00) 00000-0000"
+                        value={leadPhoneNationalNumber}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
+                          leadErrors.telefone ? 'border-red-300' : 'border-gray-300'
+                        }`}
+                        placeholder={selectedLeadPhoneCountry.sample}
+                        onChange={(event) => {
+                          const onlyDigits = sanitizePhoneDigits(event.target.value).slice(
+                            0,
+                            selectedLeadPhoneCountry.maxLength,
+                          );
+                          setLeadPhoneNationalNumber(onlyDigits);
+                          setLeadValue('telefone', toE164(selectedLeadPhoneCountry, onlyDigits), {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          });
+                        }}
                         disabled={isSubmitting}
                       />
                     </div>
+                    {leadErrors.telefone && (
+                      <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {leadErrors.telefone.message}
+                      </p>
+                    )}
+                    {!leadErrors.telefone &&
+                    leadPhoneNationalNumber.length > 0 &&
+                    leadPhoneNationalNumber.length < selectedLeadPhoneCountry.minLength ? (
+                      <p className="mt-1 text-xs text-[#8A6D3B]">
+                        Número incompleto para {selectedLeadPhoneCountry.name}.
+                      </p>
+                    ) : null}
+                    {!leadErrors.telefone && watchedLeadTelefone ? (
+                      <p className="mt-1 text-xs text-[#607B89]">
+                        Formato salvo: {watchedLeadTelefone}
+                      </p>
+                    ) : null}
+                    {!leadErrors.telefone && !watchedLeadTelefone && !watchedLeadEmail.trim() ? (
+                      <p className="mt-1 text-xs text-[#8A6D3B]">
+                        Informe pelo menos um contato: e-mail ou telefone.
+                      </p>
+                    ) : null}
                   </div>
                 </div>
 
@@ -2298,13 +2545,13 @@ const LeadsPage: React.FC = () => {
                       }`}
                       disabled={isSubmitting}
                     >
-                      <option value={OrigemLead.MANUAL}>Manual</option>
-                      <option value={OrigemLead.FORMULARIO}>Formulário</option>
-                      <option value={OrigemLead.IMPORTACAO}>Importação</option>
-                      <option value={OrigemLead.API}>API</option>
-                      <option value={OrigemLead.WHATSAPP}>WhatsApp</option>
-                      <option value={OrigemLead.INDICACAO}>Indicação</option>
-                      <option value={OrigemLead.OUTRO}>Outro</option>
+                      {leadOriginFormOptions.map((originOption) => (
+                        <option key={originOption.value} value={originOption.value}>
+                          {originOption.allowManualSelection
+                            ? originOption.label
+                            : `${originOption.label} (sistema)`}
+                        </option>
+                      ))}
                     </select>
                     {leadErrors.origem && (
                       <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
@@ -2663,7 +2910,7 @@ const LeadsPage: React.FC = () => {
                       <li>telefone</li>
                       <li>empresa_nome</li>
                       <li>
-                        origem (site, formulario, email, telefone, redes_sociais, indicacao, outros)
+                        origem (manual, formulario, whatsapp, importacao, indicacao, api, outro)
                       </li>
                       <li>observacoes</li>
                       <li>responsavel_email (email do usuário responsável)</li>
