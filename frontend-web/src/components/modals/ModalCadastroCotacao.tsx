@@ -21,6 +21,7 @@ import { cotacaoService } from '../../services/cotacaoService';
 import { toastService } from '../../services/toastService';
 import { useAuth } from '../../hooks/useAuth';
 import MoneyInput from '../common/MoneyInput';
+import SearchSelect from '../common/SearchSelect';
 import {
   Cotacao,
   CriarCotacaoRequest,
@@ -99,6 +100,16 @@ interface ModalCadastroCotacaoProps {
   onSave: (cotacao: Cotacao) => void;
 }
 
+interface CotacaoSelectOption {
+  id: string;
+  label: string;
+  subtitle?: string;
+  extra?: string;
+}
+
+type CotacaoTab = 'dados' | 'itens' | 'configuracoes';
+const COTACAO_TAB_ORDER: CotacaoTab[] = ['dados', 'itens', 'configuracoes'];
+
 export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
   isOpen,
   onClose,
@@ -112,7 +123,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [loadingUsuarios, setLoadingUsuarios] = useState(false);
   const [novaTag, setNovaTag] = useState('');
-  const [activeTab, setActiveTab] = useState<'dados' | 'itens' | 'configuracoes'>('dados');
+  const [activeTab, setActiveTab] = useState<CotacaoTab>('dados');
 
   const isEditing = !!cotacao;
 
@@ -125,6 +136,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
     reset,
     getValues,
     control,
+    trigger,
   } = useForm<CotacaoFormData>({
     resolver: yupResolver(schemaValidacao),
     defaultValues: {
@@ -147,6 +159,45 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
 
   const watchedItens = watch('itens');
   const watchedTags = watch('tags');
+  const activeTabIndex = COTACAO_TAB_ORDER.indexOf(activeTab);
+  const isFirstTab = activeTabIndex <= 0;
+  const isLastTab = activeTabIndex === COTACAO_TAB_ORDER.length - 1;
+
+  const validarAbaAtual = async (): Promise<boolean> => {
+    if (activeTab === 'dados') {
+      return trigger(['fornecedorId', 'prioridade', 'titulo', 'origem']);
+    }
+
+    if (activeTab === 'itens') {
+      return trigger('itens');
+    }
+
+    return true;
+  };
+
+  const avancarAba = async () => {
+    if (isLastTab) return;
+
+    const etapaValida = await validarAbaAtual();
+    if (!etapaValida) {
+      toastService.error('Revise os campos obrigatórios desta etapa antes de continuar.');
+      return;
+    }
+
+    const nextTab = COTACAO_TAB_ORDER[activeTabIndex + 1];
+    if (nextTab) {
+      setActiveTab(nextTab);
+    }
+  };
+
+  const voltarAba = () => {
+    if (isFirstTab) return;
+
+    const previousTab = COTACAO_TAB_ORDER[activeTabIndex - 1];
+    if (previousTab) {
+      setActiveTab(previousTab);
+    }
+  };
 
   // Carregar metadata de criacao/edicao (fornecedores + aprovadores)
   useEffect(() => {
@@ -329,6 +380,20 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
     return colors[prioridade] || colors.media;
   };
 
+  const fornecedorOptions: CotacaoSelectOption[] = fornecedores.map((fornecedor) => ({
+    id: String(fornecedor.id),
+    label: fornecedor.nome || 'Fornecedor sem nome',
+    subtitle: fornecedor.cnpjCpf || fornecedor.documento || fornecedor.email || undefined,
+    extra: fornecedor.telefone || undefined,
+  }));
+
+  const aprovadorOptions: CotacaoSelectOption[] = usuarios.map((usuario) => ({
+    id: String(usuario.id),
+    label: usuario.nome || usuario.email || 'Usuário sem nome',
+    subtitle: usuario.email || undefined,
+    extra: usuario.role ? String(usuario.role).toUpperCase() : undefined,
+  }));
+
   return (
     <div
       className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-[#0F172A]/35 p-4 backdrop-blur-sm sm:items-center"
@@ -371,7 +436,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
             ].map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
-                onClick={() => setActiveTab(id as any)}
+                onClick={() => setActiveTab(id as CotacaoTab)}
                 className={`shrink-0 whitespace-nowrap py-4 px-3 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === id
                     ? 'border-[#159A9C] text-[#159A9C]'
@@ -399,23 +464,36 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Fornecedor *
                     </label>
-                    <select
-                      {...register('fornecedorId')}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent ${
-                        errors.fornecedorId ? 'border-red-300' : 'border-gray-300'
-                      }`}
-                      disabled={loadingFornecedores}
-                    >
-                      <option value="">Selecione um fornecedor</option>
-                      {fornecedores.map((fornecedor) => (
-                        <option key={fornecedor.id} value={fornecedor.id}>
-                          {fornecedor.nome}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.fornecedorId && (
-                      <p className="text-red-500 text-sm mt-1">{errors.fornecedorId.message}</p>
-                    )}
+                    <Controller
+                      control={control}
+                      name="fornecedorId"
+                      render={({ field }) => {
+                        const selectedOption =
+                          fornecedorOptions.find((option) => option.id === String(field.value || '')) ||
+                          null;
+
+                        return (
+                          <SearchSelect
+                            options={fornecedorOptions}
+                            value={selectedOption}
+                            onChange={(option) => field.onChange(option ? String(option.id) : '')}
+                            placeholder="Busque por fornecedor..."
+                            disabled={loadingFornecedores}
+                            loading={loadingFornecedores}
+                            icon="user"
+                            emptyMessage="Nenhum fornecedor encontrado"
+                            error={errors.fornecedorId?.message}
+                            inputTestId="cotacao-fornecedor-search"
+                            inputClassName={`h-10 rounded-lg ${
+                              errors.fornecedorId
+                                ? 'focus:ring-red-500'
+                                : 'focus:ring-[#159A9C]'
+                            }`}
+                            dropdownClassName="max-h-64 rounded-lg"
+                          />
+                        );
+                      }}
+                    />
                   </div>
 
                   {/* Aprovador (opcional) */}
@@ -424,18 +502,31 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                       Aprovador
                       <span className="text-gray-400 text-xs ml-2">(opcional)</span>
                     </label>
-                    <select
-                      {...register('aprovadorId')}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                      disabled={loadingUsuarios}
-                    >
-                      <option value="">Nenhum (sem aprovação)</option>
-                      {usuarios.map((usuario) => (
-                        <option key={usuario.id} value={usuario.id}>
-                          {usuario.nome} ({usuario.email})
-                        </option>
-                      ))}
-                    </select>
+                    <Controller
+                      control={control}
+                      name="aprovadorId"
+                      render={({ field }) => {
+                        const selectedOption =
+                          aprovadorOptions.find((option) => option.id === String(field.value || '')) ||
+                          null;
+
+                        return (
+                          <SearchSelect
+                            options={aprovadorOptions}
+                            value={selectedOption}
+                            onChange={(option) => field.onChange(option ? String(option.id) : '')}
+                            placeholder="Nenhum (sem aprovação)"
+                            disabled={loadingUsuarios}
+                            loading={loadingUsuarios}
+                            icon="user"
+                            emptyMessage="Nenhum aprovador encontrado"
+                            inputTestId="cotacao-aprovador-search"
+                            inputClassName="h-10 rounded-lg focus:ring-[#159A9C]"
+                            dropdownClassName="max-h-64 rounded-lg"
+                          />
+                        );
+                      }}
+                    />
                     <p className="text-xs text-gray-500 mt-1">
                       Se selecionado, esta cotação precisará ser aprovada antes de prosseguir.
                     </p>
@@ -797,13 +888,24 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
               >
                 Cancelar
               </button>
+              {!isFirstTab && (
+                <button
+                  type="button"
+                  onClick={voltarAba}
+                  className="inline-flex items-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
+                  disabled={isSubmitting}
+                >
+                  Anterior
+                </button>
+              )}
               <button
-                type="submit"
+                type={isLastTab ? 'submit' : 'button'}
+                onClick={isLastTab ? undefined : () => void avancarAba()}
                 disabled={isSubmitting}
                 className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                <span>{isEditing ? 'Atualizar' : 'Criar'} Cotação</span>
+                {isSubmitting && isLastTab && <Loader2 className="w-4 h-4 animate-spin" />}
+                <span>{isLastTab ? `${isEditing ? 'Atualizar' : 'Criar'} Cotação` : 'Próximo'}</span>
               </button>
             </div>
           </div>
@@ -814,5 +916,4 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
 };
 
 export default ModalCadastroCotacao;
-
 
