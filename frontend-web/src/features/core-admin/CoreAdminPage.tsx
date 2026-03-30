@@ -73,6 +73,15 @@ const DEFAULT_PLAN_FORM: PlanFormState = {
 };
 
 const CORE_ADMIN_CANONICAL_ESSENTIAL_MODULE_CODES = new Set(['CRM', 'BILLING']);
+const CORE_ADMIN_TAB_LABELS: Record<CoreAdminTab, string> = {
+  overview: 'Overview',
+  governance: 'Governanca Runtime',
+  companies: 'Empresas e Flags',
+  plans: 'Planos',
+  billing: 'Billing',
+  access: 'Acessos',
+  audit: 'Auditoria',
+};
 
 const CORE_ADMIN_MODULE_LINKED_SCREENS: Record<string, ModuleLinkedScreen[]> = {
   CRM: [
@@ -1290,35 +1299,143 @@ const CoreAdminPage: React.FC = () => {
     return companies.filter((company) => company.ativo).length;
   }, [companies]);
 
+  const companiesInactiveCount = useMemo(() => {
+    return Math.max(0, companies.length - companiesActiveCount);
+  }, [companies.length, companiesActiveCount]);
+
   const checkoutPublishedPlansCount = useMemo(() => {
     return plans.filter((plan) => plan.ativo && plan.publicadoCheckout !== false).length;
   }, [plans]);
 
+  const checkoutHiddenPlansCount = useMemo(() => {
+    return plans.filter((plan) => plan.ativo && plan.publicadoCheckout === false).length;
+  }, [plans]);
+
+  const pendingAccessRequestsCount = Number(overview.pending_access_requests ?? 0);
+  const pendingBreakGlassRequestsCount = Number(overview.pending_break_glass_requests ?? 0);
+  const activeBreakGlassAccessesCount = Number(overview.active_break_glass_accesses ?? 0);
+
+  const enabledHighRiskCapabilitiesCount = useMemo(() => {
+    return governanceCapabilities.filter(
+      (capability) => capability.enabled && capability.risk === 'alto',
+    ).length;
+  }, [governanceCapabilities]);
+
+  const overviewHealth = useMemo(() => {
+    const hasAttentionSignals =
+      governanceAlerts.length > 0 ||
+      pendingBreakGlassRequestsCount > 0 ||
+      enabledHighRiskCapabilitiesCount > 0;
+
+    if (hasAttentionSignals) {
+      return {
+        label: 'Atencao operacional',
+        tone: 'attention' as const,
+        description:
+          'Existem sinais de risco ou pendencias de governanca. Priorize a tratativa das acoes recomendadas.',
+      };
+    }
+
+    return {
+      label: 'Operacao estavel',
+      tone: 'healthy' as const,
+      description:
+        'Sem sinais criticos no momento. Mantenha monitoramento continuo de acesso, planos e capacidades.',
+    };
+  }, [enabledHighRiskCapabilitiesCount, governanceAlerts.length, pendingBreakGlassRequestsCount]);
+
   const overviewSummaryCards = useMemo(
     () => [
       {
-        label: 'Empresas ativas',
-        value: `${companiesActiveCount}/${companies.length || 0}`,
-        hint: 'Empresas habilitadas para operar no SaaS.',
+        label: 'Empresas inativas',
+        value: String(companiesInactiveCount),
+        hint: `${companiesActiveCount}/${companies.length || 0} empresas ativas no SaaS.`,
       },
       {
-        label: 'Planos publicados',
-        value: String(checkoutPublishedPlansCount),
-        hint: 'Planos ativos e disponiveis no checkout.',
+        label: 'Planos ocultos no checkout',
+        value: String(checkoutHiddenPlansCount),
+        hint: `${checkoutPublishedPlansCount} planos ativos estao publicados.`,
       },
       {
-        label: 'Solicitacoes pendentes',
-        value: String(overview.pending_access_requests ?? 0),
-        hint: 'Demandas aguardando decisao de acesso.',
+        label: 'Solicitacoes de acesso pendentes',
+        value: String(pendingAccessRequestsCount),
+        hint: 'Demandas aguardando aprovacao ou rejeicao.',
       },
       {
-        label: 'Break-glass ativos',
-        value: String(overview.active_break_glass_accesses ?? 0),
-        hint: 'Acessos emergenciais temporarios em andamento.',
+        label: 'Break-glass pendentes',
+        value: String(pendingBreakGlassRequestsCount),
+        hint: `${activeBreakGlassAccessesCount} acessos emergenciais estao ativos.`,
       },
     ],
-    [checkoutPublishedPlansCount, companies.length, companiesActiveCount, overview.active_break_glass_accesses, overview.pending_access_requests],
+    [
+      activeBreakGlassAccessesCount,
+      checkoutHiddenPlansCount,
+      checkoutPublishedPlansCount,
+      companies.length,
+      companiesActiveCount,
+      companiesInactiveCount,
+      pendingAccessRequestsCount,
+      pendingBreakGlassRequestsCount,
+    ],
   );
+
+  const overviewRecommendedActions = useMemo(() => {
+    const actions: Array<{ id: string; label: string; detail: string; tab: CoreAdminTab }> = [];
+
+    if (pendingAccessRequestsCount > 0) {
+      actions.push({
+        id: 'pending-access',
+        label: 'Tratar solicitacoes de acesso',
+        detail: `${pendingAccessRequestsCount} solicitacao(oes) aguardando decisao.`,
+        tab: 'access',
+      });
+    }
+
+    if (pendingBreakGlassRequestsCount > 0 || activeBreakGlassAccessesCount > 0) {
+      actions.push({
+        id: 'break-glass',
+        label: 'Revisar break-glass',
+        detail: `${pendingBreakGlassRequestsCount} pendente(s) e ${activeBreakGlassAccessesCount} ativo(s).`,
+        tab: 'access',
+      });
+    }
+
+    if (checkoutHiddenPlansCount > 0) {
+      actions.push({
+        id: 'hidden-checkout-plans',
+        label: 'Revisar planos ocultos',
+        detail: `${checkoutHiddenPlansCount} plano(s) ativos nao aparecem no checkout.`,
+        tab: 'plans',
+      });
+    }
+
+    if (!runtimeContext.adminMfaRequired || governanceAlerts.length > 0) {
+      actions.push({
+        id: 'governance-alerts',
+        label: 'Ajustar governanca runtime',
+        detail: `Existem ${governanceAlerts.length} alerta(s) de governanca para tratar.`,
+        tab: 'governance',
+      });
+    }
+
+    if (actions.length === 0) {
+      actions.push({
+        id: 'all-good',
+        label: 'Painel sem pendencias criticas',
+        detail: 'Operacao atual esta estavel. Faça revisoes preventivas semanalmente.',
+        tab: 'overview',
+      });
+    }
+
+    return actions.slice(0, 4);
+  }, [
+    activeBreakGlassAccessesCount,
+    checkoutHiddenPlansCount,
+    governanceAlerts.length,
+    pendingAccessRequestsCount,
+    pendingBreakGlassRequestsCount,
+    runtimeContext.adminMfaRequired,
+  ]);
 
   const handleRefreshRuntimeGovernance = useCallback(async () => {
     await runAction('governance:refresh', async () => {
@@ -1384,41 +1501,91 @@ const CoreAdminPage: React.FC = () => {
         </div>
       ) : null}
 
-      <section className="rounded-xl border border-[#D9E6EC] bg-white p-3">
-        <div className="flex flex-wrap gap-2">
-          {[
-            ['overview', 'Overview'],
-            ['governance', 'Governanca Runtime'],
-            ['companies', 'Empresas e Flags'],
-            ['plans', 'Planos'],
-            ['billing', 'Billing'],
-            ['access', 'Acessos'],
-            ['audit', 'Auditoria'],
-          ].map(([tabKey, label]) => (
-            <button
-              key={tabKey}
-              type="button"
-              onClick={() => setActiveTab(tabKey as CoreAdminTab)}
+      <section className="rounded-2xl border border-[#D9E6EC] bg-[#F7FBFD] p-4 shadow-[0_18px_35px_-30px_rgba(0,35,51,0.45)] sm:p-5">
+        <section className="rounded-xl border border-[#D9E6EC] bg-white p-3">
+          <div className="flex flex-wrap gap-2">
+            {(Object.keys(CORE_ADMIN_TAB_LABELS) as CoreAdminTab[]).map((tabKey) => (
+              <button
+                key={tabKey}
+                type="button"
+                onClick={() => setActiveTab(tabKey)}
+                className={[
+                  'rounded-lg px-3 py-2 text-sm font-medium transition',
+                  activeTab === tabKey
+                    ? 'bg-[#149CA0] text-white'
+                    : 'border border-[#D9E6EC] text-[#335B6D] hover:bg-[#F5FAFB]',
+                ].join(' ')}
+              >
+                {CORE_ADMIN_TAB_LABELS[tabKey]}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#E3EDF2] bg-white px-4 py-2.5">
+          <p className="text-sm text-[#335B6D]">
+            Secao ativa: <strong>{CORE_ADMIN_TAB_LABELS[activeTab]}</strong>
+          </p>
+          {activeTab === 'overview' ? (
+            <span
               className={[
-                'rounded-lg px-3 py-2 text-sm font-medium transition',
-                activeTab === tabKey
-                  ? 'bg-[#149CA0] text-white'
-                  : 'border border-[#D9E6EC] text-[#335B6D] hover:bg-[#F5FAFB]',
+                'rounded-full px-2.5 py-1 text-xs font-semibold',
+                overviewHealth.tone === 'healthy'
+                  ? 'bg-[#D9F4E4] text-[#0A7A3D]'
+                  : 'bg-[#FFF4DC] text-[#9A6700]',
               ].join(' ')}
             >
-              {label}
-            </button>
-          ))}
+              {overviewHealth.label}
+            </span>
+          ) : null}
         </div>
-      </section>
 
-      {activeTab === 'overview' ? (
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {overviewSummaryCards.map((card) => (
-            <MetricCard key={card.label} label={card.label} value={card.value} hint={card.hint} />
-          ))}
-        </section>
-      ) : null}
+        <div className="mt-4 space-y-4">
+          {activeTab === 'overview' && (
+            <section className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+              <Panel title="Saude operacional">
+                <p className="text-sm text-[#335B6D]">{overviewHealth.description}</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <MetricMini label="Alertas de governanca" value={String(governanceAlerts.length)} />
+                  <MetricMini
+                    label="Capacidades sensiveis habilitadas"
+                    value={String(enabledHighRiskCapabilitiesCount)}
+                  />
+                </div>
+              </Panel>
+
+              <Panel title="Acoes recomendadas">
+                <div className="space-y-2">
+                  {overviewRecommendedActions.map((actionItem) => (
+                    <div
+                      key={actionItem.id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#E3EDF2] px-3 py-2"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-[#002333]">{actionItem.label}</p>
+                        <p className="text-xs text-[#587285]">{actionItem.detail}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab(actionItem.tab)}
+                        className="rounded-md border border-[#BCD3DE] px-2 py-1 text-xs font-medium text-[#0F5A6B] hover:bg-[#F3FAFC]"
+                      >
+                        Abrir aba
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </Panel>
+            </section>
+          )}
+
+          {activeTab === 'overview' ? (
+            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {overviewSummaryCards.map((card) => (
+                <MetricCard key={card.label} label={card.label} value={card.value} hint={card.hint} />
+              ))}
+            </section>
+          ) : null}
 
       {activeTab === 'overview' && (
         <section className="grid gap-4 lg:grid-cols-2">
@@ -2952,6 +3119,8 @@ const CoreAdminPage: React.FC = () => {
           </Panel>
         </div>
       )}
+        </div>
+      </section>
     </div>
   );
 };
@@ -2990,7 +3159,7 @@ const Panel: React.FC<{ title: string; children: React.ReactNode; extra?: React.
   children,
   extra,
 }) => (
-  <section className="rounded-xl border border-[#D9E6EC] bg-white p-4">
+  <section className="rounded-xl border border-[#E3EDF2] bg-white p-4 shadow-[0_10px_24px_-26px_rgba(0,35,51,0.45)]">
     <div className="mb-3 flex items-center justify-between gap-2">
       <h2 className="text-base font-semibold text-[#002333]">{title}</h2>
       {extra}
@@ -3004,7 +3173,7 @@ const MetricCard: React.FC<{ label: string; value: string; hint?: string }> = ({
   value,
   hint,
 }) => (
-  <div className="rounded-xl border border-[#D9E6EC] bg-white p-4 shadow-[0_10px_20px_-18px_rgba(16,57,74,0.35)]">
+  <div className="rounded-xl border border-[#E3EDF2] bg-white p-4 shadow-[0_12px_22px_-24px_rgba(16,57,74,0.45)]">
     <p className="text-xs uppercase tracking-wide text-[#587285]">{label}</p>
     <p className="mt-2 text-2xl font-semibold text-[#002333]">{value}</p>
     {hint ? <p className="mt-1.5 text-xs text-[#587285]">{hint}</p> : null}

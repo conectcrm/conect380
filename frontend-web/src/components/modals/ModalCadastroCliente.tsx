@@ -447,10 +447,10 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-slate-900/45 backdrop-blur-[2px]" onClick={onClose} />
 
-      <div className="relative flex min-h-full items-center justify-center p-4 sm:p-6">
-        <div className="relative flex w-full max-w-[1100px] max-h-[92vh] flex-col overflow-hidden rounded-xl border border-[#DCE8EC] bg-white shadow-2xl">
-          <div className="sticky top-0 z-10 border-b border-[#E4EDF0] bg-white px-6 py-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="relative flex min-h-full items-end justify-center p-0 sm:items-center sm:p-6">
+        <div className="relative flex h-[100dvh] w-full max-w-[1100px] flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:rounded-xl sm:border sm:border-[#DCE8EC]">
+          <div className="sticky top-0 z-10 border-b border-[#E4EDF0] bg-white px-4 py-4 sm:px-6">
+            <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="text-xl font-bold text-[#002333]">
                   {cliente ? 'Editar cliente' : 'Novo cliente'}
@@ -460,7 +460,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                 </p>
               </div>
 
-              <div className="flex items-center space-x-3">
+              <div className="flex shrink-0 items-center space-x-3">
                 <button
                   type="button"
                   onClick={onClose}
@@ -480,10 +480,10 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
 
           <form
             onSubmit={handleSubmit(onSubmit)}
-            className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-5"
+            className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:space-y-6 sm:px-6 sm:py-5"
           >
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              <div className="space-y-4 rounded-xl border border-[#DCE8EC] bg-white p-4">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
+              <div className="space-y-4 p-0 sm:rounded-xl sm:border sm:border-[#DCE8EC] sm:bg-white sm:p-4">
                 <div className="border-b border-gray-200 pb-2">
                   <h3 className="text-base font-semibold text-[#002333] flex items-center gap-2">
                     <User className="h-4 w-4 text-[#159A9C]" />
@@ -669,14 +669,14 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                   ) : null}
                 </div>
 
-                <p className="rounded-md border border-[#DCE8EC] bg-[#F6FBFC] px-3 py-2 text-xs text-[#355061]">
+                <p className="rounded-md border border-[#DCE8EC] bg-[#F6FBFC] px-3 py-2 text-xs text-[#355061] sm:rounded-md">
                   Obrigatorio: tipo, {watchedTipo === 'pessoa_fisica' ? 'CPF' : 'CNPJ'},{' '}
                   {watchedTipo === 'pessoa_fisica' ? 'nome completo' : 'razao social'} e pelo menos
                   um contato (e-mail ou telefone).
                 </p>
               </div>
 
-              <div className="space-y-4 rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-4">
+              <div className="space-y-4 p-0 sm:rounded-xl sm:border sm:border-[#DCE8EC] sm:bg-[#FBFDFE] sm:p-4">
                 <div className="border-b border-gray-200 pb-2">
                   <h3 className="text-base font-semibold text-[#002333] flex items-center gap-2">
                     <Building className="h-4 w-4 text-[#159A9C]" />
@@ -684,7 +684,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                   </h3>
                 </div>
 
-                <div className="space-y-3 rounded-lg border border-[#DCE8EC] bg-white p-3">
+                <div className="space-y-3 border-0 bg-transparent p-0 sm:rounded-lg sm:border sm:border-[#DCE8EC] sm:bg-white sm:p-3">
                   <h4 className="text-sm font-semibold text-[#244455]">Endereco</h4>
 
                   <div>
@@ -763,7 +763,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                   </div>
                 </div>
 
-                <div className="space-y-3 rounded-lg border border-[#DCE8EC] bg-white p-3">
+                <div className="space-y-3 border-0 bg-transparent p-0 sm:rounded-lg sm:border sm:border-[#DCE8EC] sm:bg-white sm:p-3">
                   <h4 className="text-sm font-semibold text-[#244455]">Follow-up</h4>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
@@ -781,7 +781,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                   </div>
                 </div>
 
-                <div className="space-y-3 rounded-lg border border-[#DCE8EC] bg-white p-3">
+                <div className="space-y-3 border-0 bg-transparent p-0 sm:rounded-lg sm:border sm:border-[#DCE8EC] sm:bg-white sm:p-3">
                   <h4 className="text-sm font-semibold text-[#244455]">Comercial</h4>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
@@ -807,7 +807,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                   </div>
                 </div>
 
-                <div className="space-y-3 rounded-lg border border-[#DCE8EC] bg-white p-3">
+                <div className="space-y-3 border-0 bg-transparent p-0 sm:rounded-lg sm:border sm:border-[#DCE8EC] sm:bg-white sm:p-3">
                   <h4 className="text-sm font-semibold text-[#244455]">Observacoes internas</h4>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -841,9 +841,9 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
               </div>
             </div>
 
-            <div className="sticky bottom-0 border-t border-gray-200 bg-gray-50 px-1 py-4">
+            <div className="sticky bottom-0 border-t border-gray-200 bg-gray-50 px-1 py-3 sm:py-4">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-sm text-gray-500 text-center sm:text-left">
+                <div className="text-xs text-gray-500 text-center sm:text-sm sm:text-left">
                   Campos permitidos no fluxo atual: identificacao, contato, endereco, follow-up,
                   comercial, tags e observacoes.
                 </div>

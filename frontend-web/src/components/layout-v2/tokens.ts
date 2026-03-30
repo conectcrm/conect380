@@ -2,7 +2,7 @@ export const shellTokens = {
   appRoot: 'min-h-screen bg-[#EDF2F4] text-[#1E3A4B]',
   sidebar:
     'border-r border-[#D6E2E6] bg-[#ECF3F2] shadow-[inset_-1px_0_0_rgba(214,226,230,0.85),8px_0_26px_-24px_rgba(16,57,74,0.45)]',
-  topbar: 'bg-white/95 backdrop-blur-[2px]',
+  topbar: 'bg-white md:bg-white/95 md:backdrop-blur-[2px]',
   divider: 'bg-[#DCE6EA]',
   card: 'rounded-[18px] border border-[#D7E3E8] bg-white shadow-[0_18px_32px_-24px_rgba(16,57,74,0.24)]',
   cardSoft:

@@ -22,8 +22,13 @@ type AppShellProps = {
 };
 
 const MOBILE_BREAKPOINT = 768;
+const ENABLE_MOBILE_TOPBAR_AUTO_HIDE = false;
 
 const isMobileAutoHideEnabledForViewport = (): boolean => {
+  if (!ENABLE_MOBILE_TOPBAR_AUTO_HIDE) {
+    return false;
+  }
+
   if (typeof window === 'undefined') {
     return false;
   }
@@ -362,10 +367,10 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
         <header className={`sticky top-0 z-20 ${shellTokens.topbar}`}>
           <div
             data-testid="mobile-topbar-container"
-            className={`transition-[max-height,opacity,transform] duration-200 ease-out md:max-h-[86px] md:translate-y-0 md:opacity-100 md:pointer-events-auto ${
+            className={`h-[86px] transition-transform duration-200 ease-out will-change-transform motion-reduce:transition-none md:translate-y-0 md:pointer-events-auto ${
               isMobileAutoHideEnabled && isMobileTopbarHidden
-                ? 'max-h-0 -translate-y-2 opacity-0 pointer-events-none overflow-hidden'
-                : 'max-h-[86px] translate-y-0 opacity-100 overflow-visible'
+                ? '-translate-y-full pointer-events-none'
+                : 'translate-y-0'
             }`}
           >
             <div
