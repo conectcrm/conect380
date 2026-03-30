@@ -86,6 +86,7 @@ export const DEFAULT_MODULOS_SISTEMA: DefaultModuloSeed[] = [
     descricao: 'Governanca, seguranca e administracao corporativa.',
     icone: 'ShieldCheck',
     cor: '#5E35B1',
+    essencial: true,
     ordem: 7,
   },
 ];
@@ -111,7 +112,7 @@ export const DEFAULT_PLANOS_SISTEMA: DefaultPlanoSeed[] = [
     whiteLabel: false,
     suportePrioritario: false,
     ordem: 1,
-    modulosCodigos: ['CRM', 'ATENDIMENTO', 'BILLING'],
+    modulosCodigos: ['CRM', 'ATENDIMENTO', 'BILLING', 'ADMINISTRACAO'],
   },
   {
     nome: 'Business',
@@ -129,7 +130,15 @@ export const DEFAULT_PLANOS_SISTEMA: DefaultPlanoSeed[] = [
     whiteLabel: true,
     suportePrioritario: true,
     ordem: 2,
-    modulosCodigos: ['CRM', 'ATENDIMENTO', 'VENDAS', 'COMPRAS', 'FINANCEIRO', 'BILLING'],
+    modulosCodigos: [
+      'CRM',
+      'ATENDIMENTO',
+      'VENDAS',
+      'COMPRAS',
+      'FINANCEIRO',
+      'BILLING',
+      'ADMINISTRACAO',
+    ],
   },
   {
     nome: 'Enterprise',

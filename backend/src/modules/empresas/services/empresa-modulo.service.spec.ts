@@ -72,7 +72,7 @@ describe('EmpresaModuloService', () => {
 
     const result = await service.listarModulosAtivos('tenant-id');
 
-    expect(result).toEqual([ModuloEnum.CRM, ModuloEnum.BILLING]);
+    expect(result).toEqual([ModuloEnum.CRM, ModuloEnum.BILLING, ModuloEnum.ADMINISTRACAO]);
     expect(repositoryMock.update).toHaveBeenCalledWith('module-2', { ativo: false });
   });
 
@@ -80,12 +80,12 @@ describe('EmpresaModuloService', () => {
     tenantBillingPolicyServiceMock.resolveForEmpresa.mockRejectedValue(new Error('db timeout'));
     repositoryMock.findOne.mockResolvedValue({
       id: 'module-1',
-      modulo: ModuloEnum.ADMINISTRACAO,
+      modulo: ModuloEnum.FINANCEIRO,
       ativo: true,
       data_expiracao: null,
     });
 
-    const result = await service.isModuloAtivo('tenant-id', ModuloEnum.ADMINISTRACAO);
+    const result = await service.isModuloAtivo('tenant-id', ModuloEnum.FINANCEIRO);
 
     expect(result).toBe(true);
     expect(repositoryMock.findOne).toHaveBeenCalled();

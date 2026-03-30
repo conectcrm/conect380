@@ -163,15 +163,21 @@ describe('PlanosService - validacao de limites', () => {
       .mockResolvedValueOnce([
         { id: 'mod-crm', codigo: 'CRM' },
         { id: 'mod-billing', codigo: 'BILLING' },
+        { id: 'mod-admin', codigo: 'ADMINISTRACAO' },
       ])
       .mockResolvedValueOnce([
         { codigo: 'CRM', ativo: true },
         { codigo: 'BILLING', ativo: true },
+        { codigo: 'ADMINISTRACAO', ativo: true },
         { codigo: 'ATENDIMENTO', ativo: true },
       ]);
 
-    const resultado = await (service as any).validarModulosInclusos(['mod-crm', 'mod-billing']);
+    const resultado = await (service as any).validarModulosInclusos([
+      'mod-crm',
+      'mod-billing',
+      'mod-admin',
+    ]);
 
-    expect(resultado).toEqual(['mod-crm', 'mod-billing']);
+    expect(resultado).toEqual(['mod-crm', 'mod-billing', 'mod-admin']);
   });
 });
