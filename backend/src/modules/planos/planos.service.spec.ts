@@ -61,6 +61,31 @@ describe('PlanosService - validacao de limites', () => {
     expect(moduloSistemaRepository.find).not.toHaveBeenCalled();
   });
 
+  it('rejeita buscarPorCodigoAtivo quando plano esta desativado', async () => {
+    planoRepository.findOne.mockResolvedValue({
+      id: 'plano-1',
+      codigo: 'starter',
+      ativo: false,
+      modulosInclusos: [{ modulo: { codigo: 'CRM' } }],
+    });
+
+    await expect(service.buscarPorCodigoAtivo('starter')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
+  it('retorna buscarPorCodigoAtivo quando plano esta ativo', async () => {
+    const plano = {
+      id: 'plano-1',
+      codigo: 'starter',
+      ativo: true,
+      modulosInclusos: [{ modulo: { codigo: 'CRM' } }],
+    };
+    planoRepository.findOne.mockResolvedValue(plano);
+
+    await expect(service.buscarPorCodigoAtivo('starter')).resolves.toEqual(plano);
+  });
+
   it('rejeita atualizacao de plano com limiteApiCalls = 0', async () => {
     jest.spyOn(service, 'buscarPorId').mockResolvedValue({
       id: 'plano-1',
@@ -131,5 +156,22 @@ describe('PlanosService - validacao de limites', () => {
       where: { ativo: true },
       order: { ordem: 'ASC', nome: 'ASC' },
     });
+  });
+
+  it('nao exige ATENDIMENTO como essencial ao validar modulos de plano', async () => {
+    moduloSistemaRepository.find
+      .mockResolvedValueOnce([
+        { id: 'mod-crm', codigo: 'CRM' },
+        { id: 'mod-billing', codigo: 'BILLING' },
+      ])
+      .mockResolvedValueOnce([
+        { codigo: 'CRM', ativo: true },
+        { codigo: 'BILLING', ativo: true },
+        { codigo: 'ATENDIMENTO', ativo: true },
+      ]);
+
+    const resultado = await (service as any).validarModulosInclusos(['mod-crm', 'mod-billing']);
+
+    expect(resultado).toEqual(['mod-crm', 'mod-billing']);
   });
 });

@@ -13,6 +13,10 @@ export type DefaultPlanoSeed = {
   codigo: string;
   descricao: string;
   preco: number;
+  periodicidadeCobranca: 'mensal' | 'anual';
+  diasTrial: number;
+  gatewayPriceId: string | null;
+  publicadoCheckout: boolean;
   limiteUsuarios: number;
   limiteClientes: number;
   limiteStorage: number;
@@ -96,6 +100,10 @@ export const DEFAULT_PLANOS_SISTEMA: DefaultPlanoSeed[] = [
     codigo: 'starter',
     descricao: 'Ideal para pequenas empresas em fase inicial.',
     preco: 149,
+    periodicidadeCobranca: 'mensal',
+    diasTrial: 7,
+    gatewayPriceId: null,
+    publicadoCheckout: true,
     limiteUsuarios: 3,
     limiteClientes: 1000,
     limiteStorage: 5 * ONE_GB_BYTES,
@@ -110,6 +118,10 @@ export const DEFAULT_PLANOS_SISTEMA: DefaultPlanoSeed[] = [
     codigo: 'business',
     descricao: 'Para empresas em crescimento com operacao comercial ativa.',
     preco: 549,
+    periodicidadeCobranca: 'mensal',
+    diasTrial: 7,
+    gatewayPriceId: null,
+    publicadoCheckout: true,
     limiteUsuarios: 10,
     limiteClientes: 10000,
     limiteStorage: 50 * ONE_GB_BYTES,
@@ -124,6 +136,10 @@ export const DEFAULT_PLANOS_SISTEMA: DefaultPlanoSeed[] = [
     codigo: 'enterprise',
     descricao: 'Para operacoes de alta escala com governanca avancada.',
     preco: 1790,
+    periodicidadeCobranca: 'mensal',
+    diasTrial: 7,
+    gatewayPriceId: null,
+    publicadoCheckout: true,
     limiteUsuarios: -1,
     limiteClientes: -1,
     limiteStorage: 500 * ONE_GB_BYTES,

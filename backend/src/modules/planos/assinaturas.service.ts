@@ -161,6 +161,23 @@ export class AssinaturasService {
       .filter(Boolean);
   }
 
+  private async buscarPlanoAtivoPorId(
+    planoId: string,
+    options?: { includeModules?: boolean },
+  ): Promise<Plano> {
+    const relations = options?.includeModules ? ['modulosInclusos', 'modulosInclusos.modulo'] : [];
+    const plano = await this.planoRepository.findOne({
+      where: { id: planoId, ativo: true },
+      relations,
+    });
+
+    if (!plano) {
+      throw new NotFoundException(`Plano com ID ${planoId} nao encontrado ou desativado`);
+    }
+
+    return plano;
+  }
+
   private async buscarAssinaturaMaisRecente(
     empresaId: string,
     options?: {
@@ -291,13 +308,7 @@ export class AssinaturasService {
       }
     }
 
-    const plano = await this.planoRepository.findOne({
-      where: { id: dados.planoId },
-    });
-
-    if (!plano) {
-      throw new NotFoundException(`Plano com ID ${dados.planoId} nao encontrado`);
-    }
+    const plano = await this.buscarPlanoAtivoPorId(dados.planoId);
 
     const initialStatus = policy.isPlatformOwner
       ? 'active'
@@ -325,10 +336,7 @@ export class AssinaturasService {
     const policy = await this.obterPoliticaTenant(empresaId);
     this.ensureCheckoutAllowed(policy);
 
-    const plano = await this.planoRepository.findOne({ where: { id: planoId } });
-    if (!plano) {
-      throw new NotFoundException(`Plano com ID ${planoId} nao encontrado`);
-    }
+    const plano = await this.buscarPlanoAtivoPorId(planoId);
 
     const assinaturaAtual = await this.buscarAssinaturaMaisRecente(empresaId, { includePlano: true });
 
@@ -384,14 +392,7 @@ export class AssinaturasService {
       throw new BadRequestException('Nao e possivel alterar plano de assinatura cancelada');
     }
 
-    const novoPlano = await this.planoRepository.findOne({
-      where: { id: novoPlanoId },
-      relations: ['modulosInclusos', 'modulosInclusos.modulo'],
-    });
-
-    if (!novoPlano) {
-      throw new NotFoundException(`Plano com ID ${novoPlanoId} nao encontrado`);
-    }
+    const novoPlano = await this.buscarPlanoAtivoPorId(novoPlanoId, { includeModules: true });
 
     assinatura.plano = novoPlano;
     assinatura.valorMensal = novoPlano.preco;

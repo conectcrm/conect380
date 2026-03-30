@@ -1056,7 +1056,7 @@ export class CoreAdminEmpresasService {
     const resolvedCode = this.resolvePlanCode(planoInput);
 
     try {
-      return await this.planosService.buscarPorCodigo(resolvedCode);
+      return await this.planosService.buscarPorCodigoAtivo(resolvedCode);
     } catch {
       const normalizedName = this.normalizePlanInput(planoInput);
       const planosAtivos = await this.planosService.listarTodos();

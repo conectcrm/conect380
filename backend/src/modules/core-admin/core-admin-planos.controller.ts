@@ -40,8 +40,13 @@ export class CoreAdminPlanosController {
   ) {}
 
   @Get()
-  async listarTodos(@Query('include_inactive') includeInactive?: string) {
-    return this.planosService.listarTodos(this.parseIncludeInactive(includeInactive));
+  async listarTodos(
+    @Query('include_inactive') includeInactive?: string,
+    @Query('include_unpublished') includeUnpublished?: string,
+  ) {
+    return this.planosService.listarTodos(this.parseIncludeInactive(includeInactive), {
+      includeUnpublished: this.parseIncludeUnpublished(includeUnpublished),
+    });
   }
 
   @Get('modulos')
@@ -122,5 +127,22 @@ export class CoreAdminPlanosController {
     }
 
     throw new BadRequestException('Parametro include_inactive invalido');
+  }
+
+  private parseIncludeUnpublished(raw: string | undefined): boolean {
+    if (raw === undefined) {
+      return true;
+    }
+
+    const normalized = raw.trim().toLowerCase();
+    if (normalized === 'true' || normalized === '1') {
+      return true;
+    }
+
+    if (normalized === 'false' || normalized === '0') {
+      return false;
+    }
+
+    throw new BadRequestException('Parametro include_unpublished invalido');
   }
 }

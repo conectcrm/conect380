@@ -23,7 +23,7 @@ export class PlanosController {
 
   @Get()
   async listarTodos(): Promise<Plano[]> {
-    return this.planosService.listarTodos();
+    return this.planosService.listarTodos(false, { includeUnpublished: false });
   }
 
   @Get('modulos')
@@ -55,6 +55,10 @@ export class PlanosController {
       limiteClientes: typeof dados.limiteClientes,
       limiteStorage: typeof dados.limiteStorage,
       limiteApiCalls: typeof dados.limiteApiCalls,
+      periodicidadeCobranca: typeof dados.periodicidadeCobranca,
+      diasTrial: typeof dados.diasTrial,
+      gatewayPriceId: typeof dados.gatewayPriceId,
+      publicadoCheckout: typeof dados.publicadoCheckout,
     });
 
     const novoPlano = await this.planosService.criar(dados);
@@ -77,6 +81,10 @@ export class PlanosController {
         limiteClientes: typeof dados.limiteClientes,
         limiteStorage: typeof dados.limiteStorage,
         limiteApiCalls: typeof dados.limiteApiCalls,
+        periodicidadeCobranca: typeof dados.periodicidadeCobranca,
+        diasTrial: typeof dados.diasTrial,
+        gatewayPriceId: typeof dados.gatewayPriceId,
+        publicadoCheckout: typeof dados.publicadoCheckout,
       },
     });
 

@@ -9,6 +9,8 @@ import {
 import { AssinaturaEmpresa } from './assinatura-empresa.entity';
 import { PlanoModulo } from './plano-modulo.entity';
 
+export type PlanoPeriodicidadeCobranca = 'mensal' | 'anual';
+
 @Entity('planos')
 export class Plano {
   @PrimaryGeneratedColumn('uuid')
@@ -25,6 +27,18 @@ export class Plano {
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   preco: number;
+
+  @Column({ name: 'periodicidade_cobranca', type: 'varchar', length: 20, default: 'mensal' })
+  periodicidadeCobranca: PlanoPeriodicidadeCobranca;
+
+  @Column({ name: 'dias_trial', type: 'int', default: 0 })
+  diasTrial: number;
+
+  @Column({ name: 'gateway_price_id', type: 'varchar', length: 120, nullable: true })
+  gatewayPriceId: string | null;
+
+  @Column({ name: 'publicado_checkout', type: 'boolean', default: true })
+  publicadoCheckout: boolean;
 
   @Column({ type: 'int', default: 1 })
   limiteUsuarios: number;

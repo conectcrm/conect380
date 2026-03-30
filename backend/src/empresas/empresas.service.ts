@@ -427,7 +427,7 @@ export class EmpresasService {
       throw new HttpException('Plano invalido para cadastro', HttpStatus.BAD_REQUEST);
     }
 
-    const planoCatalogo = await this.planosService.buscarPorCodigo(planoCanonico).catch(() => {
+    const planoCatalogo = await this.planosService.buscarPorCodigoAtivo(planoCanonico).catch(() => {
       throw new HttpException(
         `Plano "${plano}" nao encontrado no catalogo`,
         HttpStatus.BAD_REQUEST,
@@ -767,24 +767,12 @@ export class EmpresasService {
   }
 
   async listarPlanos(): Promise<any[]> {
-    const planosCatalogo = await this.planosService.listarTodos();
+    const planosCatalogo = await this.planosService.listarTodos(false, {
+      includeUnpublished: false,
+    });
 
     if (planosCatalogo.length > 0) {
       return planosCatalogo.map((plano) => {
-        const storageRecurso =
-          plano.limiteStorage === -1
-            ? 'Armazenamento ilimitado'
-            : plano.limiteStorage > 0
-              ? `${this.formatStorageLimit(plano.limiteStorage)} de armazenamento`
-              : 'Armazenamento nao configurado';
-
-        const apiCallsRecurso =
-          plano.limiteApiCalls === -1
-            ? 'API calls ilimitadas/dia'
-            : plano.limiteApiCalls > 0
-              ? `${Number(plano.limiteApiCalls).toLocaleString('pt-BR')} API calls/dia`
-              : 'API calls/dia nao configuradas';
-
         const recursos: string[] = [
           plano.limiteUsuarios === -1
             ? 'Usuarios ilimitados'
@@ -792,18 +780,11 @@ export class EmpresasService {
           plano.limiteClientes === -1
             ? 'Clientes ilimitados'
             : `Ate ${plano.limiteClientes.toLocaleString('pt-BR')} clientes`,
-          storageRecurso,
-          apiCallsRecurso,
+          plano.periodicidadeCobranca === 'anual' ? 'Cobranca anual' : 'Cobranca mensal',
         ];
 
-        if (plano.whiteLabel) {
-          recursos.push('White-label');
-        }
-
-        if (plano.suportePrioritario) {
-          recursos.push('Suporte prioritario');
-        } else {
-          recursos.push('Suporte padrao');
+        if (Number(plano.diasTrial || 0) > 0) {
+          recursos.push(`Teste gratis de ${plano.diasTrial} dia(s)`);
         }
 
         const modulos = (plano.modulosInclusos || [])

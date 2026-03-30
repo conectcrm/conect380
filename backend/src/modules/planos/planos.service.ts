@@ -17,6 +17,16 @@ import {
   DEFAULT_PLANOS_SISTEMA,
 } from './planos.defaults';
 
+const CANONICAL_ESSENTIAL_MODULE_CODES = Array.from(
+  new Set(
+    DEFAULT_ESSENTIAL_MODULE_CODES.map((codigo) =>
+      String(codigo || '')
+        .trim()
+        .toUpperCase(),
+    ).filter(Boolean),
+  ),
+);
+
 @Injectable()
 export class PlanosService {
   constructor(
@@ -32,9 +42,20 @@ export class PlanosService {
     private dataSource: DataSource,
   ) {}
 
-  async listarTodos(includeInactive = false): Promise<Plano[]> {
+  async listarTodos(
+    includeInactive = false,
+    options?: { includeUnpublished?: boolean },
+  ): Promise<Plano[]> {
     await this.seedDefaultsIfEmpty();
-    const where = includeInactive ? undefined : { ativo: true };
+    const includeUnpublished = options?.includeUnpublished !== false;
+
+    const where = includeInactive
+      ? includeUnpublished
+        ? undefined
+        : { publicadoCheckout: true }
+      : includeUnpublished
+        ? { ativo: true }
+        : { ativo: true, publicadoCheckout: true };
 
     return this.planoRepository.find({
       where,
@@ -53,6 +74,14 @@ export class PlanosService {
       throw new NotFoundException(`Plano com ID ${id} nao encontrado`);
     }
 
+    return plano;
+  }
+
+  async buscarPorIdAtivo(id: string): Promise<Plano> {
+    const plano = await this.buscarPorId(id);
+    if (!plano.ativo) {
+      throw new BadRequestException(`Plano com ID ${id} esta desativado`);
+    }
     return plano;
   }
 
@@ -97,6 +126,14 @@ export class PlanosService {
     return plano;
   }
 
+  async buscarPorCodigoAtivo(codigo: string): Promise<Plano> {
+    const plano = await this.buscarPorCodigo(codigo);
+    if (!plano.ativo) {
+      throw new BadRequestException(`Plano com codigo ${codigo} esta desativado`);
+    }
+    return plano;
+  }
+
   async criar(dados: CriarPlanoDto): Promise<Plano> {
     const planoExistente = await this.planoRepository.findOne({
       where: { codigo: dados.codigo },
@@ -115,6 +152,10 @@ export class PlanosService {
       codigo: dados.codigo,
       descricao: dados.descricao,
       preco: dados.preco,
+      periodicidadeCobranca: dados.periodicidadeCobranca || 'mensal',
+      diasTrial: dados.diasTrial ?? 0,
+      gatewayPriceId: dados.gatewayPriceId ? String(dados.gatewayPriceId).trim() : null,
+      publicadoCheckout: dados.publicadoCheckout !== false,
       limiteUsuarios: dados.limiteUsuarios,
       limiteClientes: dados.limiteClientes,
       limiteStorage: dados.limiteStorage,
@@ -148,8 +189,20 @@ export class PlanosService {
 
     const modulosInclusos = await this.validarModulosInclusos(dados.modulosInclusos);
     const { modulosInclusos: _ignored, ...dadosPlano } = dados;
+    const dadosNormalizados: Partial<Plano> = { ...dadosPlano };
 
-    Object.assign(plano, dadosPlano);
+    if (dadosNormalizados.periodicidadeCobranca) {
+      dadosNormalizados.periodicidadeCobranca = String(
+        dadosNormalizados.periodicidadeCobranca,
+      ).toLowerCase() as Plano['periodicidadeCobranca'];
+    }
+
+    if ((dadosNormalizados as any).gatewayPriceId !== undefined) {
+      const sanitizedGatewayPriceId = String((dadosNormalizados as any).gatewayPriceId || '').trim();
+      (dadosNormalizados as any).gatewayPriceId = sanitizedGatewayPriceId || null;
+    }
+
+    Object.assign(plano, dadosNormalizados);
     const planoAtualizado = await this.planoRepository.save(plano);
 
     await this.planoModuloRepository.delete({ plano: { id } });
@@ -165,7 +218,8 @@ export class PlanosService {
       `
       SELECT COUNT(*) as total
       FROM assinaturas_empresas
-      WHERE plano_id = $1 AND status = 'ativa'
+      WHERE plano_id = $1
+        AND status IN ('trial', 'pendente', 'active', 'ativa', 'past_due', 'suspended', 'suspensa')
     `,
       [id],
     );
@@ -266,20 +320,28 @@ export class PlanosService {
       );
     }
 
-    const modulosEssenciaisAtivos = await this.moduloSistemaRepository.find({
-      where: { essencial: true, ativo: true },
-      select: ['codigo'],
+    const modulosCatalogo = await this.moduloSistemaRepository.find({
+      select: ['codigo', 'ativo'],
     });
-    const codigosEssenciais = Array.from(
-      new Set(
-        (modulosEssenciaisAtivos.length > 0
-          ? modulosEssenciaisAtivos.map((modulo) => modulo.codigo)
-          : DEFAULT_ESSENTIAL_MODULE_CODES
-        )
-          .map((codigo) => String(codigo || '').trim().toUpperCase())
-          .filter(Boolean),
-      ),
-    );
+    const catalogoPorCodigo = new Map<string, { ativo: boolean }>();
+    modulosCatalogo.forEach((modulo) => {
+      const codigo = String(modulo.codigo || '').trim().toUpperCase();
+      if (codigo) {
+        catalogoPorCodigo.set(codigo, { ativo: Boolean(modulo.ativo) });
+      }
+    });
+
+    const codigosEssenciais = [...CANONICAL_ESSENTIAL_MODULE_CODES];
+    const essenciaisIndisponiveis = codigosEssenciais.filter((codigo) => {
+      const registro = catalogoPorCodigo.get(codigo);
+      return !registro || !registro.ativo;
+    });
+
+    if (essenciaisIndisponiveis.length > 0) {
+      throw new BadRequestException(
+        `Catalogo de modulos inconsistente. Modulos essenciais indisponiveis: ${essenciaisIndisponiveis.join(', ')}`,
+      );
+    }
 
     if (codigosEssenciais.length > 0) {
       const codigosInformados = new Set(
@@ -365,6 +427,13 @@ export class PlanosService {
         });
         modulo = await this.moduloSistemaRepository.save(modulo);
         modulosAtualizados += 1;
+      } else {
+        const essentialShouldBe = Boolean(moduloDefault.essencial);
+        if (Boolean(modulo.essencial) !== essentialShouldBe) {
+          modulo.essencial = essentialShouldBe;
+          modulo = await this.moduloSistemaRepository.save(modulo);
+          modulosAtualizados += 1;
+        }
       }
 
       modulosByCode.set(moduloDefault.codigo, modulo);
@@ -392,6 +461,10 @@ export class PlanosService {
         codigo: planoDefault.codigo,
         descricao: planoDefault.descricao,
         preco: planoDefault.preco,
+        periodicidadeCobranca: planoDefault.periodicidadeCobranca,
+        diasTrial: planoDefault.diasTrial,
+        gatewayPriceId: planoDefault.gatewayPriceId,
+        publicadoCheckout: planoDefault.publicadoCheckout,
         limiteUsuarios: planoDefault.limiteUsuarios,
         limiteClientes: planoDefault.limiteClientes,
         limiteStorage: planoDefault.limiteStorage,

@@ -2,6 +2,10 @@ import {
   ArrayNotEmpty,
   IsArray,
   IsBoolean,
+  IsIn,
+  IsInt,
+  Max,
+  MaxLength,
   IsNumber,
   NotEquals,
   IsOptional,
@@ -24,6 +28,27 @@ export class CriarPlanoDto {
   @IsNumber()
   @Min(0)
   preco: number;
+
+  @IsOptional()
+  @IsIn(['mensal', 'anual'], {
+    message: 'periodicidadeCobranca invalida. Use mensal ou anual.',
+  })
+  periodicidadeCobranca?: 'mensal' | 'anual';
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(365)
+  diasTrial?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  gatewayPriceId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  publicadoCheckout?: boolean;
 
   @IsNumber()
   @Min(-1) // -1 representa ilimitado
