@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Edit2,
   Calendar,
@@ -117,9 +117,9 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
     novoTipoAtividade !== TipoAtividade.NOTA;
 
   const formatarDataEvento = (value?: Date | string | null): string => {
-    if (!value) return 'Data nÃ£o informada';
+    if (!value) return 'Data não informada';
     const parsed = value instanceof Date ? value : new Date(value);
-    if (Number.isNaN(parsed.getTime())) return 'Data nÃ£o informada';
+    if (Number.isNaN(parsed.getTime())) return 'Data não informada';
     return parsed.toLocaleString('pt-BR', {
       day: '2-digit',
       month: '2-digit',
@@ -241,7 +241,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
       setAtividades(dados);
     } catch (err) {
       console.error('Erro ao carregar atividades:', err);
-      toastService.error('NÃ£o foi possÃ­vel carregar as atividades desta oportunidade.');
+      toastService.error('Não foi possível carregar as atividades desta oportunidade.');
     } finally {
       setLoadingAtividades(false);
     }
@@ -399,7 +399,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
 
   if (!oportunidade) return null;
 
-  // Calcular dias atÃ© vencimento
+  // Calcular dias até vencimento
   const diasAteVencimento = oportunidade.dataFechamentoEsperado
     ? differenceInDays(new Date(oportunidade.dataFechamentoEsperado), new Date())
     : null;
@@ -489,9 +489,9 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
             ? 'bg-green-100 text-green-700 border-green-200'
             : 'bg-green-200 text-green-800 border-green-300';
   const probEmoji =
-    prob <= 20 ? 'â„ï¸' : prob <= 40 ? 'ðŸŒ¤ï¸' : prob <= 60 ? 'â˜€ï¸' : prob <= 80 ? 'ðŸ”¥' : 'ðŸš€';
+    prob <= 20 ? '❄️' : prob <= 40 ? '🌤️' : prob <= 60 ? '☀️' : prob <= 80 ? '🔥' : '🚀';
 
-  // Ãcone por tipo de atividade
+  // Ícone por tipo de atividade
   const getIconeAtividade = (tipo: string) => {
     switch (tipo) {
       case 'call':
@@ -509,14 +509,14 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
     }
   };
 
-  // Nome do estÃ¡gio em portuguÃªs
+  // Nome do estágio em português
   const getNomeEstagio = (estagio?: EstagioOportunidade | string | null) => {
     if (!estagio) return 'Nao informado';
     const estagios = {
       [EstagioOportunidade.LEADS]: 'Leads',
-      [EstagioOportunidade.QUALIFICACAO]: 'QualificaÃ§Ã£o',
+      [EstagioOportunidade.QUALIFICACAO]: 'Qualificação',
       [EstagioOportunidade.PROPOSTA]: 'Proposta',
-      [EstagioOportunidade.NEGOCIACAO]: 'NegociaÃ§Ã£o',
+      [EstagioOportunidade.NEGOCIACAO]: 'Negociação',
       [EstagioOportunidade.FECHAMENTO]: 'Fechamento',
       [EstagioOportunidade.GANHO]: 'Ganho',
       [EstagioOportunidade.PERDIDO]: 'Perdido',
@@ -592,7 +592,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
           <div className="flex flex-wrap items-center gap-4 text-sm text-[#002333]/70">
             <span className="inline-flex items-center gap-1">
               <User className="h-4 w-4 text-[#159A9C]" />
-              {oportunidade.responsavel?.nome || 'Sem responsÃ¡vel'}
+              {oportunidade.responsavel?.nome || 'Sem responsável'}
             </span>
             <span className="inline-flex items-center gap-1">
               <Clock className="h-4 w-4 text-[#159A9C]" />
@@ -620,7 +620,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
       {eventContext && (
         <div className="border-b border-[#B4BEC9]/25 bg-[#E8F5FF] px-6 py-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-[#0F4A6C]/70">
-            Evento selecionado no calendÃ¡rio
+            Evento selecionado no calendário
           </p>
           <p className="mt-1 text-sm font-semibold text-[#0F4A6C]">{eventContext.title}</p>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-[#0F4A6C]">
@@ -651,7 +651,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
             )}
             {eventContext.responsavelNome && (
               <span className="rounded-full border border-[#B6D9EE] bg-white px-2 py-0.5 text-xs">
-                ResponsÃ¡vel: {eventContext.responsavelNome}
+                Responsável: {eventContext.responsavelNome}
               </span>
             )}
           </div>
@@ -707,7 +707,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
         </div>
       </div>
 
-      {/* ConteÃºdo com scroll */}
+      {/* Conteúdo com scroll */}
       <div className="p-6">
         {abaSelecionada === 'detalhes' ? (
           <div
@@ -716,7 +716,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
             aria-labelledby={tabDetalhesId}
             className="space-y-6"
           >
-            {/* MÃ©tricas Principais */}
+            {/* Métricas Principais */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Valor */}
               <div className="bg-[#159A9C]/10 border border-[#159A9C]/20 rounded-xl p-4">
@@ -741,11 +741,11 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                 </p>
               </div>
 
-              {/* EstÃ¡gio */}
+              {/* Estágio */}
               <div className="bg-[#DEEFE7]/55 border border-[#B4BEC9]/35 rounded-xl p-4">
                 <div className="flex items-center gap-2 text-[#159A9C] mb-1">
                   <CheckCircle className="h-5 w-5" />
-                  <span className="text-sm font-medium">EstÃ¡gio</span>
+                  <span className="text-sm font-medium">Estágio</span>
                 </div>
                 <p className="text-xl font-bold text-[#002333]">
                   {getNomeEstagio(oportunidade.estagio)}
@@ -780,7 +780,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                     <div>
                       <h4 className="font-semibold text-red-900">Oportunidade Atrasada</h4>
                       <p className="text-red-700 text-sm">
-                        Esta oportunidade estÃ¡ atrasada hÃ¡ {Math.abs(diasAteVencimento)} dias
+                        Esta oportunidade está atrasada há {Math.abs(diasAteVencimento)} dias
                       </p>
                     </div>
                   </div>
@@ -789,7 +789,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                   <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-4 flex items-start gap-3">
                     <AlertCircle className="h-6 w-6 text-yellow-600 flex-shrink-0 mt-0.5" />
                     <div>
-                      <h4 className="font-semibold text-yellow-900">AtenÃ§Ã£o: Vencimento PrÃ³ximo</h4>
+                      <h4 className="font-semibold text-yellow-900">Atenção: Vencimento Próximo</h4>
                       <p className="text-yellow-700 text-sm">
                         Esta oportunidade vence em {diasAteVencimento}{' '}
                         {diasAteVencimento === 1 ? 'dia' : 'dias'}
@@ -800,11 +800,11 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
               </>
             )}
 
-            {/* InformaÃ§Ãµes de Contato */}
+            {/* Informações de Contato */}
             <div className="bg-[#DEEFE7]/35 rounded-xl p-5 space-y-4 border border-[#B4BEC9]/25">
               <h3 className="text-lg font-bold text-[#002333] flex items-center gap-2 mb-4">
                 <Users className="h-5 w-5 text-[#159A9C]" />
-                InformaÃ§Ãµes de Contato
+                Informações de Contato
               </h3>
 
               {oportunidade.nomeContato && (
@@ -877,7 +877,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                       {oportunidade.prioridade === PrioridadeOportunidade.ALTA
                         ? 'Alta'
                         : oportunidade.prioridade === PrioridadeOportunidade.MEDIA
-                          ? 'MÃ©dia'
+                          ? 'Média'
                           : 'Baixa'}
                     </span>
                   </div>
@@ -907,10 +907,10 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
               )}
             </div>
 
-            {/* DescriÃ§Ã£o */}
+            {/* Descrição */}
             {oportunidade.descricao && (
               <div>
-                <h3 className="text-lg font-bold text-[#002333] mb-3">DescriÃ§Ã£o</h3>
+                <h3 className="text-lg font-bold text-[#002333] mb-3">Descrição</h3>
                 <div className="bg-[#DEEFE7]/35 rounded-xl p-4 border border-[#B4BEC9]/25">
                   <p className="text-[#002333]/80 whitespace-pre-wrap">{oportunidade.descricao}</p>
                 </div>
@@ -1081,7 +1081,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                   <MessageSquare className="h-12 w-12 text-[#B4BEC9] mx-auto mb-3" />
                   <p className="text-[#002333]/70 font-medium">Nenhuma atividade registrada</p>
                   <p className="text-[#002333]/55 text-sm mt-1">
-                    As atividades aparecerÃ£o aqui conforme forem criadas.
+                    As atividades aparecerão aqui conforme forem criadas.
                   </p>
                   <button
                     type="button"
@@ -1271,7 +1271,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                           : `Entrada em ${getNomeEstagio(evento.toStage)}`}
                       </p>
                       <p className="mt-1 text-xs text-[#002333]/60">
-                        {evento.changedBy?.nome || 'Sistema'} â€¢ {formatarData(evento.changedAt)} â€¢{' '}
+                        {evento.changedBy?.nome || 'Sistema'} • {formatarData(evento.changedAt)} •{' '}
                         Origem: {evento.source}
                       </p>
                     </div>
