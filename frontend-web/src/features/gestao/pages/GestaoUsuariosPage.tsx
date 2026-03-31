@@ -55,6 +55,7 @@ import {
   STATUS_ATENDENTE_LABELS,
   STATUS_ATENDENTE_COLORS,
 } from '../../../types/usuarios';
+import { useNavigate } from 'react-router-dom';
 
 type AbaAtiva = 'todos' | 'atendentes' | 'governanca';
 
@@ -607,7 +608,9 @@ const mapPermissionCatalogPayload = (payload: PermissionCatalogResponse): Permis
 
 const GestaoUsuariosPage: React.FC = () => {
   const { user: authUser } = useAuth();
+  const navigate = useNavigate();
   const normalizedAuthRole = String(authUser?.role || '').toLowerCase();
+  const authUserId = authUser?.id ?? null;
   const canManageAccessApprovals =
     normalizedAuthRole === UserRole.ADMIN || normalizedAuthRole === UserRole.SUPERADMIN;
   const canManageAccessReview =
@@ -1007,6 +1010,15 @@ const GestaoUsuariosPage: React.FC = () => {
   }).length;
 
   const handleOpenDialog = (usuario?: Usuario): void => {
+    if (usuario && authUserId && usuario.id === authUserId) {
+      showFeedback(
+        'info',
+        'Para editar seu proprio usuario, use a tela "Meu Perfil". Acoes administrativas sobre o proprio cadastro sao bloqueadas por seguranca.',
+      );
+      navigate('/perfil');
+      return;
+    }
+
     setFormError(null);
     setPermissionSearch('');
     const roleFallback = roleOptionsForForm[0]?.value ?? defaultRoleForForm;
@@ -1138,6 +1150,15 @@ const GestaoUsuariosPage: React.FC = () => {
   };
 
   const handleDelete = (usuario: Usuario): void => {
+    if (authUserId && usuario.id === authUserId) {
+      showFeedback(
+        'info',
+        'Exclusao do proprio usuario nao e permitida nesta tela. Use "Meu Perfil" para gerenciar sua conta.',
+      );
+      navigate('/perfil');
+      return;
+    }
+
     openConfirmDialog({
       title: 'Excluir usuario',
       description: `Deseja realmente excluir o usuario "${usuario.nome}"? Esta acao nao pode ser desfeita.`,
@@ -1159,6 +1180,15 @@ const GestaoUsuariosPage: React.FC = () => {
   };
 
   const handleToggleStatus = async (usuario: Usuario): Promise<void> => {
+    if (authUserId && usuario.id === authUserId) {
+      showFeedback(
+        'info',
+        'Nao e permitido alterar o proprio status por esta tela. Use "Meu Perfil" para ajustes da sua conta.',
+      );
+      navigate('/perfil');
+      return;
+    }
+
     try {
       const novoStatus = !usuario.ativo;
       await usuariosService.alterarStatusUsuario(usuario.id, novoStatus);
@@ -1176,6 +1206,12 @@ const GestaoUsuariosPage: React.FC = () => {
   };
 
   const handleResetSenha = (usuario: Usuario): void => {
+    if (authUserId && usuario.id === authUserId) {
+      showFeedback('info', 'Para alterar sua senha, use "Meu Perfil" > "Alterar senha".');
+      navigate('/perfil');
+      return;
+    }
+
     setUsuarioResetSenha(usuario);
     setNovaSenhaGerada(null);
     setResetSenhaError(null);
@@ -2296,20 +2332,31 @@ const GestaoUsuariosPage: React.FC = () => {
 
                 <div className="grid grid-cols-4 gap-2" onClick={(event) => event.stopPropagation()}>
                   <button
-                    onClick={() => handleOpenDialog(usuario)}
+                    onClick={() => {
+                      if (authUserId && usuario.id === authUserId) {
+                        navigate('/perfil');
+                        return;
+                      }
+                      handleOpenDialog(usuario);
+                    }}
                     className="inline-flex h-9 items-center justify-center rounded-lg border border-[#D6E5EA] bg-white text-[#159A9C] transition-colors hover:bg-[#EAF8F6]"
-                    title="Editar"
-                    aria-label={`Editar ${usuario.nome}`}
+                    title={authUserId && usuario.id === authUserId ? 'Meu perfil' : 'Editar'}
+                    aria-label={
+                      authUserId && usuario.id === authUserId
+                        ? 'Abrir meu perfil'
+                        : `Editar ${usuario.nome}`
+                    }
                   >
                     <Edit2 className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => handleToggleStatus(usuario)}
+                    disabled={Boolean(authUserId && usuario.id === authUserId)}
                     className={`inline-flex h-9 items-center justify-center rounded-lg border transition-colors ${
                       usuario.ativo
                         ? 'border-yellow-200 bg-yellow-50 text-yellow-700 hover:bg-yellow-100'
                         : 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100'
-                    }`}
+                    } disabled:cursor-not-allowed disabled:opacity-45`}
                     title={usuario.ativo ? 'Desativar' : 'Ativar'}
                     aria-label={`${usuario.ativo ? 'Desativar' : 'Ativar'} ${usuario.nome}`}
                   >
@@ -2321,7 +2368,8 @@ const GestaoUsuariosPage: React.FC = () => {
                   </button>
                   <button
                     onClick={() => handleResetSenha(usuario)}
-                    className="inline-flex h-9 items-center justify-center rounded-lg border border-purple-200 bg-purple-50 text-purple-700 transition-colors hover:bg-purple-100"
+                    disabled={Boolean(authUserId && usuario.id === authUserId)}
+                    className="inline-flex h-9 items-center justify-center rounded-lg border border-purple-200 bg-purple-50 text-purple-700 transition-colors hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-45"
                     title="Resetar senha"
                     aria-label={`Resetar senha de ${usuario.nome}`}
                   >
@@ -2329,7 +2377,8 @@ const GestaoUsuariosPage: React.FC = () => {
                   </button>
                   <button
                     onClick={() => handleDelete(usuario)}
-                    className="inline-flex h-9 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-700 transition-colors hover:bg-red-100"
+                    disabled={Boolean(authUserId && usuario.id === authUserId)}
+                    className="inline-flex h-9 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-45"
                     title="Excluir"
                     aria-label={`Excluir ${usuario.nome}`}
                   >
@@ -2456,18 +2505,25 @@ const GestaoUsuariosPage: React.FC = () => {
                         <td className={`${desktopCellPaddingClass} whitespace-nowrap text-right text-sm font-medium`}>
                           <div className="flex justify-end gap-2" onClick={(event) => event.stopPropagation()}>
                             <button
-                              onClick={() => handleOpenDialog(usuario)}
+                              onClick={() => {
+                                if (authUserId && usuario.id === authUserId) {
+                                  navigate('/perfil');
+                                  return;
+                                }
+                                handleOpenDialog(usuario);
+                              }}
                               className="text-[#159A9C] hover:text-blue-900 p-1 hover:bg-blue-50 rounded transition-colors"
-                              title="Editar"
+                              title={authUserId && usuario.id === authUserId ? 'Meu perfil' : 'Editar'}
                             >
                               <Edit2 className="h-4 w-4" />
                             </button>
                             <button
                               onClick={() => handleToggleStatus(usuario)}
+                              disabled={Boolean(authUserId && usuario.id === authUserId)}
                               className={`${usuario.ativo
                                   ? 'text-yellow-600 hover:text-yellow-900 hover:bg-yellow-50'
                                   : 'text-green-600 hover:text-green-900 hover:bg-green-50'
-                                } p-1 rounded transition-colors`}
+                                } p-1 rounded transition-colors disabled:cursor-not-allowed disabled:opacity-45`}
                               title={usuario.ativo ? 'Desativar' : 'Ativar'}
                             >
                               {usuario.ativo ? (
@@ -2478,14 +2534,16 @@ const GestaoUsuariosPage: React.FC = () => {
                             </button>
                             <button
                               onClick={() => handleResetSenha(usuario)}
-                              className="text-purple-600 hover:text-purple-900 p-1 hover:bg-purple-50 rounded transition-colors"
+                              disabled={Boolean(authUserId && usuario.id === authUserId)}
+                              className="text-purple-600 hover:text-purple-900 p-1 hover:bg-purple-50 rounded transition-colors disabled:cursor-not-allowed disabled:opacity-45"
                               title="Resetar senha"
                             >
                               <Key className="h-4 w-4" />
                             </button>
                             <button
                               onClick={() => handleDelete(usuario)}
-                              className="text-red-600 hover:text-red-900 p-1 hover:bg-red-50 rounded transition-colors"
+                              disabled={Boolean(authUserId && usuario.id === authUserId)}
+                              className="text-red-600 hover:text-red-900 p-1 hover:bg-red-50 rounded transition-colors disabled:cursor-not-allowed disabled:opacity-45"
                               title="Excluir"
                             >
                               <Trash2 className="h-4 w-4" />
