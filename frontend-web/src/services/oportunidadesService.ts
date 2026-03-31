@@ -414,11 +414,12 @@ class OportunidadesService {
   async concluirAtividade(
     oportunidadeId: number,
     atividadeId: number,
-    dados: { resultadoConclusao: string },
+    dados?: { resultadoConclusao?: string },
   ): Promise<Atividade> {
+    const resultadoConclusao = dados?.resultadoConclusao?.trim();
     const response = await api.patch(
       this.getUrl(`/${oportunidadeId}/atividades/${atividadeId}/concluir`),
-      dados,
+      resultadoConclusao ? { resultadoConclusao } : {},
     );
     const item = response.data || {};
     return {

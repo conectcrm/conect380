@@ -26,7 +26,8 @@ export class CreateAtividadeDto {
 }
 
 export class ConcluirAtividadeDto {
+  @IsOptional()
   @IsString()
   @MaxLength(2000)
-  resultadoConclusao: string;
+  resultadoConclusao?: string;
 }

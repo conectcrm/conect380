@@ -387,7 +387,7 @@ export class OportunidadesController {
   }
 
   @Patch(':id/atividades/:atividadeId/concluir')
-  @Permissions(Permission.CRM_OPORTUNIDADES_UPDATE)
+  @Permissions(Permission.CRM_OPORTUNIDADES_READ)
   concluirAtividade(
     @Param('id') id: string,
     @Param('atividadeId') atividadeId: string,

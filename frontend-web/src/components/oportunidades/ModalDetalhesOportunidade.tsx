@@ -98,7 +98,6 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
   const [novaDataAtividade, setNovaDataAtividade] = useState('');
   const [atividadeEmConclusaoId, setAtividadeEmConclusaoId] = useState<number | null>(null);
   const [resultadoConclusao, setResultadoConclusao] = useState('');
-  const [tentouConcluirAtividade, setTentouConcluirAtividade] = useState(false);
   const [concluindoAtividadeId, setConcluindoAtividadeId] = useState<number | null>(null);
   const [atividadeFiltro, setAtividadeFiltro] = useState<AtividadeFiltro>('all');
   const [abaSelecionada, setAbaSelecionada] = useState<'detalhes' | 'atividades'>('detalhes');
@@ -109,8 +108,6 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
 
   const descricaoAtividadeLimpa = novaDescricaoAtividade.trim();
   const descricaoAtividadeInvalida = tentouSalvarAtividade && !descricaoAtividadeLimpa;
-  const resultadoConclusaoLimpo = resultadoConclusao.trim();
-  const resultadoConclusaoInvalido = tentouConcluirAtividade && !resultadoConclusaoLimpo;
   const hasDraftAtividade =
     Boolean(descricaoAtividadeLimpa) ||
     Boolean(novaDataAtividade) ||
@@ -204,7 +201,6 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
       setTentouSalvarAtividade(false);
       setAtividadeEmConclusaoId(null);
       setResultadoConclusao('');
-      setTentouConcluirAtividade(false);
       setConcluindoAtividadeId(null);
       setAtividadeFiltro('all');
       setAbaSelecionada(initialTab);
@@ -350,33 +346,36 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
     return atividade.criadoPor?.id === user.id;
   };
 
-  const abrirConclusaoAtividade = (atividadeId: number) => {
-    setAtividadeEmConclusaoId(atividadeId);
+  const abrirConclusaoAtividade = (atividade: Atividade) => {
+    const concluirSemObservacao = window.confirm(
+      'Deseja concluir esta atividade sem observacao?\n\nClique em "OK" para concluir agora.\nClique em "Cancelar" para adicionar observacao antes de concluir.',
+    );
+
+    if (concluirSemObservacao) {
+      void concluirAtividade(atividade, '');
+      return;
+    }
+
+    setAtividadeEmConclusaoId(atividade.id);
     setResultadoConclusao('');
-    setTentouConcluirAtividade(false);
   };
 
   const cancelarConclusaoAtividade = () => {
     setAtividadeEmConclusaoId(null);
     setResultadoConclusao('');
-    setTentouConcluirAtividade(false);
   };
 
-  const concluirAtividade = async (atividade: Atividade) => {
+  const concluirAtividade = async (atividade: Atividade, resultadoForcado?: string) => {
     if (!oportunidade) return;
 
-    setTentouConcluirAtividade(true);
-    if (!resultadoConclusaoLimpo) {
-      toastService.error('Descreva o resultado da atividade para concluir.');
-      return;
-    }
+    const resultadoFinal = (resultadoForcado ?? resultadoConclusao).trim();
 
     try {
       setConcluindoAtividadeId(atividade.id);
       const atividadeAtualizada = await oportunidadesService.concluirAtividade(
         oportunidade.id,
         atividade.id,
-        { resultadoConclusao: resultadoConclusaoLimpo },
+        resultadoFinal ? { resultadoConclusao: resultadoFinal } : {},
       );
       setAtividades((prev) =>
         prev.map((item) => (item.id === atividade.id ? atividadeAtualizada : item)),
@@ -1180,7 +1179,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                               {atividadeEmConclusaoId === atividade.id ? (
                                 <>
                                   <label className="mb-1 block text-xs font-semibold text-[#002333]/80">
-                                    O que foi realizado para concluir?
+                                    Observacao da conclusao (opcional)
                                   </label>
                                   <textarea
                                     value={resultadoConclusao}
@@ -1188,19 +1187,9 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                                     rows={3}
                                     maxLength={2000}
                                     disabled={concluindoAtividadeId === atividade.id}
-                                    aria-invalid={resultadoConclusaoInvalido}
                                     placeholder="Descreva o resultado final desta tarefa/acao."
-                                    className={`w-full resize-y rounded-lg border bg-white px-3 py-2 text-sm text-[#002333] focus:outline-none disabled:cursor-not-allowed disabled:opacity-70 ${
-                                      resultadoConclusaoInvalido
-                                        ? 'border-red-300 focus:border-red-500'
-                                        : 'border-[#B4BEC9]/70 focus:border-[#159A9C]'
-                                    }`}
+                                    className="w-full resize-y rounded-lg border border-[#B4BEC9]/70 bg-white px-3 py-2 text-sm text-[#002333] focus:border-[#159A9C] focus:outline-none disabled:cursor-not-allowed disabled:opacity-70"
                                   />
-                                  {resultadoConclusaoInvalido && (
-                                    <p className="mt-1 text-xs text-red-600">
-                                      Informe o resultado para concluir a atividade.
-                                    </p>
-                                  )}
                                   <div className="mt-2 flex flex-wrap gap-2">
                                     <button
                                       type="button"
@@ -1227,7 +1216,8 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                               ) : (
                                 <button
                                   type="button"
-                                  onClick={() => abrirConclusaoAtividade(atividade.id)}
+                                  onClick={() => abrirConclusaoAtividade(atividade)}
+                                  disabled={concluindoAtividadeId === atividade.id}
                                   className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
                                 >
                                   Marcar como concluida

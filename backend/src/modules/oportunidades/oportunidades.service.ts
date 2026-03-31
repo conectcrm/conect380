@@ -623,6 +623,106 @@ export class OportunidadesService {
     }).format(safeValue);
   }
 
+  private getAtividadeTipoLabel(tipo?: TipoAtividade | string | null): string {
+    switch (String(tipo || '').toLowerCase()) {
+      case TipoAtividade.LIGACAO:
+        return 'Ligacao';
+      case TipoAtividade.EMAIL:
+        return 'E-mail';
+      case TipoAtividade.REUNIAO:
+        return 'Reuniao';
+      case TipoAtividade.TAREFA:
+        return 'Tarefa';
+      case TipoAtividade.NOTA:
+      default:
+        return 'Atividade';
+    }
+  }
+
+  private async notifyAssignedUserOnActivityCreated(input: {
+    empresaId: string;
+    oportunidade: Oportunidade;
+    atividade: Pick<Atividade, 'id' | 'tipo' | 'descricao' | 'dataAtividade' | 'responsavel_id'>;
+    actorUserId?: string;
+  }): Promise<void> {
+    if (!this.notificationService) {
+      return;
+    }
+
+    const assignedUserId = String(input.atividade.responsavel_id || '').trim();
+    if (!assignedUserId) {
+      return;
+    }
+
+    const actorUserId = String(input.actorUserId || '').trim();
+    if (actorUserId && actorUserId === assignedUserId) {
+      return;
+    }
+
+    try {
+      const destinatario = await this.userRepository.findOne({
+        where: {
+          id: assignedUserId,
+          empresa_id: input.empresaId,
+          ativo: true,
+        },
+        select: ['id'],
+      });
+
+      if (!destinatario) {
+        return;
+      }
+
+      const actorName = actorUserId
+        ? (
+            await this.userRepository.findOne({
+              where: { id: actorUserId, empresa_id: input.empresaId },
+              select: ['nome'],
+            })
+          )?.nome || 'Equipe comercial'
+        : 'Equipe comercial';
+
+      const oportunidadeTitulo = String(input.oportunidade.titulo || 'Oportunidade').trim();
+      const tipoLabel = this.getAtividadeTipoLabel(input.atividade.tipo);
+      const dataAtividade = new Date(input.atividade.dataAtividade || new Date());
+      const dataAtividadeValida = Number.isNaN(dataAtividade.getTime()) ? new Date() : dataAtividade;
+      const dataAtividadeLabel = dataAtividadeValida.toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
+      const title = 'Nova tarefa da pipeline';
+      const message = `${actorName} atribuiu ${tipoLabel.toLowerCase()} para ${dataAtividadeLabel} na oportunidade "${oportunidadeTitulo}".`;
+
+      await this.notificationService.create({
+        empresaId: input.empresaId,
+        userId: destinatario.id,
+        type: NotificationType.SISTEMA,
+        title,
+        message,
+        data: {
+          category: 'comercial',
+          event: 'atividade_atribuida',
+          module: 'pipeline',
+          oportunidadeId: String(input.oportunidade.id || ''),
+          oportunidadeTitulo,
+          atividadeId: String(input.atividade.id || ''),
+          atividadeTipo: input.atividade.tipo,
+          atividadeDescricao: String(input.atividade.descricao || ''),
+          dataAtividade: dataAtividadeValida.toISOString(),
+          assignedByUserId: actorUserId || null,
+        },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao notificar responsavel por atividade atribuida (${input.atividade.id}): ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
   private async notifyManagersOnWonOpportunity(input: {
     empresaId: string;
     oportunidade: Oportunidade;
@@ -4277,7 +4377,7 @@ export class OportunidadesService {
     );
 
     const atividade = insertResult?.[0];
-    return {
+    const atividadePayload = {
       id: atividade.id,
       empresa_id: atividade.empresa_id,
       tipo: atividade.tipo,
@@ -4295,6 +4395,15 @@ export class OportunidadesService {
       responsavel: undefined,
       concluidoPor: undefined,
     } as Atividade;
+
+    await this.notifyAssignedUserOnActivityCreated({
+      empresaId: context.empresaId,
+      oportunidade,
+      atividade: atividadePayload,
+      actorUserId: context.userId,
+    });
+
+    return atividadePayload;
   }
 
   async listarAtividades(oportunidadeId: string, empresaId: string): Promise<Atividade[]> {
@@ -4428,14 +4537,11 @@ export class OportunidadesService {
   ): Promise<Atividade> {
     const atividadeSchema = await this.resolveAtividadesSchema();
     const actorUserId = (context.userId || '').trim();
-    const resultadoConclusao = (payload.resultadoConclusao || '').trim();
+    const resultadoConclusaoInformado = (payload?.resultadoConclusao || '').trim();
+    const resultadoConclusao = resultadoConclusaoInformado || 'Concluida sem observacoes.';
 
     if (!actorUserId) {
       throw new ForbiddenException('Sessao invalida para concluir atividade.');
-    }
-
-    if (!resultadoConclusao) {
-      throw new BadRequestException('resultadoConclusao e obrigatorio para concluir a atividade.');
     }
 
     if (
