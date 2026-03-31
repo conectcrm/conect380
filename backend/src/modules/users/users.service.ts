@@ -7,7 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { QueryFailedError, Repository } from 'typeorm';
+import { In, QueryFailedError, Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User, UserRole } from './user.entity';
 import { Empresa } from '../../empresas/entities/empresa.entity';
@@ -269,6 +269,42 @@ export class UsersService {
         return UserRole.FINANCEIRO;
       default:
         return null;
+    }
+  }
+
+  private isAdminRole(role: unknown): boolean {
+    return this.normalizeRoleInput(role) === UserRole.ADMIN;
+  }
+
+  private async countActiveAdmins(empresaId: string, excludeUserId?: string): Promise<number> {
+    if (!excludeUserId) {
+      return this.userRepository.count({
+        where: { empresa_id: empresaId, ativo: true, role: UserRole.ADMIN },
+      });
+    }
+
+    const [total, excluded] = await Promise.all([
+      this.userRepository.count({
+        where: { empresa_id: empresaId, ativo: true, role: UserRole.ADMIN },
+      }),
+      this.userRepository.count({
+        where: { empresa_id: empresaId, ativo: true, role: UserRole.ADMIN, id: excludeUserId },
+      }),
+    ]);
+
+    return Math.max(0, total - excluded);
+  }
+
+  private async ensureCanRemoveAdminSafely(beforeUser: User, empresaId: string): Promise<void> {
+    if (!beforeUser?.ativo || !this.isAdminRole(beforeUser.role)) {
+      return;
+    }
+
+    const remainingActiveAdmins = await this.countActiveAdmins(empresaId, beforeUser.id);
+    if (remainingActiveAdmins <= 0) {
+      throw new ConflictException(
+        'Nao e permitido remover ou desativar o ultimo administrador ativo da empresa.',
+      );
     }
   }
 
@@ -2394,6 +2430,16 @@ export class UsersService {
     }
 
     const normalizedData = this.normalizeRoleForUpdate(userData);
+    const removingAdminPrivileges =
+      beforeUser.ativo &&
+      this.isAdminRole(beforeUser.role) &&
+      (normalizedData.ativo === false ||
+        (normalizedData.role !== undefined && !this.isAdminRole(normalizedData.role)));
+
+    if (removingAdminPrivileges) {
+      await this.ensureCanRemoveAdminSafely(beforeUser, empresa_id);
+    }
+
     const repositoryUpdatableData = this.extractRepositoryUpdatableFields(normalizedData);
 
     if (Object.keys(repositoryUpdatableData).length > 0) {
@@ -2467,6 +2513,8 @@ export class UsersService {
     if (!beforeUser || beforeUser.empresa_id !== empresa_id) {
       throw new NotFoundException('Usuario nao encontrado');
     }
+
+    await this.ensureCanRemoveAdminSafely(beforeUser, empresa_id);
 
     try {
       const resultado = await this.userRepository.delete({ id, empresa_id });
@@ -2582,6 +2630,10 @@ export class UsersService {
       throw new NotFoundException('Usuário não encontrado');
     }
 
+    if (ativo === false) {
+      await this.ensureCanRemoveAdminSafely(beforeUser, empresa_id);
+    }
+
     // Atualizar o status
     await this.userRepository.update({ id, empresa_id }, { ativo });
 
@@ -2612,7 +2664,36 @@ export class UsersService {
   }
 
   async desativarEmMassa(ids: string[], empresa_id: string): Promise<void> {
-    for (const id of ids) {
+    const idsUnicos = Array.from(
+      new Set(ids.filter((id) => typeof id === 'string' && id.trim()).map((id) => id.trim())),
+    );
+
+    if (idsUnicos.length === 0) {
+      return;
+    }
+
+    const usuariosAlvo = await this.userRepository.find({
+      where: {
+        empresa_id,
+        id: In(idsUnicos),
+      },
+      select: ['id', 'role', 'ativo', 'empresa_id'],
+    });
+
+    const adminsAtivosAlvo = usuariosAlvo.filter(
+      (usuario) => usuario.ativo && this.isAdminRole(usuario.role),
+    );
+
+    if (adminsAtivosAlvo.length > 0) {
+      const totalAdminsAtivos = await this.countActiveAdmins(empresa_id);
+      if (adminsAtivosAlvo.length >= totalAdminsAtivos) {
+        throw new ConflictException(
+          'Nao e permitido desativar todos os administradores ativos da empresa.',
+        );
+      }
+    }
+
+    for (const id of idsUnicos) {
       await this.userRepository.update({ id, empresa_id }, { ativo: false });
     }
   }
