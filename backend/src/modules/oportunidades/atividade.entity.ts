@@ -18,6 +18,11 @@ export enum TipoAtividade {
   TAREFA = 'task',
 }
 
+export enum StatusAtividade {
+  PENDENTE = 'pending',
+  CONCLUIDA = 'completed',
+}
+
 @Entity('atividades')
 export class Atividade {
   @PrimaryGeneratedColumn()
@@ -57,8 +62,24 @@ export class Atividade {
   @Column('text')
   descricao: string;
 
+  @Column({ type: 'varchar', default: StatusAtividade.PENDENTE })
+  status: StatusAtividade;
+
+  @Column({ type: 'text', name: 'resultado_conclusao', nullable: true })
+  resultadoConclusao?: string | null;
+
   @Column({ type: 'timestamp', name: 'dataAtividade' })
   dataAtividade: Date;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'concluido_por' })
+  concluidoPor?: User | null;
+
+  @Column('uuid', { name: 'concluido_por', nullable: true })
+  concluido_por?: string | null;
+
+  @Column({ type: 'timestamp', name: 'concluido_em', nullable: true })
+  concluidoEm?: Date | null;
 
   @CreateDateColumn({ name: 'createdAt' })
   createdAt: Date;

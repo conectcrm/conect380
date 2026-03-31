@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Edit2,
   Calendar,
@@ -37,11 +37,14 @@ import { oportunidadesService } from '../../services/oportunidadesService';
 import { toastService } from '../../services/toastService';
 import { differenceInDays } from 'date-fns';
 import { BaseModal } from '../base/BaseModal';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ModalDetalhesOportunidadeProps {
   oportunidade: Oportunidade | null;
   onClose: () => void;
   onEditar: (oportunidade: Oportunidade) => void;
+  initialTab?: 'detalhes' | 'atividades';
+  eventContext?: ModalDetalhesEventoContext | null;
   onClonar?: (oportunidade: Oportunidade) => void;
   exclusaoDireta?: boolean;
   onMarcarComoGanho?: (oportunidade: Oportunidade) => Promise<void> | void;
@@ -53,10 +56,24 @@ interface ModalDetalhesOportunidadeProps {
   onExcluirPermanente?: (oportunidade: Oportunidade) => Promise<void> | void;
 }
 
+export interface ModalDetalhesEventoContext {
+  kind: 'oportunidade' | 'atividade';
+  title: string;
+  dataEvento?: Date | string | null;
+  tipoAtividadeLabel?: string;
+  responsavelNome?: string;
+  prioridade?: PrioridadeOportunidade;
+  descricao?: string;
+}
+
+type AtividadeFiltro = 'all' | 'pending' | 'completed';
+
 const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
   oportunidade,
   onClose,
   onEditar,
+  initialTab = 'detalhes',
+  eventContext = null,
   onClonar,
   exclusaoDireta = false,
   onMarcarComoGanho,
@@ -67,6 +84,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
   onExcluir,
   onExcluirPermanente,
 }) => {
+  const { user } = useAuth();
   const [atividades, setAtividades] = useState<Atividade[]>([]);
   const [historicoEstagios, setHistoricoEstagios] = useState<OportunidadeHistoricoEstagioItem[]>(
     [],
@@ -78,6 +96,11 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
   const [novoTipoAtividade, setNovoTipoAtividade] = useState<TipoAtividade>(TipoAtividade.NOTA);
   const [novaDescricaoAtividade, setNovaDescricaoAtividade] = useState('');
   const [novaDataAtividade, setNovaDataAtividade] = useState('');
+  const [atividadeEmConclusaoId, setAtividadeEmConclusaoId] = useState<number | null>(null);
+  const [resultadoConclusao, setResultadoConclusao] = useState('');
+  const [tentouConcluirAtividade, setTentouConcluirAtividade] = useState(false);
+  const [concluindoAtividadeId, setConcluindoAtividadeId] = useState<number | null>(null);
+  const [atividadeFiltro, setAtividadeFiltro] = useState<AtividadeFiltro>('all');
   const [abaSelecionada, setAbaSelecionada] = useState<'detalhes' | 'atividades'>('detalhes');
   const [limiteHistoricoEstagios, setLimiteHistoricoEstagios] = useState(30);
   const [acaoLifecycleLoading, setAcaoLifecycleLoading] = useState<
@@ -86,10 +109,90 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
 
   const descricaoAtividadeLimpa = novaDescricaoAtividade.trim();
   const descricaoAtividadeInvalida = tentouSalvarAtividade && !descricaoAtividadeLimpa;
+  const resultadoConclusaoLimpo = resultadoConclusao.trim();
+  const resultadoConclusaoInvalido = tentouConcluirAtividade && !resultadoConclusaoLimpo;
   const hasDraftAtividade =
     Boolean(descricaoAtividadeLimpa) ||
     Boolean(novaDataAtividade) ||
     novoTipoAtividade !== TipoAtividade.NOTA;
+
+  const formatarDataEvento = (value?: Date | string | null): string => {
+    if (!value) return 'Data nÃ£o informada';
+    const parsed = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(parsed.getTime())) return 'Data nÃ£o informada';
+    return parsed.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const getEventTimingBadge = (value?: Date | string | null) => {
+    if (!value) return null;
+    const parsed = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(parsed.getTime())) return null;
+
+    const today = new Date();
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const startOfEvent = new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+    const diff = Math.round(
+      (startOfEvent.getTime() - startOfToday.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
+    if (diff < 0) {
+      return {
+        label: `Atrasado ${Math.abs(diff)}d`,
+        className: 'border-red-200 bg-red-50 text-red-700',
+      };
+    }
+
+    if (diff === 0) {
+      return {
+        label: 'Vence hoje',
+        className: 'border-amber-200 bg-amber-50 text-amber-700',
+      };
+    }
+
+    if (diff === 1) {
+      return {
+        label: 'Amanha',
+        className: 'border-blue-200 bg-blue-50 text-blue-700',
+      };
+    }
+
+    return {
+      label: `Em ${diff}d`,
+      className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    };
+  };
+
+  const getPrioridadeEventoBadge = (prioridade?: PrioridadeOportunidade) => {
+    if (!prioridade) return null;
+
+    if (prioridade === PrioridadeOportunidade.ALTA) {
+      return {
+        label: 'Prioridade alta',
+        className: 'border-red-200 bg-red-50 text-red-700',
+      };
+    }
+
+    if (prioridade === PrioridadeOportunidade.MEDIA) {
+      return {
+        label: 'Prioridade media',
+        className: 'border-amber-200 bg-amber-50 text-amber-700',
+      };
+    }
+
+    return {
+      label: 'Prioridade baixa',
+      className: 'border-slate-200 bg-slate-50 text-slate-700',
+    };
+  };
+
+  const eventTimingBadge = getEventTimingBadge(eventContext?.dataEvento);
+  const prioridadeEventoBadge = getPrioridadeEventoBadge(eventContext?.prioridade);
 
   useEffect(() => {
     if (oportunidade?.id) {
@@ -99,8 +202,14 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
       setNovaDescricaoAtividade('');
       setNovaDataAtividade('');
       setTentouSalvarAtividade(false);
+      setAtividadeEmConclusaoId(null);
+      setResultadoConclusao('');
+      setTentouConcluirAtividade(false);
+      setConcluindoAtividadeId(null);
+      setAtividadeFiltro('all');
+      setAbaSelecionada(initialTab);
     }
-  }, [oportunidade?.id]);
+  }, [initialTab, oportunidade?.id]);
 
   const podeFecharModal = useCallback(() => {
     if (abaSelecionada !== 'atividades' || salvandoAtividade || !hasDraftAtividade) {
@@ -132,7 +241,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
       setAtividades(dados);
     } catch (err) {
       console.error('Erro ao carregar atividades:', err);
-      toastService.error('Não foi possível carregar as atividades desta oportunidade.');
+      toastService.error('NÃ£o foi possÃ­vel carregar as atividades desta oportunidade.');
     } finally {
       setLoadingAtividades(false);
     }
@@ -197,9 +306,100 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
     }
   };
 
+  const isUsuarioGestor = (() => {
+    const role = String(user?.role || '').toLowerCase();
+    return role === 'superadmin' || role === 'admin' || role === 'gerente' || role === 'manager';
+  })();
+
+  const isAtividadeConcluida = (atividade: Atividade): boolean =>
+    String(atividade.status || 'pending').toLowerCase() === 'completed';
+
+  const atividadesPendentesCount = useMemo(
+    () => atividades.filter((atividade) => !isAtividadeConcluida(atividade)).length,
+    [atividades],
+  );
+
+  const atividadesConcluidasCount = useMemo(
+    () => atividades.filter((atividade) => isAtividadeConcluida(atividade)).length,
+    [atividades],
+  );
+
+  const atividadesFiltradas = useMemo(() => {
+    if (atividadeFiltro === 'pending') {
+      return atividades.filter((atividade) => !isAtividadeConcluida(atividade));
+    }
+
+    if (atividadeFiltro === 'completed') {
+      return atividades.filter((atividade) => isAtividadeConcluida(atividade));
+    }
+
+    return atividades;
+  }, [atividadeFiltro, atividades]);
+
+  const podeConcluirAtividade = (atividade: Atividade): boolean => {
+    if (!user?.id) return false;
+    if (atividade.tipo === TipoAtividade.NOTA) return false;
+    if (isAtividadeConcluida(atividade)) return false;
+    if (isUsuarioGestor) return true;
+
+    const responsavelId = atividade.responsavelId || atividade.responsavel?.id;
+    if (responsavelId) {
+      return responsavelId === user.id;
+    }
+
+    return atividade.criadoPor?.id === user.id;
+  };
+
+  const abrirConclusaoAtividade = (atividadeId: number) => {
+    setAtividadeEmConclusaoId(atividadeId);
+    setResultadoConclusao('');
+    setTentouConcluirAtividade(false);
+  };
+
+  const cancelarConclusaoAtividade = () => {
+    setAtividadeEmConclusaoId(null);
+    setResultadoConclusao('');
+    setTentouConcluirAtividade(false);
+  };
+
+  const concluirAtividade = async (atividade: Atividade) => {
+    if (!oportunidade) return;
+
+    setTentouConcluirAtividade(true);
+    if (!resultadoConclusaoLimpo) {
+      toastService.error('Descreva o resultado da atividade para concluir.');
+      return;
+    }
+
+    try {
+      setConcluindoAtividadeId(atividade.id);
+      const atividadeAtualizada = await oportunidadesService.concluirAtividade(
+        oportunidade.id,
+        atividade.id,
+        { resultadoConclusao: resultadoConclusaoLimpo },
+      );
+      setAtividades((prev) =>
+        prev.map((item) => (item.id === atividade.id ? atividadeAtualizada : item)),
+      );
+      cancelarConclusaoAtividade();
+      toastService.success('Atividade concluida com sucesso.');
+    } catch (err: any) {
+      const apiMessage = err?.response?.data?.message;
+      const mensagem =
+        Array.isArray(apiMessage) && apiMessage.length
+          ? apiMessage.join(', ')
+          : typeof apiMessage === 'string' && apiMessage.trim()
+            ? apiMessage
+            : 'Nao foi possivel concluir a atividade.';
+      toastService.error(mensagem);
+    } finally {
+      setConcluindoAtividadeId(null);
+    }
+  };
+
   if (!oportunidade) return null;
 
-  // Calcular dias até vencimento
+  // Calcular dias atÃ© vencimento
   const diasAteVencimento = oportunidade.dataFechamentoEsperado
     ? differenceInDays(new Date(oportunidade.dataFechamentoEsperado), new Date())
     : null;
@@ -289,9 +489,9 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
             ? 'bg-green-100 text-green-700 border-green-200'
             : 'bg-green-200 text-green-800 border-green-300';
   const probEmoji =
-    prob <= 20 ? '❄️' : prob <= 40 ? '🌤️' : prob <= 60 ? '☀️' : prob <= 80 ? '🔥' : '🚀';
+    prob <= 20 ? 'â„ï¸' : prob <= 40 ? 'ðŸŒ¤ï¸' : prob <= 60 ? 'â˜€ï¸' : prob <= 80 ? 'ðŸ”¥' : 'ðŸš€';
 
-  // Ícone por tipo de atividade
+  // Ãcone por tipo de atividade
   const getIconeAtividade = (tipo: string) => {
     switch (tipo) {
       case 'call':
@@ -309,14 +509,14 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
     }
   };
 
-  // Nome do estágio em português
+  // Nome do estÃ¡gio em portuguÃªs
   const getNomeEstagio = (estagio?: EstagioOportunidade | string | null) => {
     if (!estagio) return 'Nao informado';
     const estagios = {
       [EstagioOportunidade.LEADS]: 'Leads',
-      [EstagioOportunidade.QUALIFICACAO]: 'Qualificação',
+      [EstagioOportunidade.QUALIFICACAO]: 'QualificaÃ§Ã£o',
       [EstagioOportunidade.PROPOSTA]: 'Proposta',
-      [EstagioOportunidade.NEGOCIACAO]: 'Negociação',
+      [EstagioOportunidade.NEGOCIACAO]: 'NegociaÃ§Ã£o',
       [EstagioOportunidade.FECHAMENTO]: 'Fechamento',
       [EstagioOportunidade.GANHO]: 'Ganho',
       [EstagioOportunidade.PERDIDO]: 'Perdido',
@@ -392,7 +592,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
           <div className="flex flex-wrap items-center gap-4 text-sm text-[#002333]/70">
             <span className="inline-flex items-center gap-1">
               <User className="h-4 w-4 text-[#159A9C]" />
-              {oportunidade.responsavel?.nome || 'Sem responsável'}
+              {oportunidade.responsavel?.nome || 'Sem responsÃ¡vel'}
             </span>
             <span className="inline-flex items-center gap-1">
               <Clock className="h-4 w-4 text-[#159A9C]" />
@@ -417,6 +617,51 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
           )}
         </div>
       </div>
+      {eventContext && (
+        <div className="border-b border-[#B4BEC9]/25 bg-[#E8F5FF] px-6 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#0F4A6C]/70">
+            Evento selecionado no calendÃ¡rio
+          </p>
+          <p className="mt-1 text-sm font-semibold text-[#0F4A6C]">{eventContext.title}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-[#0F4A6C]">
+            <span className="rounded-full border border-[#B6D9EE] bg-white px-2 py-0.5 text-xs font-semibold">
+              {eventContext.kind === 'atividade' ? 'Atividade agendada' : 'Marco da oportunidade'}
+            </span>
+            <span className="rounded-full border border-[#B6D9EE] bg-white px-2 py-0.5 text-xs">
+              {formatarDataEvento(eventContext.dataEvento)}
+            </span>
+            {eventTimingBadge && (
+              <span
+                className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${eventTimingBadge.className}`}
+              >
+                {eventTimingBadge.label}
+              </span>
+            )}
+            {eventContext.tipoAtividadeLabel && (
+              <span className="rounded-full border border-[#B6D9EE] bg-white px-2 py-0.5 text-xs">
+                {eventContext.tipoAtividadeLabel}
+              </span>
+            )}
+            {prioridadeEventoBadge && (
+              <span
+                className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${prioridadeEventoBadge.className}`}
+              >
+                {prioridadeEventoBadge.label}
+              </span>
+            )}
+            {eventContext.responsavelNome && (
+              <span className="rounded-full border border-[#B6D9EE] bg-white px-2 py-0.5 text-xs">
+                ResponsÃ¡vel: {eventContext.responsavelNome}
+              </span>
+            )}
+          </div>
+          {eventContext.descricao?.trim() && (
+            <p className="mt-2 rounded-lg border border-[#B6D9EE] bg-white px-3 py-2 text-sm text-[#0F4A6C]">
+              {eventContext.descricao.trim()}
+            </p>
+          )}
+        </div>
+      )}
       {/* Abas */}
       <div className="border-b border-[#B4BEC9]/35 bg-[#DEEFE7]/35">
         <div className="flex" role="tablist" aria-label="Navegacao de detalhes da oportunidade">
@@ -462,7 +707,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
         </div>
       </div>
 
-      {/* Conteúdo com scroll */}
+      {/* ConteÃºdo com scroll */}
       <div className="p-6">
         {abaSelecionada === 'detalhes' ? (
           <div
@@ -471,7 +716,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
             aria-labelledby={tabDetalhesId}
             className="space-y-6"
           >
-            {/* Métricas Principais */}
+            {/* MÃ©tricas Principais */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Valor */}
               <div className="bg-[#159A9C]/10 border border-[#159A9C]/20 rounded-xl p-4">
@@ -496,11 +741,11 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                 </p>
               </div>
 
-              {/* Estágio */}
+              {/* EstÃ¡gio */}
               <div className="bg-[#DEEFE7]/55 border border-[#B4BEC9]/35 rounded-xl p-4">
                 <div className="flex items-center gap-2 text-[#159A9C] mb-1">
                   <CheckCircle className="h-5 w-5" />
-                  <span className="text-sm font-medium">Estágio</span>
+                  <span className="text-sm font-medium">EstÃ¡gio</span>
                 </div>
                 <p className="text-xl font-bold text-[#002333]">
                   {getNomeEstagio(oportunidade.estagio)}
@@ -535,7 +780,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                     <div>
                       <h4 className="font-semibold text-red-900">Oportunidade Atrasada</h4>
                       <p className="text-red-700 text-sm">
-                        Esta oportunidade está atrasada há {Math.abs(diasAteVencimento)} dias
+                        Esta oportunidade estÃ¡ atrasada hÃ¡ {Math.abs(diasAteVencimento)} dias
                       </p>
                     </div>
                   </div>
@@ -544,7 +789,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                   <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-4 flex items-start gap-3">
                     <AlertCircle className="h-6 w-6 text-yellow-600 flex-shrink-0 mt-0.5" />
                     <div>
-                      <h4 className="font-semibold text-yellow-900">Atenção: Vencimento Próximo</h4>
+                      <h4 className="font-semibold text-yellow-900">AtenÃ§Ã£o: Vencimento PrÃ³ximo</h4>
                       <p className="text-yellow-700 text-sm">
                         Esta oportunidade vence em {diasAteVencimento}{' '}
                         {diasAteVencimento === 1 ? 'dia' : 'dias'}
@@ -555,11 +800,11 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
               </>
             )}
 
-            {/* Informações de Contato */}
+            {/* InformaÃ§Ãµes de Contato */}
             <div className="bg-[#DEEFE7]/35 rounded-xl p-5 space-y-4 border border-[#B4BEC9]/25">
               <h3 className="text-lg font-bold text-[#002333] flex items-center gap-2 mb-4">
                 <Users className="h-5 w-5 text-[#159A9C]" />
-                Informações de Contato
+                InformaÃ§Ãµes de Contato
               </h3>
 
               {oportunidade.nomeContato && (
@@ -632,7 +877,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                       {oportunidade.prioridade === PrioridadeOportunidade.ALTA
                         ? 'Alta'
                         : oportunidade.prioridade === PrioridadeOportunidade.MEDIA
-                          ? 'Média'
+                          ? 'MÃ©dia'
                           : 'Baixa'}
                     </span>
                   </div>
@@ -662,10 +907,10 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
               )}
             </div>
 
-            {/* Descrição */}
+            {/* DescriÃ§Ã£o */}
             {oportunidade.descricao && (
               <div>
-                <h3 className="text-lg font-bold text-[#002333] mb-3">Descrição</h3>
+                <h3 className="text-lg font-bold text-[#002333] mb-3">DescriÃ§Ã£o</h3>
                 <div className="bg-[#DEEFE7]/35 rounded-xl p-4 border border-[#B4BEC9]/25">
                   <p className="text-[#002333]/80 whitespace-pre-wrap">{oportunidade.descricao}</p>
                 </div>
@@ -783,10 +1028,48 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
             </div>
 
             <div>
-              <h3 className="text-lg font-bold text-[#002333] mb-4 flex items-center gap-2">
-                <MessageSquare className="h-5 w-5 text-[#159A9C]" />
-                Timeline de Atividades
-              </h3>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-lg font-bold text-[#002333] flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5 text-[#159A9C]" />
+                  Timeline de Atividades
+                </h3>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAtividadeFiltro('all')}
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                      atividadeFiltro === 'all'
+                        ? 'border-[#159A9C] bg-[#159A9C] text-white'
+                        : 'border-[#B4BEC9]/70 bg-white text-[#002333]/80 hover:bg-[#DEEFE7]/35'
+                    }`}
+                  >
+                    Todas ({atividades.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAtividadeFiltro('pending')}
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                      atividadeFiltro === 'pending'
+                        ? 'border-amber-500 bg-amber-500 text-white'
+                        : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                    }`}
+                  >
+                    Pendentes ({atividadesPendentesCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAtividadeFiltro('completed')}
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                      atividadeFiltro === 'completed'
+                        ? 'border-emerald-600 bg-emerald-600 text-white'
+                        : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                    }`}
+                  >
+                    Concluidas ({atividadesConcluidasCount})
+                  </button>
+                </div>
+              </div>
 
               {loadingAtividades ? (
                 <div className="text-center py-8">
@@ -798,7 +1081,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                   <MessageSquare className="h-12 w-12 text-[#B4BEC9] mx-auto mb-3" />
                   <p className="text-[#002333]/70 font-medium">Nenhuma atividade registrada</p>
                   <p className="text-[#002333]/55 text-sm mt-1">
-                    As atividades aparecerão aqui conforme forem criadas.
+                    As atividades aparecerÃ£o aqui conforme forem criadas.
                   </p>
                   <button
                     type="button"
@@ -810,15 +1093,23 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                     Recarregar
                   </button>
                 </div>
+              ) : atividadesFiltradas.length === 0 ? (
+                <div className="text-center py-10 bg-[#F8FAFC] rounded-xl border border-[#B4BEC9]/25">
+                  <MessageSquare className="h-10 w-10 text-[#B4BEC9] mx-auto mb-3" />
+                  <p className="text-[#002333]/70 font-medium">Nenhuma atividade neste filtro</p>
+                  <p className="text-[#002333]/55 text-sm mt-1">
+                    Ajuste o filtro para visualizar outras atividades da oportunidade.
+                  </p>
+                </div>
               ) : (
                 <div className="space-y-4">
-                  {atividades.map((atividade, index) => (
+                  {atividadesFiltradas.map((atividade, index) => (
                     <div key={atividade.id} className="flex gap-4">
                       <div className="flex flex-col items-center">
                         <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] flex items-center justify-center shadow-sm">
                           {getIconeAtividade(atividade.tipo)}
                         </div>
-                        {index < atividades.length - 1 && (
+                        {index < atividadesFiltradas.length - 1 && (
                           <div className="w-0.5 flex-1 bg-[#B4BEC9]/60 my-2 min-h-[30px]" />
                         )}
                       </div>
@@ -838,14 +1129,112 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                               {atividade.responsavel?.nome && (
                                 <p className="text-xs text-[#002333]/55 flex items-center gap-1 mt-1">
                                   <User className="h-3 w-3" />
-                                  Responsável da ação: {atividade.responsavel.nome}
+                                  Responsavel da acao: {atividade.responsavel.nome}
                                 </p>
                               )}
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                {isAtividadeConcluida(atividade) ? (
+                                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                                    Concluida
+                                  </span>
+                                ) : (
+                                  <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
+                                    Pendente
+                                  </span>
+                                )}
+                                {atividade.concluidoEm && (
+                                  <span className="rounded-full border border-[#B4BEC9]/40 bg-[#F8FAFC] px-2.5 py-0.5 text-xs text-[#002333]/70">
+                                    Concluida em {formatarData(atividade.concluidoEm)}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                           <p className="text-[#002333]/80 text-sm whitespace-pre-wrap">
                             {atividade.descricao}
                           </p>
+
+                          {atividade.resultadoConclusao?.trim() && (
+                            <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                                Resultado da conclusao
+                              </p>
+                              <p className="mt-1 whitespace-pre-wrap text-sm text-[#002333]/85">
+                                {atividade.resultadoConclusao}
+                              </p>
+                              {(atividade.concluidoPor?.nome || atividade.concluidoEm) && (
+                                <p className="mt-1 text-xs text-[#002333]/65">
+                                  {atividade.concluidoPor?.nome
+                                    ? `Por ${atividade.concluidoPor.nome}`
+                                    : 'Concluida'}{' '}
+                                  {atividade.concluidoEm
+                                    ? `em ${formatarData(atividade.concluidoEm)}`
+                                    : ''}
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {!isAtividadeConcluida(atividade) && podeConcluirAtividade(atividade) && (
+                            <div className="mt-3 rounded-lg border border-[#B4BEC9]/40 bg-[#F8FAFC] p-3">
+                              {atividadeEmConclusaoId === atividade.id ? (
+                                <>
+                                  <label className="mb-1 block text-xs font-semibold text-[#002333]/80">
+                                    O que foi realizado para concluir?
+                                  </label>
+                                  <textarea
+                                    value={resultadoConclusao}
+                                    onChange={(event) => setResultadoConclusao(event.target.value)}
+                                    rows={3}
+                                    maxLength={2000}
+                                    disabled={concluindoAtividadeId === atividade.id}
+                                    aria-invalid={resultadoConclusaoInvalido}
+                                    placeholder="Descreva o resultado final desta tarefa/acao."
+                                    className={`w-full resize-y rounded-lg border bg-white px-3 py-2 text-sm text-[#002333] focus:outline-none disabled:cursor-not-allowed disabled:opacity-70 ${
+                                      resultadoConclusaoInvalido
+                                        ? 'border-red-300 focus:border-red-500'
+                                        : 'border-[#B4BEC9]/70 focus:border-[#159A9C]'
+                                    }`}
+                                  />
+                                  {resultadoConclusaoInvalido && (
+                                    <p className="mt-1 text-xs text-red-600">
+                                      Informe o resultado para concluir a atividade.
+                                    </p>
+                                  )}
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        void concluirAtividade(atividade);
+                                      }}
+                                      disabled={concluindoAtividadeId === atividade.id}
+                                      className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
+                                    >
+                                      {concluindoAtividadeId === atividade.id
+                                        ? 'Concluindo...'
+                                        : 'Confirmar conclusao'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={cancelarConclusaoAtividade}
+                                      disabled={concluindoAtividadeId === atividade.id}
+                                      className="rounded-lg border border-[#B4BEC9]/70 px-3 py-1.5 text-xs font-semibold text-[#002333] hover:bg-[#DEEFE7]/55 disabled:cursor-not-allowed disabled:opacity-70"
+                                    >
+                                      Cancelar
+                                    </button>
+                                  </div>
+                                </>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => abrirConclusaoAtividade(atividade.id)}
+                                  className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                                >
+                                  Marcar como concluida
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -882,7 +1271,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                           : `Entrada em ${getNomeEstagio(evento.toStage)}`}
                       </p>
                       <p className="mt-1 text-xs text-[#002333]/60">
-                        {evento.changedBy?.nome || 'Sistema'} • {formatarData(evento.changedAt)} •{' '}
+                        {evento.changedBy?.nome || 'Sistema'} â€¢ {formatarData(evento.changedAt)} â€¢{' '}
                         Origem: {evento.source}
                       </p>
                     </div>
@@ -1062,3 +1451,5 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
 };
 
 export default ModalDetalhesOportunidade;
+
+

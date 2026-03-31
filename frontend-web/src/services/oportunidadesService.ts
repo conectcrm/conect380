@@ -259,6 +259,8 @@ class OportunidadesService {
     id: number,
     dados: {
       estagio: EstagioOportunidade;
+      forcarTransicao?: boolean;
+      justificativaForcamento?: string;
       motivoPerda?: string;
       motivoPerdaDetalhes?: string;
       concorrenteNome?: string;
@@ -284,6 +286,14 @@ class OportunidadesService {
       id: Number(item.id),
       tipo: item.tipo,
       descricao: item.descricao,
+      status: item.status || 'pending',
+      resultadoConclusao: item.resultadoConclusao ?? item.resultado_conclusao ?? null,
+      concluidoEm: item.concluidoEm
+        ? new Date(item.concluidoEm)
+        : item.concluido_em
+          ? new Date(item.concluido_em)
+          : null,
+      concluidoPorId: item.concluidoPorId ?? item.concluido_por ?? undefined,
       dataAtividade: item.dataAtividade ? new Date(item.dataAtividade) : new Date(),
       oportunidadeId: Number(item.oportunidadeId ?? item.oportunidade_id ?? oportunidadeId),
       responsavelId: item.responsavelId ?? item.responsavel_id ?? item.responsavel?.id,
@@ -302,6 +312,13 @@ class OportunidadesService {
             id: item.responsavel.id,
             nome: item.responsavel.nome,
             avatar: item.responsavel.avatar || item.responsavel.avatar_url,
+          }
+        : undefined,
+      concluidoPor: item.concluidoPor
+        ? {
+            id: item.concluidoPor.id,
+            nome: item.concluidoPor.nome,
+            avatar: item.concluidoPor.avatar || item.concluidoPor.avatar_url,
           }
         : undefined,
       createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
@@ -347,6 +364,15 @@ class OportunidadesService {
       id: Number(response.data?.id ?? 0),
       tipo: response.data?.tipo ?? atividade.tipo,
       descricao: response.data?.descricao ?? atividade.descricao,
+      status: response.data?.status || 'pending',
+      resultadoConclusao:
+        response.data?.resultadoConclusao ?? response.data?.resultado_conclusao ?? null,
+      concluidoEm: response.data?.concluidoEm
+        ? new Date(response.data.concluidoEm)
+        : response.data?.concluido_em
+          ? new Date(response.data.concluido_em)
+          : null,
+      concluidoPorId: response.data?.concluidoPorId ?? response.data?.concluido_por ?? undefined,
       dataAtividade: response.data?.dataAtividade
         ? new Date(response.data.dataAtividade)
         : atividade.dataAtividade || new Date(),
@@ -374,7 +400,67 @@ class OportunidadesService {
             avatar: response.data.responsavel.avatar || response.data.responsavel.avatar_url,
           }
         : undefined,
+      concluidoPor: response.data?.concluidoPor
+        ? {
+            id: response.data.concluidoPor.id,
+            nome: response.data.concluidoPor.nome,
+            avatar: response.data.concluidoPor.avatar || response.data.concluidoPor.avatar_url,
+          }
+        : undefined,
       createdAt: response.data?.createdAt ? new Date(response.data.createdAt) : new Date(),
+    };
+  }
+
+  async concluirAtividade(
+    oportunidadeId: number,
+    atividadeId: number,
+    dados: { resultadoConclusao: string },
+  ): Promise<Atividade> {
+    const response = await api.patch(
+      this.getUrl(`/${oportunidadeId}/atividades/${atividadeId}/concluir`),
+      dados,
+    );
+    const item = response.data || {};
+    return {
+      id: Number(item.id ?? atividadeId),
+      tipo: item.tipo,
+      descricao: item.descricao,
+      status: item.status || 'completed',
+      resultadoConclusao: item.resultadoConclusao ?? item.resultado_conclusao ?? null,
+      concluidoEm: item.concluidoEm
+        ? new Date(item.concluidoEm)
+        : item.concluido_em
+          ? new Date(item.concluido_em)
+          : null,
+      concluidoPorId: item.concluidoPorId ?? item.concluido_por ?? undefined,
+      dataAtividade: item.dataAtividade ? new Date(item.dataAtividade) : new Date(),
+      oportunidadeId: Number(item.oportunidadeId ?? item.oportunidade_id ?? oportunidadeId),
+      responsavelId: item.responsavelId ?? item.responsavel_id ?? item.responsavel?.id,
+      criadoPor: item.criadoPor
+        ? {
+            id: item.criadoPor.id,
+            nome: item.criadoPor.nome,
+            avatar: item.criadoPor.avatar || item.criadoPor.avatar_url,
+          }
+        : {
+            id: item.criado_por_id || '',
+            nome: 'Sistema',
+          },
+      responsavel: item.responsavel
+        ? {
+            id: item.responsavel.id,
+            nome: item.responsavel.nome,
+            avatar: item.responsavel.avatar || item.responsavel.avatar_url,
+          }
+        : undefined,
+      concluidoPor: item.concluidoPor
+        ? {
+            id: item.concluidoPor.id,
+            nome: item.concluidoPor.nome,
+            avatar: item.concluidoPor.avatar || item.concluidoPor.avatar_url,
+          }
+        : undefined,
+      createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
     };
   }
 

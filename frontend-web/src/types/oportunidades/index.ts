@@ -104,6 +104,10 @@ export interface Atividade {
   id: number;
   tipo: TipoAtividade;
   descricao: string;
+  status?: 'pending' | 'completed' | string;
+  resultadoConclusao?: string | null;
+  concluidoEm?: Date | string | null;
+  concluidoPorId?: string | null;
   dataAtividade: Date;
   oportunidadeId: number;
   responsavelId?: string;
@@ -113,6 +117,11 @@ export interface Atividade {
     avatar?: string;
   };
   responsavel?: {
+    id: string;
+    nome: string;
+    avatar?: string;
+  };
+  concluidoPor?: {
     id: string;
     nome: string;
     avatar?: string;

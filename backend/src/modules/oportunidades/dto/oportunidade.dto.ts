@@ -191,6 +191,15 @@ export class UpdateEstagioDto {
   estagio: EstagioOportunidade;
 
   @IsOptional()
+  @IsBoolean()
+  forcarTransicao?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  justificativaForcamento?: string;
+
+  @IsOptional()
   @IsDateString()
   dataFechamentoReal?: string;
 

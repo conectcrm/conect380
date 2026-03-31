@@ -1,8 +1,10 @@
 import { EstagioOportunidade, LifecycleStatusOportunidade } from './oportunidade.entity';
 import {
+  canBypassOportunidadeStageTransitionByRole,
   getDefaultOportunidadeProbabilityByStage,
   getAllowedNextOportunidadeLifecycleStatuses,
   getAllowedNextOportunidadeStages,
+  isOportunidadeForwardSkipTransition,
   isOportunidadeLifecycleTransitionAllowed,
   isOportunidadeStageTransitionAllowed,
   isOportunidadeTerminalStage,
@@ -104,6 +106,42 @@ describe('Oportunidades stage rules', () => {
     expect(isOportunidadeTerminalStage('won')).toBe(true);
     expect(isOportunidadeTerminalStage('perdido')).toBe(true);
     expect(isOportunidadeTerminalStage(EstagioOportunidade.PROPOSTA)).toBe(false);
+  });
+
+  it('identifica quando a transicao e um pulo forward no pipeline', () => {
+    expect(
+      isOportunidadeForwardSkipTransition(
+        EstagioOportunidade.LEADS,
+        EstagioOportunidade.NEGOCIACAO,
+      ),
+    ).toBe(true);
+    expect(
+      isOportunidadeForwardSkipTransition(
+        EstagioOportunidade.QUALIFICACAO,
+        EstagioOportunidade.PROPOSTA,
+      ),
+    ).toBe(false);
+    expect(
+      isOportunidadeForwardSkipTransition(
+        EstagioOportunidade.FECHAMENTO,
+        EstagioOportunidade.GANHO,
+      ),
+    ).toBe(false);
+    expect(
+      isOportunidadeForwardSkipTransition(
+        EstagioOportunidade.PROPOSTA,
+        EstagioOportunidade.QUALIFICACAO,
+      ),
+    ).toBe(false);
+  });
+
+  it('define papeis que podem bypass de transicao de etapa', () => {
+    expect(canBypassOportunidadeStageTransitionByRole('superadmin')).toBe(true);
+    expect(canBypassOportunidadeStageTransitionByRole('admin')).toBe(true);
+    expect(canBypassOportunidadeStageTransitionByRole('gerente')).toBe(true);
+    expect(canBypassOportunidadeStageTransitionByRole('manager')).toBe(true);
+    expect(canBypassOportunidadeStageTransitionByRole('vendedor')).toBe(false);
+    expect(canBypassOportunidadeStageTransitionByRole(undefined)).toBe(false);
   });
 
   it('retorna probabilidade padrao por estagio', () => {

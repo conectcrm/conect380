@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -14,7 +15,7 @@ import {
   OrigemOportunidade,
   LifecycleStatusOportunidade,
 } from './oportunidade.entity';
-import { Atividade, TipoAtividade } from './atividade.entity';
+import { Atividade, StatusAtividade, TipoAtividade } from './atividade.entity';
 import { OportunidadeStageEvent } from './oportunidade-stage-event.entity';
 import { DashboardV2JobsService } from '../dashboard-v2/dashboard-v2.jobs.service';
 import { Lead, OrigemLead, StatusLead } from '../leads/lead.entity';
@@ -31,7 +32,7 @@ import {
   UpdateOportunidadeDto,
   UpdateEstagioDto,
 } from './dto/oportunidade.dto';
-import { CreateAtividadeDto } from './dto/atividade.dto';
+import { ConcluirAtividadeDto, CreateAtividadeDto } from './dto/atividade.dto';
 import { FeatureFlagTenant } from '../dashboard-v2/entities/feature-flag-tenant.entity';
 import { User, UserRole } from '../users/user.entity';
 import { NotificationService } from '../../notifications/notification.service';
@@ -314,6 +315,21 @@ export const OPORTUNIDADE_STAGE_TRANSITIONS: Record<
   [EstagioOportunidade.PERDIDO]: [],
 };
 
+const OPORTUNIDADE_FORWARD_STAGE_ORDER: readonly EstagioOportunidade[] = [
+  EstagioOportunidade.LEADS,
+  EstagioOportunidade.QUALIFICACAO,
+  EstagioOportunidade.PROPOSTA,
+  EstagioOportunidade.NEGOCIACAO,
+  EstagioOportunidade.FECHAMENTO,
+];
+
+const OPORTUNIDADE_STAGE_SKIP_PRIVILEGED_ROLES = new Set<string>([
+  UserRole.SUPERADMIN,
+  UserRole.ADMIN,
+  UserRole.GERENTE,
+  'manager',
+]);
+
 export const OPORTUNIDADE_DEFAULT_PROBABILIDADE_BY_STAGE: Record<
   EstagioOportunidade,
   number
@@ -357,6 +373,31 @@ export function isOportunidadeStageTransitionAllowed(
   if (!current || !next) return false;
   if (current === next) return true;
   return getAllowedNextOportunidadeStages(current).includes(next);
+}
+
+export function isOportunidadeForwardSkipTransition(
+  currentStage?: EstagioOportunidade | string | null,
+  nextStage?: EstagioOportunidade | string | null,
+): boolean {
+  const current = normalizeStageRuleInput(currentStage);
+  const next = normalizeStageRuleInput(nextStage);
+  if (!current || !next) return false;
+  if (current === next) return false;
+
+  const currentIndex = OPORTUNIDADE_FORWARD_STAGE_ORDER.indexOf(current);
+  const nextIndex = OPORTUNIDADE_FORWARD_STAGE_ORDER.indexOf(next);
+
+  if (currentIndex === -1 || nextIndex === -1) {
+    return false;
+  }
+
+  return nextIndex - currentIndex > 1;
+}
+
+export function canBypassOportunidadeStageTransitionByRole(role?: UserRole | string | null): boolean {
+  const normalizedRole = (role || '').toString().trim().toLowerCase();
+  if (!normalizedRole) return false;
+  return OPORTUNIDADE_STAGE_SKIP_PRIVILEGED_ROLES.has(normalizedRole);
 }
 
 export function getAllowedNextOportunidadeLifecycleStatuses(
@@ -1484,6 +1525,22 @@ export class OportunidadesService {
       dateColumn: columns.has('data') ? 'data' : 'dataAtividade',
       createdAtColumn: columns.has('criado_em') ? 'criado_em' : 'createdAt',
       titleColumn: columns.has('titulo') ? 'titulo' : null,
+      statusColumn: columns.has('status') ? 'status' : null,
+      completionResultColumn: columns.has('resultado_conclusao')
+        ? 'resultado_conclusao'
+        : columns.has('resultadoConclusao')
+          ? 'resultadoConclusao'
+          : null,
+      completedByColumn: columns.has('concluido_por')
+        ? 'concluido_por'
+        : columns.has('concluidoPor')
+          ? 'concluidoPor'
+          : null,
+      completedAtColumn: columns.has('concluido_em')
+        ? 'concluido_em'
+        : columns.has('concluidoEm')
+          ? 'concluidoEm'
+          : null,
     };
   }
 
@@ -2578,6 +2635,7 @@ export class OportunidadesService {
     updateEstagioDto: UpdateEstagioDto,
     empresaId: string,
     actorUserId?: string,
+    actorRole?: UserRole | string | null,
   ): Promise<Oportunidade> {
     const schema = await this.resolveOportunidadesSchema();
     const lifecycleEnabled = await this.isLifecycleEnabledForTenant({ empresaId, schema });
@@ -2605,10 +2663,39 @@ export class OportunidadesService {
       return oportunidade;
     }
 
-    if (!isOportunidadeStageTransitionAllowed(currentStage, nextStage)) {
+    const transitionAllowed = isOportunidadeStageTransitionAllowed(currentStage, nextStage);
+    const forwardSkipRequested = isOportunidadeForwardSkipTransition(currentStage, nextStage);
+    const forcedTransitionRequested = Boolean(updateEstagioDto.forcarTransicao);
+    const justificativaForcamento = (updateEstagioDto.justificativaForcamento || '').trim();
+    const canBypassTransitionRule = canBypassOportunidadeStageTransitionByRole(actorRole);
+
+    if (!transitionAllowed) {
+      if (!(forwardSkipRequested && forcedTransitionRequested)) {
+        const allowed = getAllowedNextOportunidadeStages(currentStage);
+        throw new BadRequestException(
+          `Transicao de estagio invalida: ${currentStage} -> ${nextStage}. Permitidos: ${allowed.join(', ') || 'nenhum'}`,
+        );
+      }
+
+      if (!canBypassTransitionRule) {
+        throw new ForbiddenException(
+          'Somente gerente, admin ou superadmin podem pular etapas no pipeline.',
+        );
+      }
+
+      if (!justificativaForcamento) {
+        throw new BadRequestException(
+          'justificativaForcamento e obrigatoria para pular etapas no pipeline.',
+        );
+      }
+    }
+
+    const stageSkipBypassed = !transitionAllowed && forwardSkipRequested && forcedTransitionRequested;
+
+    if (updateEstagioDto.forcarTransicao && !stageSkipBypassed) {
       const allowed = getAllowedNextOportunidadeStages(currentStage);
       throw new BadRequestException(
-        `Transicao de estagio invalida: ${currentStage} -> ${nextStage}. Permitidos: ${allowed.join(', ') || 'nenhum'}`,
+        `forcarTransicao so pode ser usado em pulo de etapa forward. Permitidos no fluxo normal a partir de ${currentStage}: ${allowed.join(', ') || 'nenhum'}.`,
       );
     }
 
@@ -2683,11 +2770,15 @@ export class OportunidadesService {
       fromStage: oportunidade.estagio,
       toStage: updateEstagioDto.estagio,
       changedBy: actorUserId ?? oportunidade.responsavel_id,
-      source: 'update_estagio',
+      source: stageSkipBypassed ? 'update_estagio_forcado' : 'update_estagio',
     });
 
-    const descricao =
-      nextStage === EstagioOportunidade.GANHO
+    const descricao = stageSkipBypassed
+      ? [
+          `Movido para estagio: ${nextStage} (pulo de etapa autorizado)`,
+          `Justificativa: ${justificativaForcamento}`,
+        ].join('\n')
+      : nextStage === EstagioOportunidade.GANHO
         ? 'Oportunidade GANHA'
         : nextStage === EstagioOportunidade.PERDIDO
           ? `Oportunidade perdida${updateEstagioDto.motivoPerda ? ` (motivo: ${updateEstagioDto.motivoPerda})` : ''}`
@@ -4127,6 +4218,11 @@ export class OportunidadesService {
       createAtividadeDto.dataAtividade ? new Date(createAtividadeDto.dataAtividade) : new Date(),
     ];
 
+    if (atividadeSchema.statusColumn) {
+      columns.push(atividadeSchema.statusColumn);
+      values.push(StatusAtividade.PENDENTE);
+    }
+
     if (atividadeSchema.responsavelColumn) {
       columns.push(atividadeSchema.responsavelColumn);
       values.push(responsavelAtividadeId);
@@ -4150,9 +4246,29 @@ export class OportunidadesService {
           "oportunidade_id",
           ${this.quoteIdentifier(atividadeSchema.userColumn)} AS "criado_por_id",
           ${
+            atividadeSchema.statusColumn
+              ? `${this.quoteIdentifier(atividadeSchema.statusColumn)} AS "status",`
+              : `'${StatusAtividade.PENDENTE}'::varchar AS "status",`
+          }
+          ${
             atividadeSchema.responsavelColumn
               ? `${this.quoteIdentifier(atividadeSchema.responsavelColumn)} AS "responsavel_id",`
               : 'NULL::uuid AS "responsavel_id",'
+          }
+          ${
+            atividadeSchema.completionResultColumn
+              ? `${this.quoteIdentifier(atividadeSchema.completionResultColumn)} AS "resultado_conclusao",`
+              : 'NULL::text AS "resultado_conclusao",'
+          }
+          ${
+            atividadeSchema.completedByColumn
+              ? `${this.quoteIdentifier(atividadeSchema.completedByColumn)} AS "concluido_por",`
+              : 'NULL::uuid AS "concluido_por",'
+          }
+          ${
+            atividadeSchema.completedAtColumn
+              ? `${this.quoteIdentifier(atividadeSchema.completedAtColumn)} AS "concluido_em",`
+              : 'NULL::timestamptz AS "concluido_em",'
           }
           ${this.quoteIdentifier(atividadeSchema.dateColumn)} AS "dataAtividade",
           ${this.quoteIdentifier(atividadeSchema.createdAtColumn)} AS "createdAt"
@@ -4166,13 +4282,18 @@ export class OportunidadesService {
       empresa_id: atividade.empresa_id,
       tipo: atividade.tipo,
       descricao: atividade.descricao,
+      status: atividade.status || StatusAtividade.PENDENTE,
+      resultadoConclusao: atividade.resultado_conclusao ?? null,
       oportunidade_id: atividade.oportunidade_id,
       criado_por_id: atividade.criado_por_id,
       responsavel_id: atividade.responsavel_id,
+      concluido_por: atividade.concluido_por ?? null,
+      concluidoEm: atividade.concluido_em ?? null,
       dataAtividade: atividade.dataAtividade,
       createdAt: atividade.createdAt,
       criadoPor: undefined,
       responsavel: undefined,
+      concluidoPor: undefined,
     } as Atividade;
   }
 
@@ -4189,10 +4310,23 @@ export class OportunidadesService {
     const responsavelRef = atividadeSchema.responsavelColumn
       ? `atividade.${this.quoteIdentifier(atividadeSchema.responsavelColumn)}`
       : null;
+    const completedByRef = atividadeSchema.completedByColumn
+      ? `atividade.${this.quoteIdentifier(atividadeSchema.completedByColumn)}`
+      : null;
+    const statusRef = atividadeSchema.statusColumn
+      ? `atividade.${this.quoteIdentifier(atividadeSchema.statusColumn)}`
+      : `'${StatusAtividade.PENDENTE}'`;
+    const completionResultRef = atividadeSchema.completionResultColumn
+      ? `atividade.${this.quoteIdentifier(atividadeSchema.completionResultColumn)}`
+      : 'NULL::text';
+    const completedAtRef = atividadeSchema.completedAtColumn
+      ? `atividade.${this.quoteIdentifier(atividadeSchema.completedAtColumn)}`
+      : 'NULL::timestamptz';
     const dateRef = `atividade.${this.quoteIdentifier(atividadeSchema.dateColumn)}`;
     const createdRef = `atividade.${this.quoteIdentifier(atividadeSchema.createdAtColumn)}`;
     const usuarioAvatarExpr = usersColumns.has('avatar_url') ? 'usuario.avatar_url' : 'NULL';
     const responsavelAvatarExpr = usersColumns.has('avatar_url') ? 'responsavel.avatar_url' : 'NULL';
+    const concluidoPorAvatarExpr = usersColumns.has('avatar_url') ? 'concluido_por_user.avatar_url' : 'NULL';
 
     const queryBuilder = this.atividadeRepository
       .createQueryBuilder('atividade')
@@ -4201,6 +4335,9 @@ export class OportunidadesService {
       .addSelect('atividade.empresa_id', 'empresa_id')
       .addSelect('atividade.tipo', 'tipo')
       .addSelect('atividade.descricao', 'descricao')
+      .addSelect(statusRef, 'status')
+      .addSelect(completionResultRef, 'resultado_conclusao')
+      .addSelect(completedAtRef, 'concluido_em')
       .addSelect('atividade.oportunidade_id', 'oportunidade_id')
       .addSelect(userRef, 'criado_por_id')
       .addSelect(dateRef, 'dataAtividade')
@@ -4224,6 +4361,21 @@ export class OportunidadesService {
         .addSelect('NULL', 'responsavel__avatar_url');
     }
 
+    if (completedByRef) {
+      queryBuilder
+        .leftJoin('users', 'concluido_por_user', `concluido_por_user.id = ${completedByRef}`)
+        .addSelect(completedByRef, 'concluido_por')
+        .addSelect('concluido_por_user.id', 'concluido_por_user__id')
+        .addSelect('concluido_por_user.nome', 'concluido_por_user__nome')
+        .addSelect(concluidoPorAvatarExpr, 'concluido_por_user__avatar_url');
+    } else {
+      queryBuilder
+        .addSelect('NULL::uuid', 'concluido_por')
+        .addSelect('NULL::uuid', 'concluido_por_user__id')
+        .addSelect('NULL', 'concluido_por_user__nome')
+        .addSelect('NULL', 'concluido_por_user__avatar_url');
+    }
+
     const rows = await queryBuilder
       .where('atividade.oportunidade_id::text = :oportunidadeId', { oportunidadeId })
       .andWhere('atividade.empresa_id = :empresaId', { empresaId })
@@ -4235,9 +4387,13 @@ export class OportunidadesService {
       empresa_id: row.empresa_id,
       tipo: row.tipo,
       descricao: row.descricao,
+      status: row.status || StatusAtividade.PENDENTE,
+      resultadoConclusao: row.resultado_conclusao ?? null,
       oportunidade_id: row.oportunidade_id,
       criado_por_id: row.criado_por_id,
       responsavel_id: row.responsavel_id ?? null,
+      concluido_por: row.concluido_por ?? null,
+      concluidoEm: row.concluido_em ?? null,
       dataAtividade: row.dataAtividade,
       createdAt: row.createdAt,
       criadoPor: row.usuario__id
@@ -4254,7 +4410,125 @@ export class OportunidadesService {
             avatar_url: row.responsavel__avatar_url,
           }
         : undefined,
+      concluidoPor: row.concluido_por_user__id
+        ? {
+            id: row.concluido_por_user__id,
+            nome: row.concluido_por_user__nome,
+            avatar_url: row.concluido_por_user__avatar_url,
+          }
+        : undefined,
     })) as Atividade[];
+  }
+
+  async concluirAtividade(
+    oportunidadeId: string,
+    atividadeId: number,
+    payload: ConcluirAtividadeDto,
+    context: { empresaId: string; userId?: string; userRole?: UserRole | string | null },
+  ): Promise<Atividade> {
+    const atividadeSchema = await this.resolveAtividadesSchema();
+    const actorUserId = (context.userId || '').trim();
+    const resultadoConclusao = (payload.resultadoConclusao || '').trim();
+
+    if (!actorUserId) {
+      throw new ForbiddenException('Sessao invalida para concluir atividade.');
+    }
+
+    if (!resultadoConclusao) {
+      throw new BadRequestException('resultadoConclusao e obrigatorio para concluir a atividade.');
+    }
+
+    if (
+      !atividadeSchema.statusColumn ||
+      !atividadeSchema.completionResultColumn ||
+      !atividadeSchema.completedByColumn ||
+      !atividadeSchema.completedAtColumn
+    ) {
+      throw new BadRequestException(
+        'Conclusao de atividades indisponivel neste ambiente. Execute as migrations pendentes.',
+      );
+    }
+
+    await this.findOne(oportunidadeId, context.empresaId, {
+      include_deleted: true,
+    });
+
+    const atividadeRows = await this.atividadeRepository.query(
+      `
+        SELECT
+          atividade.id,
+          atividade.${this.quoteIdentifier(atividadeSchema.statusColumn)} AS status,
+          atividade.${this.quoteIdentifier(atividadeSchema.userColumn)} AS criado_por_id,
+          ${
+            atividadeSchema.responsavelColumn
+              ? `atividade.${this.quoteIdentifier(atividadeSchema.responsavelColumn)} AS responsavel_id`
+              : 'NULL::uuid AS responsavel_id'
+          }
+        FROM "atividades" atividade
+        WHERE atividade.id = $1
+          AND atividade.oportunidade_id::text = $2::text
+          AND atividade.empresa_id = $3
+        LIMIT 1
+      `,
+      [atividadeId, oportunidadeId, context.empresaId],
+    );
+
+    const atividade = atividadeRows?.[0];
+    if (!atividade) {
+      throw new NotFoundException('Atividade nao encontrada para esta oportunidade.');
+    }
+
+    const statusAtual = String(atividade.status || StatusAtividade.PENDENTE).toLowerCase();
+    if (statusAtual === StatusAtividade.CONCLUIDA) {
+      throw new BadRequestException('Atividade ja esta concluida.');
+    }
+
+    const canOverrideByRole = canBypassOportunidadeStageTransitionByRole(context.userRole);
+    const responsavelId = String(atividade.responsavel_id || '').trim();
+    const criadoPorId = String(atividade.criado_por_id || '').trim();
+
+    if (responsavelId) {
+      if (responsavelId !== actorUserId && !canOverrideByRole) {
+        throw new ForbiddenException(
+          'Somente o responsavel atribuido pode concluir esta atividade.',
+        );
+      }
+    } else if (criadoPorId && criadoPorId !== actorUserId && !canOverrideByRole) {
+      throw new ForbiddenException(
+        'Somente o criador da atividade ou gestor pode concluir esta atividade.',
+      );
+    }
+
+    await this.atividadeRepository.query(
+      `
+        UPDATE "atividades"
+        SET
+          ${this.quoteIdentifier(atividadeSchema.statusColumn)} = $1,
+          ${this.quoteIdentifier(atividadeSchema.completionResultColumn)} = $2,
+          ${this.quoteIdentifier(atividadeSchema.completedByColumn)} = $3,
+          ${this.quoteIdentifier(atividadeSchema.completedAtColumn)} = now()
+        WHERE id = $4
+          AND oportunidade_id::text = $5::text
+          AND empresa_id = $6
+      `,
+      [
+        StatusAtividade.CONCLUIDA,
+        resultadoConclusao,
+        actorUserId,
+        atividadeId,
+        oportunidadeId,
+        context.empresaId,
+      ],
+    );
+
+    const atividades = await this.listarAtividades(oportunidadeId, context.empresaId);
+    const atividadeAtualizada = atividades.find((item) => Number(item.id) === Number(atividadeId));
+
+    if (!atividadeAtualizada) {
+      throw new NotFoundException('Atividade concluida, mas nao foi possivel recarregar o item.');
+    }
+
+    return atividadeAtualizada;
   }
 
   async obterResumoAtividadesComerciais(

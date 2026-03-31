@@ -14,17 +14,24 @@ interface AgendamentoProximaAcao {
   tipoEvento: TipoAtividade;
   responsavelId: string;
   responsavelNome: string;
+  descricao: string;
 }
 
 interface ModalMudancaEstagioProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (motivo: string, comentario: string, agendamento?: AgendamentoProximaAcao) => void;
+  onConfirm: (
+    motivo: string,
+    comentario: string,
+    agendamento?: AgendamentoProximaAcao,
+    justificativaPulo?: string,
+  ) => void;
   estagioOrigem: string;
   estagioDestino: string;
   tituloOportunidade: string;
   responsaveis: ResponsavelOpcao[];
   responsavelPadraoId?: string;
+  isPuloEtapa?: boolean;
   loading?: boolean;
   errorMessage?: string | null;
 }
@@ -87,6 +94,7 @@ const ModalMudancaEstagio: React.FC<ModalMudancaEstagioProps> = ({
   tituloOportunidade,
   responsaveis,
   responsavelPadraoId,
+  isPuloEtapa = false,
   loading = false,
   errorMessage = null,
 }) => {
@@ -95,6 +103,8 @@ const ModalMudancaEstagio: React.FC<ModalMudancaEstagioProps> = ({
   const [proximaAcao, setProximaAcao] = useState('');
   const [tipoProximoEvento, setTipoProximoEvento] = useState('');
   const [responsavelProximaAcao, setResponsavelProximaAcao] = useState('');
+  const [descricaoProximaAcao, setDescricaoProximaAcao] = useState('');
+  const [justificativaPulo, setJustificativaPulo] = useState('');
   const [tentouConfirmar, setTentouConfirmar] = useState(false);
 
   const responsavelPadraoSelecionado = useMemo(() => {
@@ -114,16 +124,26 @@ const ModalMudancaEstagio: React.FC<ModalMudancaEstagioProps> = ({
 
   const mostrarOutroMotivo = motivo === 'outro';
   const comentarioLimpo = comentario.trim();
+  const descricaoProximaAcaoLimpa = descricaoProximaAcao.trim();
+  const justificativaPuloLimpa = justificativaPulo.trim();
   const precisaConfigurarProximaAcao = Boolean(proximaAcao);
+  const justificativaPuloInvalida = tentouConfirmar && isPuloEtapa && !justificativaPuloLimpa;
   const motivoInvalido = tentouConfirmar && !motivo;
   const comentarioObrigatorioInvalido = tentouConfirmar && mostrarOutroMotivo && !comentarioLimpo;
-  const tipoProximoEventoInvalido = tentouConfirmar && precisaConfigurarProximaAcao && !tipoProximoEvento;
+  const tipoProximoEventoInvalido =
+    tentouConfirmar && precisaConfigurarProximaAcao && !tipoProximoEvento;
   const responsavelProximaAcaoInvalido =
     tentouConfirmar && precisaConfigurarProximaAcao && !responsavelProximaAcao;
+  const descricaoProximaAcaoInvalida =
+    tentouConfirmar && precisaConfigurarProximaAcao && !descricaoProximaAcaoLimpa;
   const isFormValid =
     Boolean(motivo) &&
+    (!isPuloEtapa || Boolean(justificativaPuloLimpa)) &&
     (!mostrarOutroMotivo || Boolean(comentarioLimpo)) &&
-    (!precisaConfigurarProximaAcao || (Boolean(tipoProximoEvento) && Boolean(responsavelProximaAcao)));
+    (!precisaConfigurarProximaAcao ||
+      (Boolean(tipoProximoEvento) &&
+        Boolean(responsavelProximaAcao) &&
+        Boolean(descricaoProximaAcaoLimpa)));
 
   const handleClose = useCallback(() => {
     if (loading) return;
@@ -141,16 +161,17 @@ const ModalMudancaEstagio: React.FC<ModalMudancaEstagioProps> = ({
     const responsavelSelecionado = responsaveis.find((item) => item.id === responsavelProximaAcao);
 
     const agendamento: AgendamentoProximaAcao | undefined =
-      dataAgendada && tipoProximoEvento && responsavelSelecionado
+      dataAgendada && tipoProximoEvento && responsavelSelecionado && descricaoProximaAcaoLimpa
         ? {
             data: dataAgendada,
             tipoEvento: tipoProximoEvento as TipoAtividade,
             responsavelId: responsavelSelecionado.id,
             responsavelNome: responsavelSelecionado.nome,
+            descricao: descricaoProximaAcaoLimpa,
           }
         : undefined;
 
-    onConfirm(motivoFinal, comentarioFinal, agendamento);
+    onConfirm(motivoFinal, comentarioFinal, agendamento, justificativaPuloLimpa || undefined);
   };
 
   return (
@@ -179,6 +200,15 @@ const ModalMudancaEstagio: React.FC<ModalMudancaEstagioProps> = ({
               </span>
             </div>
           </div>
+
+          {isPuloEtapa && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <p className="text-xs text-amber-800">
+                <strong>Pulo de etapa:</strong> esta movimentacao ignora etapas intermediarias do
+                pipeline. Informe uma justificativa para auditoria.
+              </p>
+            </div>
+          )}
 
           <div>
             <label
@@ -249,6 +279,40 @@ const ModalMudancaEstagio: React.FC<ModalMudancaEstagioProps> = ({
               <p className="mt-1 text-xs text-red-600">Descreva o motivo para continuar.</p>
             )}
           </div>
+
+          {isPuloEtapa && (
+            <div>
+              <label
+                htmlFor="modal-mudanca-estagio-justificativa-pulo"
+                className="mb-2 block text-sm font-medium text-[#002333]"
+              >
+                Justificativa do pulo <span className="text-red-600">*</span>
+              </label>
+              <textarea
+                id="modal-mudanca-estagio-justificativa-pulo"
+                value={justificativaPulo}
+                onChange={(event) => setJustificativaPulo(event.target.value)}
+                placeholder="Explique por que essa oportunidade deve pular etapas do pipeline."
+                rows={3}
+                maxLength={500}
+                disabled={loading}
+                aria-invalid={justificativaPuloInvalida}
+                className={`w-full rounded-lg border bg-white px-4 py-2.5 text-sm resize-none disabled:cursor-not-allowed disabled:opacity-50 ${
+                  justificativaPuloInvalida
+                    ? 'border-red-300 focus:border-red-500 focus:ring-red-500/20'
+                    : 'border-[#B4BEC9] focus:border-transparent focus:ring-2 focus:ring-[#159A9C]'
+                }`}
+              />
+              <p className="mt-1 text-xs text-[#002333]/60">
+                Esse texto sera registrado no historico para rastreabilidade da decisao.
+              </p>
+              {justificativaPuloInvalida && (
+                <p className="mt-1 text-xs text-red-600">
+                  Informe a justificativa para confirmar o pulo de etapa.
+                </p>
+              )}
+            </div>
+          )}
 
           <div>
             <label
@@ -339,6 +403,38 @@ const ModalMudancaEstagio: React.FC<ModalMudancaEstagioProps> = ({
                 {responsavelProximaAcaoInvalido && (
                   <p className="mt-1 text-xs text-red-600">
                     Selecione quem vai executar a proxima acao.
+                  </p>
+                )}
+              </div>
+
+              <div className="md:col-span-2">
+                <label
+                  htmlFor="modal-mudanca-estagio-descricao-proxima-acao"
+                  className="mb-2 block text-sm font-medium text-[#002333]"
+                >
+                  Descricao da proxima acao <span className="text-red-600">*</span>
+                </label>
+                <textarea
+                  id="modal-mudanca-estagio-descricao-proxima-acao"
+                  value={descricaoProximaAcao}
+                  onChange={(event) => setDescricaoProximaAcao(event.target.value)}
+                  placeholder="Ex: Entrar em contato para validar proposta e confirmar decisores."
+                  rows={3}
+                  maxLength={280}
+                  disabled={loading}
+                  aria-invalid={descricaoProximaAcaoInvalida}
+                  className={`w-full rounded-lg border bg-white px-4 py-2.5 text-sm resize-none disabled:cursor-not-allowed disabled:opacity-50 ${
+                    descricaoProximaAcaoInvalida
+                      ? 'border-red-300 focus:border-red-500 focus:ring-red-500/20'
+                      : 'border-[#B4BEC9] focus:border-transparent focus:ring-2 focus:ring-[#159A9C]'
+                  }`}
+                />
+                <p className="mt-1 text-xs text-[#002333]/60">
+                  Esse texto sera mostrado como orientacao da tarefa para o responsavel designado.
+                </p>
+                {descricaoProximaAcaoInvalida && (
+                  <p className="mt-1 text-xs text-red-600">
+                    Descreva o que deve ser executado na proxima acao.
                   </p>
                 )}
               </div>

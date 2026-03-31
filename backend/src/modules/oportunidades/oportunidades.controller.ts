@@ -27,7 +27,7 @@ import {
   UpdateStalePolicyDto,
   UpdateSalesFeatureFlagsDto,
 } from './dto/oportunidade.dto';
-import { CreateAtividadeDto } from './dto/atividade.dto';
+import { ConcluirAtividadeDto, CreateAtividadeDto } from './dto/atividade.dto';
 import { TipoAtividade } from './atividade.entity';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
@@ -298,7 +298,13 @@ export class OportunidadesController {
     @EmpresaId() empresaId: string,
     @Request() req,
   ) {
-    return this.oportunidadesService.updateEstagio(id, updateEstagioDto, empresaId, req.user?.id);
+    return this.oportunidadesService.updateEstagio(
+      id,
+      updateEstagioDto,
+      empresaId,
+      req.user?.id,
+      req.user?.role,
+    );
   }
 
   @Delete(':id')
@@ -377,6 +383,27 @@ export class OportunidadesController {
     return this.oportunidadesService.createAtividade(createAtividadeDto, {
       userId: req.user?.id,
       empresaId,
+    });
+  }
+
+  @Patch(':id/atividades/:atividadeId/concluir')
+  @Permissions(Permission.CRM_OPORTUNIDADES_UPDATE)
+  concluirAtividade(
+    @Param('id') id: string,
+    @Param('atividadeId') atividadeId: string,
+    @Body() payload: ConcluirAtividadeDto,
+    @EmpresaId() empresaId: string,
+    @Request() req,
+  ) {
+    const atividadeIdNumber = Number(atividadeId);
+    if (!Number.isFinite(atividadeIdNumber) || atividadeIdNumber <= 0) {
+      throw new BadRequestException('atividadeId invalido');
+    }
+
+    return this.oportunidadesService.concluirAtividade(id, atividadeIdNumber, payload, {
+      empresaId,
+      userId: req.user?.id,
+      userRole: req.user?.role,
     });
   }
 
