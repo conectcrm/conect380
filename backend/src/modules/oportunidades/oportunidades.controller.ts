@@ -395,12 +395,12 @@ export class OportunidadesController {
     @EmpresaId() empresaId: string,
     @Request() req,
   ) {
-    const atividadeIdNumber = Number(atividadeId);
-    if (!Number.isFinite(atividadeIdNumber) || atividadeIdNumber <= 0) {
+    const atividadeIdNormalizado = atividadeId?.trim();
+    if (!atividadeIdNormalizado) {
       throw new BadRequestException('atividadeId invalido');
     }
 
-    return this.oportunidadesService.concluirAtividade(id, atividadeIdNumber, payload, {
+    return this.oportunidadesService.concluirAtividade(id, atividadeIdNormalizado, payload, {
       empresaId,
       userId: req.user?.id,
       userRole: req.user?.role,

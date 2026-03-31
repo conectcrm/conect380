@@ -573,6 +573,7 @@ export class OportunidadesService {
   private tableColumnsCache = new Map<string, Set<string>>();
   private tableColumnMetadataCache = new Map<string, Map<string, TableColumnMetadata>>();
   private enumValuesCache = new Map<string, Set<string>>();
+  private atividadesSchemaRefreshAttempted = false;
   private stageEventsTableAvailable?: boolean;
   private featureFlagsTableAvailable?: boolean;
   private itensPreliminaresTableAvailable?: boolean;
@@ -1420,8 +1421,13 @@ export class OportunidadesService {
     return parsed.toISOString();
   }
 
-  private async getTableColumns(tableName: string): Promise<Set<string>> {
-    if (this.tableColumnsCache.has(tableName)) {
+  private async getTableColumns(
+    tableName: string,
+    options?: { refresh?: boolean },
+  ): Promise<Set<string>> {
+    const shouldRefresh = options?.refresh === true;
+
+    if (!shouldRefresh && this.tableColumnsCache.has(tableName)) {
       return this.tableColumnsCache.get(tableName)!;
     }
 
@@ -1442,6 +1448,9 @@ export class OportunidadesService {
     );
 
     this.tableColumnsCache.set(tableName, columns);
+    if (shouldRefresh) {
+      this.tableColumnMetadataCache.delete(tableName);
+    }
     return columns;
   }
 
@@ -1616,7 +1625,14 @@ export class OportunidadesService {
   }
 
   private async resolveAtividadesSchema() {
-    const columns = await this.getTableColumns('atividades');
+    let columns = await this.getTableColumns('atividades');
+    const hasCompletionColumns =
+      columns.has('resultado_conclusao') || columns.has('resultadoConclusao');
+
+    if (!hasCompletionColumns && !this.atividadesSchemaRefreshAttempted) {
+      this.atividadesSchemaRefreshAttempted = true;
+      columns = await this.getTableColumns('atividades', { refresh: true });
+    }
 
     return {
       columns,
@@ -1626,6 +1642,7 @@ export class OportunidadesService {
       createdAtColumn: columns.has('criado_em') ? 'criado_em' : 'createdAt',
       titleColumn: columns.has('titulo') ? 'titulo' : null,
       statusColumn: columns.has('status') ? 'status' : null,
+      legacyCompletedColumn: columns.has('concluida') ? 'concluida' : null,
       completionResultColumn: columns.has('resultado_conclusao')
         ? 'resultado_conclusao'
         : columns.has('resultadoConclusao')
@@ -4422,12 +4439,21 @@ export class OportunidadesService {
     const completedByRef = atividadeSchema.completedByColumn
       ? `atividade.${this.quoteIdentifier(atividadeSchema.completedByColumn)}`
       : null;
+    const legacyCompletedRef = atividadeSchema.legacyCompletedColumn
+      ? `atividade.${this.quoteIdentifier(atividadeSchema.legacyCompletedColumn)}`
+      : null;
     const statusRef = atividadeSchema.statusColumn
       ? `atividade.${this.quoteIdentifier(atividadeSchema.statusColumn)}`
-      : `'${StatusAtividade.PENDENTE}'`;
+      : legacyCompletedRef
+        ? `CASE WHEN ${legacyCompletedRef} THEN '${StatusAtividade.CONCLUIDA}' ELSE '${StatusAtividade.PENDENTE}' END`
+        : `'${StatusAtividade.PENDENTE}'`;
     const completionResultRef = atividadeSchema.completionResultColumn
       ? `atividade.${this.quoteIdentifier(atividadeSchema.completionResultColumn)}`
-      : 'NULL::text';
+      : legacyCompletedRef
+        ? `CASE WHEN ${legacyCompletedRef} THEN 'Concluida sem observacoes.' ELSE NULL::text END`
+        : atividadeSchema.statusColumn
+          ? `CASE WHEN atividade.${this.quoteIdentifier(atividadeSchema.statusColumn)} = '${StatusAtividade.CONCLUIDA}' THEN 'Concluida sem observacoes.' ELSE NULL::text END`
+          : 'NULL::text';
     const completedAtRef = atividadeSchema.completedAtColumn
       ? `atividade.${this.quoteIdentifier(atividadeSchema.completedAtColumn)}`
       : 'NULL::timestamptz';
@@ -4531,7 +4557,7 @@ export class OportunidadesService {
 
   async concluirAtividade(
     oportunidadeId: string,
-    atividadeId: number,
+    atividadeId: string | number,
     payload: ConcluirAtividadeDto,
     context: { empresaId: string; userId?: string; userRole?: UserRole | string | null },
   ): Promise<Atividade> {
@@ -4544,12 +4570,7 @@ export class OportunidadesService {
       throw new ForbiddenException('Sessao invalida para concluir atividade.');
     }
 
-    if (
-      !atividadeSchema.statusColumn ||
-      !atividadeSchema.completionResultColumn ||
-      !atividadeSchema.completedByColumn ||
-      !atividadeSchema.completedAtColumn
-    ) {
+    if (!atividadeSchema.statusColumn && !atividadeSchema.legacyCompletedColumn) {
       throw new BadRequestException(
         'Conclusao de atividades indisponivel neste ambiente. Execute as migrations pendentes.',
       );
@@ -4559,11 +4580,19 @@ export class OportunidadesService {
       include_deleted: true,
     });
 
+    const atividadeIdText = String(atividadeId).trim();
+
+    const statusSelectRef = atividadeSchema.statusColumn
+      ? `atividade.${this.quoteIdentifier(atividadeSchema.statusColumn)}`
+      : atividadeSchema.legacyCompletedColumn
+        ? `CASE WHEN atividade.${this.quoteIdentifier(atividadeSchema.legacyCompletedColumn)} THEN '${StatusAtividade.CONCLUIDA}' ELSE '${StatusAtividade.PENDENTE}' END`
+        : `'${StatusAtividade.PENDENTE}'`;
+
     const atividadeRows = await this.atividadeRepository.query(
       `
         SELECT
           atividade.id,
-          atividade.${this.quoteIdentifier(atividadeSchema.statusColumn)} AS status,
+          ${statusSelectRef} AS status,
           atividade.${this.quoteIdentifier(atividadeSchema.userColumn)} AS criado_por_id,
           ${
             atividadeSchema.responsavelColumn
@@ -4571,12 +4600,12 @@ export class OportunidadesService {
               : 'NULL::uuid AS responsavel_id'
           }
         FROM "atividades" atividade
-        WHERE atividade.id = $1
+        WHERE atividade.id::text = $1::text
           AND atividade.oportunidade_id::text = $2::text
           AND atividade.empresa_id = $3
         LIMIT 1
       `,
-      [atividadeId, oportunidadeId, context.empresaId],
+      [atividadeIdText, oportunidadeId, context.empresaId],
     );
 
     const atividade = atividadeRows?.[0];
@@ -4605,33 +4634,67 @@ export class OportunidadesService {
       );
     }
 
+    const updateSetClauses: string[] = [];
+    const updateParams: unknown[] = [];
+
+    if (atividadeSchema.statusColumn) {
+      updateParams.push(StatusAtividade.CONCLUIDA);
+      updateSetClauses.push(
+        `${this.quoteIdentifier(atividadeSchema.statusColumn)} = $${updateParams.length}`,
+      );
+    }
+
+    if (atividadeSchema.legacyCompletedColumn) {
+      updateSetClauses.push(`${this.quoteIdentifier(atividadeSchema.legacyCompletedColumn)} = TRUE`);
+    }
+
+    if (atividadeSchema.completionResultColumn) {
+      updateParams.push(resultadoConclusao);
+      updateSetClauses.push(
+        `${this.quoteIdentifier(atividadeSchema.completionResultColumn)} = $${updateParams.length}`,
+      );
+    }
+
+    if (atividadeSchema.completedByColumn) {
+      updateParams.push(actorUserId);
+      updateSetClauses.push(
+        `${this.quoteIdentifier(atividadeSchema.completedByColumn)} = $${updateParams.length}`,
+      );
+    }
+
+    if (atividadeSchema.completedAtColumn) {
+      updateSetClauses.push(`${this.quoteIdentifier(atividadeSchema.completedAtColumn)} = now()`);
+    }
+
+    const idParamIndex = updateParams.push(atividadeIdText);
+    const oportunidadeParamIndex = updateParams.push(oportunidadeId);
+    const empresaParamIndex = updateParams.push(context.empresaId);
+
     await this.atividadeRepository.query(
       `
         UPDATE "atividades"
-        SET
-          ${this.quoteIdentifier(atividadeSchema.statusColumn)} = $1,
-          ${this.quoteIdentifier(atividadeSchema.completionResultColumn)} = $2,
-          ${this.quoteIdentifier(atividadeSchema.completedByColumn)} = $3,
-          ${this.quoteIdentifier(atividadeSchema.completedAtColumn)} = now()
-        WHERE id = $4
-          AND oportunidade_id::text = $5::text
-          AND empresa_id = $6
+        SET ${updateSetClauses.join(', ')}
+        WHERE id::text = $${idParamIndex}::text
+          AND oportunidade_id::text = $${oportunidadeParamIndex}::text
+          AND empresa_id = $${empresaParamIndex}
       `,
-      [
-        StatusAtividade.CONCLUIDA,
-        resultadoConclusao,
-        actorUserId,
-        atividadeId,
-        oportunidadeId,
-        context.empresaId,
-      ],
+      updateParams,
     );
 
     const atividades = await this.listarAtividades(oportunidadeId, context.empresaId);
-    const atividadeAtualizada = atividades.find((item) => Number(item.id) === Number(atividadeId));
+    const atividadeAtualizada = atividades.find(
+      (item) => String(item.id).trim() === atividadeIdText,
+    );
 
     if (!atividadeAtualizada) {
       throw new NotFoundException('Atividade concluida, mas nao foi possivel recarregar o item.');
+    }
+
+    if (!atividadeSchema.completionResultColumn) {
+      atividadeAtualizada.resultadoConclusao =
+        resultadoConclusaoInformado ||
+        atividadeAtualizada.resultadoConclusao ||
+        'Concluida sem observacoes.';
     }
 
     return atividadeAtualizada;
