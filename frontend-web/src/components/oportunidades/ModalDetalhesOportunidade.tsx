@@ -38,6 +38,7 @@ import { toastService } from '../../services/toastService';
 import { differenceInDays } from 'date-fns';
 import { BaseModal } from '../base/BaseModal';
 import { useAuth } from '../../contexts/AuthContext';
+import { useGlobalConfirmation } from '../../contexts/GlobalConfirmationContext';
 
 interface ModalDetalhesOportunidadeProps {
   oportunidade: Oportunidade | null;
@@ -85,6 +86,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
   onExcluirPermanente,
 }) => {
   const { user } = useAuth();
+  const { confirm } = useGlobalConfirmation();
   const [atividades, setAtividades] = useState<Atividade[]>([]);
   const [historicoEstagios, setHistoricoEstagios] = useState<OportunidadeHistoricoEstagioItem[]>(
     [],
@@ -96,9 +98,9 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
   const [novoTipoAtividade, setNovoTipoAtividade] = useState<TipoAtividade>(TipoAtividade.NOTA);
   const [novaDescricaoAtividade, setNovaDescricaoAtividade] = useState('');
   const [novaDataAtividade, setNovaDataAtividade] = useState('');
-  const [atividadeEmConclusaoId, setAtividadeEmConclusaoId] = useState<number | null>(null);
+  const [atividadeEmConclusaoId, setAtividadeEmConclusaoId] = useState<string | number | null>(null);
   const [resultadoConclusao, setResultadoConclusao] = useState('');
-  const [concluindoAtividadeId, setConcluindoAtividadeId] = useState<number | null>(null);
+  const [concluindoAtividadeId, setConcluindoAtividadeId] = useState<string | number | null>(null);
   const [atividadeFiltro, setAtividadeFiltro] = useState<AtividadeFiltro>('all');
   const [abaSelecionada, setAbaSelecionada] = useState<'detalhes' | 'atividades'>('detalhes');
   const [limiteHistoricoEstagios, setLimiteHistoricoEstagios] = useState(30);
@@ -207,18 +209,23 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
     }
   }, [initialTab, oportunidade?.id]);
 
-  const podeFecharModal = useCallback(() => {
+  const podeFecharModal = useCallback(async () => {
     if (abaSelecionada !== 'atividades' || salvandoAtividade || !hasDraftAtividade) {
       return true;
     }
 
-    return window.confirm(
-      'Existe uma atividade em rascunho. Deseja fechar e descartar esse rascunho?',
-    );
-  }, [abaSelecionada, hasDraftAtividade, salvandoAtividade]);
+    return confirm({
+      title: 'Descartar rascunho?',
+      message: 'Existe uma atividade em rascunho. Deseja fechar e descartar esse rascunho?',
+      confirmText: 'Descartar',
+      cancelText: 'Continuar editando',
+      icon: 'warning',
+      confirmButtonClass: 'bg-[#DC2626] hover:bg-[#B91C1C] focus:ring-[#DC2626]',
+    });
+  }, [abaSelecionada, confirm, hasDraftAtividade, salvandoAtividade]);
 
-  const handleClose = useCallback(() => {
-    if (!podeFecharModal()) return;
+  const handleClose = useCallback(async () => {
+    if (!(await podeFecharModal())) return;
     onClose();
   }, [onClose, podeFecharModal]);
 
@@ -346,10 +353,16 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
     return atividade.criadoPor?.id === user.id;
   };
 
-  const abrirConclusaoAtividade = (atividade: Atividade) => {
-    const concluirSemObservacao = window.confirm(
-      'Deseja concluir esta atividade sem observacao?\n\nClique em "OK" para concluir agora.\nClique em "Cancelar" para adicionar observacao antes de concluir.',
-    );
+  const abrirConclusaoAtividade = async (atividade: Atividade) => {
+    const concluirSemObservacao = await confirm({
+      title: 'Concluir atividade',
+      message:
+        'Deseja concluir esta atividade sem observacao? Clique em "Concluir agora" para finalizar imediatamente ou em "Adicionar observacao" para registrar detalhes antes de concluir.',
+      confirmText: 'Concluir agora',
+      cancelText: 'Adicionar observacao',
+      icon: 'info',
+      confirmButtonClass: 'bg-[#0F766E] hover:bg-[#0D5C56] focus:ring-[#0F766E]',
+    });
 
     if (concluirSemObservacao) {
       void concluirAtividade(atividade, '');
@@ -449,7 +462,15 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
     confirmacao: string,
   ) => {
     if (!callback) return;
-    if (!window.confirm(confirmacao)) return;
+    const confirmou = await confirm({
+      title: 'Confirmar acao',
+      message: confirmacao,
+      confirmText: 'Confirmar',
+      cancelText: 'Cancelar',
+      icon: 'warning',
+      confirmButtonClass: 'bg-[#0F766E] hover:bg-[#0D5C56] focus:ring-[#0F766E]',
+    });
+    if (!confirmou) return;
 
     try {
       setAcaoLifecycleLoading(acao);
@@ -1102,8 +1123,13 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {atividadesFiltradas.map((atividade, index) => (
-                    <div key={atividade.id} className="flex gap-4">
+                  {atividadesFiltradas.map((atividade, index) => {
+                    const resultadoConclusaoExibicao =
+                      atividade.resultadoConclusao?.trim() ||
+                      (isAtividadeConcluida(atividade) ? 'Concluida sem observacoes.' : '');
+
+                    return (
+                      <div key={atividade.id} className="flex gap-4">
                       <div className="flex flex-col items-center">
                         <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] flex items-center justify-center shadow-sm">
                           {getIconeAtividade(atividade.tipo)}
@@ -1153,13 +1179,13 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                             {atividade.descricao}
                           </p>
 
-                          {atividade.resultadoConclusao?.trim() && (
+                          {resultadoConclusaoExibicao && (
                             <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2">
                               <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
                                 Resultado da conclusao
                               </p>
                               <p className="mt-1 whitespace-pre-wrap text-sm text-[#002333]/85">
-                                {atividade.resultadoConclusao}
+                                {resultadoConclusaoExibicao}
                               </p>
                               {(atividade.concluidoPor?.nome || atividade.concluidoEm) && (
                                 <p className="mt-1 text-xs text-[#002333]/65">
@@ -1216,7 +1242,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                               ) : (
                                 <button
                                   type="button"
-                                  onClick={() => abrirConclusaoAtividade(atividade)}
+                                  onClick={() => void abrirConclusaoAtividade(atividade)}
                                   disabled={concluindoAtividadeId === atividade.id}
                                   className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
                                 >
@@ -1228,7 +1254,8 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

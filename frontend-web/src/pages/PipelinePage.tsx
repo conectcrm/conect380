@@ -314,7 +314,7 @@ interface EventoCalendarioPipeline {
   resource: Oportunidade;
   color: string;
   eventKind: 'oportunidade' | 'atividade';
-  atividadeId?: number;
+  atividadeId?: string | number;
   atividadeTipo?: TipoAtividade;
   atividadeDescricao?: string;
   atividadeResponsavelNome?: string;

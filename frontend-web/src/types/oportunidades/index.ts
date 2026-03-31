@@ -101,7 +101,7 @@ export interface Oportunidade {
 }
 
 export interface Atividade {
-  id: number;
+  id: string | number;
   tipo: TipoAtividade;
   descricao: string;
   status?: 'pending' | 'completed' | string;
@@ -109,7 +109,7 @@ export interface Atividade {
   concluidoEm?: Date | string | null;
   concluidoPorId?: string | null;
   dataAtividade: Date;
-  oportunidadeId: number;
+  oportunidadeId: string | number;
   responsavelId?: string;
   criadoPor: {
     id: string;

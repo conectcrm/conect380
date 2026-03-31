@@ -279,11 +279,11 @@ class OportunidadesService {
   }
 
   // Atividades
-  async listarAtividades(oportunidadeId: number): Promise<Atividade[]> {
+  async listarAtividades(oportunidadeId: number | string): Promise<Atividade[]> {
     const response = await api.get(this.getUrl(`/${oportunidadeId}/atividades`));
     const data = Array.isArray(response.data) ? response.data : [];
     return data.map((item: any) => ({
-      id: Number(item.id),
+      id: item.id ?? '',
       tipo: item.tipo,
       descricao: item.descricao,
       status: item.status || 'pending',
@@ -295,7 +295,7 @@ class OportunidadesService {
           : null,
       concluidoPorId: item.concluidoPorId ?? item.concluido_por ?? undefined,
       dataAtividade: item.dataAtividade ? new Date(item.dataAtividade) : new Date(),
-      oportunidadeId: Number(item.oportunidadeId ?? item.oportunidade_id ?? oportunidadeId),
+      oportunidadeId: item.oportunidadeId ?? item.oportunidade_id ?? oportunidadeId,
       responsavelId: item.responsavelId ?? item.responsavel_id ?? item.responsavel?.id,
       criadoPor: item.criadoPor
         ? {
@@ -361,7 +361,7 @@ class OportunidadesService {
       payload,
     );
     return {
-      id: Number(response.data?.id ?? 0),
+      id: response.data?.id ?? '',
       tipo: response.data?.tipo ?? atividade.tipo,
       descricao: response.data?.descricao ?? atividade.descricao,
       status: response.data?.status || 'pending',
@@ -376,9 +376,8 @@ class OportunidadesService {
       dataAtividade: response.data?.dataAtividade
         ? new Date(response.data.dataAtividade)
         : atividade.dataAtividade || new Date(),
-      oportunidadeId: Number(
+      oportunidadeId:
         response.data?.oportunidadeId ?? response.data?.oportunidade_id ?? atividade.oportunidadeId,
-      ),
       responsavelId:
         response.data?.responsavelId ??
         response.data?.responsavel_id ??
@@ -412,8 +411,8 @@ class OportunidadesService {
   }
 
   async concluirAtividade(
-    oportunidadeId: number,
-    atividadeId: number,
+    oportunidadeId: number | string,
+    atividadeId: number | string,
     dados?: { resultadoConclusao?: string },
   ): Promise<Atividade> {
     const resultadoConclusao = dados?.resultadoConclusao?.trim();
@@ -423,7 +422,7 @@ class OportunidadesService {
     );
     const item = response.data || {};
     return {
-      id: Number(item.id ?? atividadeId),
+      id: item.id ?? atividadeId,
       tipo: item.tipo,
       descricao: item.descricao,
       status: item.status || 'completed',
@@ -435,7 +434,7 @@ class OportunidadesService {
           : null,
       concluidoPorId: item.concluidoPorId ?? item.concluido_por ?? undefined,
       dataAtividade: item.dataAtividade ? new Date(item.dataAtividade) : new Date(),
-      oportunidadeId: Number(item.oportunidadeId ?? item.oportunidade_id ?? oportunidadeId),
+      oportunidadeId: item.oportunidadeId ?? item.oportunidade_id ?? oportunidadeId,
       responsavelId: item.responsavelId ?? item.responsavel_id ?? item.responsavel?.id,
       criadoPor: item.criadoPor
         ? {
@@ -465,7 +464,10 @@ class OportunidadesService {
     };
   }
 
-  async excluirAtividade(oportunidadeId: number, atividadeId: number): Promise<void> {
+  async excluirAtividade(
+    oportunidadeId: number | string,
+    atividadeId: number | string,
+  ): Promise<void> {
     await api.delete(this.getUrl(`/${oportunidadeId}/atividades/${atividadeId}`));
   }
 
