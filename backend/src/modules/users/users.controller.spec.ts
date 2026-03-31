@@ -140,7 +140,7 @@ describe('UsersController Security', () => {
     expect(result.data.request_payload.senha).toBe('[REDACTED]');
   });
 
-  it('impede admin de gerenciar outro admin da mesma empresa', async () => {
+  it('permite admin gerenciar outro admin da mesma empresa', async () => {
     const admin = {
       id: 'admin-1',
       role: UserRole.ADMIN,
@@ -153,9 +153,21 @@ describe('UsersController Security', () => {
       empresa_id: 'empresa-1',
     });
 
-    await expect(controller.atualizarUsuario(admin, 'admin-2', { nome: 'Alterado' })).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    usersServiceMock.atualizar.mockResolvedValue({
+      id: 'admin-2',
+      nome: 'Alterado',
+      email: 'admin2@empresa.com',
+      role: UserRole.ADMIN,
+      empresa_id: 'empresa-1',
+      permissoes: [],
+    });
+
+    await expect(
+      controller.atualizarUsuario(admin, 'admin-2', { nome: 'Alterado' }),
+    ).resolves.toMatchObject({
+      success: true,
+      message: expect.stringMatching(/atualizado com sucesso/i),
+    });
   });
 
   it('rejeita permissao invalida no create', async () => {

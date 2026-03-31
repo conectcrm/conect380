@@ -523,7 +523,13 @@ export class CoreAdminBffService {
     }
 
     if (actorRole === UserRole.ADMIN) {
-      return new Set([UserRole.GERENTE, UserRole.VENDEDOR, UserRole.SUPORTE, UserRole.FINANCEIRO]);
+      return new Set([
+        UserRole.ADMIN,
+        UserRole.GERENTE,
+        UserRole.VENDEDOR,
+        UserRole.SUPORTE,
+        UserRole.FINANCEIRO,
+      ]);
     }
 
     if (actorRole === UserRole.GERENTE) {
