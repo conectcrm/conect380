@@ -694,7 +694,13 @@ const GestaoUsuariosPage: React.FC = () => {
     }
 
     if (normalizedAuthRole === UserRole.ADMIN) {
-      return [UserRole.GERENTE, UserRole.FINANCEIRO, UserRole.VENDEDOR, UserRole.SUPORTE];
+      return [
+        UserRole.ADMIN,
+        UserRole.GERENTE,
+        UserRole.FINANCEIRO,
+        UserRole.VENDEDOR,
+        UserRole.SUPORTE,
+      ];
     }
 
     if (

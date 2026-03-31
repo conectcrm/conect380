@@ -157,6 +157,35 @@ export class UsersController {
     return new Set();
   }
 
+  private getAssignableRoles(actorRole: UserRole): Set<UserRole> {
+    if (actorRole === UserRole.SUPERADMIN) {
+      return new Set([
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+        UserRole.GERENTE,
+        UserRole.VENDEDOR,
+        UserRole.SUPORTE,
+        UserRole.FINANCEIRO,
+      ]);
+    }
+
+    if (actorRole === UserRole.ADMIN) {
+      return new Set([
+        UserRole.ADMIN,
+        UserRole.GERENTE,
+        UserRole.VENDEDOR,
+        UserRole.SUPORTE,
+        UserRole.FINANCEIRO,
+      ]);
+    }
+
+    if (actorRole === UserRole.GERENTE) {
+      return new Set([UserRole.VENDEDOR, UserRole.SUPORTE]);
+    }
+
+    return new Set();
+  }
+
   private resolveUsersReadScope(actor: User): UsersReadScope {
     const actorRole = this.normalizeRoleInput(actor.role);
     if (actorRole === UserRole.SUPERADMIN || actorRole === UserRole.ADMIN) {
@@ -230,7 +259,7 @@ export class UsersController {
       throw new BadRequestException('Perfil de usuario invalido');
     }
 
-    if (!normalizedRequestedRole || !this.getManageableRoles(actorRole).has(normalizedRequestedRole)) {
+    if (!normalizedRequestedRole || !this.getAssignableRoles(actorRole).has(normalizedRequestedRole)) {
       throw new ForbiddenException('Sem permissao para atribuir este perfil');
     }
   }
@@ -335,7 +364,7 @@ export class UsersController {
           if (
             actorRole === UserRole.ADMIN &&
             normalizedTargetRole &&
-            this.getManageableRoles(actorRole).has(normalizedTargetRole) &&
+            this.getAssignableRoles(actorRole).has(normalizedTargetRole) &&
             targetDefaultPermissions.has(permission)
           ) {
             return false;

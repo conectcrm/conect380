@@ -232,6 +232,43 @@ describe('UsersController Security', () => {
     );
   });
 
+  it('permite admin criar outro usuario com role admin', async () => {
+    const admin = {
+      id: 'admin-1',
+      role: UserRole.ADMIN,
+      empresa_id: 'empresa-1',
+    } as any;
+
+    usersServiceMock.criar.mockResolvedValue({
+      id: 'admin-2',
+      nome: 'Admin Secundario',
+      email: 'admin2@empresa.com',
+      role: UserRole.ADMIN,
+      empresa_id: 'empresa-1',
+      permissoes: [],
+    });
+
+    await controller.criarUsuario(admin, {
+      nome: 'Admin Secundario',
+      email: 'admin2@empresa.com',
+      senha: '123456',
+      role: UserRole.ADMIN,
+    });
+
+    expect(usersServiceMock.criar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: UserRole.ADMIN,
+        empresa_id: 'empresa-1',
+      }),
+      expect.objectContaining({
+        source: 'users.controller.criarUsuario',
+        actor: expect.objectContaining({
+          id: 'admin-1',
+        }),
+      }),
+    );
+  });
+
   it('impede admin de conceder permissao fora do template do perfil alvo', async () => {
     const admin = {
       id: 'admin-1',
