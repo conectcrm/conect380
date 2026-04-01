@@ -9,6 +9,8 @@ process.env.EMAIL_INTEGRADO_LOGS_IN_TEST ??= 'false';
 process.env.EMAIL_INTEGRADO_ERRORS_IN_TEST ??= 'false';
 process.env.NEST_LOGS_IN_TEST ??= 'false';
 process.env.E2E_BOOTSTRAP_LOCK_IN_TEST ??= 'false';
+// Mantem compatibilidade com schema legado/hibrido durante suites E2E de vendas.
+process.env.E2E_DB_COMPAT_LEGACY_SCHEMA ??= 'true';
 process.env.JWT_SECRET ??= 'test-jwt-secret';
 process.env.AUTH_ADMIN_MFA_REQUIRED ??= 'false';
 process.env.AUTH_LOGIN_LOCKOUT_ENABLED ??= 'false';
