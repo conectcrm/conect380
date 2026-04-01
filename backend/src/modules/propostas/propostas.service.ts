@@ -4991,6 +4991,9 @@ export class PropostasService {
     empresaId?: string,
   ): Promise<Proposta> {
     try {
+      const podePromoverParaVisualizada = (statusAtual: SalesFlowStatus): boolean =>
+        statusAtual === 'rascunho' || statusAtual === 'enviada' || statusAtual === 'visualizada';
+
       const propostaColumns = await this.getTableColumns('propostas');
       const legacySchema = this.isLegacyPropostasSchema(propostaColumns);
 
@@ -5000,16 +5003,53 @@ export class PropostasService {
           throw new Error(this.buildPropostaNotFoundMessage(propostaId));
         }
 
-        const propostaAtualizada = await this.atualizarStatus(
-          propostaId,
-          'visualizada',
-          'portal',
-          undefined,
-          undefined,
-          empresaId,
+        const statusAtual = this.normalizeStatusInput(proposta.status);
+        if (podePromoverParaVisualizada(statusAtual)) {
+          const propostaAtualizada = await this.atualizarStatus(
+            propostaId,
+            'visualizada',
+            'portal',
+            undefined,
+            undefined,
+            empresaId,
+          );
+          this.logger.log(`Proposta ${propostaId} marcada como visualizada (legacy mode)`);
+          return propostaAtualizada;
+        }
+
+        let emailDetailsLegacy = this.toObjectRecord(proposta.emailDetails);
+        emailDetailsLegacy = this.appendPortalEvento(
+          {
+            ...emailDetailsLegacy,
+            fluxoStatus: statusAtual,
+          },
+          'visualizacao_portal',
+          {
+            origem: 'portal',
+            status: statusAtual,
+            detalhes: 'Visualizacao no portal registrada sem alterar status atual da proposta.',
+            ip,
+            userAgent,
+          },
         );
-        this.logger.log(`Proposta ${propostaId} marcada como visualizada (legacy mode)`);
-        return propostaAtualizada;
+        await this.persistLegacyEmailDetails(
+          propostaId,
+          empresaId,
+          propostaColumns,
+          emailDetailsLegacy,
+        );
+
+        return {
+          ...proposta,
+          status: statusAtual,
+          emailDetails: emailDetailsLegacy as any,
+          portalAccess: {
+            accessedAt: new Date().toISOString(),
+            ip,
+            userAgent,
+          },
+          historicoEventos: this.getHistoricoEventos(emailDetailsLegacy),
+        };
       }
 
       const proposta = await this.propostaRepository.findOne({
@@ -5020,7 +5060,15 @@ export class PropostasService {
         throw new Error(this.buildPropostaNotFoundMessage(propostaId));
       }
 
-      proposta.status = this.mapFlowStatusToDatabaseStatus('visualizada', false) as any;
+      const statusAtual = this.extractFlowStatusFromEmailDetails(proposta.emailDetails) ||
+        this.mapDatabaseStatusToFlowStatus(proposta.status);
+      const statusVisualizacao = podePromoverParaVisualizada(statusAtual)
+        ? 'visualizada'
+        : statusAtual;
+
+      if (statusVisualizacao === 'visualizada') {
+        proposta.status = this.mapFlowStatusToDatabaseStatus('visualizada', false) as any;
+      }
       proposta.portalAccess = {
         accessedAt: new Date().toISOString(),
         ip,
@@ -5029,20 +5077,34 @@ export class PropostasService {
       proposta.emailDetails = this.appendPortalEvento(
         {
           ...(proposta.emailDetails || {}),
-          fluxoStatus: 'visualizada',
+          fluxoStatus: statusVisualizacao,
         },
         'visualizacao_portal',
         {
           origem: 'portal',
-          status: 'visualizada',
-          detalhes: 'Proposta visualizada no portal do cliente',
+          status: statusVisualizacao,
+          detalhes:
+            statusVisualizacao === 'visualizada'
+              ? 'Proposta visualizada no portal do cliente'
+              : 'Visualizacao no portal registrada sem alterar status atual da proposta.',
           ip,
           userAgent,
         },
       ) as any;
 
-      const propostaAtualizada = await this.savePropostaWithStatusFallback(proposta, 'visualizada');
-      this.logger.log(`Proposta ${propostaId} marcada como visualizada`);
+      const propostaAtualizada =
+        statusVisualizacao === 'visualizada'
+          ? await this.savePropostaWithStatusFallback(proposta, 'visualizada')
+          : await this.propostaRepository.save(proposta);
+
+      if (statusVisualizacao === 'visualizada') {
+        this.logger.log(`Proposta ${propostaId} marcada como visualizada`);
+      } else {
+        this.logger.log(
+          `Visualizacao de portal registrada para proposta ${propostaId} sem alterar status (${statusAtual})`,
+        );
+      }
+
       await this.syncOportunidadeFromPropostaPrincipal(propostaAtualizada.id, empresaId);
       const [propostaHidratada] = await this.hydratePropostasOpportunityContext(
         [this.entityToInterface(propostaAtualizada)],

@@ -543,6 +543,22 @@ describe('Portal Propostas Token - Core (E2E)', () => {
     expect(aprovarViaPortal.status).toBe(200);
     expect(aprovarViaPortal.body?.success).toBe(true);
 
+    // Reabrir o portal apos aprovacao nao pode regredir status para "visualizada".
+    const reabrirPortalAposAprovacao = await request(h.httpServer)
+      .get(`/api/portal/proposta/${tokenPortal}`)
+      .send();
+    expect(reabrirPortalAposAprovacao.status).toBe(200);
+    expect(reabrirPortalAposAprovacao.body?.success).toBe(true);
+    expect(String(reabrirPortalAposAprovacao.body?.proposta?.status || '')).toBe('aprovada');
+
+    const registrarViewAposAprovacao = await request(h.httpServer)
+      .put(`/api/portal/proposta/${tokenPortal}/view`)
+      .send({
+        timestamp: new Date().toISOString(),
+      });
+    expect(registrarViewAposAprovacao.status).toBe(200);
+    expect(registrarViewAposAprovacao.body?.success).toBe(true);
+
     const propostaFinal = await request(h.httpServer)
       .get(`/propostas/${propostaId}`)
       .set('Authorization', `Bearer ${h.tokenAdminEmpresaA}`)
