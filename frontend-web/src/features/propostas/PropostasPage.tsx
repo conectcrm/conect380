@@ -196,15 +196,20 @@ const converterPropostaParaUI = async (proposta: any) => {
   }
 
   // Correcao de datas: garantir que as datas sejam validas
-  const criadaEm = proposta.criadaEm ? new Date(proposta.criadaEm) : new Date();
+  const criadaEmFonte =
+    proposta?.criadaEm ||
+    proposta?.createdAt ||
+    proposta?.criado_em ||
+    proposta?.created_at ||
+    null;
+  const criadaEm = criadaEmFonte ? new Date(criadaEmFonte) : null;
   const dataValidade = proposta.dataValidade
     ? new Date(proposta.dataValidade)
     : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 dias por padrão
 
   // Validar se as datas são válidas
-  const dataCreated = !isNaN(criadaEm.getTime())
-    ? criadaEm.toISOString().split('T')[0]
-    : new Date().toISOString().split('T')[0];
+  const dataCreated =
+    criadaEm && !isNaN(criadaEm.getTime()) ? criadaEm.toISOString().split('T')[0] : '';
   const dataExpiry = !isNaN(dataValidade.getTime())
     ? dataValidade.toISOString().split('T')[0]
     : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -679,7 +684,12 @@ const PropostasPage: React.FC = () => {
                 status: proposta.status,
                 observacoes: proposta.observacoes,
                 motivoPerda: (proposta as any).motivoPerda || '',
-                criadaEm: (proposta as any).criadaEm || new Date().toISOString(),
+                criadaEm:
+                  (proposta as any).criadaEm ||
+                  (proposta as any).createdAt ||
+                  (proposta as any).criado_em ||
+                  (proposta as any).created_at ||
+                  '',
                 dataValidade:
                   (proposta as any).dataVencimento ||
                   new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
@@ -1090,6 +1100,9 @@ const PropostasPage: React.FC = () => {
     if (filtrosAvancados.dataInicio && filtrosAvancados.dataFim) {
       filtered = filtered.filter((p) => {
         const dataProposta = new Date(p.data_criacao);
+        if (Number.isNaN(dataProposta.getTime())) {
+          return false;
+        }
         const inicio = new Date(filtrosAvancados.dataInicio);
         const fim = new Date(filtrosAvancados.dataFim);
         return dataProposta >= inicio && dataProposta <= fim;
@@ -1132,7 +1145,13 @@ const PropostasPage: React.FC = () => {
 
       switch (sortBy) {
         case 'data_criacao':
-          comparison = new Date(a.data_criacao).getTime() - new Date(b.data_criacao).getTime();
+          comparison =
+            (Number.isFinite(new Date(a.data_criacao).getTime())
+              ? new Date(a.data_criacao).getTime()
+              : 0) -
+            (Number.isFinite(new Date(b.data_criacao).getTime())
+              ? new Date(b.data_criacao).getTime()
+              : 0);
           break;
         case 'valor':
           comparison = a.valor - b.valor;
