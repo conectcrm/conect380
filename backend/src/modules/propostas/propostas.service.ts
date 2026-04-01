@@ -145,6 +145,29 @@ const FLOW_STATUS_TRANSITIONS: Record<SalesFlowStatus, readonly SalesFlowStatus[
   expirada: ['enviada', 'negociacao'],
 };
 
+const SALES_MVP_BLOCKED_FLOW_STATUSES = new Set<SalesFlowStatus>([
+  'fatura_criada',
+  'aguardando_pagamento',
+  'pago',
+]);
+
+const parseBooleanEnv = (rawValue: string | undefined, fallback: boolean): boolean => {
+  if (!rawValue || typeof rawValue !== 'string') {
+    return fallback;
+  }
+
+  const normalized = rawValue.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on', 'sim'].includes(normalized)) {
+    return true;
+  }
+
+  if (['0', 'false', 'no', 'off', 'nao'].includes(normalized)) {
+    return false;
+  }
+
+  return fallback;
+};
+
 type ApprovalStatus = 'nao_requer' | 'pendente' | 'aprovada' | 'rejeitada';
 
 interface PropostaHistoricoEvento {
@@ -332,6 +355,10 @@ export class PropostasService {
   private readonly MAX_VERSOES = 50;
   private readonly NEGOCIACAO_FOLLOWUP_DIAS_PADRAO = 2;
   private readonly NEGOCIACAO_FOLLOWUP_DIAS_MAXIMO = 30;
+  private readonly salesMvpModeEnabled =
+    parseBooleanEnv(process.env.SALES_MVP_MODE, false) ||
+    parseBooleanEnv(process.env.MVP_MODE, false) ||
+    parseBooleanEnv(process.env.FINANCEIRO_MVP_MODE, false);
   private readonly COMMERCIAL_POLICY_CACHE_TTL_MS = Math.max(
     0,
     Number(process.env.PROPOSTAS_COMMERCIAL_POLICY_CACHE_TTL_MS || 0),
@@ -1622,7 +1649,11 @@ export class PropostasService {
   }
 
   private async getTableColumns(tableName: string): Promise<Set<string>> {
-    if (this.tableColumnsCache.has(tableName)) {
+    const forceRefreshForLegacyE2ECompat =
+      process.env.NODE_ENV === 'test' &&
+      process.env.E2E_DB_COMPAT_LEGACY_SCHEMA === 'true';
+
+    if (!forceRefreshForLegacyE2ECompat && this.tableColumnsCache.has(tableName)) {
       return this.tableColumnsCache.get(tableName)!;
     }
 
@@ -1846,7 +1877,25 @@ export class PropostasService {
       }
     }
 
-    return baseTransitions;
+    if (!this.salesMvpModeEnabled) {
+      return baseTransitions;
+    }
+
+    return baseTransitions.filter((status) => !SALES_MVP_BLOCKED_FLOW_STATUSES.has(status));
+  }
+
+  private assertStatusAllowedBySalesMvp(status: SalesFlowStatus): void {
+    if (!this.salesMvpModeEnabled) {
+      return;
+    }
+
+    if (!SALES_MVP_BLOCKED_FLOW_STATUSES.has(status)) {
+      return;
+    }
+
+    throw new BadRequestException(
+      `Status "${status}" fora do escopo do MVP comercial. O fluxo encerra em contrato_assinado.`,
+    );
   }
 
   private isStatusTransitionAllowed(
@@ -1991,6 +2040,45 @@ export class PropostasService {
       return {};
     }
     return { ...(value as Record<string, unknown>) };
+  }
+
+  private getLegacyEmailDetailsColumn(columns: Set<string>): string | null {
+    if (columns.has('emailDetails')) {
+      return 'emailDetails';
+    }
+    if (columns.has('email_details')) {
+      return 'email_details';
+    }
+    return null;
+  }
+
+  private async persistLegacyEmailDetails(
+    propostaId: string,
+    empresaId: string | undefined,
+    propostaColumns: Set<string>,
+    emailDetails: Record<string, unknown>,
+  ): Promise<void> {
+    const emailDetailsColumn = this.getLegacyEmailDetailsColumn(propostaColumns);
+    if (!emailDetailsColumn) {
+      return;
+    }
+
+    const params: unknown[] = [JSON.stringify(emailDetails), propostaId];
+    let whereClause = 'id = $2';
+
+    if (empresaId) {
+      params.push(empresaId);
+      whereClause += ' AND empresa_id = $3';
+    }
+
+    await this.propostaRepository.query(
+      `
+        UPDATE propostas
+        SET "${emailDetailsColumn}" = $1
+        WHERE ${whereClause}
+      `,
+      params,
+    );
   }
 
   private toJsonRecordOrUndefined(value: unknown): Record<string, unknown> | undefined {
@@ -4442,6 +4530,7 @@ export class PropostasService {
   ): Promise<Proposta> {
     try {
       const fluxoStatus = this.normalizeStatusInput(status);
+      this.assertStatusAllowedBySalesMvp(fluxoStatus);
       const motivoPerdaLimpo = this.sanitizeMotivoPerda(motivoPerda);
       const strictTransitionsEnabled = await this.isStrictPropostaTransitionsEnabled(empresaId);
       const commercialPolicy = await this.resolveCommercialPolicy(empresaId);
@@ -4522,6 +4611,55 @@ export class PropostasService {
           );
         }
 
+        let emailDetailsLegacy = this.toObjectRecord(propostaAtual.emailDetails);
+        emailDetailsLegacy.aprovacaoInterna = this.calcularAprovacaoInterna(
+          propostaAtual.descontoGlobal,
+          propostaAtual.produtos,
+          this.parseAprovacaoInterna(emailDetailsLegacy),
+          commercialPolicy,
+        );
+        const aprovacaoInternaLegacy = this.parseAprovacaoInterna(emailDetailsLegacy);
+
+        if (
+          fluxoStatus === 'aprovada' &&
+          aprovacaoInternaLegacy?.obrigatoria &&
+          aprovacaoInternaLegacy.status !== 'aprovada'
+        ) {
+          emailDetailsLegacy.fluxoStatus = propostaAtual.status;
+          emailDetailsLegacy.aprovacaoInterna = {
+            ...aprovacaoInternaLegacy,
+            status: 'pendente',
+            solicitadaEm: aprovacaoInternaLegacy.solicitadaEm || new Date().toISOString(),
+            observacoes:
+              aprovacaoInternaLegacy.observacoes ||
+              'Aguardando aprovacao interna por alcada para concluir a aprovacao comercial.',
+          } as PropostaAprovacaoInterna;
+          emailDetailsLegacy = this.appendHistoricoEvento(
+            emailDetailsLegacy,
+            'aprovacao_interna_pendente',
+            {
+              origem: source || 'api',
+              status: propostaAtual.status,
+              detalhes:
+                'Tentativa de aprovar proposta bloqueada por regra de alcada de desconto.',
+              metadata: {
+                limiteDesconto: aprovacaoInternaLegacy.limiteDesconto,
+                descontoDetectado: aprovacaoInternaLegacy.descontoDetectado,
+                ...(metadata || {}),
+              },
+            },
+          );
+          await this.persistLegacyEmailDetails(
+            propostaId,
+            empresaId,
+            propostaColumns,
+            emailDetailsLegacy,
+          );
+          throw new BadRequestException(
+            'Proposta exige aprovacao interna por alcada antes de ser marcada como aprovada.',
+          );
+        }
+
         const observacoesOverride =
           directDraftApprovalGoverned && canDirectDraftApprovalOverride
             ? `Override aprovado para rascunho -> aprovada por ${transitionContext?.actorUserId || 'usuario-sem-id'}. Motivo: ${directDraftApprovalOverrideReason}`
@@ -4555,25 +4693,63 @@ export class PropostasService {
           empresaId,
         );
 
-        if (directDraftApprovalGoverned && canDirectDraftApprovalOverride) {
-          const propostaPersistida = await this.propostaRepository.findOne({
-            where: empresaId ? { id: propostaId, empresaId } : { id: propostaId },
-          });
-          if (propostaPersistida) {
-            let emailDetailsLegacy = this.toObjectRecord(propostaPersistida.emailDetails);
-            emailDetailsLegacy = this.appendHistoricoEvento(
-              emailDetailsLegacy,
-              'override_aprovacao_rascunho',
-              {
-                origem: source || 'api',
-                status: fluxoStatus,
-                detalhes: 'Override aplicado para permitir aprovacao direta de rascunho.',
-                metadata: metadataComOverride || undefined,
-              },
-            );
-            propostaPersistida.emailDetails = emailDetailsLegacy as any;
-            await this.propostaRepository.save(propostaPersistida);
+        emailDetailsLegacy = this.toObjectRecord(
+          propostaAtualizada.emailDetails || emailDetailsLegacy,
+        );
+        emailDetailsLegacy.fluxoStatus = fluxoStatus;
+        if (motivoPerda !== undefined) {
+          if (motivoPerdaLimpo) {
+            emailDetailsLegacy.motivoPerda = motivoPerdaLimpo;
+          } else {
+            delete emailDetailsLegacy.motivoPerda;
           }
+        } else if (fluxoStatus !== 'rejeitada') {
+          delete emailDetailsLegacy.motivoPerda;
+        }
+        emailDetailsLegacy.aprovacaoInterna = this.calcularAprovacaoInterna(
+          propostaAtualizada.descontoGlobal,
+          propostaAtualizada.produtos,
+          this.parseAprovacaoInterna(emailDetailsLegacy),
+          commercialPolicy,
+        );
+        emailDetailsLegacy = this.appendHistoricoEvento(emailDetailsLegacy, 'status_alterado', {
+          origem: source || 'api',
+          status: fluxoStatus,
+          detalhes: observacoes || '',
+          metadata: metadata || undefined,
+        });
+        await this.persistLegacyEmailDetails(
+          propostaId,
+          empresaId,
+          propostaColumns,
+          emailDetailsLegacy,
+        );
+        propostaAtualizada.status = fluxoStatus;
+        propostaAtualizada.emailDetails = emailDetailsLegacy as any;
+        propostaAtualizada.historicoEventos = this.getHistoricoEventos(emailDetailsLegacy);
+
+        if (directDraftApprovalGoverned && canDirectDraftApprovalOverride) {
+          emailDetailsLegacy = this.toObjectRecord(
+            propostaAtualizada.emailDetails || propostaAtual.emailDetails,
+          );
+          emailDetailsLegacy = this.appendHistoricoEvento(
+            emailDetailsLegacy,
+            'override_aprovacao_rascunho',
+            {
+              origem: source || 'api',
+              status: fluxoStatus,
+              detalhes: 'Override aplicado para permitir aprovacao direta de rascunho.',
+              metadata: metadataComOverride || undefined,
+            },
+          );
+          await this.persistLegacyEmailDetails(
+            propostaId,
+            empresaId,
+            propostaColumns,
+            emailDetailsLegacy,
+          );
+          propostaAtualizada.emailDetails = emailDetailsLegacy as any;
+          propostaAtualizada.historicoEventos = this.getHistoricoEventos(emailDetailsLegacy);
         }
         this.logger.log(
           `Status da proposta ${propostaId} atualizado para: ${fluxoStatus} (legacy mode)`,

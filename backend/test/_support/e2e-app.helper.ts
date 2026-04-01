@@ -354,6 +354,16 @@ async function ensureE2EDatabaseCompatibility(app: INestApplication): Promise<vo
       ADD COLUMN IF NOT EXISTS "oportunidade_id" UUID
     `), queryTimeoutMs, 'ensureE2EDatabaseCompatibility.alter-propostas-oportunidade-id');
 
+    await withBestEffortTimeout(queryRunner.query(`
+      ALTER TABLE "propostas"
+      ADD COLUMN IF NOT EXISTS "descontoGlobal" numeric(10,2) NOT NULL DEFAULT 0
+    `), queryTimeoutMs, 'ensureE2EDatabaseCompatibility.alter-propostas-desconto-global');
+
+    await withBestEffortTimeout(queryRunner.query(`
+      ALTER TABLE "propostas"
+      ADD COLUMN IF NOT EXISTS "emailDetails" jsonb
+    `), queryTimeoutMs, 'ensureE2EDatabaseCompatibility.alter-propostas-email-details');
+
     // Compatibilidade da Fase 2 do pipeline: itens preliminares da oportunidade.
     await withBestEffortTimeout(queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "oportunidade_itens_preliminares" (
