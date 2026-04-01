@@ -947,8 +947,8 @@ export const menuConfig: MenuConfig[] = [
     children: [
       {
         id: 'comercial-cotacoes',
-        title: 'Cotacoes de Compras',
-        shortTitle: 'Cotacoes',
+        title: 'Cotações de Compras',
+        shortTitle: 'Cotações',
         icon: Calculator,
         href: '/compras/cotacoes',
         color: 'orange',
@@ -958,8 +958,8 @@ export const menuConfig: MenuConfig[] = [
       },
       {
         id: 'comercial-aprovacoes',
-        title: 'Aprovacoes de Compras',
-        shortTitle: 'Aprovacoes',
+        title: 'Aprovações de Compras',
+        shortTitle: 'Aprovações',
         icon: CheckCircle,
         href: '/compras/aprovacoes',
         color: 'orange',
@@ -1041,8 +1041,8 @@ export const menuConfig: MenuConfig[] = [
       },
       {
         id: 'financeiro-aprovacoes',
-        title: 'Aprovacoes Financeiras',
-        shortTitle: 'Aprovacoes',
+        title: 'Aprovações Financeiras',
+        shortTitle: 'Aprovações',
         icon: ListChecks,
         href: '/financeiro/aprovacoes',
         color: 'orange',
