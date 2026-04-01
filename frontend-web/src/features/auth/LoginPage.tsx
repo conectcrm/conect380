@@ -5,7 +5,6 @@ import { Eye, EyeOff, Loader2, Mail, Lock, ArrowRight, Check, CheckCircle2 } fro
 import Conect360Logo from '../../components/ui/Conect360Logo';
 import { toastService } from '../../services/toastService';
 import { MfaRequiredActionData } from '../../types';
-import { hasKnownLoginForEmail, markKnownLoginForEmail } from './loginGreetingHistory';
 
 const IS_DEV_ENV = process.env.NODE_ENV !== 'production';
 
@@ -24,6 +23,26 @@ const formatCountdown = (seconds: number) => {
   return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
 };
 
+const LOGIN_HERO_FEATURES = [
+  'Atendimento omnichannel com histórico único por cliente',
+  'CRM completo com funil, propostas e contratos',
+  'Financeiro integrado com cobrança e recorrência',
+  'Automações com IA para triagem e produtividade',
+  'Dashboards em tempo real para decisões rápidas',
+];
+
+const LOGIN_HERO_MODULES = [
+  { title: 'Omnichannel', subtitle: 'WhatsApp, e-mail e chat' },
+  { title: 'CRM', subtitle: 'Pipeline e conversões' },
+  { title: 'Financeiro', subtitle: 'Receitas e cobranças' },
+];
+
+const LOGIN_TRIAL_BADGES = [
+  'Teste grátis por 30 dias',
+  'Sem cartão de crédito',
+  'Ativação em poucos minutos',
+];
+
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -39,7 +58,6 @@ const LoginPage: React.FC = () => {
   const [mfaIsResending, setMfaIsResending] = useState(false);
   const [mfaExpiresInSeconds, setMfaExpiresInSeconds] = useState(0);
   const [mfaResendInSeconds, setMfaResendInSeconds] = useState(0);
-  const [isKnownReturningUser, setIsKnownReturningUser] = useState(false);
 
   const { login, verifyMfa, resendMfa } = useAuth();
   const location = useLocation();
@@ -98,10 +116,6 @@ const LoginPage: React.FC = () => {
     return () => window.clearInterval(timerId);
   }, [mfaState]);
 
-  useEffect(() => {
-    setIsKnownReturningUser(hasKnownLoginForEmail(email));
-  }, [email]);
-
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
 
@@ -143,8 +157,6 @@ const LoginPage: React.FC = () => {
 
     try {
       await login(email, password);
-      markKnownLoginForEmail(email);
-      setIsKnownReturningUser(true);
       toastService.success('Login realizado com sucesso!');
     } catch (error: unknown) {
       const errorMessage =
@@ -218,7 +230,7 @@ const LoginPage: React.FC = () => {
         });
         toastService.info(
           deliveryChannel === 'dev_fallback' && devCode && IS_DEV_ENV
-            ? 'MFA em modo desenvolvimento: use o codigo exibido na tela.'
+            ? 'MFA em modo desenvolvimento: use o código exibido na tela.'
             : 'Código MFA enviado para o e-mail corporativo.',
         );
         return;
@@ -258,8 +270,6 @@ const LoginPage: React.FC = () => {
 
     try {
       await verifyMfa(mfaState.challengeId, mfaCode.trim());
-      markKnownLoginForEmail(email);
-      setIsKnownReturningUser(true);
       toastService.success('Verificação concluída com sucesso!');
     } catch (error) {
       const message =
@@ -292,7 +302,7 @@ const LoginPage: React.FC = () => {
       applyMfaState(data);
       toastService.success(
         data.deliveryChannel === 'dev_fallback' && data.devCode && IS_DEV_ENV
-          ? 'MFA em modo desenvolvimento: use o codigo exibido na tela.'
+          ? 'MFA em modo desenvolvimento: use o código exibido na tela.'
           : 'Novo código MFA enviado com sucesso.',
       );
     } catch (error) {
@@ -309,10 +319,8 @@ const LoginPage: React.FC = () => {
     setMfaError(null);
   };
 
-  const loginTitle = isKnownReturningUser ? 'Bem-vindo de volta!' : 'Bem-vindo!';
-  const loginSubtitle = isKnownReturningUser
-    ? 'Faça login para acessar sua conta'
-    : 'Primeiro acesso? Use sua senha temporaria para continuar.';
+  const loginTitle = 'Bem-vindo';
+  const loginSubtitle = 'Faça login para acessar sua conta.';
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -330,23 +338,17 @@ const LoginPage: React.FC = () => {
             </div>
 
             <h2 className="text-fluid-3xl font-bold mb-4">
-              Unifique atendimento,
+              Centralize atendimento,
               <br />
-              <span className="text-[#DEEFE7]">vendas e financeiro</span>
+              <span className="text-[#DEEFE7]">comercial e financeiro</span>
             </h2>
             <p className="text-fluid-lg text-[#DEEFE7] mb-10">
-              Omnichannel, CRM, Financeiro e Automação com IA no mesmo sistema.
+              A Conect360 conecta equipes, processos e indicadores em uma única plataforma.
             </p>
           </div>
 
           <div className="space-y-4">
-            {[
-              'Atendimento omnichannel (WhatsApp, e-mail, chat e telefone)',
-              'CRM e Vendas (leads, oportunidades, propostas e contratos)',
-              'Financeiro integrado (faturas, pagamentos e recorrência)',
-              'Automação com IA (triagem, bot e insights)',
-              'Analytics e dashboards com métricas em tempo real',
-            ].map((feature, index) => (
+            {LOGIN_HERO_FEATURES.map((feature, index) => (
               <div key={index} className="flex items-start gap-3">
                 <div className="mt-0.5 w-5 h-5 bg-white/15 rounded-full flex items-center justify-center flex-shrink-0">
                   <Check className="w-3 h-3 text-white" />
@@ -357,11 +359,7 @@ const LoginPage: React.FC = () => {
           </div>
 
           <div className="mt-12 grid grid-cols-3 gap-3">
-            {[
-              { title: 'Omnichannel', subtitle: 'Inbox unificada' },
-              { title: 'IA', subtitle: 'Triagem e automações' },
-              { title: 'Multi-tenant', subtitle: 'Dados isolados' },
-            ].map((item) => (
+            {LOGIN_HERO_MODULES.map((item) => (
               <div
                 key={item.title}
                 className="rounded-xl border border-white/15 bg-white/10 px-4 py-3"
@@ -388,7 +386,7 @@ const LoginPage: React.FC = () => {
             </h1>
             <p className="text-[#B4BEC9]">
               {mfaState
-                ? 'Informe o código enviado para concluir seu acesso administrativo.'
+                ? 'Informe o código enviado para concluir seu acesso com segurança.'
                 : loginSubtitle}
             </p>
 
@@ -584,7 +582,7 @@ const LoginPage: React.FC = () => {
                     </div>
                     <div className="relative flex justify-center text-sm">
                       <span className="px-4 bg-white text-[#B4BEC9] font-medium">
-                        Novo no Conect360?
+                        Ainda não tem conta?
                       </span>
                     </div>
                   </div>
@@ -596,22 +594,16 @@ const LoginPage: React.FC = () => {
                     onClick={() => navigate('/registro')}
                     className="w-full bg-white border border-[#159A9C] text-[#159A9C] px-4 py-2 rounded-lg hover:bg-[#159A9C]/10 transition-colors flex items-center justify-center space-x-2 text-sm font-medium"
                   >
-                    <span>Criar Conta Empresarial</span>
+                    <span>Criar conta empresarial</span>
                   </button>
 
                   <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-[#B4BEC9]">
-                    <div className="flex items-center space-x-1">
-                      <Check className="w-3 h-3 text-green-500" />
-                      <span>30 dias grátis</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <Check className="w-3 h-3 text-green-500" />
-                      <span>Sem cartão</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <Check className="w-3 h-3 text-green-500" />
-                      <span>Setup em 5 min</span>
-                    </div>
+                    {LOGIN_TRIAL_BADGES.map((badge) => (
+                      <div key={badge} className="flex items-center space-x-1">
+                        <Check className="w-3 h-3 text-green-500" />
+                        <span>{badge}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </>
