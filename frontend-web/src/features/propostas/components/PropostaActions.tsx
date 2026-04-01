@@ -39,6 +39,7 @@ import { authService } from '../../../services/authService';
 import { empresaConfigService } from '../../../services/empresaConfigService';
 import { minhasEmpresasService } from '../../../services/minhasEmpresasService';
 import { useNavigate } from 'react-router-dom';
+import { isMvpModeEnabled } from '../../../config/mvpScope';
 import ModalEnviarWhatsApp from '../../../components/whatsapp/ModalEnviarWhatsApp';
 import { triggerSalesCelebration } from '../../../components/feedback/SalesCelebrationHost';
 import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
@@ -73,7 +74,7 @@ const CLIENTE_DETAILS_COOLDOWN_TTL = 30 * 1000; // Evita loop de erros
 const CLIENTE_DETAILS_MIN_INTERVAL_MS = 300; // Debounce/throttle curto entre buscas
 const EMPRESA_DETAILS_TTL = 5 * 60 * 1000; // 5 minutos
 const AUTOMACAO_FLUXO_MENSAGEM =
-  'Automacao de contrato/fatura ainda indisponivel nesta versao. Use os modulos de Contratos e Faturamento.';
+  'No MVP atual, o fluxo comercial encerra em contrato assinado. Faturamento e cobranca seguem pos-MVP.';
 const OBSERVACOES_OPERACIONAIS_REGEX = [
   /^proposta enviada por e-?mail/i,
   /^proposta enviada via e-?mail/i,
@@ -438,6 +439,8 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 }) => {
   const navigate = useNavigate();
   const { confirm } = useGlobalConfirmation();
+  const mvpModeAtivo = isMvpModeEnabled();
+  const faturamentoDisponivelNoContexto = !mvpModeAtivo;
   const [sendingEmail, setSendingEmail] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [clienteData, setClienteData] = useState<{
@@ -749,9 +752,9 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const ehPropostaPrincipal = Boolean((proposta as any)?.isPropostaPrincipal);
   const podeDefinirComoPrincipal = Boolean(oportunidadeVinculada?.id) && !ehPropostaPrincipal;
   const editavelNoFluxo = ['rascunho', 'negociacao'].includes(statusFluxoAtual);
-  const statusEncerradoSemAcoesComerciais = ['rejeitada', 'expirada', 'pago'].includes(
-    statusFluxoAtual,
-  );
+  const statusEncerradoSemAcoesComerciais =
+    ['rejeitada', 'expirada', 'pago'].includes(statusFluxoAtual) ||
+    (mvpModeAtivo && statusFluxoAtual === 'contrato_assinado');
   const extrairHistoricoPayload = (response: any) => {
     if (!response || typeof response !== 'object') {
       return null;
@@ -1600,6 +1603,11 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   };
 
   const abrirFaturamento = (faturaId?: string | number) => {
+    if (!faturamentoDisponivelNoContexto) {
+      toastService.info(AUTOMACAO_FLUXO_MENSAGEM);
+      return;
+    }
+
     if (faturaId !== undefined && faturaId !== null && String(faturaId).trim() !== '') {
       navigate(`/financeiro/faturamento?faturaId=${String(faturaId)}`);
       return;
@@ -1965,6 +1973,11 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   };
 
   const abrirFaturamentoParaPagamento = async () => {
+    if (!faturamentoDisponivelNoContexto) {
+      toastService.info(AUTOMACAO_FLUXO_MENSAGEM);
+      return;
+    }
+
     const faturaId = await localizarFaturaRelacionada();
     if (faturaId) {
       abrirFaturamento(faturaId);
@@ -1979,6 +1992,11 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
   // Criar fatura automatica
   const handleCriarFatura = async (options?: { ignoreStatusGate?: boolean }) => {
+    if (!faturamentoDisponivelNoContexto) {
+      toastService.info(AUTOMACAO_FLUXO_MENSAGEM);
+      return;
+    }
+
     if (!options?.ignoreStatusGate && !podeCriarFatura()) {
       toastService.error('Apenas propostas com contrato assinado podem gerar faturas');
       return;
@@ -2100,6 +2118,11 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         }
 
         case 'aprovada': {
+          if (!faturamentoDisponivelNoContexto) {
+            await handleGerarContrato();
+            break;
+          }
+
           const desejaGerarContrato = await confirm({
             title: 'Gerar contrato para esta venda?',
             message:
@@ -2165,16 +2188,31 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
             source: 'assinatura-externa-confirmada',
             observacoes: `Contrato ${contrato.numero || contrato.id} confirmado como assinado externamente.`,
           });
+          if (!faturamentoDisponivelNoContexto) {
+            toastService.success('Assinatura externa confirmada. Fluxo MVP concluido no contrato.');
+            abrirContrato(contrato.id);
+            onPropostaUpdated?.();
+            break;
+          }
+
           toastService.success('Assinatura externa confirmada. Prosseguindo para faturamento.');
           await handleCriarFatura({ ignoreStatusGate: true });
           break;
         }
 
         case 'contrato_assinado':
+          if (!faturamentoDisponivelNoContexto) {
+            toastService.info(AUTOMACAO_FLUXO_MENSAGEM);
+            break;
+          }
           await handleCriarFatura(); // Criar fatura
           break;
 
         case 'fatura_criada':
+          if (!faturamentoDisponivelNoContexto) {
+            toastService.info(AUTOMACAO_FLUXO_MENSAGEM);
+            break;
+          }
           await sincronizarStatusProposta('aguardando_pagamento', {
             source: 'fluxo-avanco',
             observacoes: 'Fatura emitida e aguardando pagamento.',
@@ -2185,6 +2223,10 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           break;
 
         case 'aguardando_pagamento':
+          if (!faturamentoDisponivelNoContexto) {
+            toastService.info(AUTOMACAO_FLUXO_MENSAGEM);
+            break;
+          }
           await abrirFaturamentoParaPagamento();
           break;
 
@@ -2210,6 +2252,11 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   };
 
   const handleCriarFaturaSemContrato = async () => {
+    if (!faturamentoDisponivelNoContexto) {
+      toastService.info(AUTOMACAO_FLUXO_MENSAGEM);
+      return;
+    }
+
     setCriandoFatura(true);
     try {
       const { propostaCompleta, clienteId, usuarioResponsavelId } = await obterContextoAutomacao();
@@ -2691,12 +2738,15 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     accent: 'text-[#7C3AED] hover:bg-[#F5F3FF] hover:text-[#6D28D9]',
   } as const;
   const pagamentoControladoNoFinanceiro = statusFluxoAtual === 'aguardando_pagamento';
+  const bloqueiaAvancoFinanceiroNoMvp =
+    mvpModeAtivo &&
+    ['contrato_assinado', 'fatura_criada', 'aguardando_pagamento'].includes(statusFluxoAtual);
   const exibirEmailDireto = !statusEncerradoSemAcoesComerciais;
   const exibirWhatsApp = !statusEncerradoSemAcoesComerciais;
   const exibirCompartilhar = !statusEncerradoSemAcoesComerciais;
   const exibirGerarContrato = podeGerarContrato();
-  const exibirCriarFatura = podeCriarFatura();
-  const exibirAvancarFluxo = !statusEncerradoSemAcoesComerciais;
+  const exibirCriarFatura = faturamentoDisponivelNoContexto && podeCriarFatura();
+  const exibirAvancarFluxo = !statusEncerradoSemAcoesComerciais && !bloqueiaAvancoFinanceiroNoMvp;
   const exibirAcoesCompartilhamento = actionScope === 'all' || actionScope === 'share';
   const exibirAcoesFluxo = actionScope === 'all' || actionScope === 'flow';
   const exibirCancelarVenda = exibirAcoesFluxo && !statusEncerradoSemAcoesComerciais;
@@ -2734,27 +2784,35 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       case 'aprovada':
         return {
           label: 'Formalizar venda',
-          title: 'Gerar contrato ou criar fatura a partir da proposta aprovada',
+          title: faturamentoDisponivelNoContexto
+            ? 'Gerar contrato ou criar fatura a partir da proposta aprovada'
+            : 'Gerar contrato para formalizar a venda no MVP',
         };
       case 'contrato_gerado':
         return {
           label: 'Confirmar assinatura',
-          title: 'Confirmar assinatura externa do contrato para seguir',
+          title: faturamentoDisponivelNoContexto
+            ? 'Confirmar assinatura externa do contrato para seguir'
+            : 'Confirmar assinatura externa para concluir no contrato',
         };
       case 'contrato_assinado':
         return {
-          label: 'Gerar fatura',
-          title: 'Criar fatura automatica a partir do contrato assinado',
+          label: faturamentoDisponivelNoContexto ? 'Gerar fatura' : 'Fluxo concluido',
+          title: faturamentoDisponivelNoContexto
+            ? 'Criar fatura automatica a partir do contrato assinado'
+            : AUTOMACAO_FLUXO_MENSAGEM,
         };
       case 'fatura_criada':
         return {
-          label: 'Ir para cobranca',
-          title: 'Atualizar para aguardando pagamento e abrir o financeiro',
+          label: faturamentoDisponivelNoContexto ? 'Ir para cobranca' : 'Fluxo concluido',
+          title: faturamentoDisponivelNoContexto
+            ? 'Atualizar para aguardando pagamento e abrir o financeiro'
+            : AUTOMACAO_FLUXO_MENSAGEM,
         };
       case 'aguardando_pagamento':
         return {
-          label: 'Abrir financeiro',
-          title: 'Pagamento desta proposta e controlado no modulo de faturamento',
+          label: faturamentoDisponivelNoContexto ? 'Abrir financeiro' : 'Fluxo concluido',
+          title: AUTOMACAO_FLUXO_MENSAGEM,
         };
       default:
         return {

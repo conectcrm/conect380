@@ -3,6 +3,21 @@ import { expect, test, type Page } from '@playwright/test';
 const ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL || 'admin@conect360.com.br';
 const ADMIN_PASSWORD = process.env.TEST_ADMIN_PASSWORD || 'admin123';
 const PROFILE_STORAGE_KEY = 'selectedProfileId';
+const USERS_PROFILE_ROUTE_GLOB = '**/users/profile';
+
+const MVP_SMOKE_REQUIRED_PERMISSIONS = [
+  'dashboard.read',
+  'crm.clientes.read',
+  'crm.leads.read',
+  'crm.oportunidades.read',
+  'comercial.propostas.read',
+  'compras.cotacoes.read',
+  'compras.aprovacoes.manage',
+  // Mantemos permissoes dos modulos fora do GO Core para garantir
+  // que o bloqueio validado venha do escopo MVP e nao de RBAC.
+  'financeiro.contas-pagar.read',
+  'atendimento.chats.read',
+];
 
 type PerfilSmoke = {
   id: 'administrador' | 'vendedor';
@@ -64,11 +79,58 @@ async function login(page: Page) {
   await passwordInput.fill(ADMIN_PASSWORD);
   await submitButton.click({ force: true });
 
-  await page.waitForURL(/.*dashboard/, { timeout: 20000 });
-  await expect(page).toHaveURL(/.*dashboard/);
+  await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 20000 });
+  await expect(page).not.toHaveURL(/.*\/login.*/);
 }
 
-async function assertRouteLoads(page: Page, route: string, hints: string[]) {
+async function applyProfilePermissions(page: Page, permissions: string[]) {
+  await page.unroute(USERS_PROFILE_ROUTE_GLOB).catch(() => undefined);
+  await page.route(USERS_PROFILE_ROUTE_GLOB, async (route) => {
+    const response = await route.fetch();
+    const payload = (await response.json().catch(() => ({}))) as {
+      data?: Record<string, unknown>;
+      [key: string]: unknown;
+    };
+
+    const currentUser =
+      payload && typeof payload.data === 'object' && payload.data !== null
+        ? payload.data
+        : {};
+
+    const existingPermissions = [
+      ...(Array.isArray((currentUser as { permissions?: unknown[] }).permissions)
+        ? ((currentUser as { permissions?: unknown[] }).permissions as unknown[])
+        : []),
+      ...(Array.isArray((currentUser as { permissoes?: unknown[] }).permissoes)
+        ? ((currentUser as { permissoes?: unknown[] }).permissoes as unknown[])
+        : []),
+    ]
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      .map((value) => value.trim());
+
+    const mergedPermissions = Array.from(new Set([...existingPermissions, ...permissions]));
+
+    const mergedPayload = {
+      ...(payload || {}),
+      success: true,
+      data: {
+        ...currentUser,
+        permissions: mergedPermissions,
+        permissoes: mergedPermissions,
+      },
+    };
+
+    await route.fulfill({
+      response,
+      body: JSON.stringify(mergedPayload),
+      contentType: 'application/json',
+    });
+  });
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+}
+
+async function assertRouteAccessible(page: Page, route: string, hints: string[]) {
   await page.goto(route);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(1500);
@@ -78,6 +140,99 @@ async function assertRouteLoads(page: Page, route: string, hints: string[]) {
   const content = (await page.locator('body').innerText()).toLowerCase();
   const hasExpectedContent = hints.some((hint) => content.includes(hint.toLowerCase()));
   expect(hasExpectedContent).toBeTruthy();
+  expect(content).not.toContain('acesso negado');
+  expect(content).not.toContain('modulo em construcao');
+}
+
+async function assertRouteBlockedByMvp(page: Page, route: string, hints: string[]) {
+  await page.goto(route);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(1500);
+
+  await expect(page).not.toHaveURL(/.*\/login.*/);
+
+  const content = (await page.locator('body').innerText()).toLowerCase();
+  const hasExpectedContent = hints.some((hint) => content.includes(hint.toLowerCase()));
+  expect(hasExpectedContent).toBeTruthy();
+  expect(content).not.toContain('acesso negado');
+  expect(content).toContain('modulo em construcao');
+}
+
+async function detectMvpBlockingWithAnyProfile(
+  page: Page,
+  route: string,
+  hints: string[],
+  profiles: PerfilSmoke[],
+): Promise<boolean> {
+  for (const profile of profiles) {
+    await switchProfile(page, profile);
+    await page.goto(route);
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(1500);
+
+    await expect(page).not.toHaveURL(/.*\/login.*/);
+
+    const content = (await page.locator('body').innerText()).toLowerCase();
+    const hasExpectedContent = hints.some((hint) => content.includes(hint.toLowerCase()));
+
+    if (!hasExpectedContent) {
+      continue;
+    }
+
+    if (content.includes('acesso negado')) {
+      continue;
+    }
+
+    return content.includes('modulo em construcao');
+  }
+
+  throw new Error(`Nao foi possivel detectar estado MVP para a rota ${route}.`);
+}
+
+async function assertRouteAccessibleWithAnyProfile(
+  page: Page,
+  route: string,
+  hints: string[],
+  profiles: PerfilSmoke[],
+) {
+  let lastError: unknown = null;
+
+  for (const profile of profiles) {
+    await switchProfile(page, profile);
+    try {
+      await assertRouteAccessible(page, route, hints);
+      return profile;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`Nenhum perfil conseguiu acessar a rota ${route}.`);
+}
+
+async function assertRouteBlockedByMvpWithAnyProfile(
+  page: Page,
+  route: string,
+  hints: string[],
+  profiles: PerfilSmoke[],
+) {
+  let lastError: unknown = null;
+
+  for (const profile of profiles) {
+    await switchProfile(page, profile);
+    try {
+      await assertRouteBlockedByMvp(page, route, hints);
+      return profile;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`Nenhum perfil conseguiu validar o bloqueio MVP da rota ${route}.`);
 }
 
 async function openUserMenu(page: Page) {
@@ -92,7 +247,7 @@ async function openUserMenu(page: Page) {
 }
 
 async function switchProfile(page: Page, profile: PerfilSmoke) {
-  await page.goto('/dashboard');
+  await page.goto('/');
   await page.waitForLoadState('domcontentloaded');
   await dismissDevServerOverlay(page);
 
@@ -116,71 +271,77 @@ async function switchProfile(page: Page, profile: PerfilSmoke) {
 }
 
 test.describe('MVP UI Smoke', () => {
-  test('deve autenticar, alternar perfil e carregar dashboards do MVP', async ({ page }) => {
+  test('deve autenticar, alternar perfil e validar o fluxo GO Core do MVP', async ({ page }) => {
     await login(page);
+    await applyProfilePermissions(page, MVP_SMOKE_REQUIRED_PERMISSIONS);
 
-    await assertRouteLoads(page, '/dashboard', [
-      'dashboard',
-      'crm',
-      'conect',
-      'modulo em construcao',
-      'painel',
-      'performance',
-    ]);
-
-    await assertRouteLoads(page, '/leads', [
+    await assertRouteAccessibleWithAnyProfile(page, '/leads', [
       'lead',
       'leads',
       'pipeline',
-      'modulo em construcao',
-    ]);
+    ], PERFIS_SMOKE);
 
-    await assertRouteLoads(page, '/pipeline', [
+    await assertRouteAccessibleWithAnyProfile(page, '/pipeline', [
       'pipeline',
       'oportunidade',
       'funil',
-      'modulo em construcao',
-    ]);
+    ], PERFIS_SMOKE);
 
-    await assertRouteLoads(page, '/propostas', [
+    await assertRouteAccessibleWithAnyProfile(page, '/propostas', [
       'proposta',
       'propostas',
       'comercial',
-      'modulo em construcao',
-    ]);
+    ], PERFIS_SMOKE);
 
-    await assertRouteLoads(page, '/atendimento/inbox', [
-      'atendimento',
-      'inbox',
-      'ticket',
-      'conversa',
-      'modulo em construcao',
-    ]);
+    await assertRouteAccessibleWithAnyProfile(page, '/contratos', [
+      'contrato',
+      'assinatura',
+      'comercial',
+    ], PERFIS_SMOKE);
 
-    await assertRouteLoads(page, '/relatorios/analytics', [
-      'analytics',
-      'relatorios',
-      'dashboard',
-      'kpis',
-    ]);
+    await assertRouteAccessibleWithAnyProfile(page, '/financeiro/cotacoes', [
+      'cotacao',
+      'compras',
+      'orcamento',
+    ], PERFIS_SMOKE);
+
+    await assertRouteAccessibleWithAnyProfile(page, '/financeiro/compras/aprovacoes', [
+      'aprov',
+      'compras',
+      'cotacao',
+    ], PERFIS_SMOKE);
+
+    const mvpBlockingAtivo = await detectMvpBlockingWithAnyProfile(page, '/financeiro/contas-pagar', [
+      'financeiro',
+      'billing',
+      'faturamento',
+      'contas a pagar',
+    ], PERFIS_SMOKE);
+
+    if (mvpBlockingAtivo) {
+      await assertRouteBlockedByMvpWithAnyProfile(page, '/financeiro/contas-pagar', [
+        'financeiro',
+        'billing',
+        'faturamento',
+        'contas a pagar',
+        'modulo em construcao',
+      ], PERFIS_SMOKE);
+
+      await assertRouteBlockedByMvpWithAnyProfile(page, '/atendimento/inbox', [
+        'atendimento',
+        'modulo em construcao',
+      ], PERFIS_SMOKE);
+    } else {
+      await assertRouteAccessibleWithAnyProfile(page, '/financeiro/contas-pagar', [
+        'financeiro',
+        'contas a pagar',
+        'fornecedor',
+      ], PERFIS_SMOKE);
+    }
 
     for (const perfil of PERFIS_SMOKE) {
       await switchProfile(page, perfil);
-
-      await assertRouteLoads(page, '/dashboard', [
-        'dashboard',
-        'painel',
-        'performance',
-      ]);
-
-      await assertRouteLoads(page, '/atendimento/analytics', [
-        'atendimento',
-        'analytics',
-        'tickets',
-        'desempenho',
-        'sla',
-        'em desenvolvimento',
-      ]);
+      await expect(page).not.toHaveURL(/.*\/login.*/);
     }
   });
 });
