@@ -41,7 +41,7 @@ describe('getFinanceiroFeatureFlags (backend)', () => {
     expect(flags.boletoEnabled).toBe(false);
   });
 
-  it('respeita as flags especificas quando modo MVP estiver desativado', () => {
+  it('mantem emissao fiscal desabilitada mesmo com env fiscal ligado', () => {
     process.env.FINANCEIRO_MVP_MODE = 'false';
     process.env.MVP_MODE = 'false';
     process.env.FINANCEIRO_FISCAL_DOCS_ENABLED = 'true';
@@ -49,9 +49,9 @@ describe('getFinanceiroFeatureFlags (backend)', () => {
 
     const flags = getFinanceiroFeatureFlags();
 
-    expect(flags.fiscalDocumentsEnabled).toBe(true);
+    expect(flags.fiscalDocumentsEnabled).toBe(false);
     expect(flags.boletoEnabled).toBe(false);
-    expect(flags.fiscalDisabledReason).toBe('');
+    expect(flags.fiscalDisabledReason).toContain('desabilitada');
     expect(flags.boletoDisabledReason).toContain('desabilitado');
   });
 });

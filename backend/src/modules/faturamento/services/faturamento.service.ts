@@ -15,6 +15,7 @@ import { ItemFatura } from '../entities/item-fatura.entity';
 import { Pagamento, StatusPagamento, TipoPagamento } from '../entities/pagamento.entity';
 import { Contrato } from '../../contratos/entities/contrato.entity';
 import { Cliente } from '../../clientes/cliente.entity';
+import { EmpresaConfig } from '../../empresas/entities/empresa-config.entity';
 import { PropostasService } from '../../propostas/propostas.service';
 import { MercadoPagoService } from '../../mercado-pago/mercado-pago.service';
 import {
@@ -23,7 +24,10 @@ import {
   GerarFaturaAutomaticaDto,
   TipoDocumentoFinanceiro,
 } from '../dto/fatura.dto';
-import { EmailIntegradoService } from '../../propostas/email-integrado.service';
+import {
+  EmailEntregaDiagnostico,
+  EmailIntegradoService,
+} from '../../propostas/email-integrado.service';
 import { getFinanceiroFeatureFlags } from '../financeiro-feature-flags';
 
 export interface ResultadoEnvioFaturaEmail {
@@ -77,6 +81,43 @@ export interface LinkPagamentoFaturaGerado {
   preferenceId?: string;
   link: string;
   expiraEm: string;
+}
+
+export interface PdfFaturaGerado {
+  buffer: Buffer;
+  filename: string;
+}
+
+export type StatusProntidaoCobranca = 'ok' | 'alerta' | 'bloqueio';
+
+export interface CanalProntidaoCobranca {
+  operacional: boolean;
+  simulado: boolean;
+  status: StatusProntidaoCobranca;
+  detalhe: string;
+  bloqueios: string[];
+  alertas: string[];
+}
+
+export interface ProntidaoCobranca {
+  statusGeral: StatusProntidaoCobranca;
+  prontoParaCobrancaOnline: boolean;
+  prontoParaCobrancaPorEmail: boolean;
+  recomendacaoOperacional: string;
+  gateway: CanalProntidaoCobranca;
+  email: CanalProntidaoCobranca;
+  geradoEm: string;
+}
+
+type GatewayPagamentoConfigSource = 'tenant' | 'env' | 'default';
+
+interface GatewayPagamentoRuntimeConfig {
+  provider: string | null;
+  providerSource: GatewayPagamentoConfigSource;
+  accessToken: string | null;
+  accessTokenSource: GatewayPagamentoConfigSource;
+  webhookSecret: string | null;
+  webhookSecretSource: GatewayPagamentoConfigSource;
 }
 
 interface ItemCalculoFaturaInput {
@@ -136,12 +177,36 @@ export class FaturamentoService {
     'folha_pagamento',
     'outro',
   ]);
+  private readonly tiposDocumentoFinanceiroBloqueadosNoFaturamento = new Set<TipoDocumentoFinanceiro>([
+    'folha_pagamento',
+  ]);
   private readonly tiposDocumentoFiscal = new Set<TipoDocumentoFinanceiro>(['nfe', 'nfse']);
+  private readonly formasPagamentoCobrancaOnline = new Set<FormaPagamento>([
+    FormaPagamento.PIX,
+    FormaPagamento.CARTAO_CREDITO,
+    FormaPagamento.CARTAO_DEBITO,
+    FormaPagamento.BOLETO,
+  ]);
+  private readonly mercadoPagoPaymentTypesSuportados = [
+    'credit_card',
+    'debit_card',
+    'prepaid_card',
+    'ticket',
+    'account_money',
+    'bank_transfer',
+    'atm',
+  ] as const;
   private readonly prefixosNumeroDocumentoFinanceiro: Record<string, string> = {
     fatura: 'FAT',
     recibo: 'REC',
     folha_pagamento: 'FPG',
     outro: 'DOC',
+  };
+  private readonly camposOrdenacaoFaturas: Record<string, string> = {
+    createdAt: 'fatura.createdAt',
+    dataVencimento: 'fatura.dataVencimento',
+    valorTotal: 'fatura.valorTotal',
+    numero: 'fatura.numero',
   };
 
   constructor(
@@ -160,6 +225,9 @@ export class FaturamentoService {
     @Optional()
     @Inject(forwardRef(() => MercadoPagoService))
     private readonly mercadoPagoService?: MercadoPagoService,
+    @Optional()
+    @InjectRepository(EmpresaConfig)
+    private readonly empresaConfigRepository?: Repository<EmpresaConfig>,
   ) {}
 
   async criarFatura(
@@ -455,8 +523,11 @@ export class FaturamentoService {
 
     aplicarFiltros(queryBuilder);
 
+    const campoOrdenacao = this.resolverCampoOrdenacaoFaturas(sortBy);
+    const direcaoOrdenacao: 'ASC' | 'DESC' = sortOrder === 'ASC' ? 'ASC' : 'DESC';
+
     const [faturas, total] = await queryBuilder
-      .orderBy(`fatura.${sortBy}`, sortOrder)
+      .orderBy(campoOrdenacao, direcaoOrdenacao)
       .limit(pageSize)
       .offset((page - 1) * pageSize)
       .getManyAndCount();
@@ -525,6 +596,133 @@ export class FaturamentoService {
     }
 
     return fatura;
+  }
+
+  async gerarPdfFatura(id: number, empresaId: string): Promise<PdfFaturaGerado> {
+    const fatura = await this.buscarFaturaPorId(id, empresaId);
+    const itens = Array.isArray(fatura.itens) ? fatura.itens : [];
+    const valorTotal = this.toFiniteNumberPdf(fatura.valorTotal);
+    const valorPago = this.toFiniteNumberPdf(fatura.valorPago);
+    const valorAberto = Math.max(valorTotal - valorPago, 0);
+    const clienteNome = this.escapeHtml(String(fatura.cliente?.nome || fatura.clienteId || '-'));
+    const clienteEmail = this.escapeHtml(String(fatura.cliente?.email || '-'));
+    const responsavel = this.escapeHtml(
+      String((fatura as any)?.usuarioResponsavel?.nome || (fatura as any)?.usuarioResponsavel?.name || '-'),
+    );
+    const descricao = this.escapeHtml(String(fatura.descricao || '-'));
+    const observacoes = this.escapeHtml(String(fatura.observacoes || '-'));
+
+    const itensHtml =
+      itens.length > 0
+        ? itens
+            .map((item, index) => {
+              const quantidade = this.toFiniteNumberPdf(item.quantidade);
+              const valorUnitario = this.toFiniteNumberPdf(item.valorUnitario);
+              const valorItemTotal = this.toFiniteNumberPdf(item.valorTotal);
+              const unidade = this.escapeHtml(String(item.unidade || 'un'));
+              const descricaoItem = this.escapeHtml(String(item.descricao || `Item ${index + 1}`));
+
+              return `
+                <tr>
+                  <td>${descricaoItem}</td>
+                  <td style="text-align:center;">${quantidade.toLocaleString('pt-BR')}</td>
+                  <td style="text-align:center;">${unidade}</td>
+                  <td style="text-align:right;">${this.formatCurrencyPdf(valorUnitario)}</td>
+                  <td style="text-align:right;">${this.formatCurrencyPdf(valorItemTotal)}</td>
+                </tr>
+              `;
+            })
+            .join('')
+        : `<tr><td colspan="5" style="text-align:center;color:#6b7280;">Nenhum item informado.</td></tr>`;
+
+    const html = `
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <style>
+            body { font-family: Arial, sans-serif; color: #0f172a; font-size: 12px; }
+            .header { border-bottom: 2px solid #159a9c; padding-bottom: 10px; margin-bottom: 16px; }
+            .title { font-size: 20px; font-weight: bold; color: #0f172a; margin: 0; }
+            .subtitle { margin-top: 4px; color: #475569; }
+            .grid { display: flex; gap: 10px; margin-bottom: 12px; }
+            .card { flex: 1; border: 1px solid #dce8ec; border-radius: 8px; padding: 8px; }
+            .label { color: #64748b; font-size: 10px; text-transform: uppercase; letter-spacing: .4px; }
+            .value { margin-top: 4px; font-size: 12px; font-weight: 600; color: #0f172a; }
+            .section { margin-top: 12px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+            th, td { border: 1px solid #e2e8f0; padding: 6px; }
+            th { background: #f8fafc; text-align: left; font-size: 11px; }
+            .footer { margin-top: 14px; color: #64748b; font-size: 10px; text-align: center; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <p class="title">Fatura ${this.escapeHtml(String(fatura.numero || id))}</p>
+            <p class="subtitle">
+              Emissao: ${this.formatDatePtBr(fatura.dataEmissao)} | Vencimento: ${this.formatDatePtBr(fatura.dataVencimento)}
+            </p>
+          </div>
+
+          <div class="grid">
+            <div class="card">
+              <div class="label">Cliente</div>
+              <div class="value">${clienteNome}</div>
+              <div style="margin-top:2px;color:#475569;">${clienteEmail}</div>
+            </div>
+            <div class="card">
+              <div class="label">Status</div>
+              <div class="value">${this.escapeHtml(String(fatura.status || '-'))}</div>
+              <div style="margin-top:2px;color:#475569;">Responsavel: ${responsavel}</div>
+            </div>
+            <div class="card">
+              <div class="label">Totais</div>
+              <div class="value">Total: ${this.formatCurrencyPdf(valorTotal)}</div>
+              <div style="margin-top:2px;color:#475569;">Pago: ${this.formatCurrencyPdf(valorPago)} | Aberto: ${this.formatCurrencyPdf(valorAberto)}</div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="label">Descricao</div>
+            <div class="value" style="font-weight:500;">${descricao}</div>
+          </div>
+
+          <div class="section">
+            <div class="label">Itens da fatura</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Descricao</th>
+                  <th style="text-align:center;">Qtd</th>
+                  <th style="text-align:center;">Unidade</th>
+                  <th style="text-align:right;">Valor unit.</th>
+                  <th style="text-align:right;">Valor total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itensHtml}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="section">
+            <div class="label">Observacoes</div>
+            <div style="margin-top:4px;">${observacoes}</div>
+          </div>
+
+          <div class="footer">
+            Documento gerado automaticamente pelo modulo financeiro ConectCRM em ${this.formatDatePtBr(new Date())}.
+          </div>
+        </body>
+      </html>
+    `;
+
+    const buffer = await this.gerarPdfBufferFromHtml(html);
+    const numeroArquivo = this.sanitizarComponenteArquivoPdf(String(fatura.numero || id));
+
+    return {
+      buffer,
+      filename: `fatura-${numeroArquivo}.pdf`,
+    };
   }
 
   async gerarNumeroDocumentoFinanceiro(
@@ -617,6 +815,14 @@ export class FaturamentoService {
       );
     }
 
+    const gatewayRuntime = await this.resolverGatewayPagamentoRuntime(empresaId);
+    const providerNormalizado = gatewayRuntime.provider;
+    if (providerNormalizado && providerNormalizado !== 'mercadopago') {
+      throw new BadRequestException(
+        `Provider de cobranca "${providerNormalizado}" ainda nao e suportado neste estagio. Configure "mercadopago" para gerar links online.`,
+      );
+    }
+
     const fatura = await this.buscarFaturaPorId(faturaId, empresaId);
     if (fatura.status === StatusFatura.CANCELADA) {
       throw new BadRequestException('Nao e possivel gerar link para fatura cancelada.');
@@ -624,6 +830,9 @@ export class FaturamentoService {
     if (fatura.status === StatusFatura.PAGA) {
       throw new BadRequestException('Fatura ja esta paga. Nao e necessario gerar novo link.');
     }
+    const formaPagamentoCobrancaOnline = this.resolverFormaPagamentoCobrancaOnline(
+      fatura.formaPagamentoPreferida,
+    );
 
     const cliente = await this.clienteRepository.findOne({
       where: { id: fatura.clienteId, empresaId },
@@ -641,18 +850,39 @@ export class FaturamentoService {
     const [primeiroNome, ...sobrenomePartes] = nomeCliente.split(/\s+/).filter(Boolean);
     const sobrenome = sobrenomePartes.join(' ') || '-';
 
-    const frontendBaseUrl = this.normalizarBaseUrl(
-      contexto?.frontendBaseUrl || process.env.FRONTEND_URL || process.env.APP_FRONTEND_URL || '',
-      'https://conect360.com',
-    );
-    const backendBaseUrl = this.normalizarBaseUrl(
-      contexto?.backendBaseUrl || process.env.BACKEND_URL || process.env.API_URL || '',
-      'http://localhost:3001',
-    );
+    const mockEnabled = this.isTruthy(process.env.MERCADO_PAGO_MOCK);
+    const frontendBaseUrl = this.resolverBaseUrlPagamento({
+      configurada: process.env.FRONTEND_URL || process.env.APP_FRONTEND_URL,
+      contexto: contexto?.frontendBaseUrl,
+      fallback: 'https://conect360.com',
+      tipo: 'frontend',
+      bloquearLocalPrivado: !mockEnabled,
+    });
+    const backendBaseUrl = this.resolverBaseUrlPagamento({
+      configurada: process.env.WEBHOOK_BASE_URL || process.env.BACKEND_URL || process.env.API_URL,
+      contexto: contexto?.backendBaseUrl,
+      fallback: 'http://localhost:3001',
+      tipo: 'backend',
+      bloquearLocalPrivado: !mockEnabled,
+    });
+
+    if (!mockEnabled && this.isLocalOrPrivateUrl(frontendBaseUrl)) {
+      throw new BadRequestException(
+        'Link de pagamento exige URL publica no retorno. Configure FRONTEND_URL com dominio HTTPS publico.',
+      );
+    }
+
+    if (!mockEnabled && this.isLocalOrPrivateUrl(backendBaseUrl)) {
+      this.logger.warn(
+        `WEBHOOK_BASE_URL local/privada (${backendBaseUrl}) pode impedir callbacks do Mercado Pago. Configure WEBHOOK_BASE_URL publico.`,
+      );
+    }
 
     const expiraEmDate = this.calcularDataExpiracaoCobranca(fatura.dataVencimento);
     const expiraEm = expiraEmDate.toISOString();
     const referenciaGateway = `fatura:${empresaId}:${fatura.id}`;
+    const accessTokenOverride =
+      gatewayRuntime.accessTokenSource === 'tenant' ? gatewayRuntime.accessToken : null;
 
     const preference = await this.mercadoPagoService.createPreference({
       items: [
@@ -676,7 +906,7 @@ export class FaturamentoService {
       },
       auto_return: 'approved',
       payment_methods: this.construirRestricoesPagamentoMercadoPago(
-        fatura.formaPagamentoPreferida,
+        formaPagamentoCobrancaOnline,
       ),
       notification_url: `${backendBaseUrl}/mercadopago/webhooks`,
       statement_descriptor: 'ConectCRM',
@@ -684,6 +914,8 @@ export class FaturamentoService {
       expires: true,
       expiration_date_from: new Date().toISOString(),
       expiration_date_to: expiraEm,
+    }, {
+      accessTokenOverride,
     });
 
     const link = String(preference?.init_point || preference?.sandbox_init_point || '').trim();
@@ -692,11 +924,12 @@ export class FaturamentoService {
     }
 
     fatura.linkPagamento = link;
+    fatura.formaPagamentoPreferida = formaPagamentoCobrancaOnline;
     fatura.metadados = {
       ...(fatura.metadados || {}),
       gateway: 'mercadopago',
       transactionId: String(preference?.id || referenciaGateway),
-      paymentMethod: fatura.formaPagamentoPreferida || FormaPagamento.A_COMBINAR,
+      paymentMethod: formaPagamentoCobrancaOnline,
     };
     await this.faturaRepository.save(fatura);
     await this.registrarPagamentoPendentePorLink({
@@ -716,6 +949,153 @@ export class FaturamentoService {
       link,
       expiraEm,
     };
+  }
+
+  async obterProntidaoCobranca(empresaId: string): Promise<ProntidaoCobranca> {
+    const gatewayRuntime = await this.resolverGatewayPagamentoRuntime(empresaId);
+    const gateway = this.obterDiagnosticoGatewayCobranca(gatewayRuntime);
+    const email = await this.obterDiagnosticoEmailCobranca(empresaId);
+    const recomendacaoOperacional =
+      'Fluxo recomendado: enviar a fatura ao cliente e registrar o recebimento em "Registrar Pgto" apos a confirmacao bancaria.';
+
+    const statusGeral: StatusProntidaoCobranca = !email.operacional
+      ? 'bloqueio'
+      : gateway.status !== 'ok' || email.status !== 'ok'
+        ? 'alerta'
+        : 'ok';
+
+    return {
+      statusGeral,
+      prontoParaCobrancaOnline: gateway.operacional,
+      prontoParaCobrancaPorEmail: email.operacional,
+      recomendacaoOperacional,
+      gateway,
+      email,
+      geradoEm: new Date().toISOString(),
+    };
+  }
+
+  private obterDiagnosticoGatewayCobranca(
+    gatewayRuntime: GatewayPagamentoRuntimeConfig,
+  ): CanalProntidaoCobranca {
+    const bloqueios: string[] = [];
+    const alertas: string[] = [];
+    const ambienteProducao = this.isProductionRuntime();
+    const tokenConfigurado = Boolean(gatewayRuntime.accessToken);
+    const webhookSecretConfigurado = Boolean(gatewayRuntime.webhookSecret);
+    const mockEnabled = this.isTruthy(process.env.MERCADO_PAGO_MOCK);
+    const gatewayDisponivel = Boolean(this.mercadoPagoService);
+    const providerNormalizado = gatewayRuntime.provider;
+
+    if (!gatewayDisponivel) {
+      alertas.push('Servico de gateway de pagamento nao carregado no backend.');
+      return {
+        operacional: false,
+        simulado: false,
+        status: 'alerta',
+        detalhe: 'Gateway de pagamento indisponivel neste ambiente.',
+        bloqueios,
+        alertas,
+      };
+    }
+
+    if (providerNormalizado && providerNormalizado !== 'mercadopago') {
+      bloqueios.push(
+        `Provider "${providerNormalizado}" configurado para a empresa, mas o backend suporta apenas "mercadopago" neste estagio.`,
+      );
+      return {
+        operacional: false,
+        simulado: false,
+        status: 'bloqueio',
+        detalhe:
+          'Gateway da empresa nao suportado no fluxo atual. Ajuste o provider para "mercadopago".',
+        bloqueios,
+        alertas,
+      };
+    }
+
+    if (tokenConfigurado) {
+      if (gatewayRuntime.accessTokenSource === 'env') {
+        alertas.push(
+          'Credencial de gateway usando fallback global do ambiente (.env). Recomendado configurar token por empresa.',
+        );
+      }
+
+      if (ambienteProducao && !webhookSecretConfigurado) {
+        alertas.push(
+          gatewayRuntime.webhookSecretSource === 'env'
+            ? 'MERCADO_PAGO_WEBHOOK_SECRET nao configurado em producao para callbacks de pagamento.'
+            : 'Webhook secret da empresa nao configurado para callbacks de pagamento em producao.',
+        );
+      }
+
+      return {
+        operacional: true,
+        simulado: false,
+        status: alertas.length > 0 ? 'alerta' : 'ok',
+        detalhe:
+          alertas.length > 0
+            ? 'Gateway online ativo, porem com alertas de configuracao complementar.'
+            : gatewayRuntime.accessTokenSource === 'tenant'
+              ? 'Gateway online configurado com credencial da empresa para cobranca real.'
+              : 'Gateway online configurado com credencial global do ambiente.',
+        bloqueios,
+        alertas,
+      };
+    }
+
+    if (mockEnabled && !ambienteProducao) {
+      alertas.push('MERCADO_PAGO_MOCK ativo sem token real. Cobranca online em modo simulado.');
+      return {
+        operacional: false,
+        simulado: true,
+        status: 'alerta',
+        detalhe: 'Gateway em modo simulado. Configure token real para cobranca online.',
+        bloqueios,
+        alertas,
+      };
+    }
+
+    alertas.push(
+      'Token do Mercado Pago nao configurado para gerar cobranca online (empresa e ambiente).',
+    );
+    return {
+      operacional: false,
+      simulado: false,
+      status: 'alerta',
+      detalhe:
+        'Gateway online indisponivel. Configure o token no Financeiro da empresa ou MERCADO_PAGO_ACCESS_TOKEN no ambiente.',
+      bloqueios,
+      alertas,
+    };
+  }
+
+  private async obterDiagnosticoEmailCobranca(empresaId: string): Promise<CanalProntidaoCobranca> {
+    const diagnosticoEmail: EmailEntregaDiagnostico =
+      await this.emailService.obterDiagnosticoEntregaEmail(empresaId);
+    const bloqueios: string[] = [];
+    const alertas: string[] = [];
+
+    if (diagnosticoEmail.status === 'bloqueio') {
+      bloqueios.push(diagnosticoEmail.detalhe);
+    }
+    if (diagnosticoEmail.status === 'alerta') {
+      alertas.push(diagnosticoEmail.detalhe);
+    }
+
+    return {
+      operacional: diagnosticoEmail.operacional,
+      simulado: diagnosticoEmail.simulado,
+      status: diagnosticoEmail.status,
+      detalhe: diagnosticoEmail.detalhe,
+      bloqueios,
+      alertas,
+    };
+  }
+
+  private isProductionRuntime(): boolean {
+    const runtime = String(process.env.NODE_ENV || process.env.APP_ENV || '').trim().toLowerCase();
+    return runtime === 'production';
   }
 
   async atualizarFatura(
@@ -1091,19 +1471,71 @@ export class FaturamentoService {
     };
   }
 
-  async verificarFaturasVencidas(): Promise<void> {
+  async gerarCobrancaFaturasVencidas(empresaId: string): Promise<ResultadoCobrancaLote> {
+    const statusBloqueados = [StatusFatura.PAGA, StatusFatura.CANCELADA];
+    const faturasVencidas = await this.faturaRepository
+      .createQueryBuilder('fatura')
+      .select('fatura.id', 'id')
+      .where('fatura.dataVencimento < :agora', { agora: new Date() })
+      .andWhere('fatura.ativo = :ativo', { ativo: true })
+      .andWhere('fatura.empresa_id = :empresaId', { empresaId })
+      .andWhere('fatura.status NOT IN (:...statusBloqueados)', { statusBloqueados })
+      .getRawMany<{ id: number }>();
+
+    const ids = faturasVencidas
+      .map((item) => Number(item.id))
+      .filter((id) => Number.isInteger(id) && id > 0);
+
+    if (!ids.length) {
+      return {
+        solicitadas: 0,
+        processadas: 0,
+        sucesso: 0,
+        simuladas: 0,
+        falhas: 0,
+        ignoradas: 0,
+        resultados: [],
+      };
+    }
+
+    return this.gerarCobrancaEmLote(ids, empresaId);
+  }
+
+  async verificarFaturasVencidas(
+    empresaId: string,
+  ): Promise<{ processados: number; sucesso: number; falhas: number }> {
     const faturasVencidas = await this.faturaRepository
       .createQueryBuilder('fatura')
       .where('fatura.status = :status', { status: StatusFatura.PENDENTE })
       .andWhere('fatura.dataVencimento < :agora', { agora: new Date() })
       .andWhere('fatura.ativo = :ativo', { ativo: true })
+      .andWhere('fatura.empresa_id = :empresaId', { empresaId })
       .getMany();
+
+    let sucesso = 0;
+    let falhas = 0;
 
     for (const fatura of faturasVencidas) {
       fatura.status = StatusFatura.VENCIDA;
-      await this.faturaRepository.save(fatura);
-      this.logger.log(`Fatura vencida: ${fatura.numero}`);
+      try {
+        await this.faturaRepository.save(fatura);
+        this.logger.log(`Fatura vencida: ${fatura.numero}`);
+        sucesso += 1;
+      } catch (error) {
+        falhas += 1;
+        const mensagemErro =
+          error && typeof error === 'object' && 'message' in error
+            ? String((error as { message?: unknown }).message || 'erro desconhecido')
+            : 'erro desconhecido';
+        this.logger.error(`Erro ao atualizar status de vencida para fatura ${fatura.numero}: ${mensagemErro}`);
+      }
     }
+
+    return {
+      processados: faturasVencidas.length,
+      sucesso,
+      falhas,
+    };
   }
 
   private obterMensagemErroCobranca(error: unknown): string {
@@ -1673,9 +2105,20 @@ export class FaturamentoService {
     }
 
     const documento = { ...(documentoRaw as Record<string, unknown>) };
-    const tipoDocumento = String(documento.tipo || '')
+    const tipoDocumento = String(documento.tipo || 'fatura')
       .trim()
-      .toLowerCase();
+      .toLowerCase() as TipoDocumentoFinanceiro;
+
+    if (!this.tiposDocumentoFinanceiro.has(tipoDocumento)) {
+      throw new BadRequestException('Tipo de documento financeiro invalido.');
+    }
+
+    if (this.tiposDocumentoFinanceiroBloqueadosNoFaturamento.has(tipoDocumento)) {
+      throw new BadRequestException(
+        'Tipo de documento "folha_pagamento" nao e permitido no faturamento de clientes.',
+      );
+    }
+
     const tipoFiscal = tipoDocumento === 'nfe' || tipoDocumento === 'nfse';
 
     if (tipoFiscal && !this.financeiroFeatureFlags.fiscalDocumentsEnabled) {
@@ -2041,6 +2484,12 @@ export class FaturamentoService {
       throw new BadRequestException('Tipo de documento financeiro invalido.');
     }
 
+    if (this.tiposDocumentoFinanceiroBloqueadosNoFaturamento.has(tipoDocumento)) {
+      throw new BadRequestException(
+        'Tipo de documento "folha_pagamento" nao e permitido no faturamento de clientes.',
+      );
+    }
+
     if (this.tiposDocumentoFiscal.has(tipoDocumento) && !this.financeiroFeatureFlags.fiscalDocumentsEnabled) {
       throw new BadRequestException(
         this.financeiroFeatureFlags.fiscalDisabledReason ||
@@ -2078,12 +2527,146 @@ export class FaturamentoService {
     return total > 0;
   }
 
-  private normalizarBaseUrl(input: string, fallback: string): string {
-    const valor = String(input || '').trim();
-    if (!valor) {
-      return fallback;
+  private isTruthy(value?: string | null): boolean {
+    return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
+  }
+
+  private normalizarGatewayPagamentoProvider(value?: string | null): string | null {
+    const raw = String(value || '')
+      .trim()
+      .toLowerCase();
+    if (!raw) {
+      return null;
     }
-    return valor.replace(/\/+$/, '');
+    if (raw === 'mercadopago' || raw === 'mercado_pago' || raw === 'mercado-pago') {
+      return 'mercadopago';
+    }
+    return raw;
+  }
+
+  private async carregarConfigGatewayPagamentoEmpresa(empresaId: string): Promise<EmpresaConfig | null> {
+    const tenantId = String(empresaId || '').trim();
+    if (!tenantId || !this.empresaConfigRepository) {
+      return null;
+    }
+
+    try {
+      return await this.empresaConfigRepository.findOne({
+        where: { empresaId: tenantId },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao carregar configuracao de gateway da empresa ${tenantId}; fallback global sera aplicado.`,
+      );
+      return null;
+    }
+  }
+
+  private async resolverGatewayPagamentoRuntime(
+    empresaId: string,
+  ): Promise<GatewayPagamentoRuntimeConfig> {
+    const configEmpresa = await this.carregarConfigGatewayPagamentoEmpresa(empresaId);
+    const tenantProvider = this.normalizarGatewayPagamentoProvider(configEmpresa?.gatewayPagamentoProvider);
+    const tenantAccessToken = this.normalizarTextoDocumento(configEmpresa?.gatewayPagamentoAccessToken);
+    const tenantWebhookSecret = this.normalizarTextoDocumento(configEmpresa?.gatewayPagamentoWebhookSecret);
+
+    const envAccessToken = this.normalizarTextoDocumento(process.env.MERCADO_PAGO_ACCESS_TOKEN);
+    const envWebhookSecret = this.normalizarTextoDocumento(process.env.MERCADO_PAGO_WEBHOOK_SECRET);
+    const envProvider = this.normalizarGatewayPagamentoProvider(
+      process.env.GATEWAY_PAGAMENTO_PROVIDER || (envAccessToken ? 'mercadopago' : null),
+    );
+
+    const provider = tenantProvider || envProvider;
+    const accessToken = tenantAccessToken || envAccessToken;
+    const webhookSecret = tenantWebhookSecret || envWebhookSecret;
+
+    return {
+      provider,
+      providerSource: tenantProvider ? 'tenant' : envProvider ? 'env' : 'default',
+      accessToken,
+      accessTokenSource: tenantAccessToken ? 'tenant' : envAccessToken ? 'env' : 'default',
+      webhookSecret,
+      webhookSecretSource: tenantWebhookSecret ? 'tenant' : envWebhookSecret ? 'env' : 'default',
+    };
+  }
+
+  private normalizarBaseUrl(value?: string | null): string | null {
+    const raw = String(value || '').trim();
+    if (!raw) {
+      return null;
+    }
+
+    try {
+      const parsed = new URL(raw);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return null;
+      }
+
+      return parsed.toString().replace(/\/+$/, '');
+    } catch {
+      return null;
+    }
+  }
+
+  private isLocalOrPrivateUrl(value?: string | null): boolean {
+    const normalized = this.normalizarBaseUrl(value);
+    if (!normalized) {
+      return false;
+    }
+
+    try {
+      const parsed = new URL(normalized);
+      const host = parsed.hostname.toLowerCase();
+
+      if (
+        host === 'localhost' ||
+        host === '127.0.0.1' ||
+        host === '0.0.0.0' ||
+        host === '::1' ||
+        host.endsWith('.local')
+      ) {
+        return true;
+      }
+
+      if (host.startsWith('10.') || host.startsWith('192.168.')) {
+        return true;
+      }
+
+      return /^172\.(1[6-9]|2\d|3[0-1])\./.test(host);
+    } catch {
+      return false;
+    }
+  }
+
+  private resolverBaseUrlPagamento(params: {
+    configurada?: string | null;
+    contexto?: string | null;
+    fallback: string;
+    tipo: 'frontend' | 'backend';
+    bloquearLocalPrivado: boolean;
+  }): string {
+    const configuradaNormalizada = this.normalizarBaseUrl(params.configurada);
+    if (configuradaNormalizada) {
+      return configuradaNormalizada;
+    }
+
+    const contextoNormalizado = this.normalizarBaseUrl(params.contexto);
+    if (contextoNormalizado) {
+      if (!params.bloquearLocalPrivado || !this.isLocalOrPrivateUrl(contextoNormalizado)) {
+        return contextoNormalizado;
+      }
+
+      this.logger.warn(
+        `[gerarLinkPagamentoFatura] Ignorando ${params.tipo}BaseUrl local/privada recebida na requisicao: ${contextoNormalizado}`,
+      );
+    }
+
+    return this.normalizarBaseUrl(params.fallback) || params.fallback.replace(/\/+$/, '');
+  }
+
+  private resolverCampoOrdenacaoFaturas(sortBy?: string): string {
+    const campo = String(sortBy || '').trim();
+    return this.camposOrdenacaoFaturas[campo] || this.camposOrdenacaoFaturas.createdAt;
   }
 
   private calcularDataExpiracaoCobranca(dataVencimento: Date | string): Date {
@@ -2100,23 +2683,71 @@ export class FaturamentoService {
     return data;
   }
 
+  private resolverFormaPagamentoCobrancaOnline(
+    formaPagamento?: FormaPagamento | null,
+  ): FormaPagamento {
+    const formaValidada =
+      this.validarFormaPagamentoDisponivel(formaPagamento, 'fatura') || FormaPagamento.PIX;
+    const formaNormalizada = this.normalizarFormaPagamentoComFallback(formaValidada);
+
+    if (this.formasPagamentoCobrancaOnline.has(formaNormalizada)) {
+      return formaNormalizada;
+    }
+
+    throw new BadRequestException(
+      `Forma de pagamento "${formaNormalizada}" exige fluxo manual de recebimento. Para gerar link online, utilize PIX, cartao de credito, cartao de debito ou boleto.`,
+    );
+  }
+
   private construirRestricoesPagamentoMercadoPago(
     formaPagamento?: FormaPagamento | null,
   ): Record<string, unknown> {
-    if (formaPagamento === FormaPagamento.BOLETO) {
-      return {
-        excluded_payment_types: [
-          { id: 'credit_card' },
-          { id: 'debit_card' },
-          { id: 'prepaid_card' },
-          { id: 'account_money' },
-          { id: 'bank_transfer' },
-          { id: 'atm' },
-        ],
-      };
-    }
+    const permitirSomenteTiposPagamento = (
+      paymentTypesPermitidos: readonly string[],
+      defaults?: {
+        defaultPaymentTypeId?: string;
+        defaultPaymentMethodId?: string;
+      },
+    ): Record<string, unknown> => {
+      const permitidos = new Set(paymentTypesPermitidos);
+      const excludedPaymentTypes = this.mercadoPagoPaymentTypesSuportados
+        .filter((paymentTypeId) => !permitidos.has(paymentTypeId))
+        .map((paymentTypeId) => ({ id: paymentTypeId }));
 
-    return {};
+      const restricoes: Record<string, unknown> = {};
+      if (excludedPaymentTypes.length > 0) {
+        restricoes.excluded_payment_types = excludedPaymentTypes;
+      }
+      if (defaults?.defaultPaymentTypeId) {
+        restricoes.default_payment_type_id = defaults.defaultPaymentTypeId;
+      }
+      if (defaults?.defaultPaymentMethodId) {
+        restricoes.default_payment_method_id = defaults.defaultPaymentMethodId;
+      }
+      return restricoes;
+    };
+
+    switch (formaPagamento) {
+      case FormaPagamento.PIX:
+        return permitirSomenteTiposPagamento(['bank_transfer'], {
+          defaultPaymentTypeId: 'bank_transfer',
+          defaultPaymentMethodId: 'pix',
+        });
+      case FormaPagamento.CARTAO_CREDITO:
+        return permitirSomenteTiposPagamento(['credit_card'], {
+          defaultPaymentTypeId: 'credit_card',
+        });
+      case FormaPagamento.CARTAO_DEBITO:
+        return permitirSomenteTiposPagamento(['debit_card'], {
+          defaultPaymentTypeId: 'debit_card',
+        });
+      case FormaPagamento.BOLETO:
+        return permitirSomenteTiposPagamento(['ticket'], {
+          defaultPaymentTypeId: 'ticket',
+        });
+      default:
+        return {};
+    }
   }
 
   private async registrarPagamentoPendentePorLink(params: {
@@ -2290,7 +2921,7 @@ export class FaturamentoService {
   }
 
   private getFaturamentoPublicUrl(faturaId: number): string {
-    const frontendBaseUrl = (process.env.FRONTEND_URL || '').replace(/\/+$/, '');
+    const frontendBaseUrl = this.normalizarBaseUrl(process.env.FRONTEND_URL);
     const faturamentoPath = `/financeiro/faturamento?faturaId=${faturaId}`;
     return frontendBaseUrl ? `${frontendBaseUrl}${faturamentoPath}` : faturamentoPath;
   }
@@ -2347,6 +2978,60 @@ export class FaturamentoService {
         </p>
       </div>
     `;
+  }
+
+  private async gerarPdfBufferFromHtml(html: string): Promise<Buffer> {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const htmlPdfNode = require('html-pdf-node') as {
+        generatePdf: (
+          file: { content: string },
+          options: Record<string, unknown>,
+        ) => Promise<Buffer | Uint8Array>;
+      };
+      const pdfRaw = await htmlPdfNode.generatePdf(
+        { content: html },
+        {
+          format: 'A4',
+          printBackground: true,
+          margin: {
+            top: '12mm',
+            right: '10mm',
+            bottom: '12mm',
+            left: '10mm',
+          },
+        },
+      );
+      return Buffer.isBuffer(pdfRaw) ? pdfRaw : Buffer.from(pdfRaw);
+    } catch (error) {
+      const mensagem =
+        error instanceof Error ? error.message : 'Falha ao gerar o PDF da fatura no backend.';
+      this.logger.error(`[gerarPdfFatura] ${mensagem}`);
+      throw new BadRequestException('Nao foi possivel gerar o PDF da fatura.');
+    }
+  }
+
+  private toFiniteNumberPdf(value: unknown): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  private formatCurrencyPdf(value: unknown): string {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(this.toFiniteNumberPdf(value));
+  }
+
+  private sanitizarComponenteArquivoPdf(value: string): string {
+    const sanitized = String(value || '')
+      .trim()
+      .replace(/[^a-zA-Z0-9._-]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+    return sanitized || 'sem-numero';
   }
 
   private escapeHtml(value: string): string {

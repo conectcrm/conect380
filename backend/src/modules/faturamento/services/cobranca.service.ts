@@ -190,7 +190,9 @@ export class CobrancaService {
     return planoAtualizado;
   }
 
-  async processarCobrancasRecorrentes(empresaId: string): Promise<void> {
+  async processarCobrancasRecorrentes(
+    empresaId: string,
+  ): Promise<{ processados: number; sucesso: number; falhas: number }> {
     this.logger.log('Iniciando processamento de cobranças recorrentes...');
 
     // Buscar planos ativos que precisam de cobrança
@@ -205,15 +207,25 @@ export class CobrancaService {
 
     this.logger.log(`Encontrados ${planosParaCobranca.length} planos para cobrança`);
 
+    let sucesso = 0;
+    let falhas = 0;
+
     for (const plano of planosParaCobranca) {
       try {
         await this.gerarFaturaRecorrente(plano, empresaId);
+        sucesso += 1;
       } catch (error) {
+        falhas += 1;
         this.logger.error(`Erro ao processar cobrança do plano ${plano.codigo}: ${error.message}`);
       }
     }
 
     this.logger.log('Processamento de cobranças recorrentes concluído');
+    return {
+      processados: planosParaCobranca.length,
+      sucesso,
+      falhas,
+    };
   }
 
   async gerarFaturaRecorrente(plano: PlanoCobranca, empresaId: string): Promise<Fatura> {
@@ -309,7 +321,9 @@ export class CobrancaService {
     }
   }
 
-  async enviarLembreteVencimento(empresaId: string): Promise<void> {
+  async enviarLembreteVencimento(
+    empresaId: string,
+  ): Promise<{ processados: number; sucesso: number; falhas: number }> {
     this.logger.log('Enviando lembretes de vencimento...');
 
     // Buscar planos que precisam de lembrete
@@ -325,15 +339,25 @@ export class CobrancaService {
       .andWhere('contrato.empresa_id = :empresaId', { empresaId })
       .getMany();
 
+    let sucesso = 0;
+    let falhas = 0;
+
     for (const plano of planosLembrete) {
       try {
         await this.enviarEmailLembrete(plano);
+        sucesso += 1;
       } catch (error) {
+        falhas += 1;
         this.logger.error(`Erro ao enviar lembrete para plano ${plano.codigo}: ${error.message}`);
       }
     }
 
     this.logger.log(`Enviados ${planosLembrete.length} lembretes de vencimento`);
+    return {
+      processados: planosLembrete.length,
+      sucesso,
+      falhas,
+    };
   }
 
   private async gerarCodigoPlano(): Promise<string> {

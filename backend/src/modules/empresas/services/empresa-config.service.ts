@@ -10,6 +10,8 @@ type EmpresaConfigSecretField =
   | 'whatsappApiToken'
   | 'smsApiKey'
   | 'pushApiKey'
+  | 'gatewayPagamentoAccessToken'
+  | 'gatewayPagamentoWebhookSecret'
   | 'fiscalOfficialApiToken'
   | 'fiscalOfficialWebhookSecret';
 
@@ -29,6 +31,8 @@ export class EmpresaConfigService {
     'whatsappApiToken',
     'smsApiKey',
     'pushApiKey',
+    'gatewayPagamentoAccessToken',
+    'gatewayPagamentoWebhookSecret',
     'fiscalOfficialApiToken',
     'fiscalOfficialWebhookSecret',
   ];
@@ -39,6 +43,8 @@ export class EmpresaConfigService {
     whatsappApiToken: 'whatsapp_api_token',
     smsApiKey: 'sms_api_key',
     pushApiKey: 'push_api_key',
+    gatewayPagamentoAccessToken: 'gateway_pagamento_access_token',
+    gatewayPagamentoWebhookSecret: 'gateway_pagamento_webhook_secret',
     fiscalOfficialApiToken: 'fiscal_official_api_token',
     fiscalOfficialWebhookSecret: 'fiscal_official_webhook_secret',
   };
@@ -84,6 +90,8 @@ export class EmpresaConfigService {
       .addSelect('cfg.whatsapp_api_token', 'whatsapp_api_token')
       .addSelect('cfg.sms_api_key', 'sms_api_key')
       .addSelect('cfg.push_api_key', 'push_api_key')
+      .addSelect('cfg.gateway_pagamento_access_token', 'gateway_pagamento_access_token')
+      .addSelect('cfg.gateway_pagamento_webhook_secret', 'gateway_pagamento_webhook_secret')
       .addSelect('cfg.fiscal_official_api_token', 'fiscal_official_api_token')
       .addSelect('cfg.fiscal_official_webhook_secret', 'fiscal_official_webhook_secret')
       .where('cfg.id = :id', { id: config.id })
@@ -190,6 +198,25 @@ export class EmpresaConfigService {
     return normalized;
   }
 
+  private normalizarGatewayPagamentoProvider(value: unknown): string | null {
+    if (value === undefined || value === null) {
+      return null;
+    }
+
+    const raw = String(value).trim().toLowerCase();
+    if (!raw) {
+      return null;
+    }
+
+    if (raw === 'mercadopago' || raw === 'mercado_pago' || raw === 'mercado-pago') {
+      return 'mercadopago';
+    }
+
+    throw new BadRequestException(
+      'Gateway de pagamento nao suportado neste estagio. Use "mercadopago".',
+    );
+  }
+
   async getByEmpresaId(empresaId: string): Promise<EmpresaConfig> {
     const config = await this.getOrCreateRawByEmpresaId(empresaId);
     return this.sanitizeSecretsForResponse(config);
@@ -198,6 +225,12 @@ export class EmpresaConfigService {
   async update(empresaId: string, updateDto: UpdateEmpresaConfigDto): Promise<EmpresaConfig> {
     const config = await this.getOrCreateRawByEmpresaId(empresaId);
     const normalizedUpdate = this.normalizeSecretUpdates(config, updateDto);
+
+    if (Object.prototype.hasOwnProperty.call(normalizedUpdate, 'gatewayPagamentoProvider')) {
+      normalizedUpdate.gatewayPagamentoProvider = this.normalizarGatewayPagamentoProvider(
+        normalizedUpdate.gatewayPagamentoProvider,
+      );
+    }
 
     Object.assign(config, normalizedUpdate);
 
@@ -311,6 +344,9 @@ export class EmpresaConfigService {
     // Integracoes
     config.apiHabilitada = false;
     config.webhooksAtivos = 0;
+    config.gatewayPagamentoProvider = null;
+    config.gatewayPagamentoAccessToken = null;
+    config.gatewayPagamentoWebhookSecret = null;
     config.fiscalProvider = null;
     config.fiscalOfficialHttpEnabled = null;
     config.fiscalRequireOfficialProvider = null;

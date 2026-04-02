@@ -14,6 +14,17 @@ export interface EmailEnvioResultado {
   detalhes?: string;
 }
 
+export interface EmailEntregaDiagnostico {
+  operacional: boolean;
+  simulado: boolean;
+  status: 'ok' | 'alerta' | 'bloqueio';
+  detalhe: string;
+  smtpConfigured: boolean;
+  emailsEnabled: boolean;
+  source: 'empresa' | 'env';
+  modoProducao: boolean;
+}
+
 @Injectable()
 export class EmailIntegradoService {
   private transporter: nodemailer.Transporter;
@@ -381,6 +392,68 @@ export class EmailIntegradoService {
       );
       return false;
     }
+  }
+
+  async obterDiagnosticoEntregaEmail(empresaId?: string): Promise<EmailEntregaDiagnostico> {
+    const transportContext = await this.resolveEmailTransportContext(empresaId);
+    const modoProducao = this.isProductionEnv();
+
+    if (!transportContext.emailsEnabled) {
+      return {
+        operacional: false,
+        simulado: false,
+        status: 'bloqueio',
+        detalhe:
+          `Envio de e-mails desabilitado na configuracao da empresa ` +
+          `${empresaId || '[sem-id]'}.`,
+        smtpConfigured: transportContext.smtpConfigured,
+        emailsEnabled: transportContext.emailsEnabled,
+        source: transportContext.source,
+        modoProducao,
+      };
+    }
+
+    if (transportContext.smtpConfigured) {
+      return {
+        operacional: true,
+        simulado: false,
+        status: 'ok',
+        detalhe:
+          transportContext.source === 'empresa'
+            ? 'SMTP da empresa configurado para envio real de cobrancas.'
+            : 'SMTP global do ambiente configurado para envio real de cobrancas.',
+        smtpConfigured: transportContext.smtpConfigured,
+        emailsEnabled: transportContext.emailsEnabled,
+        source: transportContext.source,
+        modoProducao,
+      };
+    }
+
+    if (!modoProducao) {
+      return {
+        operacional: true,
+        simulado: true,
+        status: 'alerta',
+        detalhe:
+          'SMTP nao configurado. Neste ambiente nao-producao os envios serao simulados.',
+        smtpConfigured: transportContext.smtpConfigured,
+        emailsEnabled: transportContext.emailsEnabled,
+        source: transportContext.source,
+        modoProducao,
+      };
+    }
+
+    return {
+      operacional: false,
+      simulado: false,
+      status: 'bloqueio',
+      detalhe:
+        'SMTP nao configurado para producao. Defina SMTP_HOST/SMTP_USER/SMTP_PASS (ou SMTP_PASSWORD).',
+      smtpConfigured: transportContext.smtpConfigured,
+      emailsEnabled: transportContext.emailsEnabled,
+      source: transportContext.source,
+      modoProducao,
+    };
   }
 
   /**

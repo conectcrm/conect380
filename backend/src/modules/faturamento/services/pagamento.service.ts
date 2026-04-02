@@ -1,12 +1,14 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { randomUUID } from 'crypto';
 import { Pagamento, StatusPagamento, TipoPagamento } from '../entities/pagamento.entity';
 import { Fatura, StatusFatura } from '../entities/fatura.entity';
 import {
   CreatePagamentoDto,
   UpdatePagamentoDto,
   ProcessarPagamentoDto,
+  RegistrarPagamentoManualDto,
 } from '../dto/pagamento.dto';
 import { FaturamentoService } from './faturamento.service';
 
@@ -37,11 +39,21 @@ export class PagamentoService {
     return normalized ? normalized.slice(0, 180) : undefined;
   }
 
+  private gerarIdentificadorTransacao(prefixo: string): string {
+    return `${prefixo}_${Date.now()}_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+  }
+
   async criarPagamento(
     createPagamentoDto: CreatePagamentoDto,
     empresaId: string,
   ): Promise<Pagamento> {
     try {
+      const transacaoIdNormalizada =
+        String(createPagamentoDto.transacaoId || '').trim() ||
+        this.gerarIdentificadorTransacao('PAY');
+      const gatewayTransacaoIdNormalizada =
+        String(createPagamentoDto.gatewayTransacaoId || '').trim() || transacaoIdNormalizada;
+
       // Verificar se a fatura existe
       const fatura = await this.faturaRepository.findOne({
         where: { id: createPagamentoDto.faturaId, empresaId },
@@ -59,7 +71,7 @@ export class PagamentoService {
       // Verificar se j existe pagamento com o mesmo transacaoId
       const pagamentoExistente = await this.pagamentoRepository.findOne({
         where: {
-          transacaoId: createPagamentoDto.transacaoId,
+          transacaoId: transacaoIdNormalizada,
           empresaId,
         },
       });
@@ -74,6 +86,8 @@ export class PagamentoService {
 
       const pagamento = this.pagamentoRepository.create({
         ...createPagamentoDto,
+        transacaoId: transacaoIdNormalizada,
+        gatewayTransacaoId: gatewayTransacaoIdNormalizada,
         valorLiquido,
         status: StatusPagamento.PENDENTE,
         empresaId,
@@ -90,6 +104,50 @@ export class PagamentoService {
       this.logger.error(`Erro ao criar pagamento: ${error.message}`);
       throw error;
     }
+  }
+
+  async registrarPagamentoManual(
+    registrarPagamentoDto: RegistrarPagamentoManualDto,
+    empresaId: string,
+  ): Promise<Pagamento> {
+    const correlationId = this.normalizeTraceId(registrarPagamentoDto.correlationId);
+    const origemId = this.normalizeTraceId(registrarPagamentoDto.origemId);
+    const transacaoId = this.gerarIdentificadorTransacao('MANUAL');
+
+    const pagamentoCriado = await this.criarPagamento(
+      {
+        faturaId: registrarPagamentoDto.faturaId,
+        transacaoId,
+        tipo: TipoPagamento.PAGAMENTO,
+        valor: registrarPagamentoDto.valor,
+        metodoPagamento: registrarPagamentoDto.metodoPagamento,
+        gateway: 'manual',
+        gatewayTransacaoId: transacaoId,
+        observacoes: registrarPagamentoDto.observacoes,
+        dadosCompletos: {
+          source: 'financeiro_manual',
+          correlationId,
+          origemId,
+          dataPagamentoInformada: registrarPagamentoDto.dataPagamento,
+        },
+      },
+      empresaId,
+    );
+
+    return this.processarPagamento(
+      {
+        gatewayTransacaoId: pagamentoCriado.gatewayTransacaoId,
+        novoStatus: StatusPagamento.APROVADO,
+        webhookData: {
+          source: 'financeiro_manual',
+          registradoEm: new Date().toISOString(),
+          dataPagamentoInformada: registrarPagamentoDto.dataPagamento,
+        },
+        correlationId,
+        origemId,
+      },
+      empresaId,
+    );
   }
 
   async processarPagamento(

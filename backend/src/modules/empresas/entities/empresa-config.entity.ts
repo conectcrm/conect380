@@ -298,6 +298,23 @@ export class EmpresaConfig {
   @Column({ name: 'webhooks_ativos', default: 0 })
   webhooksAtivos: number;
 
+  @Column({ name: 'gateway_pagamento_provider', nullable: true })
+  gatewayPagamentoProvider: string | null;
+
+  @Column({
+    name: 'gateway_pagamento_access_token',
+    nullable: true,
+    transformer: encryptedNullableStringTransformer,
+  })
+  gatewayPagamentoAccessToken: string | null;
+
+  @Column({
+    name: 'gateway_pagamento_webhook_secret',
+    nullable: true,
+    transformer: encryptedNullableStringTransformer,
+  })
+  gatewayPagamentoWebhookSecret: string | null;
+
   @Column({ name: 'fiscal_provider', nullable: true })
   fiscalProvider: string | null;
 

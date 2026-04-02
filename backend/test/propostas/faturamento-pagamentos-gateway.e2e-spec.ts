@@ -6,8 +6,54 @@ import { CreateWebhooksGatewayEventos1802885000000 } from '../../src/migrations/
 describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
   let h: SalesFlowE2EHarness;
   const suiteTimeoutMs = Number(process.env.E2E_SALES_SUITE_TIMEOUT_MS || 240_000);
+  type WebhookGatewayProvider = 'mercado_pago' | 'stripe' | 'pagseguro';
+  const webhookProviderPriority: WebhookGatewayProvider[] = ['pagseguro', 'mercado_pago', 'stripe'];
 
   jest.setTimeout(suiteTimeoutMs);
+
+  function parseGatewayProviderToken(token: string): WebhookGatewayProvider | null {
+    const normalized = String(token || '')
+      .trim()
+      .toLowerCase();
+
+    if (normalized === 'mercado_pago' || normalized === 'mercadopago') return 'mercado_pago';
+    if (normalized === 'stripe') return 'stripe';
+    if (normalized === 'pagseguro') return 'pagseguro';
+    return null;
+  }
+
+  function resolveWebhookGatewayProvider(): WebhookGatewayProvider {
+    const rawEnabledProviders = String(process.env.PAGAMENTOS_GATEWAY_ENABLED_PROVIDERS || '')
+      .split(',')
+      .map((token) => parseGatewayProviderToken(token))
+      .filter((token): token is WebhookGatewayProvider => Boolean(token));
+
+    if (!rawEnabledProviders.length) {
+      return 'pagseguro';
+    }
+
+    for (const provider of webhookProviderPriority) {
+      if (rawEnabledProviders.includes(provider)) {
+        return provider;
+      }
+    }
+
+    return rawEnabledProviders[0];
+  }
+
+  function buildGatewayCredentials(provider: WebhookGatewayProvider): Record<string, string> {
+    switch (provider) {
+      case 'mercado_pago':
+        return { access_token: `mp-token-${h.runId}` };
+      case 'stripe':
+        return { api_key: `stripe-key-${h.runId}` };
+      case 'pagseguro':
+      default:
+        return { token: `fake-${h.runId}` };
+    }
+  }
+
+  const webhookGatewayProvider = resolveWebhookGatewayProvider();
 
   beforeAll(async () => {
     h = new SalesFlowE2EHarness();
@@ -159,17 +205,17 @@ describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
     };
   }
 
-  async function garantirConfiguracaoWebhookPagSeguro(webhookSecret: string): Promise<void> {
+  async function garantirConfiguracaoWebhookGateway(webhookSecret: string): Promise<void> {
     const configResponse = await request(h.httpServer)
       .post('/pagamentos/gateways/configuracoes')
       .set('Authorization', `Bearer ${h.tokenAdminEmpresaA}`)
       .send({
-        nome: `PagSeguro Webhook ${h.runId}`,
-        gateway: 'pagseguro',
+        nome: `${webhookGatewayProvider} Webhook ${h.runId}`,
+        gateway: webhookGatewayProvider,
         modoOperacao: 'sandbox',
         status: 'ativo',
         webhookSecret,
-        credenciais: { token: `fake-${h.runId}` },
+        credenciais: buildGatewayCredentials(webhookGatewayProvider),
       });
 
     expect([200, 201, 409]).toContain(configResponse.status);
@@ -287,7 +333,7 @@ describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
 
   it('processa webhook valido com assinatura, sincroniza pagamento e registra auditoria idempotente', async () => {
     const webhookSecret = `whsec-${h.runId}`;
-    await garantirConfiguracaoWebhookPagSeguro(webhookSecret);
+    await garantirConfiguracaoWebhookGateway(webhookSecret);
 
     const { faturaId, pagamentoId, gatewayTransacaoId, valorPagamento } = await criarPagamentoPendente();
     const eventId = `evt-whk-${h.runId}-${Date.now()}`;
@@ -304,7 +350,7 @@ describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
       'sha256=' + createHmac('sha256', webhookSecret).update(JSON.stringify(payload)).digest('hex');
 
     const response = await request(h.httpServer)
-      .post(`/pagamentos/gateways/webhooks/pagseguro/${h.empresaAId}`)
+      .post(`/pagamentos/gateways/webhooks/${webhookGatewayProvider}/${h.empresaAId}`)
       .set('x-signature', signature)
       .set('x-event-id', eventId)
       .send(payload);
@@ -339,7 +385,7 @@ describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
         WHERE empresa_id = $1 AND gateway = $2 AND idempotency_key = $3
         ORDER BY created_at DESC
       `,
-      [h.empresaAId, 'pagseguro', eventId],
+      [h.empresaAId, webhookGatewayProvider, eventId],
     );
 
     expect(auditoria).toHaveLength(1);
@@ -350,7 +396,7 @@ describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
     expect(auditoria[0].processado_em).toBeTruthy();
 
     const duplicateResponse = await request(h.httpServer)
-      .post(`/pagamentos/gateways/webhooks/pagseguro/${h.empresaAId}`)
+      .post(`/pagamentos/gateways/webhooks/${webhookGatewayProvider}/${h.empresaAId}`)
       .set('x-signature', signature)
       .set('x-event-id', eventId)
       .send(payload);
@@ -370,7 +416,7 @@ describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
         FROM webhooks_gateway_eventos
         WHERE empresa_id = $1 AND gateway = $2 AND idempotency_key = $3
       `,
-      [h.empresaAId, 'pagseguro', eventId],
+      [h.empresaAId, webhookGatewayProvider, eventId],
     );
 
     expect(Number(auditoriaPosDuplicado[0].total)).toBe(1);
@@ -378,7 +424,7 @@ describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
 
   it('consulta trilha de auditoria por correlationId no fluxo webhook', async () => {
     const webhookSecret = `whsec-${h.runId}`;
-    await garantirConfiguracaoWebhookPagSeguro(webhookSecret);
+    await garantirConfiguracaoWebhookGateway(webhookSecret);
 
     const { gatewayTransacaoId, valorPagamento } = await criarPagamentoPendente();
     const eventId = `evt-whk-corr-${h.runId}-${Date.now()}`;
@@ -396,7 +442,7 @@ describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
       'sha256=' + createHmac('sha256', webhookSecret).update(JSON.stringify(payload)).digest('hex');
 
     const webhookResponse = await request(h.httpServer)
-      .post(`/pagamentos/gateways/webhooks/pagseguro/${h.empresaAId}`)
+      .post(`/pagamentos/gateways/webhooks/${webhookGatewayProvider}/${h.empresaAId}`)
       .set('x-signature', signature)
       .set('x-event-id', eventId)
       .set('x-correlation-id', correlationId)
@@ -423,7 +469,7 @@ describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
 
   it('processa webhook rejected e sincroniza pagamento com motivo de rejeicao', async () => {
     const webhookSecret = `whsec-${h.runId}`;
-    await garantirConfiguracaoWebhookPagSeguro(webhookSecret);
+    await garantirConfiguracaoWebhookGateway(webhookSecret);
 
     const { faturaId, pagamentoId, gatewayTransacaoId, valorPagamento } = await criarPagamentoPendente();
     const eventId = `evt-whk-rejected-${h.runId}-${Date.now()}`;
@@ -440,7 +486,7 @@ describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
       'sha256=' + createHmac('sha256', webhookSecret).update(JSON.stringify(payload)).digest('hex');
 
     const response = await request(h.httpServer)
-      .post(`/pagamentos/gateways/webhooks/pagseguro/${h.empresaAId}`)
+      .post(`/pagamentos/gateways/webhooks/${webhookGatewayProvider}/${h.empresaAId}`)
       .set('x-signature', signature)
       .set('x-event-id', eventId)
       .send(payload);
@@ -476,7 +522,7 @@ describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
         WHERE empresa_id = $1 AND gateway = $2 AND idempotency_key = $3
         ORDER BY created_at DESC
       `,
-      [h.empresaAId, 'pagseguro', eventId],
+      [h.empresaAId, webhookGatewayProvider, eventId],
     );
 
     expect(auditoria).toHaveLength(1);
@@ -489,7 +535,7 @@ describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
 
   it('reabre recebivel quando pagamento aprovado recebe rejeicao posterior', async () => {
     const webhookSecret = `whsec-${h.runId}`;
-    await garantirConfiguracaoWebhookPagSeguro(webhookSecret);
+    await garantirConfiguracaoWebhookGateway(webhookSecret);
 
     const { faturaId, pagamentoId, gatewayTransacaoId, valorPagamento } = await criarPagamentoPendente();
 
@@ -505,7 +551,7 @@ describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
       'sha256=' + createHmac('sha256', webhookSecret).update(JSON.stringify(payloadAprovado)).digest('hex');
 
     const aprovadoResponse = await request(h.httpServer)
-      .post(`/pagamentos/gateways/webhooks/pagseguro/${h.empresaAId}`)
+      .post(`/pagamentos/gateways/webhooks/${webhookGatewayProvider}/${h.empresaAId}`)
       .set('x-signature', assinaturaAprovado)
       .set('x-event-id', payloadAprovado.eventId)
       .send(payloadAprovado);
@@ -525,7 +571,7 @@ describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
       'sha256=' + createHmac('sha256', webhookSecret).update(JSON.stringify(payloadRejeitado)).digest('hex');
 
     const rejeitadoResponse = await request(h.httpServer)
-      .post(`/pagamentos/gateways/webhooks/pagseguro/${h.empresaAId}`)
+      .post(`/pagamentos/gateways/webhooks/${webhookGatewayProvider}/${h.empresaAId}`)
       .set('x-signature', assinaturaRejeitado)
       .set('x-event-id', payloadRejeitado.eventId)
       .send(payloadRejeitado);
@@ -680,9 +726,23 @@ describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
           credenciais: { access_token: 'mp-fake-token' },
         });
 
-      expect([200, 201]).toContain(cfgResponse.status);
-      expect(cfgResponse.body?.id).toBeTruthy();
-      h.configuracaoGatewayEmpresaAId = cfgResponse.body.id as string;
+      expect([200, 201, 409]).toContain(cfgResponse.status);
+      if (cfgResponse.status === 409) {
+        const listResponse = await request(h.httpServer)
+          .get('/pagamentos/gateways/configuracoes')
+          .set('Authorization', `Bearer ${h.tokenAdminEmpresaA}`)
+          .set('x-forwarded-proto', 'https');
+
+        expect(listResponse.status).toBe(200);
+        const existingConfig = (listResponse.body || []).find(
+          (config: any) => config.gateway === 'mercado_pago' && config.modoOperacao === 'sandbox',
+        );
+        expect(existingConfig).toBeDefined();
+        h.configuracaoGatewayEmpresaAId = existingConfig.id as string;
+      } else {
+        expect(cfgResponse.body?.id).toBeTruthy();
+        h.configuracaoGatewayEmpresaAId = cfgResponse.body.id as string;
+      }
 
       process.env.PAGAMENTOS_GATEWAY_ENABLED_PROVIDERS = 'stripe';
 

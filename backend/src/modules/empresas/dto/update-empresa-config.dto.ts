@@ -3,6 +3,7 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsIn,
   IsInt,
   IsNumber,
   IsOptional,
@@ -164,6 +165,18 @@ export class UpdateEmpresaConfigDto {
   @IsInt()
   @Min(0)
   webhooksAtivos?: number;
+
+  @IsOptional()
+  @IsIn(['mercadopago', 'mercado_pago', 'mercado-pago'])
+  gatewayPagamentoProvider?: string;
+
+  @IsOptional()
+  @IsString()
+  gatewayPagamentoAccessToken?: string;
+
+  @IsOptional()
+  @IsString()
+  gatewayPagamentoWebhookSecret?: string;
 
   // Integracoes fiscais (multi-CNPJ)
   @IsOptional()

@@ -966,24 +966,58 @@ export class MercadoPagoService {
     }
   }
 
-  async createPreference(preferenceData: any) {
+  async createPreference(
+    preferenceData: any,
+    options?: { accessTokenOverride?: string | null },
+  ) {
     try {
-      this.assertCheckoutReady();
+      const accessTokenOverride = String(options?.accessTokenOverride || '').trim() || null;
+      const mockMode = this.isMockMode();
 
-      if (!this.preferenceApi) {
-        if (this.isMockMode()) {
+      if (!accessTokenOverride) {
+        this.assertCheckoutReady();
+      }
+
+      if (!this.preferenceApi && !accessTokenOverride) {
+        if (mockMode) {
           this.logger.warn(
-            'Mercado Pago em modo MOCK: criando preferÃªncia fake (sem chamada externa)',
+            'Mercado Pago em modo MOCK: criando preferência fake (sem chamada externa)',
           );
           return this.buildMockPreference();
         }
 
         throw new Error(
-          'Mercado Pago nÃ£o inicializado. Configure MERCADO_PAGO_ACCESS_TOKEN ou habilite MERCADO_PAGO_MOCK=true para desenvolvimento.',
+          'Mercado Pago não inicializado. Configure MERCADO_PAGO_ACCESS_TOKEN ou habilite MERCADO_PAGO_MOCK=true para desenvolvimento.',
         );
       }
 
-      const preference = await this.preferenceApi.create({
+      const preferenceApi =
+        accessTokenOverride && accessTokenOverride.length > 0
+          ? new Preference(
+              new MercadoPagoConfig({
+                accessToken: accessTokenOverride,
+                options: {
+                  timeout: 5000,
+                  idempotencyKey: 'TENANT',
+                },
+              }),
+            )
+          : this.preferenceApi;
+
+      if (!preferenceApi) {
+        if (mockMode) {
+          this.logger.warn(
+            'Mercado Pago em modo MOCK: criando preferência fake (sem chamada externa)',
+          );
+          return this.buildMockPreference();
+        }
+
+        throw new Error(
+          'Mercado Pago não inicializado. Configure MERCADO_PAGO_ACCESS_TOKEN ou habilite MERCADO_PAGO_MOCK=true para desenvolvimento.',
+        );
+      }
+
+      const preference = await preferenceApi.create({
         body: {
           items: preferenceData.items,
           payer: {
@@ -1011,10 +1045,10 @@ export class MercadoPagoService {
         },
       });
 
-      this.logger.log(`PreferÃªncia criada: ${preference.id}`);
+      this.logger.log(`Preferência criada: ${preference.id}`);
       return preference;
     } catch (error) {
-      this.logger.error('Erro ao criar preferÃªncia:', error);
+      this.logger.error('Erro ao criar preferência:', error);
       throw error;
     }
   }
@@ -1658,3 +1692,4 @@ export class MercadoPagoService {
     }
   }
 }
+

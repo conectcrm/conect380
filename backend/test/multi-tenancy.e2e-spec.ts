@@ -1577,12 +1577,12 @@ describe('Multi-Tenancy Isolation (E2E)', () => {
 
     it('Empresa 2 deve cadastrar configuração independente', async () => {
       const payload = {
-        nome: 'Gateway Stripe Empresa 2',
-        gateway: 'stripe',
-        modoOperacao: 'producao',
+        nome: 'Gateway Mercado Pago Empresa 2',
+        gateway: 'mercado_pago',
+        modoOperacao: 'sandbox',
         status: 'ativo',
-        credenciais: { api_key: 'stripe-key-empresa-2' },
-        metodosPermitidos: ['cartao_credito'],
+        credenciais: { access_token: 'mp-token-empresa-2' },
+        metodosPermitidos: ['pix', 'cartao_credito'],
       };
 
       const response = await request(app.getHttpServer())

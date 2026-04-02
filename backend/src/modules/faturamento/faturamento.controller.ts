@@ -14,6 +14,7 @@ import { Logger,
   HttpCode,
   HttpException,
   Req,
+  Res,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
@@ -25,7 +26,6 @@ import { CurrentUser } from '../../common/decorators/user.decorator';
 import { FaturamentoService } from './services/faturamento.service';
 import { PagamentoService } from './services/pagamento.service';
 import { CobrancaService } from './services/cobranca.service';
-import { DocumentoFiscalService } from './services/documento-fiscal.service';
 import {
   CreateFaturaDto,
   UpdateFaturaDto,
@@ -34,41 +34,61 @@ import {
   GerarNumeroDocumentoFinanceiroDto,
 } from './dto/fatura.dto';
 import {
-  CancelarDocumentoFiscalDto,
-  CriarRascunhoDocumentoFiscalDto,
-  EmitirDocumentoFiscalDto,
-} from './dto/documento-fiscal.dto';
-import { CreatePagamentoDto, UpdatePagamentoDto, ProcessarPagamentoDto } from './dto/pagamento.dto';
+  CreatePagamentoDto,
+  UpdatePagamentoDto,
+  ProcessarPagamentoDto,
+  RegistrarPagamentoManualDto,
+} from './dto/pagamento.dto';
 import { CreatePlanoCobrancaDto, UpdatePlanoCobrancaDto } from './dto/plano-cobranca.dto';
-import { StatusFatura } from './entities/fatura.entity';
-import { StatusPagamento } from './entities/pagamento.entity';
-import { StatusPlanoCobranca } from './entities/plano-cobranca.entity';
 import { EnvioFaturaEmailOpcoes, ResultadoCobrancaLote } from './services/faturamento.service';
-import { getFinanceiroFeatureFlags } from './financeiro-feature-flags';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
+
+type StatusFatura =
+  | 'pendente'
+  | 'enviada'
+  | 'paga'
+  | 'vencida'
+  | 'cancelada'
+  | 'parcialmente_paga';
+type StatusPagamento =
+  | 'pendente'
+  | 'processando'
+  | 'aprovado'
+  | 'rejeitado'
+  | 'cancelado'
+  | 'estornado';
+type StatusPlanoCobranca = 'ativo' | 'pausado' | 'cancelado' | 'expirado';
 
 @Controller('faturamento')
 @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
 export class FaturamentoController {
   private readonly logger = new Logger(FaturamentoController.name);
-  private readonly financeiroFeatureFlags = getFinanceiroFeatureFlags();
+  private readonly camposOrdenacaoPermitidos = new Set([
+    'createdAt',
+    'dataVencimento',
+    'valorTotal',
+    'numero',
+  ]);
 
   constructor(
     private readonly faturamentoService: FaturamentoService,
     private readonly pagamentoService: PagamentoService,
     private readonly cobrancaService: CobrancaService,
-    private readonly documentoFiscalService: DocumentoFiscalService,
   ) {}
 
-  private garantirDocumentoFiscalHabilitado(): void {
-    if (this.financeiroFeatureFlags.fiscalDocumentsEnabled) {
-      return;
+  private sanitizarSortBy(
+    sortBy?: string,
+  ): 'createdAt' | 'dataVencimento' | 'valorTotal' | 'numero' {
+    const valor = String(sortBy || '').trim();
+    if (this.camposOrdenacaoPermitidos.has(valor)) {
+      return valor as 'createdAt' | 'dataVencimento' | 'valorTotal' | 'numero';
     }
 
-    throw new BadRequestException(
-      this.financeiroFeatureFlags.fiscalDisabledReason ||
-        'Emissao fiscal (NF-e/NFS-e) desabilitada neste ambiente.',
-    );
+    return 'createdAt';
+  }
+
+  private sanitizarSortOrder(sortOrder?: string): 'ASC' | 'DESC' {
+    return String(sortOrder || '').trim().toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
   }
 
   // ==================== FATURAS ====================
@@ -115,7 +135,7 @@ export class FaturamentoController {
       const fatura = await this.faturamentoService.gerarFaturaAutomatica(gerarFaturaDto, empresaId);
       return {
         status: HttpStatus.CREATED,
-        message: 'Fatura automática gerada com sucesso',
+        message: 'Fatura automÃ¡tica gerada com sucesso',
         data: fatura,
       };
     } catch (error) {
@@ -139,11 +159,13 @@ export class FaturamentoController {
     @Query('sortBy') sortBy: 'createdAt' | 'dataVencimento' | 'valorTotal' | 'numero' = 'createdAt',
     @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'DESC',
   ) {
+    const sortBySeguro = this.sanitizarSortBy(sortBy);
+    const sortOrderSeguro = this.sanitizarSortOrder(sortOrder);
     const periodoCampoFiltro: 'emissao' | 'vencimento' =
       periodoCampo === 'vencimento' ? 'vencimento' : 'emissao';
 
     const filtros = {
-      status,
+      status: status as any,
       clienteId: clienteId?.trim() || undefined,
       contratoId: contratoId ? Number(contratoId) : undefined,
       dataInicio: dataInicio ? new Date(dataInicio) : undefined,
@@ -152,13 +174,13 @@ export class FaturamentoController {
       q,
     };
 
-    // Mantém compatibilidade com implementações que esperam paginação flat
+    // MantÃ©m compatibilidade com implementaÃ§Ãµes que esperam paginaÃ§Ã£o flat
     const paginated = await this.faturamentoService.buscarFaturasPaginadas(
       empresaId,
       Number(page) || 1,
       Number(pageSize) || 10,
-      sortBy,
-      sortOrder,
+      sortBySeguro,
+      sortOrderSeguro,
       filtros,
     );
 
@@ -190,11 +212,13 @@ export class FaturamentoController {
     @Query('sortBy') sortBy: 'createdAt' | 'dataVencimento' | 'valorTotal' | 'numero' = 'createdAt',
     @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'DESC',
   ) {
+    const sortBySeguro = this.sanitizarSortBy(sortBy);
+    const sortOrderSeguro = this.sanitizarSortOrder(sortOrder);
     const periodoCampoFiltro: 'emissao' | 'vencimento' =
       periodoCampo === 'vencimento' ? 'vencimento' : 'emissao';
 
     const filtros = {
-      status,
+      status: status as any,
       clienteId: clienteId?.trim() || undefined,
       contratoId: contratoId ? Number(contratoId) : undefined,
       dataInicio: dataInicio ? new Date(dataInicio) : undefined,
@@ -207,8 +231,8 @@ export class FaturamentoController {
       empresaId,
       Number(page) || 1,
       Number(pageSize) || 10,
-      sortBy,
-      sortOrder,
+      sortBySeguro,
+      sortOrderSeguro,
       filtros,
     );
 
@@ -290,141 +314,6 @@ export class FaturamentoController {
       status: HttpStatus.OK,
       message: 'Link de pagamento gerado com sucesso',
       data: resultado,
-    };
-  }
-
-  @Post('faturas/:id/documento-fiscal/rascunho')
-  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
-  async criarRascunhoDocumentoFiscal(
-    @Param('id', ParseIntPipe) id: number,
-    @EmpresaId() empresaId: string,
-    @Body() payload: CriarRascunhoDocumentoFiscalDto,
-    @CurrentUser() user: { id?: string; sub?: string },
-  ) {
-    this.garantirDocumentoFiscalHabilitado();
-    const userId = user?.id || user?.sub;
-    const statusFiscal = await this.documentoFiscalService.criarRascunho(
-      id,
-      empresaId,
-      payload,
-      userId,
-    );
-
-    return {
-      status: HttpStatus.OK,
-      message: 'Rascunho fiscal atualizado com sucesso',
-      data: statusFiscal,
-    };
-  }
-
-  @Post('faturas/:id/documento-fiscal/emitir')
-  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
-  async emitirDocumentoFiscal(
-    @Param('id', ParseIntPipe) id: number,
-    @EmpresaId() empresaId: string,
-    @Body() payload: EmitirDocumentoFiscalDto,
-    @CurrentUser() user: { id?: string; sub?: string },
-  ) {
-    this.garantirDocumentoFiscalHabilitado();
-    const userId = user?.id || user?.sub;
-    const statusFiscal = await this.documentoFiscalService.emitir(id, empresaId, payload, userId);
-
-    return {
-      status: HttpStatus.OK,
-      message: 'Documento fiscal emitido com sucesso',
-      data: statusFiscal,
-    };
-  }
-
-  @Get('faturas/:id/documento-fiscal/status')
-  @Permissions(Permission.FINANCEIRO_FATURAMENTO_READ)
-  async consultarStatusDocumentoFiscal(
-    @Param('id', ParseIntPipe) id: number,
-    @EmpresaId() empresaId: string,
-    @Query('sincronizar') sincronizar?: string,
-    @CurrentUser() user?: { id?: string; sub?: string },
-  ) {
-    this.garantirDocumentoFiscalHabilitado();
-    const sincronizarStatus = ['1', 'true', 'sim', 'yes'].includes(
-      String(sincronizar || '')
-        .trim()
-        .toLowerCase(),
-    );
-    const statusFiscal = await this.documentoFiscalService.consultarStatus(id, empresaId, {
-      sincronizar: sincronizarStatus,
-      userId: user?.id || user?.sub,
-    });
-
-    return {
-      status: HttpStatus.OK,
-      message: 'Status fiscal recuperado com sucesso',
-      data: statusFiscal,
-    };
-  }
-
-  @Get('documento-fiscal/configuracao')
-  @Permissions(Permission.FINANCEIRO_FATURAMENTO_READ)
-  async obterDiagnosticoConfiguracaoDocumentoFiscal(@EmpresaId() empresaId: string) {
-    this.garantirDocumentoFiscalHabilitado();
-    const diagnostico =
-      await this.documentoFiscalService.obterDiagnosticoConfiguracaoFiscalPorEmpresa(empresaId);
-
-    return {
-      status: HttpStatus.OK,
-      message: 'Diagnostico de configuracao fiscal recuperado com sucesso',
-      data: diagnostico,
-    };
-  }
-
-  @Get('documento-fiscal/conectividade')
-  @Permissions(Permission.FINANCEIRO_FATURAMENTO_READ)
-  async testarConectividadeDocumentoFiscal(@EmpresaId() empresaId: string) {
-    this.garantirDocumentoFiscalHabilitado();
-    const diagnostico = await this.documentoFiscalService.testarConectividadeProviderFiscal(
-      empresaId,
-    );
-
-    return {
-      status: HttpStatus.OK,
-      message: 'Teste de conectividade fiscal executado com sucesso',
-      data: diagnostico,
-    };
-  }
-
-  @Get('documento-fiscal/preflight')
-  @Permissions(Permission.FINANCEIRO_FATURAMENTO_READ)
-  async executarPreflightDocumentoFiscal(@EmpresaId() empresaId: string) {
-    this.garantirDocumentoFiscalHabilitado();
-    const diagnostico = await this.documentoFiscalService.executarPreflightFiscal(empresaId);
-
-    return {
-      status: HttpStatus.OK,
-      message: 'Preflight fiscal executado com sucesso',
-      data: diagnostico,
-    };
-  }
-
-  @Post('faturas/:id/documento-fiscal/cancelar')
-  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
-  async cancelarOuInutilizarDocumentoFiscal(
-    @Param('id', ParseIntPipe) id: number,
-    @EmpresaId() empresaId: string,
-    @Body() payload: CancelarDocumentoFiscalDto,
-    @CurrentUser() user: { id?: string; sub?: string },
-  ) {
-    this.garantirDocumentoFiscalHabilitado();
-    const userId = user?.id || user?.sub;
-    const statusFiscal = await this.documentoFiscalService.cancelarOuInutilizar(
-      id,
-      empresaId,
-      payload,
-      userId,
-    );
-
-    return {
-      status: HttpStatus.OK,
-      message: 'Status do documento fiscal atualizado com sucesso',
-      data: statusFiscal,
     };
   }
 
@@ -545,6 +434,54 @@ export class FaturamentoController {
     };
   }
 
+  @Get('faturas/:id/pdf')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_READ)
+  async baixarPdfFatura(
+    @Param('id', ParseIntPipe) id: number,
+    @EmpresaId() empresaId: string,
+    @Res() res: Response,
+  ) {
+    const resultado = await this.faturamentoService.gerarPdfFatura(id, empresaId);
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${resultado.filename}"`,
+      'Content-Length': resultado.buffer.length,
+    });
+
+    res.send(resultado.buffer);
+  }
+
+  @Post('faturas/cobranca-vencidas')
+  @HttpCode(HttpStatus.OK)
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
+  async gerarCobrancaFaturasVencidas(@EmpresaId() empresaId: string) {
+    const resultado = await this.faturamentoService.gerarCobrancaFaturasVencidas(empresaId);
+
+    return {
+      status: HttpStatus.OK,
+      message:
+        `Cobranca de vencidas concluida: ` +
+        `${resultado.sucesso} envio(s) real(is), ` +
+        `${resultado.simuladas} simulado(s), ` +
+        `${resultado.falhas} falha(s), ` +
+        `${resultado.ignoradas} ignorada(s).`,
+      data: resultado,
+    };
+  }
+
+  @Get('operacao/prontidao-cobranca')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_READ)
+  async obterProntidaoCobranca(@EmpresaId() empresaId: string) {
+    const prontidao = await this.faturamentoService.obterProntidaoCobranca(empresaId);
+
+    return {
+      status: HttpStatus.OK,
+      message: 'Prontidao de cobranca recuperada com sucesso',
+      data: prontidao,
+    };
+  }
+
   @Delete('faturas/:id')
   @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
   async excluirFatura(
@@ -552,22 +489,22 @@ export class FaturamentoController {
     @EmpresaId() empresaId: string,
     @CurrentUser() user: { id?: string; sub?: string },
   ) {
-    this.logger.log(`🔍 [CONTROLLER] DELETE /faturamento/faturas/${id} - Iniciando exclusão`);
+    this.logger.log(`ðŸ” [CONTROLLER] DELETE /faturamento/faturas/${id} - Iniciando exclusÃ£o`);
 
     try {
-      this.logger.log(`🔍 [CONTROLLER] Chamando excluirFatura para ID: ${id}`);
+      this.logger.log(`ðŸ” [CONTROLLER] Chamando excluirFatura para ID: ${id}`);
       const userId = user?.id || user?.sub;
       await this.faturamentoService.excluirFatura(id, empresaId, userId);
 
-      this.logger.log(`🔍 [CONTROLLER] Fatura ${id} excluída com sucesso`);
+      this.logger.log(`ðŸ” [CONTROLLER] Fatura ${id} excluÃ­da com sucesso`);
       return {
         status: HttpStatus.OK,
-        message: 'Fatura excluída com sucesso',
+        message: 'Fatura excluÃ­da com sucesso',
         data: { id },
       };
     } catch (error) {
-      this.logger.log(`🔍 [CONTROLLER] Erro ao excluir fatura ID ${id}: ${error.message}`);
-      this.logger.log(`🔍 [CONTROLLER] Stack trace: ${error.stack}`);
+      this.logger.log(`ðŸ” [CONTROLLER] Erro ao excluir fatura ID ${id}: ${error.message}`);
+      this.logger.log(`ðŸ” [CONTROLLER] Stack trace: ${error.stack}`);
       throw new BadRequestException(error.message);
     }
   }
@@ -585,6 +522,30 @@ export class FaturamentoController {
       return {
         status: HttpStatus.CREATED,
         message: 'Pagamento criado com sucesso',
+        data: pagamento,
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @Post('pagamentos/manual')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  async registrarPagamentoManual(
+    @Body() registrarPagamentoDto: RegistrarPagamentoManualDto,
+    @EmpresaId() empresaId: string,
+  ) {
+    try {
+      const pagamento = await this.pagamentoService.registrarPagamentoManual(
+        registrarPagamentoDto,
+        empresaId,
+      );
+      return {
+        status: HttpStatus.CREATED,
+        message: 'Pagamento manual registrado com sucesso',
         data: pagamento,
       };
     } catch (error) {
@@ -647,7 +608,7 @@ export class FaturamentoController {
   ) {
     const filtros = {
       faturaId: faturaId ? Number(faturaId) : undefined,
-      status,
+      status: status as any,
       metodoPagamento,
       gateway,
       dataInicio: dataInicio ? new Date(dataInicio) : undefined,
@@ -763,12 +724,12 @@ export class FaturamentoController {
 
     return {
       status: HttpStatus.OK,
-      message: 'Estatísticas recuperadas com sucesso',
+      message: 'EstatÃ­sticas recuperadas com sucesso',
       data: estatisticas,
     };
   }
 
-  // ==================== PLANOS DE COBRANÇA ====================
+  // ==================== PLANOS DE COBRANÃ‡A ====================
 
   @Post('planos-cobranca')
   @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
@@ -780,7 +741,7 @@ export class FaturamentoController {
       const plano = await this.cobrancaService.criarPlanoCobranca(createPlanoDto, empresaId);
       return {
         status: HttpStatus.CREATED,
-        message: 'Plano de cobrança criado com sucesso',
+        message: 'Plano de cobranÃ§a criado com sucesso',
         data: plano,
       };
     } catch (error) {
@@ -798,7 +759,7 @@ export class FaturamentoController {
   ) {
     const contratoIdNumber = contratoId ? Number(contratoId) : undefined;
     const filtros = {
-      status,
+      status: status as any,
       clienteId: clienteId?.trim() || undefined,
       contratoId: Number.isFinite(contratoIdNumber) ? contratoIdNumber : undefined,
     };
@@ -806,7 +767,7 @@ export class FaturamentoController {
 
     return {
       status: HttpStatus.OK,
-      message: 'Planos de cobrança recuperados com sucesso',
+      message: 'Planos de cobranÃ§a recuperados com sucesso',
       data: planos,
       total: planos.length,
     };
@@ -819,7 +780,7 @@ export class FaturamentoController {
 
     return {
       status: HttpStatus.OK,
-      message: 'Plano de cobrança encontrado',
+      message: 'Plano de cobranÃ§a encontrado',
       data: plano,
     };
   }
@@ -831,7 +792,7 @@ export class FaturamentoController {
 
     return {
       status: HttpStatus.OK,
-      message: 'Plano de cobrança encontrado',
+      message: 'Plano de cobranÃ§a encontrado',
       data: plano,
     };
   }
@@ -847,7 +808,7 @@ export class FaturamentoController {
 
     return {
       status: HttpStatus.OK,
-      message: 'Plano de cobrança atualizado com sucesso',
+      message: 'Plano de cobranÃ§a atualizado com sucesso',
       data: plano,
     };
   }
@@ -859,7 +820,7 @@ export class FaturamentoController {
 
     return {
       status: HttpStatus.OK,
-      message: 'Plano de cobrança pausado com sucesso',
+      message: 'Plano de cobranÃ§a pausado com sucesso',
       data: plano,
     };
   }
@@ -874,7 +835,7 @@ export class FaturamentoController {
 
     return {
       status: HttpStatus.OK,
-      message: 'Plano de cobrança reativado com sucesso',
+      message: 'Plano de cobranÃ§a reativado com sucesso',
       data: plano,
     };
   }
@@ -890,7 +851,7 @@ export class FaturamentoController {
 
     return {
       status: HttpStatus.OK,
-      message: 'Plano de cobrança cancelado com sucesso',
+      message: 'Plano de cobranÃ§a cancelado com sucesso',
       data: plano,
     };
   }
@@ -912,38 +873,41 @@ export class FaturamentoController {
     }
   }
 
-  // ==================== UTILITÁRIOS ====================
+  // ==================== UTILITÃRIOS ====================
 
   @Post('processar-cobrancas-recorrentes')
   @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
   async processarCobrancasRecorrentes(@EmpresaId() empresaId: string) {
-    await this.cobrancaService.processarCobrancasRecorrentes(empresaId);
+    const resultado = await this.cobrancaService.processarCobrancasRecorrentes(empresaId);
 
     return {
       status: HttpStatus.OK,
-      message: 'Processamento de cobranças recorrentes iniciado',
+      message: 'Processamento de cobrancas recorrentes concluido',
+      data: resultado,
     };
   }
 
   @Post('verificar-faturas-vencidas')
   @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
-  async verificarFaturasVencidas() {
-    await this.faturamentoService.verificarFaturasVencidas();
+  async verificarFaturasVencidas(@EmpresaId() empresaId: string) {
+    const resultado = await this.faturamentoService.verificarFaturasVencidas(empresaId);
 
     return {
       status: HttpStatus.OK,
-      message: 'Verificação de faturas vencidas concluída',
+      message: 'Verificacao de faturas vencidas concluida',
+      data: resultado,
     };
   }
 
   @Post('enviar-lembretes-vencimento')
   @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
   async enviarLembreteVencimento(@EmpresaId() empresaId: string) {
-    await this.cobrancaService.enviarLembreteVencimento(empresaId);
+    const resultado = await this.cobrancaService.enviarLembreteVencimento(empresaId);
 
     return {
       status: HttpStatus.OK,
       message: 'Lembretes de vencimento enviados',
+      data: resultado,
     };
   }
 }

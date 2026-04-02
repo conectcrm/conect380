@@ -1,3 +1,9 @@
+import { config as loadEnv } from 'dotenv';
+import { resolve } from 'path';
+
+// Carrega .env local antes dos defaults de teste sem sobrescrever variaveis ja definidas.
+loadEnv({ path: resolve(__dirname, '../.env') });
+
 process.env.NODE_ENV ??= 'test';
 process.env.APP_ENV ??= 'test';
 process.env.HTTP_LOG_REQUESTS_IN_TEST ??= 'false';

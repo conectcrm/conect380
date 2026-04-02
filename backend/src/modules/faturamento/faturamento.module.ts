@@ -1,11 +1,9 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { FaturamentoController } from './faturamento.controller';
-import { FaturamentoWebhookController } from './faturamento-webhook.controller';
 import { FaturamentoService } from './services/faturamento.service';
 import { PagamentoService } from './services/pagamento.service';
 import { CobrancaService } from './services/cobranca.service';
-import { DocumentoFiscalService } from './services/documento-fiscal.service';
 import { Fatura } from './entities/fatura.entity';
 import { ItemFatura } from './entities/item-fatura.entity';
 import { Pagamento } from './entities/pagamento.entity';
@@ -23,8 +21,8 @@ import { EmpresaConfig } from '../empresas/entities/empresa-config.entity';
     PropostasModule, // Para acessar o EmailIntegradoService
     forwardRef(() => MercadoPagoModule),
   ],
-  controllers: [FaturamentoController, FaturamentoWebhookController],
-  providers: [FaturamentoService, PagamentoService, CobrancaService, DocumentoFiscalService],
-  exports: [FaturamentoService, PagamentoService, CobrancaService, DocumentoFiscalService],
+  controllers: [FaturamentoController],
+  providers: [FaturamentoService, PagamentoService, CobrancaService],
+  exports: [FaturamentoService, PagamentoService, CobrancaService],
 })
 export class FaturamentoModule {}

@@ -26,10 +26,8 @@ export const getFinanceiroFeatureFlags = (): FinanceiroFeatureFlags => {
   const mvpMode =
     parseBooleanEnv(process.env.FINANCEIRO_MVP_MODE, false) ||
     parseBooleanEnv(process.env.MVP_MODE, false);
-  const fiscalDocumentsEnabled = parseBooleanEnv(
-    process.env.FINANCEIRO_FISCAL_DOCS_ENABLED,
-    false,
-  );
+  // Emissao fiscal permanece fora do escopo desta fase do financeiro.
+  const fiscalDocumentsEnabled = false;
   const boletoEnabled = parseBooleanEnv(process.env.FINANCEIRO_BOLETO_ENABLED, false);
 
   if (mvpMode) {
