@@ -47,6 +47,7 @@
     "check:encoding": "node scripts/checkEncoding.js",
     "validate:release:vendas:core": "node scripts/ci/validate-sales-release-mode.mjs --mode core --frontend-env frontend-web/.env.example --backend-env backend/.env.production.example",
     "validate:release:vendas:full": "node scripts/ci/validate-sales-release-mode.mjs --mode full --frontend-env frontend-web/.env.full.example --backend-env backend/.env.production.full.example",
+    "validate:architecture": "node scripts/ci/architecture-guardrails.mjs",
     "validate:permissions:parity": "node scripts/ci/validate-permissions-parity.mjs",
     "matrix:module-permission-plan": "node scripts/ci/generate-module-permission-plan-matrix.mjs",
     "preflight:go-live:vendas:core": "node scripts/ci/preflight-sales-go-core.mjs",
@@ -72,7 +73,8 @@
     "branch:health:prune": "powershell -ExecutionPolicy Bypass -File scripts/git/branch-health.ps1 -PruneFetch",
     "branch:worktree:new": "powershell -ExecutionPolicy Bypass -File scripts/git/new-isolated-worktree.ps1",
     "branch:remote-health": "powershell -ExecutionPolicy Bypass -File scripts/git/remote-branch-health.ps1",
-    "branch:remote-health:prune": "powershell -ExecutionPolicy Bypass -File scripts/git/remote-branch-health.ps1 -PruneFetch"
+    "branch:remote-health:prune": "powershell -ExecutionPolicy Bypass -File scripts/git/remote-branch-health.ps1 -PruneFetch",
+    "branch:protection:required-checks": "powershell -ExecutionPolicy Bypass -File scripts/git/configure-branch-protection-required-checks.ps1 --%"
   },
   "keywords": [
     "crm",

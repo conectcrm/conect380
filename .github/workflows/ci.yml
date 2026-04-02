@@ -68,6 +68,33 @@ jobs:
       - name: Validar baseline GO Core das flags de vendas
         run: npm run validate:release:vendas:core
 
+  architecture-guardrails:
+    name: Guardrails - Arquitetura
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+
+      - name: Validar arquitetura (PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          node scripts/ci/architecture-guardrails.mjs \
+            --base "${{ github.event.pull_request.base.sha }}" \
+            --head "${{ github.event.pull_request.head.sha }}"
+
+      - name: Validar arquitetura (push)
+        if: github.event_name != 'pull_request'
+        run: npm run validate:architecture
+
   backend:
     name: Backend - Testes e Build
     runs-on: ubuntu-latest
@@ -1008,7 +1035,7 @@ jobs:
   final-status:
     name: Status Final do CI
     runs-on: ubuntu-latest
-    needs: [encoding-guardrails, release-flags-guardrails, backend, backend-e2e-cotacao, backend-e2e-contas-pagar, backend-e2e-multi-tenancy, backend-e2e-vendas, backend-e2e-core-admin-hardening, backend-e2e-core-admin-security, frontend, frontend-e2e-pipeline-ui, frontend-e2e-billing-critical, frontend-legacy-exposure-scan, frontend-e2e-core-admin-billing-governance, security, check-temp-files]
+    needs: [encoding-guardrails, release-flags-guardrails, architecture-guardrails, backend, backend-e2e-cotacao, backend-e2e-contas-pagar, backend-e2e-multi-tenancy, backend-e2e-vendas, backend-e2e-core-admin-hardening, backend-e2e-core-admin-security, frontend, frontend-e2e-pipeline-ui, frontend-e2e-billing-critical, frontend-legacy-exposure-scan, frontend-e2e-core-admin-billing-governance, security, check-temp-files]
     if: always()
 
     steps:
@@ -1016,6 +1043,7 @@ jobs:
         run: |
           echo "Encoding Guardrails: ${{ needs.encoding-guardrails.result }}"
           echo "Release Flags Guardrails: ${{ needs.release-flags-guardrails.result }}"
+          echo "Architecture Guardrails: ${{ needs.architecture-guardrails.result }}"
           echo "Backend: ${{ needs.backend.result }}"
           echo "Backend E2E Cotacao: ${{ needs.backend-e2e-cotacao.result }}"
           echo "Backend E2E Contas Pagar: ${{ needs.backend-e2e-contas-pagar.result }}"
@@ -1033,6 +1061,7 @@ jobs:
 
           if [ "${{ needs.encoding-guardrails.result }}" != "success" ] || \
              [ "${{ needs.release-flags-guardrails.result }}" != "success" ] || \
+             [ "${{ needs.architecture-guardrails.result }}" != "success" ] || \
              [ "${{ needs.backend.result }}" != "success" ] || \
              [ "${{ needs.backend-e2e-cotacao.result }}" != "success" ] || \
              [ "${{ needs.backend-e2e-contas-pagar.result }}" != "success" ] || \

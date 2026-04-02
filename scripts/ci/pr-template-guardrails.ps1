@@ -151,7 +151,7 @@ if ($requerUxChecklist) {
   }
 }
 
-$checklistTecnico = Get-SectionContent -Text $body -StartPattern "^## Checklist Tecnico" -EndPattern "^## Multi-tenant e Seguranca"
+$checklistTecnico = Get-SectionContent -Text $body -StartPattern "^## Checklist Tecnico" -EndPattern "^## Contrato de Arquitetura e Logica de Negocio"
 if ($null -eq $checklistTecnico) {
   $issues += "Checklist Tecnico section not found."
 }
@@ -163,6 +163,88 @@ else {
   }
   elseif ($techChecked -lt $techTotal) {
     $issues += "Checklist Tecnico must be fully checked."
+  }
+}
+
+$contratoArquitetura = Get-SectionContent -Text $body -StartPattern "^## Contrato de Arquitetura e Logica de Negocio" -EndPattern "^## Multi-tenant e Seguranca"
+$houveAlteracaoRegra = $false
+
+if ($null -eq $contratoArquitetura) {
+  $issues += "Contrato de Arquitetura e Logica de Negocio section not found."
+}
+else {
+  $houveAlteracaoRegra = [regex]::IsMatch(
+    $contratoArquitetura,
+    "(?im)^\s*-\s*\[[xX]\]\s+Houve alteracao de regra de negocio neste PR"
+  )
+  $naoHouveAlteracaoRegra = [regex]::IsMatch(
+    $contratoArquitetura,
+    "(?im)^\s*-\s*\[[xX]\]\s+Nao houve alteracao de regra de negocio \(N/A\)"
+  )
+
+  if ($houveAlteracaoRegra -and $naoHouveAlteracaoRegra) {
+    $issues += "Contrato de Arquitetura: selecione apenas uma opcao entre houve alteracao e N/A."
+  }
+  elseif (-not $houveAlteracaoRegra -and -not $naoHouveAlteracaoRegra) {
+    $issues += "Contrato de Arquitetura: selecione uma opcao entre houve alteracao e N/A."
+  }
+
+  if ($houveAlteracaoRegra) {
+    $requiredChecks = @(
+      "(?im)^\s*-\s*\[[xX]\]\s+Regras implementadas em",
+      "(?im)^\s*-\s*\[[xX]\]\s+Controller apenas orquestra request/response",
+      "(?im)^\s*-\s*\[[xX]\]\s+Frontend sem acesso direto a API fora de",
+      "(?im)^\s*-\s*\[[xX]\]\s+Teste cobrindo regra de negocio adicionado/atualizado"
+    )
+
+    foreach ($pattern in $requiredChecks) {
+      if (-not [regex]::IsMatch($contratoArquitetura, $pattern)) {
+        $issues += "Contrato de Arquitetura: checklist obrigatorio incompleto para alteracao de regra."
+        break
+      }
+    }
+  }
+}
+
+$mapaRegraImplementacaoTestes = Get-SectionContent -Text $body -StartPattern "^### Mapa Regra -> Implementacao -> Testes" -EndPattern "^## Multi-tenant e Seguranca"
+if ($houveAlteracaoRegra) {
+  if ($null -eq $mapaRegraImplementacaoTestes) {
+    $issues += "Mapa Regra -> Implementacao -> Testes section not found."
+  }
+  else {
+    $linhasValidas = @()
+    $linhas = $mapaRegraImplementacaoTestes -split "`n"
+    foreach ($linhaBruta in $linhas) {
+      $linha = $linhaBruta.Trim()
+      if (-not $linha.StartsWith("|")) {
+        continue
+      }
+
+      if (
+        $linha -match "^\|\s*Regra\s*\|" -or
+        $linha -match "^\|\s*-+\s*\|" -or
+        $linha -match "^\|\s*Ex:"
+      ) {
+        continue
+      }
+
+      $colunas = $linha.Trim('|').Split('|') | ForEach-Object { $_.Trim() }
+      if ($colunas.Count -lt 3) {
+        continue
+      }
+
+      if (
+        -not [string]::IsNullOrWhiteSpace($colunas[0]) -and
+        -not [string]::IsNullOrWhiteSpace($colunas[1]) -and
+        -not [string]::IsNullOrWhiteSpace($colunas[2])
+      ) {
+        $linhasValidas += $linha
+      }
+    }
+
+    if ($linhasValidas.Count -lt 1) {
+      $issues += "Mapa Regra -> Implementacao -> Testes deve conter ao menos uma linha real."
+    }
   }
 }
 
