@@ -196,6 +196,7 @@ export class FaturamentoService {
     'bank_transfer',
     'atm',
   ] as const;
+  private readonly mercadoPagoPaymentTypesNaoExcluiveis = new Set<string>(['account_money']);
   private readonly prefixosNumeroDocumentoFinanceiro: Record<string, string> = {
     fatura: 'FAT',
     recibo: 'REC',
@@ -2711,7 +2712,11 @@ export class FaturamentoService {
     ): Record<string, unknown> => {
       const permitidos = new Set(paymentTypesPermitidos);
       const excludedPaymentTypes = this.mercadoPagoPaymentTypesSuportados
-        .filter((paymentTypeId) => !permitidos.has(paymentTypeId))
+        .filter(
+          (paymentTypeId) =>
+            !permitidos.has(paymentTypeId) &&
+            !this.mercadoPagoPaymentTypesNaoExcluiveis.has(paymentTypeId),
+        )
         .map((paymentTypeId) => ({ id: paymentTypeId }));
 
       const restricoes: Record<string, unknown> = {};
