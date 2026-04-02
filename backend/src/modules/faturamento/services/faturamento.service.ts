@@ -887,6 +887,12 @@ export class FaturamentoService {
     const expiraEmDate = this.calcularDataExpiracaoCobranca(fatura.dataVencimento);
     const expiraEm = expiraEmDate.toISOString();
     const referenciaGateway = `fatura:${empresaId}:${fatura.id}`;
+    const valorCobranca = this.calcularValorCobrancaOnline(fatura);
+    if (valorCobranca <= 0) {
+      throw new BadRequestException(
+        'Fatura sem saldo em aberto para cobranca online. Revise o valor total/descontos ou registre o recebimento manual.',
+      );
+    }
     const accessTokenOverride =
       gatewayRuntime.accessTokenSource === 'tenant' ? gatewayRuntime.accessToken : null;
 
@@ -909,7 +915,7 @@ export class FaturamentoService {
       try {
         boletoPayment = await this.mercadoPagoService.createBoletoPayment(
           {
-            transaction_amount: Number(fatura.valorTotal),
+            transaction_amount: valorCobranca,
             description: `Fatura ${fatura.numero}`,
             payment_method_id: metodoBoleto || 'bolbradesco',
             payer: {
@@ -996,7 +1002,7 @@ export class FaturamentoService {
               title: `Fatura ${fatura.numero}`,
               currency_id: 'BRL',
               quantity: 1,
-              unit_price: Number(fatura.valorTotal),
+              unit_price: valorCobranca,
             },
           ],
           payer: {
@@ -2178,6 +2184,42 @@ export class FaturamentoService {
     return Number.isFinite(parsed) ? parsed : fallback;
   }
 
+  private toFiniteMoney(value: unknown, fallback = 0): number {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : fallback;
+    }
+
+    if (typeof value === 'string') {
+      const texto = value.trim();
+      if (!texto) {
+        return fallback;
+      }
+
+      // Aceita formatos "1234.56", "1234,56" e "1.234,56".
+      let normalizado = texto.replace(/\s+/g, '');
+      if (normalizado.includes(',') && normalizado.includes('.')) {
+        if (normalizado.lastIndexOf(',') > normalizado.lastIndexOf('.')) {
+          normalizado = normalizado.replace(/\./g, '').replace(',', '.');
+        } else {
+          normalizado = normalizado.replace(/,/g, '');
+        }
+      } else if (normalizado.includes(',')) {
+        normalizado = normalizado.replace(',', '.');
+      }
+
+      const parsed = Number(normalizado);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    }
+
+    return this.toFiniteNumber(value, fallback);
+  }
+
+  private calcularValorCobrancaOnline(fatura: Fatura): number {
+    const valorTotal = this.toFiniteMoney(fatura.valorTotal, 0);
+    const valorPago = this.toFiniteMoney(fatura.valorPago, 0);
+    return this.roundMoney(Math.max(valorTotal - valorPago, 0));
+  }
+
   private roundMoney(value: number): number {
     return Math.round((this.toFiniteNumber(value, 0) + Number.EPSILON) * 100) / 100;
   }
@@ -3155,7 +3197,7 @@ export class FaturamentoService {
       where: { empresaId, faturaId: fatura.id, gatewayTransacaoId: referenciaGateway },
     });
 
-    const valorRestante = this.roundMoney(Math.max(Number(fatura.valorTotal) - Number(fatura.valorPago), 0));
+    const valorRestante = this.calcularValorCobrancaOnline(fatura);
     if (valorRestante <= 0) {
       return;
     }

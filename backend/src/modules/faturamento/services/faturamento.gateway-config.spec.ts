@@ -74,7 +74,12 @@ describe('FaturamentoService - configuracao de gateway por empresa', () => {
 
   const prepararCenarioGeracaoLink = (
     formaPagamentoPreferida: FormaPagamento,
-    options?: { mockPreferenceSuccess?: boolean; mockBoletoSuccess?: boolean },
+    options?: {
+      mockPreferenceSuccess?: boolean;
+      mockBoletoSuccess?: boolean;
+      valorTotal?: number;
+      valorPago?: number;
+    },
   ) => {
     const faturaMock: any = {
       id: 701,
@@ -82,8 +87,8 @@ describe('FaturamentoService - configuracao de gateway por empresa', () => {
       clienteId: 'cliente-1',
       status: StatusFatura.PENDENTE,
       dataVencimento: new Date('2026-12-20T00:00:00.000Z'),
-      valorTotal: 450,
-      valorPago: 0,
+      valorTotal: options?.valorTotal ?? 450,
+      valorPago: options?.valorPago ?? 0,
       formaPagamentoPreferida,
       metadados: {},
     };
@@ -242,6 +247,39 @@ describe('FaturamentoService - configuracao de gateway por empresa', () => {
       boletoPdfUrl: 'https://mercadopago.example/boleto/mp-pay-701.pdf',
       boletoBarcode: '23793381286008300004133070000012089160000100000',
     });
+  });
+
+  it('usa apenas o saldo em aberto ao gerar cobranca online', async () => {
+    prepararCenarioGeracaoLink(FormaPagamento.PIX, {
+      valorTotal: 450,
+      valorPago: 200,
+    });
+
+    await service.gerarLinkPagamentoFatura(701, 'empresa-1');
+
+    expect(mercadoPagoService.createPreference).toHaveBeenCalledWith(
+      expect.objectContaining({
+        items: expect.arrayContaining([
+          expect.objectContaining({
+            unit_price: 250,
+          }),
+        ]),
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it('bloqueia cobranca online quando nao existe saldo em aberto', async () => {
+    prepararCenarioGeracaoLink(FormaPagamento.PIX, {
+      valorTotal: 0,
+      valorPago: 0,
+    });
+
+    await expect(service.gerarLinkPagamentoFatura(701, 'empresa-1')).rejects.toThrow(
+      /saldo em aberto/i,
+    );
+    expect(mercadoPagoService.createBoletoPayment).not.toHaveBeenCalled();
+    expect(mercadoPagoService.createPreference).not.toHaveBeenCalled();
   });
 
   it('bloqueia link online quando forma preferida exigir fluxo manual', async () => {
