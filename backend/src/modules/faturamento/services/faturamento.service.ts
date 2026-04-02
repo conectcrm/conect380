@@ -6,6 +6,7 @@ import {
   ForbiddenException,
   Logger,
   Optional,
+  ServiceUnavailableException,
   forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -885,39 +886,47 @@ export class FaturamentoService {
     const accessTokenOverride =
       gatewayRuntime.accessTokenSource === 'tenant' ? gatewayRuntime.accessToken : null;
 
-    const preference = await this.mercadoPagoService.createPreference({
-      items: [
-        {
-          id: String(fatura.id),
-          title: `Fatura ${fatura.numero}`,
-          currency_id: 'BRL',
-          quantity: 1,
-          unit_price: Number(fatura.valorTotal),
+    let preference: Record<string, any>;
+    try {
+      preference = await this.mercadoPagoService.createPreference({
+        items: [
+          {
+            id: String(fatura.id),
+            title: `Fatura ${fatura.numero}`,
+            currency_id: 'BRL',
+            quantity: 1,
+            unit_price: Number(fatura.valorTotal),
+          },
+        ],
+        payer: {
+          name: primeiroNome || 'Cliente',
+          surname: sobrenome,
+          email: emailCliente,
         },
-      ],
-      payer: {
-        name: primeiroNome || 'Cliente',
-        surname: sobrenome,
-        email: emailCliente,
-      },
-      back_urls: {
-        success: `${frontendBaseUrl}/faturamento?status=success&fatura=${fatura.id}`,
-        failure: `${frontendBaseUrl}/faturamento?status=failure&fatura=${fatura.id}`,
-        pending: `${frontendBaseUrl}/faturamento?status=pending&fatura=${fatura.id}`,
-      },
-      auto_return: 'approved',
-      payment_methods: this.construirRestricoesPagamentoMercadoPago(
-        formaPagamentoCobrancaOnline,
-      ),
-      notification_url: `${backendBaseUrl}/mercadopago/webhooks`,
-      statement_descriptor: 'ConectCRM',
-      external_reference: referenciaGateway,
-      expires: true,
-      expiration_date_from: new Date().toISOString(),
-      expiration_date_to: expiraEm,
-    }, {
-      accessTokenOverride,
-    });
+        back_urls: {
+          success: `${frontendBaseUrl}/faturamento?status=success&fatura=${fatura.id}`,
+          failure: `${frontendBaseUrl}/faturamento?status=failure&fatura=${fatura.id}`,
+          pending: `${frontendBaseUrl}/faturamento?status=pending&fatura=${fatura.id}`,
+        },
+        auto_return: 'approved',
+        payment_methods: this.construirRestricoesPagamentoMercadoPago(
+          formaPagamentoCobrancaOnline,
+        ),
+        notification_url: `${backendBaseUrl}/mercadopago/webhooks`,
+        statement_descriptor: 'ConectCRM',
+        external_reference: referenciaGateway,
+        expires: true,
+        expiration_date_from: new Date().toISOString(),
+        expiration_date_to: expiraEm,
+      }, {
+        accessTokenOverride,
+      });
+    } catch (error) {
+      this.rethrowErroGatewayLinkPagamento(error, {
+        empresaId,
+        faturaId,
+      });
+    }
 
     const link = String(preference?.init_point || preference?.sandbox_init_point || '').trim();
     if (!link) {
@@ -2663,6 +2672,142 @@ export class FaturamentoService {
     }
 
     return this.normalizarBaseUrl(params.fallback) || params.fallback.replace(/\/+$/, '');
+  }
+
+  private rethrowErroGatewayLinkPagamento(
+    error: unknown,
+    contexto: {
+      empresaId: string;
+      faturaId: number;
+    },
+  ): never {
+    if (
+      error instanceof BadRequestException ||
+      error instanceof NotFoundException ||
+      error instanceof ForbiddenException ||
+      error instanceof ServiceUnavailableException
+    ) {
+      throw error;
+    }
+
+    const detalhes = this.extrairDetalhesErroGateway(error);
+    const status = detalhes.status;
+    const code = (detalhes.code || '').toUpperCase();
+    const blockedBy = (detalhes.blockedBy || '').toLowerCase();
+    const message = detalhes.message;
+
+    this.logger.error(
+      `[gerarLinkPagamentoFatura] Falha no gateway empresa=${contexto.empresaId} fatura=${contexto.faturaId} status=${status ?? 'n/a'} code=${code || 'n/a'} blockedBy=${detalhes.blockedBy || 'n/a'} message=${message}`,
+    );
+
+    if (
+      status === 401 ||
+      status === 403 ||
+      code === 'PA_UNAUTHORIZED_RESULT_FROM_POLICIES' ||
+      blockedBy === 'policyagent'
+    ) {
+      throw new BadRequestException(
+        'Mercado Pago bloqueou esta cobranca para a credencial atual. Valide no painel do Mercado Pago se a conta/token possui permissao para Checkout Pro e boleto no ambiente ativo.',
+      );
+    }
+
+    if (status === 400) {
+      throw new BadRequestException(
+        `Mercado Pago rejeitou os dados da cobranca. Detalhe: ${message}`,
+      );
+    }
+
+    if (typeof status === 'number' && status >= 500) {
+      throw new ServiceUnavailableException(
+        'Servico do gateway de pagamento indisponivel no momento. Tente novamente em alguns instantes.',
+      );
+    }
+
+    if (/access[_\s-]?token|nao inicializado|indisponivel/i.test(message)) {
+      throw new ServiceUnavailableException(
+        'Gateway de cobranca indisponivel. Configure o token do Mercado Pago para esta empresa.',
+      );
+    }
+
+    throw new BadRequestException(
+      `Nao foi possivel gerar o link de pagamento com o gateway atual. Detalhe: ${message}`,
+    );
+  }
+
+  private extrairDetalhesErroGateway(error: unknown): {
+    status: number | null;
+    code: string | null;
+    blockedBy: string | null;
+    message: string;
+  } {
+    const root = this.asRecord(error);
+    const response = this.asRecord(root?.response);
+    const responseData = this.asRecord(response?.data);
+    const cause =
+      this.firstCauseFromUnknown(root?.cause) || this.firstCauseFromUnknown(responseData?.cause);
+
+    const status = this.toHttpStatus(
+      root?.status ?? response?.status ?? responseData?.status ?? cause?.status,
+    );
+
+    const code =
+      this.toNullableText(
+        root?.code ?? root?.error ?? responseData?.code ?? responseData?.error ?? cause?.code,
+      ) || null;
+
+    const blockedBy =
+      this.toNullableText(root?.blocked_by ?? responseData?.blocked_by ?? cause?.blocked_by) ||
+      null;
+
+    const message =
+      this.toNullableText(
+        root?.message ??
+          responseData?.message ??
+          cause?.description ??
+          cause?.message ??
+          code ??
+          'Falha desconhecida no gateway.',
+      ) || 'Falha desconhecida no gateway.';
+
+    return {
+      status,
+      code,
+      blockedBy,
+      message,
+    };
+  }
+
+  private asRecord(value: unknown): Record<string, any> | null {
+    if (!value || typeof value !== 'object') {
+      return null;
+    }
+    return value as Record<string, any>;
+  }
+
+  private firstCauseFromUnknown(value: unknown): Record<string, any> | null {
+    if (Array.isArray(value) && value.length > 0) {
+      return this.asRecord(value[0]);
+    }
+    return this.asRecord(value);
+  }
+
+  private toHttpStatus(value: unknown): number | null {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < 100 || parsed > 599) {
+      return null;
+    }
+    return Math.trunc(parsed);
+  }
+
+  private toNullableText(value: unknown): string | null {
+    if (typeof value === 'string') {
+      const normalized = value.trim();
+      return normalized.length > 0 ? normalized : null;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+    return null;
   }
 
   private resolverCampoOrdenacaoFaturas(sortBy?: string): string {

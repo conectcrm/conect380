@@ -35,7 +35,7 @@ describe('FaturamentoService - configuracao de gateway por empresa', () => {
   let registrarPagamentoPendenteSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
     process.env.FINANCEIRO_MVP_MODE = 'false';
     process.env.MVP_MODE = 'false';
     process.env.FINANCEIRO_BOLETO_ENABLED = 'false';
@@ -71,7 +71,10 @@ describe('FaturamentoService - configuracao de gateway por empresa', () => {
     process.env.FINANCEIRO_BOLETO_ENABLED = originalEnv.FINANCEIRO_BOLETO_ENABLED;
   });
 
-  const prepararCenarioGeracaoLink = (formaPagamentoPreferida: FormaPagamento) => {
+  const prepararCenarioGeracaoLink = (
+    formaPagamentoPreferida: FormaPagamento,
+    options?: { mockPreferenceSuccess?: boolean },
+  ) => {
     const faturaMock: any = {
       id: 701,
       numero: 'FT2026000701',
@@ -94,10 +97,12 @@ describe('FaturamentoService - configuracao de gateway por empresa', () => {
       nome: 'Cliente Teste',
       email: 'cliente@teste.com',
     });
-    mercadoPagoService.createPreference.mockResolvedValueOnce({
-      id: 'pref-tenant-1',
-      init_point: 'https://mercadopago.example/pref-tenant-1',
-    });
+    if (options?.mockPreferenceSuccess !== false) {
+      mercadoPagoService.createPreference.mockResolvedValueOnce({
+        id: 'pref-tenant-1',
+        init_point: 'https://mercadopago.example/pref-tenant-1',
+      });
+    }
     buscarFaturaPorIdSpy.mockResolvedValueOnce(faturaMock);
 
     return faturaMock;
@@ -213,5 +218,39 @@ describe('FaturamentoService - configuracao de gateway por empresa', () => {
       /fluxo manual de recebimento/i,
     );
     expect(mercadoPagoService.createPreference).not.toHaveBeenCalled();
+  });
+
+  it('converte bloqueio de policy do Mercado Pago em erro funcional', async () => {
+    prepararCenarioGeracaoLink(FormaPagamento.PIX, { mockPreferenceSuccess: false });
+    mercadoPagoService.createPreference.mockRejectedValueOnce({
+      message: 'At least one policy returned UNAUTHORIZED.',
+      status: 403,
+      cause: [
+        {
+          code: 'PA_UNAUTHORIZED_RESULT_FROM_POLICIES',
+          description: 'At least one policy returned UNAUTHORIZED.',
+          blocked_by: 'PolicyAgent',
+        },
+      ],
+    });
+
+    await expect(service.gerarLinkPagamentoFatura(701, 'empresa-1')).rejects.toThrow(
+      /Mercado Pago bloqueou esta cobranca/i,
+    );
+    expect(registrarPagamentoPendenteSpy).not.toHaveBeenCalled();
+  });
+
+  it('converte bad_request do Mercado Pago em erro de validacao', async () => {
+    prepararCenarioGeracaoLink(FormaPagamento.PIX, { mockPreferenceSuccess: false });
+    mercadoPagoService.createPreference.mockRejectedValueOnce({
+      message: 'invalid default_payment_method_id. The default payment method is excluded',
+      error: 'bad_request',
+      status: 400,
+    });
+
+    await expect(service.gerarLinkPagamentoFatura(701, 'empresa-1')).rejects.toThrow(
+      /Mercado Pago rejeitou os dados da cobranca/i,
+    );
+    expect(registrarPagamentoPendenteSpy).not.toHaveBeenCalled();
   });
 });
