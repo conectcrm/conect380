@@ -1055,22 +1055,20 @@ export default function FaturamentoPage() {
 
   const gerarLinkPagamento = async (id: number) => {
     const faturaAlvo = obterFaturaPorId(id);
+    const formaPagamentoAtual = faturaAlvo ? resolverFormaPagamentoFatura(faturaAlvo) : null;
     if (faturaAlvo && !statusPermiteCobranca(faturaAlvo.status)) {
       notificacao.mostrarAviso(
         'Acao indisponivel',
-        `Nao e permitido gerar link de pagamento para faturas com status ${faturamentoService.formatarStatusFatura(faturaAlvo.status)}.`,
+        `Nao e permitido gerar link de pagamento para faturas com status ${faturamentoService.formatarStatusFatura(faturaAlvo.status)}.`
       );
       return;
     }
-    if (faturaAlvo) {
-      const formaPagamentoAtual = resolverFormaPagamentoFatura(faturaAlvo);
-      if (!formaPagamentoPermiteCobrancaOnline(formaPagamentoAtual)) {
-        notificacao.mostrarAviso(
-          'Forma de pagamento manual',
-          `A forma ${faturamentoService.formatarFormaPagamento(formaPagamentoAtual)} usa fluxo manual. Para cobranca online, selecione PIX, Cartao de Credito, Cartao de Debito ou Boleto na fatura.`,
-        );
-        return;
-      }
+    if (faturaAlvo && !formaPagamentoPermiteCobrancaOnline(formaPagamentoAtual)) {
+      notificacao.mostrarAviso(
+        'Forma de pagamento manual',
+        `A forma ${faturamentoService.formatarFormaPagamento(formaPagamentoAtual)} usa fluxo manual. Para cobranca online, selecione PIX, Cartao de Credito, Cartao de Debito ou Boleto na fatura.`
+      );
+      return;
     }
 
     if (!linkPagamentoHabilitado) {
@@ -1079,12 +1077,22 @@ export default function FaturamentoPage() {
     }
 
     try {
-      const link = await faturamentoService.gerarLinkPagamento(id);
-      navigator.clipboard.writeText(link);
-      notificacao.mostrarSucesso(
-        'Link de pagamento copiado',
-        'O link de pagamento foi copiado para a área de transferência.',
-      );
+      const resultadoLink = await faturamentoService.gerarLinkPagamento(id);
+      await navigator.clipboard.writeText(resultadoLink.link);
+      if (formaPagamentoAtual === FormaPagamento.BOLETO) {
+        const detalhePdf = resultadoLink.boletoPdfUrl
+          ? ' PDF do boleto disponivel em Abrir boleto/Baixar boleto PDF.'
+          : ' Use Abrir boleto para visualizar e baixar.';
+        notificacao.mostrarSucesso(
+          'Boleto gerado',
+          `Link do boleto copiado para a area de transferencia.${detalhePdf}`,
+        );
+      } else {
+        notificacao.mostrarSucesso(
+          'Link de pagamento copiado',
+          'O link de pagamento foi copiado para a area de transferencia.',
+        );
+      }
       carregarFaturas(); // Recarregar para atualizar o link
     } catch (error) {
       console.error('Erro ao gerar link de pagamento:', error);
@@ -1097,12 +1105,40 @@ export default function FaturamentoPage() {
       }
       notificacao.erro.operacaoFalhou(
         'gerar link de pagamento',
-        obterMensagemErro(error, 'Recurso indisponível no backend atual.'),
+        obterMensagemErro(error, 'Recurso indisponivel no backend atual.'),
       );
     }
   };
 
+  const obterMetadadosBoleto = (fatura: Fatura): Record<string, unknown> | null => {
+    const metadados =
+      fatura.metadados && typeof fatura.metadados === 'object' && !Array.isArray(fatura.metadados)
+        ? (fatura.metadados as Record<string, unknown>)
+        : null;
+    const boleto =
+      metadados && typeof metadados.boleto === 'object' && !Array.isArray(metadados.boleto)
+        ? (metadados.boleto as Record<string, unknown>)
+        : null;
+    return boleto;
+  };
+
   const obterLinkPagamentoValido = (fatura: Fatura): string | null => {
+    const linkPrincipal = String(fatura.linkPagamento || '').trim();
+    if (linkPrincipal.length > 0) {
+      return linkPrincipal;
+    }
+
+    const boleto = obterMetadadosBoleto(fatura);
+    const linkBoleto = String(boleto?.pdfUrl || '').trim();
+    return linkBoleto.length > 0 ? linkBoleto : null;
+  };
+
+  const obterBoletoPdfValido = (fatura: Fatura): string | null => {
+    const boleto = obterMetadadosBoleto(fatura);
+    const pdfUrl = String(boleto?.pdfUrl || '').trim();
+    if (pdfUrl.length > 0) {
+      return pdfUrl;
+    }
     const link = String(fatura.linkPagamento || '').trim();
     return link.length > 0 ? link : null;
   };
@@ -1126,7 +1162,41 @@ export default function FaturamentoPage() {
       return;
     }
 
-    notificacao.mostrarSucesso('Checkout aberto', 'O boleto foi aberto em uma nova aba.');
+    notificacao.mostrarSucesso('Boleto aberto', 'O boleto foi aberto em uma nova aba.');
+  };
+
+  const baixarBoletoPdf = (fatura: Fatura) => {
+    const formaPagamentoAtual = resolverFormaPagamentoFatura(fatura);
+    if (formaPagamentoAtual !== FormaPagamento.BOLETO) {
+      notificacao.mostrarAviso(
+        'Forma de pagamento',
+        'Esta fatura nao esta configurada como boleto.',
+      );
+      return;
+    }
+
+    const linkPdf = obterBoletoPdfValido(fatura);
+    if (!linkPdf) {
+      notificacao.mostrarAviso(
+        'PDF indisponivel',
+        'Ainda nao existe PDF/link do boleto para esta fatura. Gere o boleto primeiro.',
+      );
+      return;
+    }
+
+    const aba = window.open(linkPdf, '_blank', 'noopener,noreferrer');
+    if (!aba) {
+      notificacao.mostrarAviso(
+        'Popup bloqueado',
+        'Nao foi possivel abrir o PDF em nova aba. Verifique o bloqueador de popups.',
+      );
+      return;
+    }
+
+    notificacao.mostrarSucesso(
+      'PDF do boleto aberto',
+      'O PDF do boleto foi aberto em nova aba para download/impressao.',
+    );
   };
 
   const copiarLinkBoleto = async (fatura: Fatura) => {
@@ -2954,6 +3024,18 @@ export default function FaturamentoPage() {
                                               <ExternalLink className="w-3 h-3" />
                                               Abrir Boleto
                                             </button>
+                                            {resolverFormaPagamentoFatura(fatura) === FormaPagamento.BOLETO && (
+                                              <button
+                                                onClick={() => {
+                                                  fecharMenuAcoes();
+                                                  baixarBoletoPdf(fatura);
+                                                }}
+                                                className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-teal-50 hover:text-teal-700 flex items-center gap-2 transition-colors"
+                                              >
+                                                <Download className="w-3 h-3" />
+                                                Baixar Boleto PDF
+                                              </button>
+                                            )}
                                             <button
                                               onClick={() => {
                                                 fecharMenuAcoes();
@@ -3386,6 +3468,23 @@ export default function FaturamentoPage() {
                                       </div>
                                     </button>
                                   )}
+
+                                  {statusPermiteCobranca(fatura.status) &&
+                                    resolverFormaPagamentoFatura(fatura) === FormaPagamento.BOLETO && (
+                                      <button
+                                        onClick={() => {
+                                          fecharMenuAcoes();
+                                          baixarBoletoPdf(fatura);
+                                        }}
+                                        className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-teal-50 hover:text-teal-700 flex items-center gap-3 transition-colors"
+                                      >
+                                        <Download className="w-4 h-4" />
+                                        <div>
+                                          <div className="font-medium">Baixar Boleto PDF</div>
+                                          <div className="text-xs text-gray-500">Impressao/envio</div>
+                                        </div>
+                                      </button>
+                                    )}
 
                                   {statusPermiteCobranca(fatura.status) && (
                                     <button

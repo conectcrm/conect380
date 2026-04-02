@@ -65,6 +65,21 @@ export interface ItemFatura {
   valorTotal: number;
 }
 
+export interface FaturaBoletoMetadados {
+  paymentId?: string | null;
+  barcode?: string | null;
+  linhaDigitavel?: string | null;
+  pdfUrl?: string | null;
+}
+
+export interface FaturaMetadados {
+  gateway?: string;
+  transactionId?: string;
+  paymentMethod?: string;
+  boleto?: FaturaBoletoMetadados | null;
+  [key: string]: unknown;
+}
+
 export interface Fatura {
   id: number;
   numero: string;
@@ -95,6 +110,8 @@ export interface Fatura {
   formaPagamentoPreferida?: FormaPagamento;
   observacoes?: string;
   linkPagamento?: string;
+  codigoBoleto?: string;
+  metadados?: FaturaMetadados | null;
   arquivoUrl?: string;
   notasFiscais?: string[];
   itens: ItemFatura[];
@@ -177,6 +194,18 @@ export interface WorkflowOperacaoResultado {
   processados: number;
   sucesso: number;
   falhas: number;
+}
+
+export interface GerarLinkPagamentoResultado {
+  link: string;
+  provider?: string;
+  referenciaGateway?: string;
+  preferenceId?: string;
+  paymentId?: string;
+  boletoPdfUrl?: string | null;
+  boletoBarcode?: string | null;
+  boletoLinhaDigitavel?: string | null;
+  expiraEm?: string;
 }
 
 const toPagamento = (raw: any): Pagamento => {
@@ -925,7 +954,7 @@ export const faturamentoService = {
     throw new Error('Emissao fiscal fora do escopo desta fase do financeiro.');
   },
 
-  async gerarLinkPagamento(id: number): Promise<string> {
+  async gerarLinkPagamento(id: number): Promise<GerarLinkPagamentoResultado> {
     try {
       const response = await api.post(`/faturamento/faturas/${id}/link-pagamento`);
       const payload = response?.data?.data || response?.data || {};
@@ -933,7 +962,25 @@ export const faturamentoService = {
       if (!link) {
         throw new Error('API nao retornou um link de pagamento valido.');
       }
-      return link;
+      const boletoPdfUrlRaw =
+        typeof payload?.boletoPdfUrl === 'string'
+          ? payload.boletoPdfUrl.trim()
+          : '';
+      return {
+        link,
+        provider: payload?.provider ? String(payload.provider) : undefined,
+        referenciaGateway: payload?.referenciaGateway
+          ? String(payload.referenciaGateway)
+          : undefined,
+        preferenceId: payload?.preferenceId ? String(payload.preferenceId) : undefined,
+        paymentId: payload?.paymentId ? String(payload.paymentId) : undefined,
+        boletoPdfUrl: boletoPdfUrlRaw || null,
+        boletoBarcode: payload?.boletoBarcode ? String(payload.boletoBarcode) : null,
+        boletoLinhaDigitavel: payload?.boletoLinhaDigitavel
+          ? String(payload.boletoLinhaDigitavel)
+          : null,
+        expiraEm: payload?.expiraEm ? String(payload.expiraEm) : undefined,
+      };
     } catch (error) {
       console.error('Erro ao gerar link de pagamento:', error);
       throw error;

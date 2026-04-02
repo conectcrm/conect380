@@ -65,6 +65,12 @@ interface TributoDetalhadoVisual {
   percentual: number;
 }
 
+interface BoletoDetalheVisual {
+  pdfUrl?: string;
+  barcode?: string;
+  linhaDigitavel?: string;
+}
+
 const extrairDocumentoFinanceiro = (
   detalhes?: Record<string, unknown> | null,
 ): DocumentoFinanceiroDetalhe | null => {
@@ -126,6 +132,32 @@ const extrairTributosDetalhados = (
     })
     .filter((item): item is TributoDetalhadoVisual => Boolean(item))
     .filter((item) => item.valor > 0 || item.percentual > 0);
+};
+
+const extrairBoletoDetalhes = (fatura: Fatura): BoletoDetalheVisual | null => {
+  const metadados =
+    fatura.metadados && typeof fatura.metadados === 'object' && !Array.isArray(fatura.metadados)
+      ? (fatura.metadados as Record<string, unknown>)
+      : null;
+  const boletoRaw =
+    metadados && typeof metadados.boleto === 'object' && !Array.isArray(metadados.boleto)
+      ? (metadados.boleto as Record<string, unknown>)
+      : null;
+
+  const pdfUrl = String(boletoRaw?.pdfUrl || fatura.linkPagamento || '').trim() || undefined;
+  const barcode = String(boletoRaw?.barcode || fatura.codigoBoleto || '').trim() || undefined;
+  const linhaDigitavel =
+    String(boletoRaw?.linhaDigitavel || fatura.codigoBoleto || '').trim() || undefined;
+
+  if (!pdfUrl && !barcode && !linhaDigitavel) {
+    return null;
+  }
+
+  return {
+    pdfUrl,
+    barcode,
+    linhaDigitavel,
+  };
 };
 
 export default function ModalDetalhesFatura({
@@ -256,6 +288,9 @@ export default function ModalDetalhesFatura({
   const formaPagamentoAtual = fatura.formaPagamento || fatura.formaPagamentoPreferida;
   const documentoFinanceiro = extrairDocumentoFinanceiro(fatura.detalhesTributarios);
   const tributosDetalhados = extrairTributosDetalhados(fatura.detalhesTributarios);
+  const boletoDetalhes = extrairBoletoDetalhes(fatura);
+  const linkPagamento = String(fatura.linkPagamento || '').trim();
+  const linkBoletoPdf = String(boletoDetalhes?.pdfUrl || '').trim();
   const totalTributosDetalhados = tributosDetalhados.reduce((acc, item) => acc + item.valor, 0);
   const ajusteManualImpostos = Math.max(valorImpostos - totalTributosDetalhados, 0);
   const podeEditarFatura =
@@ -677,21 +712,58 @@ export default function ModalDetalhesFatura({
                 </div>
               </div>
 
-              {/* Link de Pagamento */}
-              {fatura.linkPagamento && (
+              {/* Link de Pagamento/Boleto */}
+              {(linkPagamento || boletoDetalhes) && (
                 <div className="bg-green-50 rounded-lg p-4 border border-green-200">
                   <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
                     <Link2 className="w-4 h-4" />
-                    Link de Pagamento
+                    Pagamento online
                   </h3>
-                  <a
-                    href={fatura.linkPagamento}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-blue-600 hover:text-blue-700 underline break-all"
-                  >
-                    {fatura.linkPagamento}
-                  </a>
+                  <div className="space-y-2">
+                    {linkPagamento && (
+                      <a
+                        href={linkPagamento}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block text-sm text-blue-600 hover:text-blue-700 underline break-all"
+                      >
+                        {linkPagamento}
+                      </a>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      {linkPagamento && (
+                        <a
+                          href={linkPagamento}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center rounded-md border border-[#159A9C]/30 bg-white px-3 py-1.5 text-xs font-medium text-[#0F7B7D] transition hover:bg-[#E9F7F7]"
+                        >
+                          Abrir pagamento
+                        </a>
+                      )}
+                      {linkBoletoPdf && (
+                        <a
+                          href={linkBoletoPdf}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center rounded-md border border-[#2563EB]/30 bg-white px-3 py-1.5 text-xs font-medium text-[#1D4ED8] transition hover:bg-[#EFF6FF]"
+                        >
+                          Baixar PDF do boleto
+                        </a>
+                      )}
+                    </div>
+                    {boletoDetalhes?.linhaDigitavel && (
+                      <p className="text-xs text-[#2F4858] break-all">
+                        Linha digitavel: <strong>{boletoDetalhes.linhaDigitavel}</strong>
+                      </p>
+                    )}
+                    {boletoDetalhes?.barcode &&
+                      boletoDetalhes.barcode !== boletoDetalhes.linhaDigitavel && (
+                        <p className="text-xs text-[#2F4858] break-all">
+                          Codigo de barras: <strong>{boletoDetalhes.barcode}</strong>
+                        </p>
+                      )}
+                  </div>
                 </div>
               )}
             </div>
