@@ -160,6 +160,12 @@ export class Fatura {
     transactionId?: string;
     paymentMethod?: string;
     installments?: number;
+    boleto?: {
+      paymentId?: string | null;
+      barcode?: string | null;
+      linhaDigitavel?: string | null;
+      pdfUrl?: string | null;
+    };
   };
 
   @Column({ type: 'jsonb', nullable: true })

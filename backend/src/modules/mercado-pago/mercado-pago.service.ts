@@ -800,6 +800,33 @@ export class MercadoPagoService {
     };
   }
 
+  private buildMockBoletoPayment(paymentData?: Record<string, unknown>) {
+    const id = 'mock_boleto_' + crypto.randomBytes(8).toString('hex');
+    const externalReference = String(paymentData?.external_reference || ('fatura:mock:' + id)).trim();
+    const ticketUrl = 'https://mercadopago.mock/boleto/' + id + '.pdf';
+    const barcode = '34191.79001 01043.510047 91020.150008 1 99990000010000';
+
+    return {
+      id,
+      status: 'pending',
+      external_reference: externalReference,
+      payment_method_id: 'bolbradesco',
+      transaction_details: {
+        external_resource_url: ticketUrl,
+      },
+      point_of_interaction: {
+        type: 'ticket',
+        transaction_data: {
+          ticket_url: ticketUrl,
+          barcode,
+          line: {
+            content: barcode,
+          },
+        },
+      },
+    };
+  }
+
   private buildMockPayment(paymentId: string) {
     const prefix = 'mock:';
     if (typeof paymentId !== 'string' || !paymentId.startsWith(prefix)) {
@@ -1053,6 +1080,70 @@ export class MercadoPagoService {
     }
   }
 
+  async createBoletoPayment(
+    paymentData: any,
+    options?: { accessTokenOverride?: string | null },
+  ) {
+    try {
+      const accessTokenOverride = String(options?.accessTokenOverride || '').trim() || null;
+      const mockMode = this.isMockMode();
+
+      const paymentApi =
+        accessTokenOverride && accessTokenOverride.length > 0
+          ? new Payment(
+              new MercadoPagoConfig({
+                accessToken: accessTokenOverride,
+                options: {
+                  timeout: 5000,
+                  idempotencyKey: 'TENANT',
+                },
+              }),
+            )
+          : this.paymentApi;
+
+      if (!paymentApi) {
+        if (mockMode) {
+          this.logger.warn(
+            'Mercado Pago em modo MOCK: criando boleto fake (sem chamada externa)',
+          );
+          return this.buildMockBoletoPayment(paymentData);
+        }
+
+        throw new Error(
+          'Mercado Pago nao inicializado. Configure MERCADO_PAGO_ACCESS_TOKEN ou habilite MERCADO_PAGO_MOCK=true para desenvolvimento.',
+        );
+      }
+
+      const payment = await paymentApi.create({
+        body: {
+          transaction_amount: paymentData.transaction_amount,
+          description: paymentData.description,
+          payment_method_id: paymentData.payment_method_id || 'bolbradesco',
+          payer: {
+            email: paymentData.payer?.email,
+            first_name: paymentData.payer?.first_name,
+            last_name: paymentData.payer?.last_name,
+            identification: paymentData.payer?.identification,
+            address: paymentData.payer?.address,
+          },
+          external_reference: paymentData.external_reference,
+          notification_url: paymentData.notification_url,
+          date_of_expiration: paymentData.date_of_expiration,
+          metadata: {
+            origem: 'ConectCRM',
+            tipo: 'Boleto',
+            timestamp: new Date().toISOString(),
+          },
+        },
+      });
+
+      this.logger.log('Pagamento boleto criado: ' + String(payment.id || 'n/a'));
+      return payment;
+    } catch (error) {
+      this.logger.error('Erro ao criar pagamento boleto:', error);
+      throw error;
+    }
+  }
   async createPixPayment(paymentData: any) {
     try {
       const payment = await this.paymentApi.create({
@@ -1692,4 +1783,6 @@ export class MercadoPagoService {
     }
   }
 }
+
+
 

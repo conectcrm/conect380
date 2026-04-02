@@ -25,6 +25,7 @@ describe('FaturamentoService - configuracao de gateway por empresa', () => {
   };
   const mercadoPagoService = {
     createPreference: jest.fn(),
+    createBoletoPayment: jest.fn(),
   };
   const empresaConfigRepository = {
     findOne: jest.fn(),
@@ -73,7 +74,7 @@ describe('FaturamentoService - configuracao de gateway por empresa', () => {
 
   const prepararCenarioGeracaoLink = (
     formaPagamentoPreferida: FormaPagamento,
-    options?: { mockPreferenceSuccess?: boolean },
+    options?: { mockPreferenceSuccess?: boolean; mockBoletoSuccess?: boolean },
   ) => {
     const faturaMock: any = {
       id: 701,
@@ -96,8 +97,28 @@ describe('FaturamentoService - configuracao de gateway por empresa', () => {
       id: 'cliente-1',
       nome: 'Cliente Teste',
       email: 'cliente@teste.com',
+      documento: '12345678909',
     });
-    if (options?.mockPreferenceSuccess !== false) {
+    if (
+      formaPagamentoPreferida === FormaPagamento.BOLETO &&
+      options?.mockBoletoSuccess !== false
+    ) {
+      mercadoPagoService.createBoletoPayment.mockResolvedValueOnce({
+        id: 'mp-pay-701',
+        transaction_details: {
+          external_resource_url: 'https://mercadopago.example/boleto/mp-pay-701.pdf',
+        },
+        point_of_interaction: {
+          transaction_data: {
+            ticket_url: 'https://mercadopago.example/boleto/mp-pay-701.pdf',
+            barcode: '23793381286008300004133070000012089160000100000',
+            line: {
+              content: '23793381286008300004133070000012089160000100000',
+            },
+          },
+        },
+      });
+    } else if (options?.mockPreferenceSuccess !== false) {
       mercadoPagoService.createPreference.mockResolvedValueOnce({
         id: 'pref-tenant-1',
         init_point: 'https://mercadopago.example/pref-tenant-1',
@@ -178,7 +199,7 @@ describe('FaturamentoService - configuracao de gateway por empresa', () => {
     );
   });
 
-  it('nao tenta excluir account_money ao gerar checkout de boleto', async () => {
+  it('gera boleto direto no Mercado Pago e retorna URL de boleto/pdf', async () => {
     process.env.FINANCEIRO_BOLETO_ENABLED = 'true';
     service = new FaturamentoService(
       faturaRepository as any,
@@ -198,16 +219,28 @@ describe('FaturamentoService - configuracao de gateway por empresa', () => {
 
     prepararCenarioGeracaoLink(FormaPagamento.BOLETO);
 
-    await service.gerarLinkPagamentoFatura(701, 'empresa-1');
+    const resultado = await service.gerarLinkPagamentoFatura(701, 'empresa-1');
 
-    const chamada = mercadoPagoService.createPreference.mock.calls[0];
-    const payload = chamada?.[0] as { payment_methods?: { excluded_payment_types?: Array<{ id: string }> } };
-    const tiposExcluidos = payload?.payment_methods?.excluded_payment_types ?? [];
-    const idsExcluidos = tiposExcluidos.map((item) => item.id);
-
-    expect(idsExcluidos).not.toContain('account_money');
-    expect(payload?.payment_methods).toMatchObject({
-      default_payment_type_id: 'ticket',
+    expect(mercadoPagoService.createBoletoPayment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        transaction_amount: 450,
+        payment_method_id: 'bolbradesco',
+        payer: expect.objectContaining({
+          email: 'cliente@teste.com',
+          identification: expect.objectContaining({
+            type: 'CPF',
+            number: '12345678909',
+          }),
+        }),
+      }),
+      expect.any(Object),
+    );
+    expect(mercadoPagoService.createPreference).not.toHaveBeenCalled();
+    expect(resultado).toMatchObject({
+      paymentId: 'mp-pay-701',
+      link: 'https://mercadopago.example/boleto/mp-pay-701.pdf',
+      boletoPdfUrl: 'https://mercadopago.example/boleto/mp-pay-701.pdf',
+      boletoBarcode: '23793381286008300004133070000012089160000100000',
     });
   });
 

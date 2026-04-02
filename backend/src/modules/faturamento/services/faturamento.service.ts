@@ -80,6 +80,10 @@ export interface LinkPagamentoFaturaGerado {
   provider: 'mercado_pago';
   referenciaGateway: string;
   preferenceId?: string;
+  paymentId?: string;
+  boletoBarcode?: string;
+  boletoLinhaDigitavel?: string;
+  boletoPdfUrl?: string;
   link: string;
   expiraEm: string;
 }
@@ -886,41 +890,140 @@ export class FaturamentoService {
     const accessTokenOverride =
       gatewayRuntime.accessTokenSource === 'tenant' ? gatewayRuntime.accessToken : null;
 
+    if (formaPagamentoCobrancaOnline === FormaPagamento.BOLETO) {
+      const identificacao = this.resolverIdentificacaoClienteBoleto(cliente);
+      if (!identificacao) {
+        throw new BadRequestException(
+          'Para gerar boleto, o cliente precisa de CPF/CNPJ valido no cadastro.',
+        );
+      }
+
+      const enderecoPagador = this.resolverEnderecoClienteBoleto(cliente);
+      const metodoBoleto = String(
+        process.env.MERCADO_PAGO_BOLETO_PAYMENT_METHOD_ID || 'bolbradesco',
+      )
+        .trim()
+        .toLowerCase();
+
+      let boletoPayment: Record<string, any>;
+      try {
+        boletoPayment = await this.mercadoPagoService.createBoletoPayment(
+          {
+            transaction_amount: Number(fatura.valorTotal),
+            description: `Fatura ${fatura.numero}`,
+            payment_method_id: metodoBoleto || 'bolbradesco',
+            payer: {
+              email: emailCliente,
+              first_name: primeiroNome || 'Cliente',
+              last_name: sobrenome,
+              identification: identificacao,
+              ...(enderecoPagador ? { address: enderecoPagador } : {}),
+            },
+            external_reference: referenciaGateway,
+            notification_url: `${backendBaseUrl}/mercadopago/webhooks`,
+            date_of_expiration: expiraEm,
+          },
+          {
+            accessTokenOverride,
+          },
+        );
+      } catch (error) {
+        this.rethrowErroGatewayLinkPagamento(error, {
+          empresaId,
+          faturaId,
+        });
+      }
+
+      const boleto = this.extrairDadosBoletoMercadoPago(boletoPayment);
+      const linkBoleto = String(boleto.url || '').trim();
+      if (!linkBoleto) {
+        throw new BadRequestException(
+          'Gateway nao retornou URL do boleto para esta cobranca.',
+        );
+      }
+
+      const paymentId = this.toNullableText(boletoPayment?.id);
+
+      fatura.linkPagamento = linkBoleto;
+      fatura.codigoBoleto = boleto.barcode || boleto.linhaDigitavel || null;
+      fatura.formaPagamentoPreferida = formaPagamentoCobrancaOnline;
+      fatura.metadados = {
+        ...(fatura.metadados || {}),
+        gateway: 'mercadopago',
+        transactionId: paymentId || referenciaGateway,
+        paymentMethod: formaPagamentoCobrancaOnline,
+        boleto: {
+          paymentId: paymentId || null,
+          barcode: boleto.barcode || null,
+          linhaDigitavel: boleto.linhaDigitavel || null,
+          pdfUrl: boleto.pdfUrl || linkBoleto,
+        },
+      } as any;
+      await this.faturaRepository.save(fatura);
+
+      await this.registrarPagamentoPendentePorLink({
+        empresaId,
+        fatura,
+        referenciaGateway,
+        linkPagamento: linkBoleto,
+        gatewayPaymentId: paymentId || undefined,
+        boletoBarcode: boleto.barcode || undefined,
+        boletoLinhaDigitavel: boleto.linhaDigitavel || undefined,
+        boletoPdfUrl: boleto.pdfUrl || linkBoleto,
+      });
+
+      return {
+        faturaId: fatura.id,
+        numeroFatura: fatura.numero,
+        provider: 'mercado_pago',
+        referenciaGateway,
+        paymentId: paymentId || undefined,
+        boletoBarcode: boleto.barcode || undefined,
+        boletoLinhaDigitavel: boleto.linhaDigitavel || undefined,
+        boletoPdfUrl: boleto.pdfUrl || linkBoleto,
+        link: linkBoleto,
+        expiraEm,
+      };
+    }
+
     let preference: Record<string, any>;
     try {
-      preference = await this.mercadoPagoService.createPreference({
-        items: [
-          {
-            id: String(fatura.id),
-            title: `Fatura ${fatura.numero}`,
-            currency_id: 'BRL',
-            quantity: 1,
-            unit_price: Number(fatura.valorTotal),
+      preference = await this.mercadoPagoService.createPreference(
+        {
+          items: [
+            {
+              id: String(fatura.id),
+              title: `Fatura ${fatura.numero}`,
+              currency_id: 'BRL',
+              quantity: 1,
+              unit_price: Number(fatura.valorTotal),
+            },
+          ],
+          payer: {
+            name: primeiroNome || 'Cliente',
+            surname: sobrenome,
+            email: emailCliente,
           },
-        ],
-        payer: {
-          name: primeiroNome || 'Cliente',
-          surname: sobrenome,
-          email: emailCliente,
+          back_urls: {
+            success: `${frontendBaseUrl}/faturamento?status=success&fatura=${fatura.id}`,
+            failure: `${frontendBaseUrl}/faturamento?status=failure&fatura=${fatura.id}`,
+            pending: `${frontendBaseUrl}/faturamento?status=pending&fatura=${fatura.id}`,
+          },
+          auto_return: 'approved',
+          payment_methods: this.construirRestricoesPagamentoMercadoPago(
+            formaPagamentoCobrancaOnline,
+          ),
+          notification_url: `${backendBaseUrl}/mercadopago/webhooks`,
+          statement_descriptor: 'ConectCRM',
+          external_reference: referenciaGateway,
+          expires: true,
+          expiration_date_from: new Date().toISOString(),
+          expiration_date_to: expiraEm,
         },
-        back_urls: {
-          success: `${frontendBaseUrl}/faturamento?status=success&fatura=${fatura.id}`,
-          failure: `${frontendBaseUrl}/faturamento?status=failure&fatura=${fatura.id}`,
-          pending: `${frontendBaseUrl}/faturamento?status=pending&fatura=${fatura.id}`,
+        {
+          accessTokenOverride,
         },
-        auto_return: 'approved',
-        payment_methods: this.construirRestricoesPagamentoMercadoPago(
-          formaPagamentoCobrancaOnline,
-        ),
-        notification_url: `${backendBaseUrl}/mercadopago/webhooks`,
-        statement_descriptor: 'ConectCRM',
-        external_reference: referenciaGateway,
-        expires: true,
-        expiration_date_from: new Date().toISOString(),
-        expiration_date_to: expiraEm,
-      }, {
-        accessTokenOverride,
-      });
+      );
     } catch (error) {
       this.rethrowErroGatewayLinkPagamento(error, {
         empresaId,
@@ -2674,6 +2777,132 @@ export class FaturamentoService {
     return this.normalizarBaseUrl(params.fallback) || params.fallback.replace(/\/+$/, '');
   }
 
+  private resolverIdentificacaoClienteBoleto(
+    cliente: Cliente,
+  ): { type: 'CPF' | 'CNPJ'; number: string } | null {
+    const digits = String(cliente?.documento || '').replace(/\D/g, '');
+    if (digits.length === 11) {
+      return {
+        type: 'CPF',
+        number: digits,
+      };
+    }
+    if (digits.length === 14) {
+      return {
+        type: 'CNPJ',
+        number: digits,
+      };
+    }
+    return null;
+  }
+
+  private resolverEnderecoClienteBoleto(cliente: Cliente): Record<string, unknown> | null {
+    const cep = String(cliente?.cep || '').replace(/\D/g, '').slice(0, 8);
+    const cidade = String(cliente?.cidade || '').trim();
+    const estado = String(cliente?.estado || '').trim().toUpperCase().slice(0, 2);
+    const enderecoRaw = String(cliente?.endereco || '').trim();
+
+    if (!cep && !cidade && !estado && !enderecoRaw) {
+      return null;
+    }
+
+    const address: Record<string, unknown> = {};
+    if (cep) {
+      address.zip_code = cep;
+    }
+
+    if (enderecoRaw) {
+      const numeroMatch = enderecoRaw.match(/\b(\d{1,6})\b/);
+      const streetNumber = numeroMatch?.[1] || '0';
+      const streetName = enderecoRaw
+        .replace(/\b\d{1,6}\b/, '')
+        .replace(/[,;-]+/g, ' ')
+        .trim();
+      address.street_name = streetName || enderecoRaw;
+      address.street_number = streetNumber;
+    }
+
+    if (cidade) {
+      address.city = cidade;
+    }
+    if (estado) {
+      address.federal_unit = estado;
+    }
+
+    return Object.keys(address).length > 0 ? address : null;
+  }
+
+  private extrairDadosBoletoMercadoPago(payment: Record<string, unknown>): {
+    url: string;
+    pdfUrl: string | null;
+    barcode: string | null;
+    linhaDigitavel: string | null;
+  } {
+    const paymentObj = this.asRecord(payment) || {};
+    const pointOfInteraction = this.asRecord(paymentObj.point_of_interaction) || {};
+    const transactionData = this.asRecord(pointOfInteraction.transaction_data) || {};
+    const transactionDetails = this.asRecord(paymentObj.transaction_details) || {};
+    const lineObj = this.asRecord(transactionData.line) || {};
+    const barcodeObj = this.asRecord(transactionData.barcode) || {};
+    const altBarcodeObj = this.asRecord(paymentObj.barcode) || {};
+
+    const url =
+      this.primeiroValorTextoHttp([
+        transactionData.ticket_url,
+        transactionData.external_resource_url,
+        transactionDetails.external_resource_url,
+        paymentObj.ticket_url,
+      ]) || '';
+
+    const barcode =
+      this.toNullableText(
+        barcodeObj.content ||
+          transactionData.barcode ||
+          transactionData.barcode_content ||
+          altBarcodeObj.content ||
+          paymentObj.barcode,
+      ) || null;
+
+    const linhaDigitavel =
+      this.toNullableText(
+        lineObj.content ||
+          transactionData.digitable_line ||
+          transactionData.line_content ||
+          paymentObj.digitable_line,
+      ) ||
+      (barcode && barcode.length >= 44 ? barcode : null);
+
+    const pdfUrl =
+      this.primeiroValorTextoHttp([
+        transactionData.pdf_url,
+        transactionData.ticket_pdf_url,
+        transactionData.external_resource_url,
+        transactionDetails.external_resource_url,
+        paymentObj.pdf_url,
+        url,
+      ]) || null;
+
+    return {
+      url,
+      pdfUrl,
+      barcode,
+      linhaDigitavel,
+    };
+  }
+
+  private primeiroValorTextoHttp(candidates: unknown[]): string | null {
+    for (const candidate of candidates) {
+      const texto = this.toNullableText(candidate);
+      if (!texto) {
+        continue;
+      }
+      if (/^https?:\/\//i.test(texto)) {
+        return texto;
+      }
+    }
+    return null;
+  }
+
   private rethrowErroGatewayLinkPagamento(
     error: unknown,
     contexto: {
@@ -2905,8 +3134,22 @@ export class FaturamentoService {
     referenciaGateway: string;
     linkPagamento: string;
     preferenceId?: string;
+    gatewayPaymentId?: string;
+    boletoBarcode?: string;
+    boletoLinhaDigitavel?: string;
+    boletoPdfUrl?: string;
   }): Promise<void> {
-    const { empresaId, fatura, referenciaGateway, linkPagamento, preferenceId } = params;
+    const {
+      empresaId,
+      fatura,
+      referenciaGateway,
+      linkPagamento,
+      preferenceId,
+      gatewayPaymentId,
+      boletoBarcode,
+      boletoLinhaDigitavel,
+      boletoPdfUrl,
+    } = params;
 
     const existente = await this.pagamentoRepository.findOne({
       where: { empresaId, faturaId: fatura.id, gatewayTransacaoId: referenciaGateway },
@@ -2921,6 +3164,10 @@ export class FaturamentoService {
       ...((existente?.dadosCompletos || {}) as Record<string, unknown>),
       linkPagamento,
       preferenceId: preferenceId || null,
+      mercadoPagoPaymentId: gatewayPaymentId || null,
+      boletoBarcode: boletoBarcode || null,
+      boletoLinhaDigitavel: boletoLinhaDigitavel || null,
+      boletoPdfUrl: boletoPdfUrl || null,
       externalReference: referenciaGateway,
       origem: 'faturamento.link_pagamento',
       atualizadoEm: new Date().toISOString(),
