@@ -106,8 +106,12 @@ services:
       args:
         REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:3500}
         REACT_APP_WS_URL: ${REACT_APP_WS_URL:-http://localhost:3500}
-        # GO Core (MVP): manter MVP mode ligado para bloquear rotas pos-MVP.
-        REACT_APP_MVP_MODE: ${REACT_APP_MVP_MODE:-true}
+        # GO Core: controlar escopo de telas pelo build.
+        REACT_APP_MVP_MODE: ${REACT_APP_MVP_MODE:-false}
+        REACT_APP_FINANCEIRO_BOLETO_ENABLED: ${REACT_APP_FINANCEIRO_BOLETO_ENABLED:-false}
+        REACT_APP_PAGAMENTOS_GATEWAY_ENABLED_PROVIDERS: ${REACT_APP_PAGAMENTOS_GATEWAY_ENABLED_PROVIDERS:-}
+        REACT_APP_PAGAMENTOS_GATEWAY_ALLOW_UNIMPLEMENTED: ${REACT_APP_PAGAMENTOS_GATEWAY_ALLOW_UNIMPLEMENTED:-false}
+        REACT_APP_GUARDIAN_WEB_URL: ${REACT_APP_GUARDIAN_WEB_URL:-}
         # Inbox/chat no build de producao depende desta flag.
         REACT_APP_ENABLE_OMNICHANNEL: ${REACT_APP_ENABLE_OMNICHANNEL:-false}
     container_name: conectcrm-frontend
