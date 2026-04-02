@@ -27,16 +27,16 @@ describe('getFinanceiroFeatureFlags (frontend)', () => {
     expect(flags.boletoDisabledReason).toContain('fora do escopo');
   });
 
-  it('habilita fiscal e boleto quando MVP estiver desativado e flags ligadas', () => {
+  it('mantem fiscal desabilitado mesmo com flag ligada quando MVP estiver desativado', () => {
     process.env.REACT_APP_MVP_MODE = 'false';
     process.env.REACT_APP_FINANCEIRO_FISCAL_DOCS_ENABLED = 'true';
     process.env.REACT_APP_FINANCEIRO_BOLETO_ENABLED = 'true';
 
     const flags = getFinanceiroFeatureFlags();
 
-    expect(flags.fiscalDocumentsEnabled).toBe(true);
+    expect(flags.fiscalDocumentsEnabled).toBe(false);
     expect(flags.boletoEnabled).toBe(true);
-    expect(flags.fiscalDisabledReason).toBe('');
+    expect(flags.fiscalDisabledReason).toContain('desabilitada');
     expect(flags.boletoDisabledReason).toBe('');
   });
 

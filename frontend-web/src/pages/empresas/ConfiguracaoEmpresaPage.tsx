@@ -15,11 +15,19 @@ import {
   Upload,
   X,
   ImageIcon,
+  CreditCard,
+  RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
 import { LoadingSkeleton, PageHeader, SectionCard } from '../../components/layout-v2';
 import { ConfiguracoesEmpresa, empresaConfigService } from '../../services/empresaConfigService';
 import { oportunidadesService } from '../../services/oportunidadesService';
 import { empresaService, EmpresaResponse } from '../../services/empresaService';
+import {
+  faturamentoService,
+  ProntidaoCobranca,
+  StatusProntidaoCobranca,
+} from '../../services/faturamentoService';
 import { useAuth } from '../../hooks/useAuth';
 import { useGlobalConfirmation } from '../../contexts/GlobalConfirmationContext';
 import { userHasPermission } from '../../config/menuConfig';
@@ -31,6 +39,7 @@ const EMPRESA_CONFIG_TABS = [
   { id: 'seguranca', label: 'Segurança', icon: Shield },
   { id: 'usuarios', label: 'Usuários e Permissões', icon: Users },
   { id: 'email', label: 'Email/SMTP', icon: Mail },
+  { id: 'financeiro', label: 'Financeiro', icon: CreditCard },
 ] as const;
 
 type EmpresaConfigTabId = (typeof EMPRESA_CONFIG_TABS)[number]['id'];
@@ -61,6 +70,20 @@ const mapSalesFeatureFlagsDecisionToForm = (
 const isValidEmpresaConfigTab = (tab: string | null): tab is EmpresaConfigTabId =>
   Boolean(tab && EMPRESA_CONFIG_TABS.some((item) => item.id === tab));
 
+const prontidaoStatusLabel: Record<StatusProntidaoCobranca, string> = {
+  ok: 'OK',
+  alerta: 'Atencao',
+  bloqueio: 'Bloqueio',
+};
+
+const prontidaoStatusClass: Record<StatusProntidaoCobranca, string> = {
+  ok: 'border-green-200 bg-green-50 text-green-800',
+  alerta: 'border-amber-200 bg-amber-50 text-amber-800',
+  bloqueio: 'border-red-200 bg-red-50 text-red-800',
+};
+
+const CONFIGURED_SECRET_MASK = '__CONFIGURED_SECRET__';
+
 const ConfiguracaoEmpresaPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { confirm } = useGlobalConfirmation();
@@ -83,6 +106,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
     success: boolean;
     message: string;
   } | null>(null);
+  const [prontidaoCobranca, setProntidaoCobranca] = useState<ProntidaoCobranca | null>(null);
+  const [carregandoProntidaoCobranca, setCarregandoProntidaoCobranca] = useState(false);
+  const [erroProntidaoCobranca, setErroProntidaoCobranca] = useState<string | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -160,6 +186,42 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
     }
   };
 
+  const carregarProntidaoCobranca = async () => {
+    try {
+      setCarregandoProntidaoCobranca(true);
+      setErroProntidaoCobranca(null);
+      const prontidao = await faturamentoService.obterProntidaoCobranca();
+      setProntidaoCobranca(prontidao);
+    } catch (err) {
+      console.error('Erro ao carregar prontidao de cobranca:', err);
+      setProntidaoCobranca(null);
+      setErroProntidaoCobranca(
+        err instanceof Error
+          ? err.message
+          : 'Nao foi possivel obter a prontidao operacional de cobranca.',
+      );
+    } finally {
+      setCarregandoProntidaoCobranca(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'financeiro') {
+      return;
+    }
+
+    if (carregandoProntidaoCobranca) {
+      return;
+    }
+
+    if (prontidaoCobranca) {
+      return;
+    }
+
+    void carregarProntidaoCobranca();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, carregandoProntidaoCobranca, prontidaoCobranca]);
+
   const handleInputChange = (field: keyof ConfiguracoesEmpresa, value: any) => {
     if (!canUpdateConfig) {
       return;
@@ -210,6 +272,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
           hasLogo: Boolean(formData.logoUrl),
           emailsHabilitados: Boolean(formData.emailsHabilitados),
           smtpConfigurado: Boolean(formData.smtpUsuario && formData.smtpSenha),
+          gatewayProvider: formData.gatewayPagamentoProvider || null,
+          gatewayTokenConfigurado: Boolean(formData.gatewayPagamentoAccessToken),
+          gatewayWebhookConfigurado: Boolean(formData.gatewayPagamentoWebhookSecret),
         });
       }
 
@@ -226,6 +291,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
       const updatedEmpresa = await empresaService.atualizarEmpresa(empresaId, empresaData);
       setEmpresa(updatedEmpresa);
       setEmpresaData(updatedEmpresa);
+      void carregarProntidaoCobranca();
 
       setHasChanges(false);
       toastService.success('Configurações salvas com sucesso!');
@@ -264,6 +330,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
       const reset = await empresaConfigService.resetConfig();
       setConfig(reset);
       setFormData(reset);
+      void carregarProntidaoCobranca();
       if (salesFlagsLoaded) {
         const currentSalesFlags = await oportunidadesService.obterSalesFeatureFlags().catch(() => null);
         if (currentSalesFlags) {
@@ -432,6 +499,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
         smtpSenha: formData.smtpSenha,
       });
       setSMTPTestResult(response);
+      if (response.success) {
+        void carregarProntidaoCobranca();
+      }
     } catch (err: any) {
       console.error('Erro ao testar SMTP:', err);
       setSMTPTestResult({
@@ -445,6 +515,15 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
     }
   };
   const canUploadLogo = canUpdateConfig && !uploadingLogo;
+  const statusGeralProntidao = prontidaoCobranca?.statusGeral || 'alerta';
+  const gatewayTokenConfigurado = String(formData.gatewayPagamentoAccessToken || '').trim().length > 0;
+  const gatewayWebhookConfigurado =
+    String(formData.gatewayPagamentoWebhookSecret || '').trim().length > 0;
+  const gatewayTokenMascara = formData.gatewayPagamentoAccessToken === CONFIGURED_SECRET_MASK;
+  const gatewayWebhookMascara = formData.gatewayPagamentoWebhookSecret === CONFIGURED_SECRET_MASK;
+  const recomendacaoOperacionalCobranca =
+    prontidaoCobranca?.recomendacaoOperacional ||
+    'Fluxo recomendado: enviar a fatura ao cliente e registrar o recebimento em "Registrar Pgto" apos a confirmacao bancaria.';
 
   if (loading || authLoading) {
     return (
@@ -1319,10 +1398,194 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                 </div>
               )}
 
+              {activeTab === 'financeiro' && (
+                <div className="space-y-6">
+                  <h2 className="text-2xl font-bold text-[#002333] flex items-center gap-2">
+                    <CreditCard className="h-6 w-6 text-[#159A9C]" />
+                    Operacao Financeira e Cobranca
+                  </h2>
+
+                  <div className="rounded-lg border border-[#DCE6EA] bg-white p-5 space-y-4">
+                    <div>
+                      <p className="text-sm font-semibold text-[#244455]">Credenciais do gateway</p>
+                      <p className="text-xs text-[#607B89] mt-1">
+                        Configure o gateway por empresa para isolar cobranca online por tenant.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Provider de pagamento
+                        </label>
+                        <select
+                          value={formData.gatewayPagamentoProvider || ''}
+                          onChange={(e) =>
+                            handleInputChange('gatewayPagamentoProvider', e.target.value || null)
+                          }
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                        >
+                          <option value="">Nao configurado (usa fallback global)</option>
+                          <option value="mercadopago">Mercado Pago</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Access Token (secreto)
+                        </label>
+                        <input
+                          type="password"
+                          value={formData.gatewayPagamentoAccessToken || ''}
+                          onChange={(e) =>
+                            handleInputChange('gatewayPagamentoAccessToken', e.target.value)
+                          }
+                          placeholder="APP_USR-..."
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                        />
+                        <p className="text-xs text-[#607B89] mt-1">
+                          {gatewayTokenConfigurado
+                            ? gatewayTokenMascara
+                              ? 'Token ja configurado. Preencha apenas se quiser substituir.'
+                              : 'Token preenchido para salvar na proxima atualizacao.'
+                            : 'Token da conta Mercado Pago para gerar links.'}
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Webhook Secret (secreto)
+                        </label>
+                        <input
+                          type="password"
+                          value={formData.gatewayPagamentoWebhookSecret || ''}
+                          onChange={(e) =>
+                            handleInputChange('gatewayPagamentoWebhookSecret', e.target.value)
+                          }
+                          placeholder="Assinatura do webhook"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                        />
+                        <p className="text-xs text-[#607B89] mt-1">
+                          {gatewayWebhookConfigurado
+                            ? gatewayWebhookMascara
+                              ? 'Secret ja configurado. Preencha apenas se quiser substituir.'
+                              : 'Secret preenchido para salvar na proxima atualizacao.'
+                            : 'Recomendado para validar callbacks do provider.'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3 rounded-lg border border-[#DCE6EA] bg-[#F8FBFC] p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-[#244455]">Prontidao de cobranca</p>
+                      <p className="text-xs text-[#607B89] mt-1">
+                        Status operacional validado no backend para gateway online e envio de
+                        cobranca por e-mail.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => void carregarProntidaoCobranca()}
+                      disabled={carregandoProntidaoCobranca}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 py-2 text-sm font-medium text-[#244455] hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <RefreshCw
+                        className={`h-4 w-4 ${carregandoProntidaoCobranca ? 'animate-spin' : ''}`}
+                      />
+                      {carregandoProntidaoCobranca ? 'Atualizando...' : 'Atualizar prontidao'}
+                    </button>
+                  </div>
+
+                  {erroProntidaoCobranca && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-semibold">Nao foi possivel carregar a prontidao</p>
+                          <p className="text-xs mt-1">{erroProntidaoCobranca}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div
+                    className={`rounded-lg border p-4 ${prontidaoStatusClass[statusGeralProntidao]}`}
+                  >
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold">Status geral da cobranca</p>
+                        <p className="text-xs mt-1">{recomendacaoOperacionalCobranca}</p>
+                      </div>
+                      <span className="inline-flex w-fit items-center rounded-full border border-current/20 bg-white/70 px-3 py-1 text-xs font-semibold">
+                        {prontidaoStatusLabel[statusGeralProntidao]}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div className="rounded-lg border border-[#DCE6EA] bg-white p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-[#244455]">
+                            Gateway de cobranca online
+                          </p>
+                          <p className="text-xs text-[#607B89] mt-1">
+                            {prontidaoCobranca?.gateway?.detalhe ||
+                              'Aguardando diagnostico do backend.'}
+                          </p>
+                        </div>
+                        <span
+                          className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                            prontidaoStatusClass[prontidaoCobranca?.gateway?.status || 'alerta']
+                          }`}
+                        >
+                          {prontidaoStatusLabel[prontidaoCobranca?.gateway?.status || 'alerta']}
+                        </span>
+                      </div>
+                      <p className="mt-3 text-xs text-[#607B89]">
+                        O backend prioriza credenciais desta empresa e usa fallback do ambiente
+                        quando necessario.
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg border border-[#DCE6EA] bg-white p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-[#244455]">
+                            Envio de cobranca por e-mail
+                          </p>
+                          <p className="text-xs text-[#607B89] mt-1">
+                            {prontidaoCobranca?.email?.detalhe ||
+                              'Ajuste o SMTP da empresa para habilitar envio real.'}
+                          </p>
+                        </div>
+                        <span
+                          className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                            prontidaoStatusClass[prontidaoCobranca?.email?.status || 'alerta']
+                          }`}
+                        >
+                          {prontidaoStatusLabel[prontidaoCobranca?.email?.status || 'alerta']}
+                        </span>
+                      </div>
+                      <div className="mt-3">
+                        <button
+                          onClick={() => handleTabChange('email')}
+                          className="inline-flex items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 py-2 text-xs font-medium text-[#244455] hover:bg-[#F6FAFB]"
+                        >
+                          <Mail className="h-3.5 w-3.5" />
+                          Abrir configuracao SMTP
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {activeTab !== 'geral' &&
                 activeTab !== 'seguranca' &&
                 activeTab !== 'usuarios' &&
                 activeTab !== 'email' &&
+                activeTab !== 'financeiro' &&
                 (
                   <div className="text-center py-12 text-gray-500">
                     <Info className="h-12 w-12 mx-auto mb-4 text-gray-400" />

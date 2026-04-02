@@ -10,7 +10,6 @@ import {
   DollarSign,
   Download,
   MoreVertical,
-  Eye,
   Send,
   Link2,
   Calendar,
@@ -32,19 +31,14 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
-  AmbienteDocumentoFiscal,
-  DocumentoFiscalCancelamentoPayload,
-  DocumentoFiscalPayload,
-  DocumentoFiscalPreflightDiagnostico,
   faturamentoService,
-  DocumentoFiscalStatus,
   Fatura,
-  FormaPagamento,
-  TipoDocumentoFiscal,
   NovaFatura,
+  FormaPagamento,
   StatusFatura,
   TipoFatura,
   FiltrosFatura,
+  ProntidaoCobranca,
 } from '../../services/faturamentoService';
 import ModalFatura from './ModalFatura';
 import ModalDetalhesFatura from './ModalDetalhesFatura';
@@ -54,6 +48,7 @@ import SkeletonTable from '../../components/skeleton/SkeletonTable';
 import RelatoriosAvancados from '../../components/analytics/RelatoriosAvancados';
 import EmailAutomacao, {
   EnvioEmailAutomacaoPayload,
+  ResultadoEnvioEmailAutomacao,
 } from '../../components/email/EmailAutomacao';
 import GatewayPagamento from '../../components/pagamento/GatewayPagamento';
 import WorkflowAutomacao, { WorkflowExecutionResult } from '../../components/automacao/WorkflowAutomacao';
@@ -68,7 +63,6 @@ import {
 import NotificacaoSucesso from '../../components/common/NotificacaoSucesso';
 import { useNotificacaoFinanceira } from '../../hooks/useNotificacao';
 import { getPagamentosGatewayUiConfig } from '../../config/pagamentosGatewayFlags';
-import { getFinanceiroFeatureFlags } from '../../config/financeiroFeatureFlags';
 import {
   DataTableCard,
   FiltersBar,
@@ -98,6 +92,17 @@ type PagamentoFormulario = {
 
 type StatusProntidao = 'ok' | 'alerta' | 'bloqueio';
 
+const STATUS_BLOQUEIO_ACOES_FINANCEIRAS: StatusFatura[] = [
+  StatusFatura.PAGA,
+  StatusFatura.CANCELADA,
+];
+const STATUS_ELEGIVEIS_COBRANCA: StatusFatura[] = [
+  StatusFatura.PENDENTE,
+  StatusFatura.ENVIADA,
+  StatusFatura.PARCIALMENTE_PAGA,
+  StatusFatura.VENCIDA,
+];
+
 export default function FaturamentoPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -111,10 +116,6 @@ export default function FaturamentoPage() {
   const [modalPagamentosAberto, setModalPagamentosAberto] = useState(false);
   const [faturaEdicao, setFaturaEdicao] = useState<Fatura | null>(null);
   const [faturaDetalhes, setFaturaDetalhes] = useState<Fatura | null>(null);
-  const [documentoFiscalStatus, setDocumentoFiscalStatus] = useState<DocumentoFiscalStatus | null>(
-    null,
-  );
-  const [fiscalActionLoading, setFiscalActionLoading] = useState(false);
   const [faturaPagamentos, setFaturaPagamentos] = useState<Fatura | null>(null);
   const [busca, setBusca] = useState('');
   const [filtros, setFiltros] = useState<FiltrosFatura>({ periodoCampo: 'vencimento' });
@@ -164,6 +165,7 @@ export default function FaturamentoPage() {
   const [processandoAcaoMassa, setProcessandoAcaoMassa] = useState(false);
   const [progressoAcaoMassa, setProgressoAcaoMassa] = useState(0);
   const [mostrarFiltrosAvancados, setMostrarFiltrosAvancados] = useState(false);
+  const [menuAcoesAbertoId, setMenuAcoesAbertoId] = useState<number | null>(null);
 
   // Estado para loading e skeleton
 
@@ -172,13 +174,6 @@ export default function FaturamentoPage() {
   const [visaoAtiva, setVisaoAtiva] = useState<
     'dashboard' | 'prontidao' | 'relatorios' | 'email' | 'workflows'
   >('dashboard');
-  const [preflightFiscalProntidao, setPreflightFiscalProntidao] =
-    useState<DocumentoFiscalPreflightDiagnostico | null>(null);
-  const [carregandoPreflightFiscalProntidao, setCarregandoPreflightFiscalProntidao] =
-    useState(false);
-  const [erroPreflightFiscalProntidao, setErroPreflightFiscalProntidao] = useState<string | null>(
-    null,
-  );
 
   const [dashboardCards, setDashboardCards] = useState<DashboardCards>({
     totalFaturas: 0,
@@ -188,16 +183,46 @@ export default function FaturamentoPage() {
     faturasPagas: 0,
     faturasDoMes: 0,
   });
+  const [prontidaoCobranca, setProntidaoCobranca] = useState<ProntidaoCobranca | null>(null);
+  const [carregandoProntidaoCobranca, setCarregandoProntidaoCobranca] = useState(false);
+  const [erroProntidaoCobranca, setErroProntidaoCobranca] = useState<string | null>(null);
 
   // Hooks para confirmação inteligente
   const confirmacao = useConfirmacaoInteligente();
   const validacao = useValidacaoFinanceira();
   const notificacao = useNotificacaoFinanceira();
   const gatewayUiConfig = getPagamentosGatewayUiConfig();
-  const gatewayUiHabilitada = gatewayUiConfig.onlineGatewayUiEnabled;
-  const linkPagamentoHabilitado = gatewayUiConfig.paymentLinkEnabled;
-  const financeiroFeatureFlags = getFinanceiroFeatureFlags();
-  const fiscalFeatureEnabled = financeiroFeatureFlags.fiscalDocumentsEnabled;
+  const gatewayFlagHabilitada = gatewayUiConfig.onlineGatewayUiEnabled;
+  const linkFlagHabilitado = gatewayUiConfig.paymentLinkEnabled;
+  const gatewayBackendOperacional = prontidaoCobranca?.prontoParaCobrancaOnline ?? true;
+  const emailCobrancaOperacional = prontidaoCobranca?.prontoParaCobrancaPorEmail ?? true;
+  const gatewayUiHabilitada = gatewayFlagHabilitada && gatewayBackendOperacional;
+  const linkPagamentoHabilitado = linkFlagHabilitado && gatewayBackendOperacional;
+  const motivoBloqueioGateway =
+    prontidaoCobranca?.gateway?.detalhe ||
+    gatewayUiConfig.motivoBloqueio ||
+    'Gateway indisponivel no ambiente atual.';
+  const motivoBloqueioEmailCobranca =
+    prontidaoCobranca?.email?.detalhe || 'Envio de cobranca por e-mail indisponivel.';
+  const cobrancaOnlineOperacional = gatewayUiHabilitada && linkPagamentoHabilitado;
+  const fallbackOperacionalCobranca =
+    prontidaoCobranca?.recomendacaoOperacional ||
+    'Fluxo recomendado: enviar a fatura ao cliente e registrar o recebimento em "Registrar Pgto" apos a confirmacao bancaria.';
+  const pdfDownloadHabilitado = faturamentoService.suportaDownloadPdfFatura();
+  const statusPermiteAcoesFinanceiras = (status: StatusFatura): boolean =>
+    !STATUS_BLOQUEIO_ACOES_FINANCEIRAS.includes(status);
+  const statusPermiteCobranca = (status: StatusFatura): boolean =>
+    STATUS_ELEGIVEIS_COBRANCA.includes(status);
+  const obterFaturaPorId = (id: number): Fatura | undefined => faturas.find((item) => item.id === id);
+  const resolverFormaPagamentoFatura = (fatura: Fatura): FormaPagamento =>
+    (fatura.formaPagamento || fatura.formaPagamentoPreferida || FormaPagamento.PIX) as FormaPagamento;
+  const formaPagamentoPermiteCobrancaOnline = (formaPagamento: FormaPagamento): boolean =>
+    [
+      FormaPagamento.PIX,
+      FormaPagamento.CARTAO_CREDITO,
+      FormaPagamento.CARTAO_DEBITO,
+      FormaPagamento.BOLETO,
+    ].includes(formaPagamento);
 
   // Dados paginados com aggregates (React Query)
   const faturasQuery = useFaturasPaginadas({
@@ -262,50 +287,27 @@ export default function FaturamentoPage() {
     }
   };
 
-  const carregarPreflightFiscalProntidao = async () => {
-    if (!fiscalFeatureEnabled) {
-      setPreflightFiscalProntidao(null);
-      setErroPreflightFiscalProntidao(
-        financeiroFeatureFlags.fiscalDisabledReason || 'Preflight fiscal desabilitado neste ambiente.',
-      );
-      return;
-    }
-
-    setErroPreflightFiscalProntidao(null);
-    setCarregandoPreflightFiscalProntidao(true);
+  const carregarProntidaoCobranca = async () => {
     try {
-      const resultado = await faturamentoService.executarPreflightFiscal();
-      setPreflightFiscalProntidao(resultado);
+      setCarregandoProntidaoCobranca(true);
+      setErroProntidaoCobranca(null);
+      const prontidao = await faturamentoService.obterProntidaoCobranca();
+      setProntidaoCobranca(prontidao);
     } catch (error) {
-      console.error('Erro ao carregar preflight fiscal:', error);
-      setErroPreflightFiscalProntidao('Nao foi possivel validar a prontidao fiscal oficial.');
+      console.error('Erro ao carregar prontidao de cobranca:', error);
+      setErroProntidaoCobranca(
+        obterMensagemErro(error, 'Nao foi possivel obter a prontidao operacional de cobranca.'),
+      );
+      setProntidaoCobranca(null);
     } finally {
-      setCarregandoPreflightFiscalProntidao(false);
+      setCarregandoProntidaoCobranca(false);
     }
   };
 
   useEffect(() => {
-    if (!fiscalFeatureEnabled && visaoAtiva === 'prontidao') {
-      setVisaoAtiva('dashboard');
-    }
-  }, [fiscalFeatureEnabled, visaoAtiva]);
-
-  useEffect(() => {
-    if (visaoAtiva !== 'prontidao') {
-      return;
-    }
-
-    if (!fiscalFeatureEnabled) {
-      return;
-    }
-
-    if (preflightFiscalProntidao || carregandoPreflightFiscalProntidao) {
-      return;
-    }
-
-    void carregarPreflightFiscalProntidao();
+    void carregarProntidaoCobranca();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visaoAtiva, preflightFiscalProntidao, carregandoPreflightFiscalProntidao, fiscalFeatureEnabled]);
+  }, []);
 
   const buscarFaturas = async () => {
     setPage(1);
@@ -335,18 +337,22 @@ export default function FaturamentoPage() {
 
   const abrirModalDetalhes = (fatura: Fatura) => {
     setFaturaDetalhes(fatura);
-    setDocumentoFiscalStatus(null);
     setModalDetalhesAberto(true);
   };
 
   const fecharModalDetalhes = () => {
     setModalDetalhesAberto(false);
     setFaturaDetalhes(null);
-    setDocumentoFiscalStatus(null);
-    setFiscalActionLoading(false);
   };
 
   const abrirModalPagamentos = (fatura: Fatura) => {
+    if (!statusPermiteAcoesFinanceiras(fatura.status)) {
+      notificacao.mostrarAviso(
+        'Acao indisponivel',
+        `Nao e permitido registrar pagamento para faturas com status ${faturamentoService.formatarStatusFatura(fatura.status)}.`,
+      );
+      return;
+    }
     setFaturaPagamentos(fatura);
     setModalPagamentosAberto(true);
   };
@@ -356,8 +362,17 @@ export default function FaturamentoPage() {
     setFaturaPagamentos(null);
   };
 
+  const alternarMenuAcoes = (event: React.MouseEvent, faturaId: number) => {
+    event.stopPropagation();
+    setMenuAcoesAbertoId((atual) => (atual === faturaId ? null : faturaId));
+  };
+
+  const fecharMenuAcoes = () => {
+    setMenuAcoesAbertoId(null);
+  };
+
   const marcarNotificacaoComoLida = (notificacaoId: string) => {
-    // Implementar lógica para marcar notificação como lida
+    void notificacaoId;
   };
 
   const obterMensagemErro = (error: unknown, fallback: string) => {
@@ -380,35 +395,94 @@ export default function FaturamentoPage() {
     );
   };
 
-  const normalizarTipoDocumentoFiscal = (tipo: unknown): TipoDocumentoFiscal | undefined => {
-    const tipoNormalizado = String(tipo || '')
-      .trim()
-      .toLowerCase();
-    if (tipoNormalizado === 'nfse' || tipoNormalizado === 'nfe') {
-      return tipoNormalizado as TipoDocumentoFiscal;
+  const obterSinalErro = (error: unknown): { status?: number; texto: string } => {
+    const err = error as {
+      response?: {
+        status?: number;
+        data?: Record<string, unknown>;
+      };
+      message?: unknown;
+    };
+
+    const partes: string[] = [];
+    const data = (err?.response?.data || {}) as Record<string, unknown>;
+
+    const adicionarTexto = (valor: unknown) => {
+      if (typeof valor === 'string' && valor.trim().length > 0) {
+        partes.push(valor.trim());
+      }
+    };
+
+    const mensagem = data.message;
+    if (Array.isArray(mensagem)) {
+      mensagem.forEach((item) => adicionarTexto(item));
+    } else {
+      adicionarTexto(mensagem);
     }
-    return undefined;
+
+    adicionarTexto(data.error);
+    const errors = data.errors;
+    if (Array.isArray(errors)) {
+      errors.forEach((item) => adicionarTexto(item));
+    } else {
+      adicionarTexto(errors);
+    }
+    adicionarTexto(data.detalhe);
+    adicionarTexto(data.detalhes);
+    adicionarTexto(data.code);
+    adicionarTexto(data.codigo);
+    adicionarTexto(err?.message);
+
+    return {
+      status: err?.response?.status,
+      texto: partes.join(' | ').toLowerCase(),
+    };
   };
 
-  const normalizarAmbienteDocumentoFiscal = (ambiente: unknown): AmbienteDocumentoFiscal => {
-    const ambienteNormalizado = String(ambiente || '')
-      .trim()
-      .toLowerCase();
-    return ambienteNormalizado === 'producao' ? 'producao' : 'homologacao';
+  const erroIndicaIndisponibilidadeCobrancaOnline = (error: unknown): boolean => {
+    const { status, texto } = obterSinalErro(error);
+    if (status === 503) {
+      return true;
+    }
+
+    const marcadores = [
+      'mercado pago',
+      'gateway',
+      'checkout',
+      'link de pagamento',
+      'payment link',
+      'access token',
+      'access_token',
+      'nao inicializado',
+      'indisponivel',
+      'url publica',
+      'webhook',
+    ];
+
+    return marcadores.some((marcador) => texto.includes(marcador));
   };
 
-  const obterTipoDocumentoFiscalDaFatura = (fatura?: Fatura | null): TipoDocumentoFiscal | undefined => {
-    const detalhes = fatura?.detalhesTributarios;
-    if (!detalhes || typeof detalhes !== 'object' || Array.isArray(detalhes)) {
-      return undefined;
+  const erroIndicaFalhaEnvioCobranca = (detalhe: string | undefined): boolean => {
+    const texto = String(detalhe || '').toLowerCase();
+    if (!texto) {
+      return false;
     }
 
-    const documentoRaw = (detalhes as Record<string, unknown>).documento;
-    if (!documentoRaw || typeof documentoRaw !== 'object' || Array.isArray(documentoRaw)) {
-      return undefined;
-    }
+    const marcadores = [
+      'smtp',
+      'email',
+      'mailer',
+      'mail',
+      'transport',
+      'autentic',
+      'timeout',
+      'connection',
+      'conexao',
+      'host',
+      'socket',
+    ];
 
-    return normalizarTipoDocumentoFiscal((documentoRaw as Record<string, unknown>).tipo);
+    return marcadores.some((marcador) => texto.includes(marcador));
   };
 
   const aplicarFaturaAtualizadaNosEstados = (faturaAtualizada: Fatura) => {
@@ -427,45 +501,6 @@ export default function FaturamentoPage() {
     const faturaAtualizada = await faturamentoService.obterFatura(faturaId);
     aplicarFaturaAtualizadaNosEstados(faturaAtualizada);
     return faturaAtualizada;
-  };
-
-  const carregarStatusDocumentoFiscal = async (
-    faturaId: number,
-    options?: { silencioso?: boolean; usarLoading?: boolean; sincronizar?: boolean },
-  ) => {
-    if (!fiscalFeatureEnabled) {
-      setDocumentoFiscalStatus(null);
-      return null;
-    }
-
-    const silencioso = options?.silencioso ?? true;
-    const usarLoading = options?.usarLoading ?? false;
-    const sincronizar = options?.sincronizar ?? false;
-
-    if (usarLoading) {
-      setFiscalActionLoading(true);
-    }
-
-    try {
-      const status = await faturamentoService.obterStatusDocumentoFiscal(faturaId, {
-        sincronizar,
-      });
-      setDocumentoFiscalStatus(status);
-      return status;
-    } catch (error) {
-      if (!silencioso) {
-        notificacao.erro.operacaoFalhou(
-          'consultar status fiscal',
-          obterMensagemErro(error, 'Falha ao consultar status do documento fiscal.'),
-        );
-      }
-      setDocumentoFiscalStatus(null);
-      return null;
-    } finally {
-      if (usarLoading) {
-        setFiscalActionLoading(false);
-      }
-    }
   };
 
   const abrirFaturaNotificacao = (faturaId: number) => {
@@ -525,39 +560,35 @@ export default function FaturamentoPage() {
   }, [faturaIdParam, setSearchParams]);
 
   useEffect(() => {
-    if (!modalDetalhesAberto || !faturaDetalhes?.id) {
+    if (menuAcoesAbertoId === null) {
       return;
     }
 
-    if (!fiscalFeatureEnabled) {
-      setDocumentoFiscalStatus(null);
-      return;
-    }
-
-    let ativo = true;
-
-    (async () => {
-      try {
-        const status = await faturamentoService.obterStatusDocumentoFiscal(faturaDetalhes.id);
-        if (ativo) {
-          setDocumentoFiscalStatus(status);
-        }
-      } catch {
-        if (ativo) {
-          setDocumentoFiscalStatus(null);
-        }
+    const handleMouseDownForaMenu = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('[data-menu-acoes-root="true"]')) {
+        return;
       }
-    })();
-
-    return () => {
-      ativo = false;
+      setMenuAcoesAbertoId(null);
     };
-  }, [modalDetalhesAberto, faturaDetalhes?.id, fiscalFeatureEnabled]);
+
+    document.addEventListener('mousedown', handleMouseDownForaMenu);
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDownForaMenu);
+    };
+  }, [menuAcoesAbertoId]);
 
   // Handlers para funcionalidades avançadas da Semana 2
   const abrirModalGateway = (fatura: Fatura) => {
+    if (!statusPermiteCobranca(fatura.status)) {
+      notificacao.mostrarAviso(
+        'Acao indisponivel',
+        `Pagamento online nao permitido para faturas com status ${faturamentoService.formatarStatusFatura(fatura.status)}.`,
+      );
+      return;
+    }
     if (!gatewayUiHabilitada) {
-      notificacao.mostrarAviso('Gateway indisponível', gatewayUiConfig.motivoBloqueio);
+      notificacao.mostrarAviso('Gateway indisponivel', motivoBloqueioGateway);
       return;
     }
     setFaturaGateway(fatura);
@@ -567,28 +598,48 @@ export default function FaturamentoPage() {
     setFaturaGateway(null);
   };
 
-  const handlePagamentoConcluido = async (_transacao: unknown) => {
+  const handlePagamentoConcluido = async (transacao: unknown) => {
     try {
-      // Marca como paga no endpoint dedicado para manter sincronizacao com proposta.
-      if (faturaGateway) {
-        const valorPago = Number(faturaGateway.valorTotal || 0);
-        await faturamentoService.marcarFaturaComoPaga(faturaGateway.id, valorPago);
-        carregarFaturas();
-        fecharModalGateway();
+      await carregarFaturas();
+
+      const statusTransacao =
+        transacao && typeof transacao === 'object' && 'status' in transacao
+          ? String((transacao as { status?: unknown }).status || '').toLowerCase()
+          : '';
+
+      if (statusTransacao === 'pendente') {
+        notificacao.mostrarSucesso(
+          'Solicitacao enviada',
+          'Link/fluxo de pagamento gerado no backend. A baixa oficial depende do processamento e webhook.',
+        );
+      } else if (statusTransacao === 'aprovado') {
+        notificacao.mostrarAviso(
+          'Pagamento online em verificacao',
+          'A baixa financeira oficial depende de confirmacao do backend (webhook/processamento).',
+        );
+      } else {
+        notificacao.mostrarAviso(
+          'Pagamento nao confirmado',
+          'A fatura permanece com status controlado apenas pelo backend.',
+        );
       }
+
+      fecharModalGateway();
     } catch (error) {
       console.error('Erro ao processar pagamento:', error);
     }
   };
 
-  const handleEnviarEmail = async (envios: EnvioEmailAutomacaoPayload[]) => {
+  const handleEnviarEmail = async (
+    envios: EnvioEmailAutomacaoPayload[],
+  ): Promise<ResultadoEnvioEmailAutomacao[]> => {
     try {
       if (!envios.length) {
         notificacao.mostrarAviso(
           'Seleção necessária',
           'Selecione ao menos uma fatura para envio.',
         );
-        return;
+        return [];
       }
 
       const resultados = await Promise.allSettled(
@@ -600,6 +651,21 @@ export default function FaturamentoPage() {
           }),
         ),
       );
+      const detalhados: ResultadoEnvioEmailAutomacao[] = resultados.map((resultado, index) => {
+        const faturaId = envios[index]?.faturaId || 0;
+        if (resultado.status === 'fulfilled') {
+          return {
+            faturaId,
+            status: resultado.value.simulado ? 'simulado' : 'enviado',
+            detalhe: resultado.value.message || resultado.value.detalhes || resultado.value.motivo,
+          };
+        }
+        return {
+          faturaId,
+          status: 'falha',
+          detalhe: obterMensagemErro(resultado.reason, 'Falha ao enviar e-mail.'),
+        };
+      });
 
       const enviados = resultados.filter((r) => r.status === 'fulfilled').length;
       const simulados = resultados.filter(
@@ -640,12 +706,18 @@ export default function FaturamentoPage() {
           `${falhas} envio(s) falharam. ${obterMensagemErro(primeiraFalha?.reason, 'Falha ao enviar e-mails.')}`,
         );
       }
+      return detalhados;
     } catch (error) {
       console.error('Erro ao enviar emails:', error);
       notificacao.erro.operacaoFalhou(
         'enviar e-mails',
         obterMensagemErro(error, 'Erro ao enviar e-mails.'),
       );
+      return envios.map((envio) => ({
+        faturaId: envio.faturaId,
+        status: 'falha',
+        detalhe: obterMensagemErro(error, 'Erro ao enviar e-mails.'),
+      }));
     }
   };
 
@@ -781,111 +853,68 @@ export default function FaturamentoPage() {
       void config;
 
       if (acao === 'workflow_lembrete_vencimento') {
-        const hoje = new Date();
-        hoje.setHours(0, 0, 0, 0);
+        const resultadoBackend = await faturamentoService.enviarLembretesVencimento();
+        const processados = Number(resultadoBackend.processados || 0);
+        const sucesso = Number(resultadoBackend.sucesso || 0);
+        const falhas = Number(resultadoBackend.falhas || 0);
+        const mensagem =
+          processados > 0
+            ? falhas > 0
+              ? 'Lembretes executados: ' + sucesso + ' sucesso(s) e ' + falhas + ' falha(s).'
+              : sucesso + ' lembrete(s) de vencimento enviado(s).'
+            : 'Nenhum lembrete elegivel encontrado pelo backend.';
 
-        const faturasElegiveis = faturas.filter((fatura) => {
-          if (
-            ![StatusFatura.PENDENTE, StatusFatura.ENVIADA, StatusFatura.PARCIALMENTE_PAGA].includes(
-              fatura.status,
-            )
-          ) {
-            return false;
-          }
-
-          const dataVencimento = new Date(fatura.dataVencimento);
-          dataVencimento.setHours(0, 0, 0, 0);
-          const diffDias = Math.ceil(
-            (dataVencimento.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24),
-          );
-          return diffDias >= 0 && diffDias <= 3;
-        });
-
-        if (!faturasElegiveis.length) {
-          return {
-            processados: 0,
-            sucesso: 0,
-            falhas: 0,
-            mensagem: 'Nenhuma fatura elegível para lembrete de vencimento.',
-          };
-        }
-
-        await faturamentoService.enviarLembretesVencimento();
-
-        const resultado: WorkflowExecutionResult = {
-          processados: faturasElegiveis.length,
-          sucesso: faturasElegiveis.length,
-          falhas: 0,
-          mensagem: faturasElegiveis.length + ' lembrete(s) de vencimento processado(s).',
-        };
-        notificacao.mostrarSucesso('Workflow executado', resultado.mensagem);
-        return resultado;
-      }
-
-      if (acao === 'workflow_cobranca_vencidas') {
-        const hoje = new Date();
-        hoje.setHours(0, 0, 0, 0);
-
-        const faturasVencidas = faturas.filter((fatura) => {
-          if ([StatusFatura.PAGA, StatusFatura.CANCELADA].includes(fatura.status)) return false;
-          const dataVencimento = new Date(fatura.dataVencimento);
-          dataVencimento.setHours(0, 0, 0, 0);
-          return dataVencimento < hoje;
-        });
-
-        if (!faturasVencidas.length) {
-          return {
-            processados: 0,
-            sucesso: 0,
-            falhas: 0,
-            mensagem: 'Nenhuma fatura vencida para cobrança neste momento.',
-          };
-        }
-
-        const resultados = await Promise.allSettled(
-          faturasVencidas.map((fatura) => faturamentoService.enviarFaturaPorEmail(fatura.id)),
-        );
-        const enviados = resultados.filter((item) => item.status === 'fulfilled').length;
-        const simulados = resultados.filter(
-          (item) => item.status === 'fulfilled' && Boolean(item.value.simulado),
-        ).length;
-        const sucesso = enviados - simulados;
-        const falhas = resultados.length - enviados;
-
-        if (sucesso > 0) {
-          notificacao.mostrarSucesso(
-            'Workflow executado',
-            sucesso + ' cobrança(s) enviada(s) por e-mail.',
-          );
-        }
-        if (simulados > 0) {
-          notificacao.mostrarAviso(
-            'Workflow em modo simulado',
-            simulados +
-              ' envio(s) foram simulados. Configure SMTP na empresa para envio real.',
-          );
-        }
         if (falhas > 0) {
-          const primeiraFalha = resultados.find(
-            (item): item is PromiseRejectedResult => item.status === 'rejected',
-          );
-          notificacao.erro.operacaoFalhou(
-            'workflow de cobrança',
-            falhas +
-              ' envio(s) falharam. ' +
-              obterMensagemErro(primeiraFalha?.reason, 'Falha no lote.'),
-          );
+          notificacao.mostrarAviso('Workflow com divergencias', mensagem);
+        } else {
+          notificacao.mostrarSucesso('Workflow executado', mensagem);
         }
 
         return {
-          processados: resultados.length,
+          processados,
+          sucesso,
+          falhas,
+          mensagem,
+        };
+      }
+
+      if (acao === 'workflow_cobranca_vencidas') {
+        const resultadoLote = await faturamentoService.gerarCobrancaFaturasVencidas();
+        const sucesso = Number(resultadoLote.sucesso || 0);
+        const falhas = Number(resultadoLote.falhas || 0);
+        const simuladas = Number(resultadoLote.simuladas || 0);
+
+        if (Number(resultadoLote.solicitadas || 0) === 0) {
+          return {
+            processados: 0,
+            sucesso: 0,
+            falhas: 0,
+            mensagem: 'Nenhuma fatura vencida para cobranca neste momento.',
+          };
+        }
+
+        if (sucesso > 0) {
+          notificacao.mostrarSucesso('Workflow executado', sucesso + ' cobranca(s) enviada(s).');
+        }
+        if (simuladas > 0) {
+          notificacao.mostrarAviso(
+            'Workflow em modo simulado',
+            simuladas + ' envio(s) foram simulados. Configure SMTP na empresa para envio real.',
+          );
+        }
+        if (falhas > 0) {
+          notificacao.mostrarAviso('Workflow com falhas', falhas + ' cobranca(s) nao puderam ser enviadas.');
+        }
+
+        return {
+          processados: Number(resultadoLote.processadas || 0),
           sucesso,
           falhas,
           mensagem:
-            'Lote de cobrança finalizado: ' +
+            'Lote de cobranca finalizado: ' +
             sucesso +
             ' envio(s) real(is), ' +
-            simulados +
+            simuladas +
             ' simulado(s), ' +
             falhas +
             ' falha(s).',
@@ -893,45 +922,38 @@ export default function FaturamentoPage() {
       }
 
       if (acao === 'workflow_sincronizacao_financeira') {
-        const tarefas = await Promise.allSettled([
+        const [vencidas, recorrentes] = await Promise.all([
           faturamentoService.verificarFaturasVencidas(),
           faturamentoService.processarCobrancasRecorrentes(),
         ]);
 
-        const sucesso = tarefas.filter((item) => item.status === 'fulfilled').length;
-        const falhas = tarefas.length - sucesso;
+        const processados = Number(vencidas.processados || 0) + Number(recorrentes.processados || 0);
+        const sucesso = Number(vencidas.sucesso || 0) + Number(recorrentes.sucesso || 0);
+        const falhas = Number(vencidas.falhas || 0) + Number(recorrentes.falhas || 0);
 
         await carregarFaturas();
 
+        const mensagem =
+          falhas > 0
+            ? 'Sincronizacao concluida com ' + falhas + ' falha(s).'
+            : 'Sincronizacao financeira executada com sucesso.';
+
         if (falhas > 0) {
-          const primeiraFalha = tarefas.find(
-            (item): item is PromiseRejectedResult => item.status === 'rejected',
-          );
-          const mensagemFalha = obterMensagemErro(
-            primeiraFalha?.reason,
-            'Falha na sincronização financeira.',
-          );
-          notificacao.erro.operacaoFalhou('workflow de sincronização', mensagemFalha);
-          return {
-            processados: tarefas.length,
-            sucesso,
-            falhas,
-            mensagem: 'Sincronização concluída com ' + falhas + ' falha(s).',
-          };
+          notificacao.mostrarAviso('Workflow com divergencias', mensagem);
+        } else {
+          notificacao.mostrarSucesso('Workflow executado', mensagem);
         }
 
-        const mensagem = 'Sincronização financeira executada com sucesso.';
-        notificacao.mostrarSucesso('Workflow executado', mensagem);
         return {
-          processados: tarefas.length,
+          processados,
           sucesso,
-          falhas: 0,
+          falhas,
           mensagem,
         };
       }
 
-      const mensagem = 'Ação de workflow não mapeada: ' + acao;
-      notificacao.mostrarAviso('Workflow indisponível', mensagem);
+      const mensagem = 'Acao de workflow nao mapeada: ' + acao;
+      notificacao.mostrarAviso('Workflow indisponivel', mensagem);
       return {
         processados: 0,
         sucesso: 0,
@@ -1029,166 +1051,28 @@ export default function FaturamentoPage() {
     }
   };
 
-  const criarRascunhoFiscal = async (id: number, payload?: DocumentoFiscalPayload) => {
-    if (!fiscalFeatureEnabled) {
-      notificacao.mostrarAviso(
-        'Fluxo fiscal desabilitado',
-        financeiroFeatureFlags.fiscalDisabledReason ||
-          'Emissao fiscal (NF-e/NFS-e) desabilitada neste ambiente.',
-      );
-      return;
-    }
-
-    const tipoDocumento = payload?.tipo || obterTipoDocumentoFiscalDaFatura(faturaDetalhes);
-    const ambiente = normalizarAmbienteDocumentoFiscal(
-      payload?.ambiente || documentoFiscalStatus?.ambiente,
-    );
-    const observacoes =
-      payload?.observacoes?.trim() || 'Rascunho fiscal atualizado no painel de faturamento.';
-    setFiscalActionLoading(true);
-    try {
-      const status = await faturamentoService.criarRascunhoDocumentoFiscal(id, {
-        tipo: tipoDocumento,
-        ambiente,
-        observacoes,
-      });
-      setDocumentoFiscalStatus(status);
-      await sincronizarFaturaAtualizada(id);
-      notificacao.mostrarSucesso(
-        'Rascunho fiscal atualizado',
-        'Documento fiscal preparado para emissao.',
-      );
-    } catch (error) {
-      console.error('Erro ao criar rascunho fiscal:', error);
-      notificacao.erro.operacaoFalhou(
-        'criar rascunho fiscal',
-        obterMensagemErro(error, 'Falha ao preparar rascunho do documento fiscal.'),
-      );
-    } finally {
-      setFiscalActionLoading(false);
-    }
-  };
-
-  const emitirDocumentoFiscal = async (id: number, payload?: DocumentoFiscalPayload) => {
-    if (!fiscalFeatureEnabled) {
-      notificacao.mostrarAviso(
-        'Fluxo fiscal desabilitado',
-        financeiroFeatureFlags.fiscalDisabledReason ||
-          'Emissao fiscal (NF-e/NFS-e) desabilitada neste ambiente.',
-      );
-      return;
-    }
-
-    const tipoDocumento = payload?.tipo || obterTipoDocumentoFiscalDaFatura(faturaDetalhes);
-    const ambiente = normalizarAmbienteDocumentoFiscal(
-      payload?.ambiente || documentoFiscalStatus?.ambiente,
-    );
-    const modoProcessamento = payload?.modoProcessamento || documentoFiscalStatus?.modoProcessamento || 'sincrono';
-    const contingencia = payload?.contingencia ?? documentoFiscalStatus?.contingencia ?? false;
-    const forcarReemissao =
-      payload?.forcarReemissao === true || documentoFiscalStatus?.status === 'emitida';
-    const observacoes =
-      payload?.observacoes?.trim() || 'Emissao fiscal solicitada no painel de faturamento.';
-    setFiscalActionLoading(true);
-    try {
-      const status = await faturamentoService.emitirDocumentoFiscal(id, {
-        tipo: tipoDocumento,
-        ambiente,
-        modoProcessamento,
-        contingencia,
-        forcarReemissao,
-        observacoes,
-      });
-      setDocumentoFiscalStatus(status);
-      await sincronizarFaturaAtualizada(id);
-      await carregarFaturas();
-      notificacao.mostrarSucesso('Documento fiscal emitido', 'Emissao registrada com sucesso.');
-    } catch (error) {
-      console.error('Erro ao emitir documento fiscal:', error);
-      notificacao.erro.operacaoFalhou(
-        'emitir documento fiscal',
-        obterMensagemErro(error, 'Falha ao emitir documento fiscal.'),
-      );
-    } finally {
-      setFiscalActionLoading(false);
-    }
-  };
-
-  const atualizarStatusFiscal = async (id: number) => {
-    if (!fiscalFeatureEnabled) {
-      notificacao.mostrarAviso(
-        'Fluxo fiscal desabilitado',
-        financeiroFeatureFlags.fiscalDisabledReason ||
-          'Emissao fiscal (NF-e/NFS-e) desabilitada neste ambiente.',
-      );
-      return;
-    }
-
-    const status = await carregarStatusDocumentoFiscal(id, {
-      silencioso: false,
-      usarLoading: true,
-      sincronizar: true,
-    });
-    if (!status) {
-      return;
-    }
-    try {
-      await sincronizarFaturaAtualizada(id);
-    } catch {}
-    notificacao.mostrarSucesso('Status fiscal atualizado', 'Dados fiscais sincronizados.');
-  };
-
-  const cancelarOuInutilizarDocumentoFiscal = async (
-    id: number,
-    payload: DocumentoFiscalCancelamentoPayload,
-  ) => {
-    if (!fiscalFeatureEnabled) {
-      notificacao.mostrarAviso(
-        'Fluxo fiscal desabilitado',
-        financeiroFeatureFlags.fiscalDisabledReason ||
-          'Emissao fiscal (NF-e/NFS-e) desabilitada neste ambiente.',
-      );
-      return;
-    }
-
-    const tipoOperacao = payload?.tipoOperacao === 'inutilizar' ? 'inutilizar' : 'cancelar';
-    const motivo = String(payload?.motivo || '').trim();
-    if (!motivo) {
-      notificacao.mostrarAviso(
-        'Motivo obrigatorio',
-        'Informe o motivo para cancelar ou inutilizar o documento fiscal.',
-      );
-      return;
-    }
-
-    setFiscalActionLoading(true);
-    try {
-      const status = await faturamentoService.cancelarOuInutilizarDocumentoFiscal(id, {
-        tipoOperacao,
-        motivo,
-        ambiente: normalizarAmbienteDocumentoFiscal(payload.ambiente || documentoFiscalStatus?.ambiente),
-      });
-      setDocumentoFiscalStatus(status);
-      await sincronizarFaturaAtualizada(id);
-      await carregarFaturas();
-      notificacao.mostrarSucesso(
-        tipoOperacao === 'cancelar' ? 'Documento fiscal cancelado' : 'Numeracao inutilizada',
-        'Status fiscal atualizado com sucesso.',
-      );
-    } catch (error) {
-      console.error('Erro ao cancelar/inutilizar documento fiscal:', error);
-      notificacao.erro.operacaoFalhou(
-        'atualizar status fiscal',
-        obterMensagemErro(error, 'Falha ao cancelar/inutilizar documento fiscal.'),
-      );
-    } finally {
-      setFiscalActionLoading(false);
-    }
-  };
-
   const gerarLinkPagamento = async (id: number) => {
+    const faturaAlvo = obterFaturaPorId(id);
+    if (faturaAlvo && !statusPermiteCobranca(faturaAlvo.status)) {
+      notificacao.mostrarAviso(
+        'Acao indisponivel',
+        `Nao e permitido gerar link de pagamento para faturas com status ${faturamentoService.formatarStatusFatura(faturaAlvo.status)}.`,
+      );
+      return;
+    }
+    if (faturaAlvo) {
+      const formaPagamentoAtual = resolverFormaPagamentoFatura(faturaAlvo);
+      if (!formaPagamentoPermiteCobrancaOnline(formaPagamentoAtual)) {
+        notificacao.mostrarAviso(
+          'Forma de pagamento manual',
+          `A forma ${faturamentoService.formatarFormaPagamento(formaPagamentoAtual)} usa fluxo manual. Para cobranca online, selecione PIX, Cartao de Credito, Cartao de Debito ou Boleto na fatura.`,
+        );
+        return;
+      }
+    }
+
     if (!linkPagamentoHabilitado) {
-      notificacao.mostrarAviso('Link de pagamento indisponível', gatewayUiConfig.motivoBloqueio);
+      notificacao.mostrarAviso('Link de pagamento indisponivel', motivoBloqueioGateway);
       return;
     }
 
@@ -1202,6 +1086,13 @@ export default function FaturamentoPage() {
       carregarFaturas(); // Recarregar para atualizar o link
     } catch (error) {
       console.error('Erro ao gerar link de pagamento:', error);
+      if (erroIndicaIndisponibilidadeCobrancaOnline(error)) {
+        notificacao.mostrarAviso(
+          'Cobranca online indisponivel',
+          `${obterMensagemErro(error, 'Servico de cobranca online indisponivel no backend.')} ${fallbackOperacionalCobranca}`,
+        );
+        return;
+      }
       notificacao.erro.operacaoFalhou(
         'gerar link de pagamento',
         obterMensagemErro(error, 'Recurso indisponível no backend atual.'),
@@ -1210,6 +1101,23 @@ export default function FaturamentoPage() {
   };
 
   const enviarPorEmail = async (id: number) => {
+    const faturaAlvo = obterFaturaPorId(id);
+    if (faturaAlvo && !statusPermiteCobranca(faturaAlvo.status)) {
+      notificacao.mostrarAviso(
+        'Acao indisponivel',
+        `Nao e permitido enviar cobranca para faturas com status ${faturamentoService.formatarStatusFatura(faturaAlvo.status)}.`,
+      );
+      return;
+    }
+
+    if (!emailCobrancaOperacional) {
+      notificacao.mostrarAviso(
+        'Envio de cobranca indisponivel',
+        `${motivoBloqueioEmailCobranca} ${fallbackOperacionalCobranca}`,
+      );
+      return;
+    }
+
     try {
       const resultado = await faturamentoService.enviarFaturaPorEmail(id);
       if (resultado.simulado) {
@@ -1234,6 +1142,13 @@ export default function FaturamentoPage() {
 
   const baixarPDF = async (id: number) => {
     try {
+      if (!pdfDownloadHabilitado) {
+        notificacao.mostrarAviso(
+          'Download de PDF indisponivel',
+          'A API de PDF de faturas ainda nao foi habilitada neste ambiente.',
+        );
+        return [];
+      }
       const blob = await faturamentoService.baixarPDF(id);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1255,57 +1170,45 @@ export default function FaturamentoPage() {
   const registrarPagamento = async (pagamento: PagamentoFormulario) => {
     try {
       if (!faturaPagamentos) {
-        throw new Error('Fatura não encontrada');
+        throw new Error('Fatura nao encontrada');
+      }
+      if (!statusPermiteAcoesFinanceiras(faturaPagamentos.status)) {
+        notificacao.mostrarAviso(
+          'Acao indisponivel',
+          `Nao e permitido registrar pagamento para faturas com status ${faturamentoService.formatarStatusFatura(faturaPagamentos.status)}.`,
+        );
+        return;
       }
 
-      // Preparar dados do pagamento no formato esperado pela API
-      const dadosPagamento = {
+      const dadosPagamentoManual = {
         faturaId: faturaPagamentos.id,
         valor: pagamento.valor,
         dataPagamento: pagamento.data,
-        formaPagamento: pagamento.metodo as FormaPagamento,
-        metodoPagamento: pagamento.metodo, // Para compatibilidade com backend
-        tipo: 'pagamento', // TipoPagamento.PAGAMENTO
+        metodoPagamento: pagamento.metodo,
         observacoes: pagamento.observacoes || '',
-        transacaoId: `PAG_${Date.now()}_${faturaPagamentos.id}`, // ID único para a transação
-        gatewayTransacaoId: `PAG_${Date.now()}_${faturaPagamentos.id}`, // Para processar depois
+        origemId: 'financeiro.faturamento.ui',
+        correlationId: 'manual_' + faturaPagamentos.id + '_' + Date.now(),
       };
 
-      // Chamar o serviço real para criar o pagamento
-      const pagamentoCreated = await faturamentoService.criarPagamento(dadosPagamento);
-
-      // Processar o pagamento como aprovado automaticamente (para pagamentos manuais)
-      if (pagamentoCreated.id) {
-        const processarData = {
-          gatewayTransacaoId: dadosPagamento.gatewayTransacaoId,
-          novoStatus: 'aprovado',
-          webhookData: {
-            source: 'manual',
-            timestamp: new Date().toISOString(),
-            userRegistered: true,
-          },
-        };
-
-        await faturamentoService.processarPagamento(pagamentoCreated.id, processarData);
-      }
+      await faturamentoService.registrarPagamentoManual(dadosPagamentoManual);
 
       notificacao.sucesso.pagamentoRegistrado(pagamento.valor);
 
-      // Estratégia agressiva de atualização do cache após pagamento
+      // Estrategia agressiva de atualizacao do cache apos pagamento
       await queryClient.removeQueries({ queryKey: ['faturas-paginadas'] });
       await queryClient.invalidateQueries({ queryKey: ['faturas-paginadas'] });
       await queryClient.refetchQueries({ queryKey: ['faturas-paginadas'] });
 
-      // Recarregar faturas após registrar pagamento
+      // Recarregar faturas apos registrar pagamento
       await carregarFaturas();
 
-      // Fechar modal após sucesso
+      // Fechar modal apos sucesso
       fecharModalPagamentos();
     } catch (error) {
       console.error('Erro ao registrar pagamento:', error);
       notificacao.erro.operacaoFalhou(
         'registrar pagamento',
-        obterMensagemErro(error, 'Falha ao registrar/processar pagamento.'),
+        obterMensagemErro(error, 'Falha ao registrar pagamento no backend.'),
       );
       throw error;
     }
@@ -1394,19 +1297,91 @@ export default function FaturamentoPage() {
       setProgressoAcaoMassa(0);
 
       switch (acao) {
-        case 'enviar-email':
-          for (let i = 0; i < faturasSelecionadasData.length; i++) {
-            const fatura = faturasSelecionadasData[i];
-            await enviarPorEmail(fatura.id);
-            setProgressoAcaoMassa(((i + 1) / faturasSelecionadasData.length) * 100);
+        case 'enviar-email': {
+          const elegiveis = faturasSelecionadasData.filter((fatura) => statusPermiteCobranca(fatura.status));
+          const ignoradas = faturasSelecionadasData.length - elegiveis.length;
+
+          if (!emailCobrancaOperacional) {
+            notificacao.mostrarAviso(
+              'Envio de cobranca indisponivel',
+              `${motivoBloqueioEmailCobranca} ${fallbackOperacionalCobranca}`,
+            );
+            break;
           }
-          notificacao.mostrarSucesso(
-            'E-mails enviados',
-            `${faturasSelecionadas.length} e-mail(s) enviado(s) com sucesso.`,
-          );
+
+          if (elegiveis.length === 0) {
+            notificacao.mostrarAviso(
+              'Acao indisponivel',
+              'Nenhuma fatura selecionada esta elegivel para envio de cobranca por e-mail.',
+            );
+            break;
+          }
+
+          let sucesso = 0;
+          let simuladas = 0;
+          let falhas = 0;
+          let primeiraFalha: unknown;
+
+          for (let i = 0; i < elegiveis.length; i++) {
+            const fatura = elegiveis[i];
+            try {
+              const resultado = await faturamentoService.enviarFaturaPorEmail(fatura.id);
+              if (resultado.simulado) {
+                simuladas += 1;
+              } else {
+                sucesso += 1;
+              }
+            } catch (error) {
+              falhas += 1;
+              if (!primeiraFalha) {
+                primeiraFalha = error;
+              }
+            } finally {
+              setProgressoAcaoMassa(((i + 1) / elegiveis.length) * 100);
+            }
+          }
+
+          if (sucesso > 0) {
+            notificacao.mostrarSucesso(
+              'E-mails enviados',
+              `${sucesso} e-mail(s) enviado(s) com sucesso.`,
+            );
+          }
+
+          if (simuladas > 0) {
+            notificacao.mostrarAviso(
+              'Envio simulado',
+              `${simuladas} e-mail(s) foram simulados. Verifique o SMTP da empresa para envio real.`,
+            );
+          }
+
+          if (falhas > 0) {
+            notificacao.erro.operacaoFalhou(
+              'enviar e-mails em lote',
+              `${falhas} envio(s) falharam. ${obterMensagemErro(primeiraFalha, 'Falha ao enviar e-mails.')}`,
+            );
+          }
+
+          if (ignoradas > 0) {
+            notificacao.mostrarAviso(
+              'Faturas ignoradas',
+              `${ignoradas} fatura(s) foram ignoradas por status nao elegivel para cobranca.`,
+            );
+          }
+
+          await queryClient.invalidateQueries({ queryKey: ['faturas-paginadas'] });
+          await carregarFaturas();
           break;
+        }
 
         case 'baixar-pdfs':
+          if (!pdfDownloadHabilitado) {
+            notificacao.mostrarAviso(
+              'Download de PDF indisponivel',
+              'A API de PDF de faturas ainda nao foi habilitada neste ambiente.',
+            );
+            break;
+          }
           for (let i = 0; i < faturasSelecionadas.length; i++) {
             const faturaId = faturasSelecionadas[i];
             await baixarPDF(faturaId);
@@ -1416,8 +1391,29 @@ export default function FaturamentoPage() {
           break;
 
         case 'gerar-cobranca': {
+          const elegiveis = faturasSelecionadasData.filter((fatura) => statusPermiteCobranca(fatura.status));
+          const ignoradasPorStatus = faturasSelecionadasData.length - elegiveis.length;
+
+          if (!emailCobrancaOperacional) {
+            notificacao.mostrarAviso(
+              'Geracao de cobranca indisponivel',
+              `${motivoBloqueioEmailCobranca} ${fallbackOperacionalCobranca}`,
+            );
+            break;
+          }
+
+          if (elegiveis.length === 0) {
+            notificacao.mostrarAviso(
+              'Sem cobrancas processadas',
+              'Nenhuma fatura selecionada estava apta para geracao de cobranca.',
+            );
+            break;
+          }
+
           setProgressoAcaoMassa(25);
-          const resultadoCobranca = await faturamentoService.gerarCobrancaEmLote(faturasSelecionadas);
+          const resultadoCobranca = await faturamentoService.gerarCobrancaEmLote(
+            elegiveis.map((fatura) => fatura.id),
+          );
           setProgressoAcaoMassa(80);
 
           if (resultadoCobranca.sucesso > 0) {
@@ -1431,14 +1427,15 @@ export default function FaturamentoPage() {
           } else if (resultadoCobranca.simuladas > 0) {
             notificacao.mostrarAviso(
               'Cobrança em modo simulado',
-              `${resultadoCobranca.simuladas} envio(s) processado(s) em simulação. Configure SMTP para envio real.`,
+              `${resultadoCobranca.simuladas} envio(s) processado(s) em simulação. Configure SMTP para envio real. ${fallbackOperacionalCobranca}`,
             );
           }
 
-          if (resultadoCobranca.ignoradas > 0) {
+          const ignoradasTotais = resultadoCobranca.ignoradas + ignoradasPorStatus;
+          if (ignoradasTotais > 0) {
             notificacao.mostrarAviso(
               'Faturas ignoradas',
-              `${resultadoCobranca.ignoradas} fatura(s) foram ignoradas por status não elegível para cobrança.`,
+              `${ignoradasTotais} fatura(s) foram ignoradas por status não elegível para cobrança.`,
             );
           }
 
@@ -1446,11 +1443,23 @@ export default function FaturamentoPage() {
             const primeiraFalha = resultadoCobranca.resultados.find(
               (item) => !item.enviado && item.motivo !== 'status_nao_elegivel',
             );
+            const existeFalhaOperacionalEntrega = resultadoCobranca.resultados.some(
+              (item) =>
+                !item.enviado &&
+                item.motivo !== 'status_nao_elegivel' &&
+                erroIndicaFalhaEnvioCobranca(item.detalhes),
+            );
             notificacao.erro.operacaoFalhou(
               'gerar cobrança em lote',
               `${resultadoCobranca.falhas} fatura(s) falharam.` +
                 (primeiraFalha?.detalhes ? ` ${primeiraFalha.detalhes}` : ''),
             );
+            if (existeFalhaOperacionalEntrega) {
+              notificacao.mostrarAviso(
+                'Contingencia recomendada',
+                `Falha operacional no envio automatico de cobrancas. ${fallbackOperacionalCobranca}`,
+              );
+            }
           }
 
           if (
@@ -1658,6 +1667,10 @@ export default function FaturamentoPage() {
   }, [faturas]);
 
   const painelProntidao = useMemo(() => {
+    const statusGatewayProntidao: StatusProntidao =
+      prontidaoCobranca?.gateway?.status || (gatewayUiHabilitada ? 'ok' : 'alerta');
+    const statusEmailProntidao: StatusProntidao = prontidaoCobranca?.email?.status || 'alerta';
+
     const itens: Array<{
       id: string;
       titulo: string;
@@ -1667,18 +1680,34 @@ export default function FaturamentoPage() {
       {
         id: 'gateway-online',
         titulo: 'Gateway online habilitado',
-        detalhe: gatewayUiHabilitada
-          ? 'Pagamento online disponivel para cobranca direta.'
-          : gatewayUiConfig.motivoBloqueio || 'Gateway indisponivel no ambiente atual.',
-        status: gatewayUiHabilitada ? 'ok' : 'alerta',
+        detalhe:
+          prontidaoCobranca?.gateway?.detalhe ||
+          (gatewayUiHabilitada
+            ? 'Pagamento online disponivel para cobranca direta.'
+            : motivoBloqueioGateway),
+        status: statusGatewayProntidao,
       },
       {
         id: 'link-pagamento',
         titulo: 'Geracao de link de pagamento',
         detalhe: linkPagamentoHabilitado
           ? 'Link de pagamento liberado para envio ao cliente.'
-          : gatewayUiConfig.motivoBloqueio || 'Link de pagamento desabilitado.',
-        status: linkPagamentoHabilitado ? 'ok' : 'alerta',
+          : prontidaoCobranca?.gateway?.detalhe || motivoBloqueioGateway,
+        status: linkPagamentoHabilitado
+          ? 'ok'
+          : statusGatewayProntidao === 'bloqueio'
+            ? 'bloqueio'
+            : 'alerta',
+      },
+      {
+        id: 'email-cobranca',
+        titulo: 'Envio de cobranca por e-mail',
+        detalhe:
+          prontidaoCobranca?.email?.detalhe ||
+          (carregandoProntidaoCobranca
+            ? 'Carregando prontidao do backend para envio de cobranca.'
+            : erroProntidaoCobranca || motivoBloqueioEmailCobranca),
+        status: statusEmailProntidao,
       },
       {
         id: 'itens-vs-total',
@@ -1709,23 +1738,6 @@ export default function FaturamentoPage() {
       },
     ];
 
-    if (fiscalFeatureEnabled) {
-      itens.unshift({
-        id: 'fiscal-preflight',
-        titulo: 'Preflight fiscal oficial',
-        detalhe: preflightFiscalProntidao
-          ? `Provider ${preflightFiscalProntidao.providerEfetivo}: ${preflightFiscalProntidao.readyForOfficialEmission ? 'pronto para emissao oficial' : preflightFiscalProntidao.conectividade.message}`
-          : carregandoPreflightFiscalProntidao
-            ? 'Validando conectividade e configuracao fiscal oficial...'
-            : erroPreflightFiscalProntidao || 'Preflight fiscal ainda nao executado nesta sessao.',
-        status: preflightFiscalProntidao
-          ? preflightFiscalProntidao.status
-          : erroPreflightFiscalProntidao
-            ? 'alerta'
-            : 'alerta',
-      });
-    }
-
     const bloqueios = itens.filter((item) => item.status === 'bloqueio').length;
     const alertas = itens.filter((item) => item.status === 'alerta').length;
     const statusGeral: StatusProntidao = bloqueios > 0 ? 'bloqueio' : alertas > 0 ? 'alerta' : 'ok';
@@ -1738,16 +1750,19 @@ export default function FaturamentoPage() {
       prontoParaFechamento: bloqueios === 0 && alertas === 0,
     };
   }, [
-    carregandoPreflightFiscalProntidao,
-    erroPreflightFiscalProntidao,
-    fiscalFeatureEnabled,
-    gatewayUiConfig.motivoBloqueio,
+    carregandoProntidaoCobranca,
+    erroProntidaoCobranca,
     gatewayUiHabilitada,
     linkPagamentoHabilitado,
+    motivoBloqueioEmailCobranca,
+    motivoBloqueioGateway,
     painelDivergencias.estornosPendentesConciliacao,
     painelDivergencias.itensVsTotal,
     painelDivergencias.parciaisSemBaixaFinal,
-    preflightFiscalProntidao,
+    prontidaoCobranca?.email?.detalhe,
+    prontidaoCobranca?.email?.status,
+    prontidaoCobranca?.gateway?.detalhe,
+    prontidaoCobranca?.gateway?.status,
   ]);
 
   const estilosStatusProntidao: Record<StatusProntidao, string> = {
@@ -1768,7 +1783,7 @@ export default function FaturamentoPage() {
     icon: React.ComponentType<{ className?: string }>;
   }> = [
     { id: 'dashboard', label: 'Faturas', icon: FileText },
-    ...(fiscalFeatureEnabled ? [{ id: 'prontidao' as const, label: 'Prontidão', icon: Activity }] : []),
+    { id: 'prontidao', label: 'Prontidao', icon: Activity },
     { id: 'relatorios', label: 'Relatórios', icon: BarChart3 },
     { id: 'email', label: 'Automação de E-mails', icon: Mail },
     { id: 'workflows', label: 'Workflows', icon: Settings },
@@ -1899,9 +1914,9 @@ export default function FaturamentoPage() {
       </FiltersBar>
 
         {/* Conteudo baseado na visao ativa */}
-        {(visaoAtiva === 'dashboard' || (fiscalFeatureEnabled && visaoAtiva === 'prontidao')) && (
+        {(visaoAtiva === 'dashboard' || visaoAtiva === 'prontidao') && (
           <div className="space-y-4">
-            {fiscalFeatureEnabled && visaoAtiva === 'prontidao' && (
+            {visaoAtiva === 'prontidao' && (
               <SectionCard className="p-4 sm:p-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -1910,17 +1925,21 @@ export default function FaturamentoPage() {
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <button
-                      type="button"
-                      onClick={() => void carregarPreflightFiscalProntidao()}
-                      disabled={carregandoPreflightFiscalProntidao}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#159A9C] bg-[#E8F6F6] px-3 text-xs font-semibold text-[#0F7B7D] transition hover:bg-[#DCF1F1] disabled:cursor-not-allowed disabled:opacity-60"
+                      onClick={() => void carregarProntidaoCobranca()}
+                      disabled={carregandoProntidaoCobranca}
+                      className="inline-flex h-8 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-xs font-semibold text-[#355563] transition hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {carregandoPreflightFiscalProntidao ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      {carregandoProntidaoCobranca ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          Atualizando...
+                        </>
                       ) : (
-                        <Activity className="h-3.5 w-3.5" />
+                        <>
+                          <Activity className="h-3.5 w-3.5" />
+                          Atualizar prontidao
+                        </>
                       )}
-                      Executar preflight fiscal
                     </button>
                     {painelProntidao.bloqueios > 0 && (
                       <span className="inline-flex w-fit items-center rounded-full border border-[#F2CACA] bg-[#FFF5F5] px-3 py-1 text-xs font-semibold text-[#A12D2D]">
@@ -1942,24 +1961,16 @@ export default function FaturamentoPage() {
                   </div>
                 </div>
 
-                {erroPreflightFiscalProntidao && (
-                  <p className="mt-3 rounded-lg border border-[#F4D8D8] bg-[#FFF5F5] px-3 py-2 text-xs text-[#A12D2D]">
-                    {erroPreflightFiscalProntidao}
-                  </p>
-                )}
-
-                {preflightFiscalProntidao && (
-                  <div className="mt-3 rounded-lg border border-[#DDEAF0] bg-[#F6FBFD] px-3 py-2 text-xs text-[#365567]">
-                    <p>
-                      Ultimo preflight: <strong>{new Date(preflightFiscalProntidao.timestamp).toLocaleString('pt-BR')}</strong>
+                {erroProntidaoCobranca && (
+                  <div className="mt-4 rounded-xl border border-[#F6D7B2] bg-[#FFF8EE] p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#9B5A00]">
+                      Prontidao parcial
                     </p>
-                    <p>
-                      Conectividade: <strong>{preflightFiscalProntidao.conectividade.success ? 'OK' : 'Com alerta'}</strong>
-                      {' '}| Provider: <strong>{preflightFiscalProntidao.providerEfetivo}</strong>
+                    <p className="mt-1 text-sm text-[#7A4B00]">
+                      {erroProntidaoCobranca}
                     </p>
                   </div>
                 )}
-
                 <div className="mt-4 space-y-2 rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
                   {painelProntidao.itens.map((item) => (
                     <div
@@ -1980,6 +1991,15 @@ export default function FaturamentoPage() {
                     </div>
                   ))}
                 </div>
+
+                {!cobrancaOnlineOperacional && (
+                  <div className="mt-4 rounded-xl border border-[#F6D7B2] bg-[#FFF8EE] p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#9B5A00]">
+                      Operacao recomendada neste ambiente
+                    </p>
+                    <p className="mt-1 text-sm text-[#7A4B00]">{fallbackOperacionalCobranca}</p>
+                  </div>
+                )}
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
                   <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
@@ -2396,11 +2416,16 @@ export default function FaturamentoPage() {
                       </button>
                       <button
                         onClick={() => handleAcaoMassa('baixar-pdfs')}
-                        disabled={processandoAcaoMassa}
+                        disabled={processandoAcaoMassa || !pdfDownloadHabilitado}
+                        title={
+                          !pdfDownloadHabilitado
+                            ? 'Download de PDF indisponivel neste ambiente'
+                            : 'Baixar PDFs'
+                        }
                         className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <Download className="h-4 w-4" />
-                        Baixar PDFs
+                        {pdfDownloadHabilitado ? 'Baixar PDFs' : 'Baixar PDFs (off)'}
                       </button>
                       <button
                         onClick={() => handleAcaoMassa('gerar-cobranca')}
@@ -2605,13 +2630,32 @@ export default function FaturamentoPage() {
                           }
 
                           return (
-                            <div key={fatura.id} className={rowClass}>
+                            <div
+                              key={fatura.id}
+                              className={`${rowClass} cursor-pointer`}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => abrirModalDetalhes(fatura)}
+                              onKeyDown={(event) => {
+                                if (event.target !== event.currentTarget) {
+                                  return;
+                                }
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault();
+                                  abrirModalDetalhes(fatura);
+                                }
+                              }}
+                            >
                               {/* Checkbox */}
-                              <div className="col-span-1 flex items-center justify-center">
+                              <div
+                                className="col-span-1 flex items-center justify-center"
+                                onClick={(event) => event.stopPropagation()}
+                              >
                                 <input
                                   type="checkbox"
                                   checked={isSelected}
                                   onChange={() => toggleSelecaoFatura(fatura.id)}
+                                  onClick={(event) => event.stopPropagation()}
                                   className="w-4 h-4 text-[#159A9C] bg-white border-gray-300 rounded shadow-sm focus:ring-[#159A9C] focus:ring-2 transition-all"
                                 />
                               </div>
@@ -2755,21 +2799,19 @@ export default function FaturamentoPage() {
                               </div>
 
                               {/* Ações */}
-                              <div className="col-span-1 flex items-center justify-center min-w-[120px]">
+                              <div
+                                className="col-span-1 flex items-center justify-center min-w-[120px]"
+                                onClick={(event) => event.stopPropagation()}
+                              >
                                 <div className="flex items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
                                   {/* Ações principais sempre visíveis */}
-                                  <button
-                                    onClick={() => abrirModalDetalhes(fatura)}
-                                    className="p-2 text-[#159A9C] hover:text-[#0F7B7D] hover:bg-[#159A9C]/10 rounded-lg transition-all duration-200 border border-[#159A9C] hover:border-[#0F7B7D] shadow-sm hover:shadow-md"
-                                    title="Ver Detalhes"
-                                  >
-                                    <Eye className="w-3 h-3" />
-                                  </button>
-
                                   {fatura.status !== StatusFatura.PAGA &&
                                     fatura.status !== StatusFatura.CANCELADA && (
                                       <button
-                                        onClick={() => abrirModalEdicao(fatura)}
+                                        onClick={() => {
+                                          fecharMenuAcoes();
+                                          abrirModalEdicao(fatura);
+                                        }}
                                         className="p-2 text-[#159A9C] hover:text-[#0F7B7D] hover:bg-[#159A9C]/10 rounded-lg transition-all duration-200 border border-[#159A9C] hover:border-[#0F7B7D] shadow-sm hover:shadow-md"
                                         title="Editar Fatura"
                                       >
@@ -2778,39 +2820,65 @@ export default function FaturamentoPage() {
                                     )}
 
                                   {/* Menu dropdown para ações secundárias */}
-                                  <div className="relative group/menu">
+                                  <div
+                                    className="relative"
+                                    data-menu-acoes-root="true"
+                                    onClick={(event) => event.stopPropagation()}
+                                  >
                                     <button
-                                      className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-lg transition-all duration-200 border border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md"
+                                      onClick={(event) => alternarMenuAcoes(event, fatura.id)}
+                                      aria-haspopup="menu"
+                                      aria-expanded={menuAcoesAbertoId === fatura.id}
+                                      className={`p-2 rounded-lg transition-all duration-200 border shadow-sm hover:shadow-md ${
+                                        menuAcoesAbertoId === fatura.id
+                                          ? 'text-gray-800 bg-gray-100 border-gray-300'
+                                          : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50 border-gray-200 hover:border-gray-300'
+                                      }`}
                                       title="Mais ações"
                                     >
                                       <MoreVertical className="w-3 h-3" />
                                     </button>
 
                                     {/* Dropdown menu compacto */}
-                                    <div className="absolute right-0 top-full mt-2 w-44 bg-white rounded-lg shadow-xl border border-gray-200 opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all duration-200 z-50 overflow-hidden">
+                                    <div
+                                      className={`absolute right-0 top-full mt-2 w-44 bg-white rounded-lg shadow-xl border border-gray-200 transition-all duration-200 z-50 overflow-hidden ${
+                                        menuAcoesAbertoId === fatura.id
+                                          ? 'opacity-100 visible translate-y-0'
+                                          : 'opacity-0 invisible pointer-events-none -translate-y-1'
+                                      }`}
+                                    >
                                       <div className="py-1">
-                                        {fatura.status !== StatusFatura.PAGA && (
+                                        {statusPermiteAcoesFinanceiras(fatura.status) && (
                                           <>
                                             <button
-                                              onClick={() => enviarPorEmail(fatura.id)}
+                                              onClick={() => {
+                                                fecharMenuAcoes();
+                                                enviarPorEmail(fatura.id);
+                                              }}
                                               className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-purple-50 hover:text-purple-700 flex items-center gap-2 transition-colors"
                                             >
                                               <Send className="w-3 h-3" />
                                               Enviar Email
                                             </button>
                                             <button
-                                              onClick={() => abrirModalPagamentos(fatura)}
+                                              onClick={() => {
+                                                fecharMenuAcoes();
+                                                abrirModalPagamentos(fatura);
+                                              }}
                                               className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-green-50 hover:text-green-700 flex items-center gap-2 transition-colors"
                                             >
                                               <DollarSign className="w-3 h-3" />
                                               Registrar Pgto
                                             </button>
                                             <button
-                                              onClick={() => gerarLinkPagamento(fatura.id)}
+                                              onClick={() => {
+                                                fecharMenuAcoes();
+                                                gerarLinkPagamento(fatura.id);
+                                              }}
                                               disabled={!linkPagamentoHabilitado}
                                               title={
                                                 !linkPagamentoHabilitado
-                                                  ? gatewayUiConfig.motivoBloqueio
+                                                  ? motivoBloqueioGateway
                                                   : 'Gerar link de pagamento'
                                               }
                                               className={`w-full px-3 py-2 text-left text-xs flex items-center gap-2 transition-colors ${
@@ -2826,17 +2894,33 @@ export default function FaturamentoPage() {
                                         )}
 
                                         <button
-                                          onClick={() => baixarPDF(fatura.id)}
-                                          className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 transition-colors"
+                                          onClick={() => {
+                                            fecharMenuAcoes();
+                                            baixarPDF(fatura.id);
+                                          }}
+                                          disabled={!pdfDownloadHabilitado}
+                                          title={
+                                            !pdfDownloadHabilitado
+                                              ? 'Download de PDF indisponivel neste ambiente'
+                                              : 'Baixar PDF'
+                                          }
+                                          className={`w-full px-3 py-2 text-left text-xs flex items-center gap-2 transition-colors ${
+                                            pdfDownloadHabilitado
+                                              ? 'text-gray-700 hover:bg-blue-50 hover:text-blue-700'
+                                              : 'text-gray-400 cursor-not-allowed bg-gray-50'
+                                          }`}
                                         >
                                           <Download className="w-3 h-3" />
-                                          Baixar PDF
+                                          {pdfDownloadHabilitado ? 'Baixar PDF' : 'Baixar PDF (off)'}
                                         </button>
 
                                         <div className="border-t border-gray-100 my-1"></div>
 
                                         <button
-                                          onClick={() => excluirFatura(fatura.id)}
+                                          onClick={() => {
+                                            fecharMenuAcoes();
+                                            excluirFatura(fatura.id);
+                                          }}
                                           className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center gap-2 transition-colors"
                                         >
                                           <Trash2 className="w-3 h-3" />
@@ -2871,7 +2955,7 @@ export default function FaturamentoPage() {
                       return (
                         <div
                           key={fatura.id}
-                          className={`bg-white rounded-xl border-2 p-5 transition-all shadow-sm hover:shadow-md ${
+                          className={`bg-white rounded-xl border-2 p-5 transition-all shadow-sm hover:shadow-md cursor-pointer ${
                             isSelected
                               ? 'border-blue-500 bg-blue-50 shadow-blue-100'
                               : isVencida && fatura.status === StatusFatura.PENDENTE
@@ -2882,14 +2966,30 @@ export default function FaturamentoPage() {
                                   ? 'border-yellow-400 bg-yellow-50 shadow-yellow-100'
                                   : 'border-gray-200 hover:border-gray-300'
                           }`}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => abrirModalDetalhes(fatura)}
+                          onKeyDown={(event) => {
+                            if (event.target !== event.currentTarget) {
+                              return;
+                            }
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              abrirModalDetalhes(fatura);
+                            }
+                          }}
                         >
                           {/* Header do card aprimorado */}
                           <div className="flex items-start justify-between mb-4">
-                            <div className="flex items-center gap-3">
+                            <div
+                              className="flex items-center gap-3"
+                              onClick={(event) => event.stopPropagation()}
+                            >
                               <input
                                 type="checkbox"
                                 checked={isSelected}
                                 onChange={() => toggleSelecaoFatura(fatura.id)}
+                                onClick={(event) => event.stopPropagation()}
                                 className="w-4 h-4 text-[#159A9C] bg-gray-100 border-gray-300 rounded focus:ring-[#159A9C] focus:ring-2"
                               />
                               <div
@@ -3046,28 +3146,30 @@ export default function FaturamentoPage() {
                           </div>
 
                           {/* Ações aprimoradas */}
-                          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                          <div
+                            className="flex items-center justify-between pt-4 border-t border-gray-200"
+                            onClick={(event) => event.stopPropagation()}
+                          >
                             <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => abrirModalDetalhes(fatura)}
-                                className="px-4 py-2 text-sm text-[#159A9C] hover:text-[#0F7B7D] hover:bg-[#159A9C]/10 rounded-lg transition-all duration-200 flex items-center gap-2 border border-[#159A9C] hover:border-[#0F7B7D] shadow-sm hover:shadow-md font-medium"
-                              >
-                                <Eye className="w-4 h-4" />
-                                Ver
-                              </button>
                               {fatura.status !== StatusFatura.PAGA &&
                                 fatura.status !== StatusFatura.CANCELADA && (
                                   <button
-                                    onClick={() => abrirModalEdicao(fatura)}
+                                    onClick={() => {
+                                      fecharMenuAcoes();
+                                      abrirModalEdicao(fatura);
+                                    }}
                                     className="px-4 py-2 text-sm text-[#159A9C] hover:text-[#0F7B7D] hover:bg-[#159A9C]/10 rounded-lg transition-all duration-200 flex items-center gap-2 border border-[#159A9C] hover:border-[#0F7B7D] shadow-sm hover:shadow-md font-medium"
                                   >
                                     <Edit3 className="w-4 h-4" />
                                     Editar
                                   </button>
                                 )}
-                              {fatura.status !== StatusFatura.PAGA && (
+                              {statusPermiteAcoesFinanceiras(fatura.status) && (
                                 <button
-                                  onClick={() => abrirModalPagamentos(fatura)}
+                                  onClick={() => {
+                                    fecharMenuAcoes();
+                                    abrirModalPagamentos(fatura);
+                                  }}
                                   className="px-4 py-2 text-sm bg-[#159A9C] hover:bg-[#0F7B7D] text-white rounded-lg transition-all duration-200 flex items-center gap-2 shadow-sm hover:shadow-md font-medium"
                                 >
                                   <DollarSign className="w-4 h-4" />
@@ -3077,24 +3179,46 @@ export default function FaturamentoPage() {
                             </div>
 
                             {/* Menu dropdown mobile aprimorado */}
-                            <div className="relative group">
-                              <button className="p-2.5 text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-lg transition-all duration-200 border border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md">
+                            <div
+                              className="relative"
+                              data-menu-acoes-root="true"
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              <button
+                                onClick={(event) => alternarMenuAcoes(event, fatura.id)}
+                                aria-haspopup="menu"
+                                aria-expanded={menuAcoesAbertoId === fatura.id}
+                                className={`p-2.5 rounded-lg transition-all duration-200 border shadow-sm hover:shadow-md ${
+                                  menuAcoesAbertoId === fatura.id
+                                    ? 'text-gray-800 bg-gray-100 border-gray-300'
+                                    : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50 border-gray-200 hover:border-gray-300'
+                                }`}
+                              >
                                 <MoreVertical className="w-4 h-4" />
                               </button>
 
-                              <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-xl shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 overflow-hidden">
+                              <div
+                                className={`absolute right-0 top-full mt-2 w-52 bg-white rounded-xl shadow-lg border border-gray-200 transition-all duration-200 z-50 overflow-hidden ${
+                                  menuAcoesAbertoId === fatura.id
+                                    ? 'opacity-100 visible translate-y-0'
+                                    : 'opacity-0 invisible pointer-events-none -translate-y-1'
+                                }`}
+                              >
                                 <div className="py-2">
                                   <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-100">
                                     Mais Ações
                                   </div>
 
-                                  {fatura.status !== StatusFatura.PAGA && (
+                                  {statusPermiteCobranca(fatura.status) && (
                                     <button
-                                      onClick={() => abrirModalGateway(fatura)}
+                                      onClick={() => {
+                                        fecharMenuAcoes();
+                                        abrirModalGateway(fatura);
+                                      }}
                                       disabled={!gatewayUiHabilitada}
                                       title={
                                         !gatewayUiHabilitada
-                                          ? gatewayUiConfig.motivoBloqueio
+                                          ? motivoBloqueioGateway
                                           : 'Abrir pagamento online'
                                       }
                                       className={`w-full px-4 py-3 text-left text-sm flex items-center gap-3 transition-colors ${
@@ -3116,30 +3240,53 @@ export default function FaturamentoPage() {
                                   )}
 
                                   <button
-                                    onClick={() => baixarPDF(fatura.id)}
-                                    className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 flex items-center gap-3 transition-colors"
+                                    onClick={() => {
+                                      fecharMenuAcoes();
+                                      baixarPDF(fatura.id);
+                                    }}
+                                    disabled={!pdfDownloadHabilitado}
+                                    title={
+                                      !pdfDownloadHabilitado
+                                        ? 'Download de PDF indisponivel neste ambiente'
+                                        : 'Baixar PDF'
+                                    }
+                                    className={`w-full px-4 py-3 text-left text-sm flex items-center gap-3 transition-colors ${
+                                      pdfDownloadHabilitado
+                                        ? 'text-gray-700 hover:bg-purple-50 hover:text-purple-700'
+                                        : 'text-gray-400 bg-gray-50 cursor-not-allowed'
+                                    }`}
                                   >
                                     <Download className="w-4 h-4" />
                                     <div>
-                                      <div className="font-medium">Baixar PDF</div>
+                                      <div className="font-medium">
+                                        {pdfDownloadHabilitado ? 'Baixar PDF' : 'Baixar PDF (off)'}
+                                      </div>
                                       <div className="text-xs text-gray-500">Documento</div>
                                     </div>
                                   </button>
 
-                                  <button
-                                    onClick={() => enviarPorEmail(fatura.id)}
-                                    className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-3 transition-colors"
-                                  >
+                                  {statusPermiteCobranca(fatura.status) && (
+                                    <button
+                                      onClick={() => {
+                                        fecharMenuAcoes();
+                                        enviarPorEmail(fatura.id);
+                                      }}
+                                      className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-3 transition-colors"
+                                    >
                                     <Send className="w-4 h-4" />
                                     <div>
                                       <div className="font-medium">Enviar Email</div>
                                       <div className="text-xs text-gray-500">Cobrança</div>
                                     </div>
-                                  </button>
+                                    </button>
+                                  )}
 
-                                  {fatura.status !== StatusFatura.PAGA && (
+                                  {statusPermiteCobranca(fatura.status) && (
                                     <button
-                                      onClick={() => gerarLinkPagamento(fatura.id)}
+                                      onClick={() => {
+                                        fecharMenuAcoes();
+                                        gerarLinkPagamento(fatura.id);
+                                      }}
                                       className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 flex items-center gap-3 transition-colors"
                                     >
                                       <Link2 className="w-4 h-4" />
@@ -3153,7 +3300,10 @@ export default function FaturamentoPage() {
                                   <div className="border-t border-gray-100 my-1"></div>
 
                                   <button
-                                    onClick={() => excluirFatura(fatura.id)}
+                                    onClick={() => {
+                                      fecharMenuAcoes();
+                                      excluirFatura(fatura.id);
+                                    }}
                                     className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center gap-3 transition-colors"
                                   >
                                     <Trash2 className="w-4 h-4" />
@@ -3335,15 +3485,6 @@ export default function FaturamentoPage() {
           isOpen={modalDetalhesAberto}
           onClose={fecharModalDetalhes}
           fatura={faturaDetalhes}
-          fiscalFeatureEnabled={fiscalFeatureEnabled}
-          documentoFiscalStatus={fiscalFeatureEnabled ? documentoFiscalStatus : null}
-          fiscalActionLoading={fiscalFeatureEnabled ? fiscalActionLoading : false}
-          onCriarRascunhoFiscal={fiscalFeatureEnabled ? criarRascunhoFiscal : undefined}
-          onEmitirDocumentoFiscal={fiscalFeatureEnabled ? emitirDocumentoFiscal : undefined}
-          onAtualizarStatusFiscal={fiscalFeatureEnabled ? atualizarStatusFiscal : undefined}
-          onCancelarDocumentoFiscal={
-            fiscalFeatureEnabled ? cancelarOuInutilizarDocumentoFiscal : undefined
-          }
           onEstornarPagamento={estornarPagamento}
           onEdit={() => {
             abrirModalEdicao(faturaDetalhes);
@@ -3351,7 +3492,7 @@ export default function FaturamentoPage() {
           }}
           onGeneratePaymentLink={gerarLinkPagamento}
           onSendEmail={enviarPorEmail}
-          onDownloadPDF={baixarPDF}
+          onDownloadPDF={pdfDownloadHabilitado ? baixarPDF : undefined}
         />
       )}
 
@@ -3370,6 +3511,7 @@ export default function FaturamentoPage() {
         <GatewayPagamento
           fatura={faturaGateway}
           onPagamentoConcluido={handlePagamentoConcluido}
+          onSolicitarLinkPagamento={gerarLinkPagamento}
           onFechar={fecharModalGateway}
         />
       )}
@@ -3403,3 +3545,7 @@ export default function FaturamentoPage() {
     </div>
   );
 }
+
+
+
+

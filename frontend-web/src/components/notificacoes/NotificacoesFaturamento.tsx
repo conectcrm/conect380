@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Fatura, StatusFatura } from '../../services/faturamentoService';
 import { formatarValorMonetario } from '../../utils/formatacao';
+import { daysUntilDate, parseDateToLocalDay } from '../../utils/dateOnly';
 
 interface Notificacao {
   id: string;
@@ -22,6 +23,19 @@ interface Notificacao {
   lida: boolean;
   prioridade: 'baixa' | 'media' | 'alta' | 'critica';
 }
+
+const STATUS_ELEGIVEIS_EM_ABERTO: StatusFatura[] = [
+  StatusFatura.PENDENTE,
+  StatusFatura.ENVIADA,
+  StatusFatura.PARCIALMENTE_PAGA,
+  StatusFatura.VENCIDA,
+];
+
+const STATUS_ELEGIVEIS_PRE_VENCIMENTO: StatusFatura[] = [
+  StatusFatura.PENDENTE,
+  StatusFatura.ENVIADA,
+  StatusFatura.PARCIALMENTE_PAGA,
+];
 
 interface NotificacoesFaturamentoProps {
   faturas: Fatura[];
@@ -47,13 +61,12 @@ export default function NotificacoesFaturamento({
     const hoje = new Date();
 
     faturas.forEach((fatura) => {
-      const dataVencimento = new Date(fatura.dataVencimento);
-      const diasParaVencimento = Math.ceil(
-        (dataVencimento.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24),
-      );
+      const dataVencimento = parseDateToLocalDay(fatura.dataVencimento);
+      const diasParaVencimento = daysUntilDate(fatura.dataVencimento);
+      const emAberto = STATUS_ELEGIVEIS_EM_ABERTO.includes(fatura.status);
 
       // Faturas vencidas
-      if (diasParaVencimento < 0 && fatura.status === StatusFatura.PENDENTE) {
+      if (diasParaVencimento < 0 && emAberto) {
         novas.push({
           id: `vencida-${fatura.id}`,
           tipo: 'vencida',
@@ -70,7 +83,7 @@ export default function NotificacoesFaturamento({
       if (
         diasParaVencimento >= 0 &&
         diasParaVencimento <= 7 &&
-        fatura.status === StatusFatura.PENDENTE
+        STATUS_ELEGIVEIS_PRE_VENCIMENTO.includes(fatura.status)
       ) {
         novas.push({
           id: `vencimento-${fatura.id}`,
@@ -106,10 +119,8 @@ export default function NotificacoesFaturamento({
 
     // Análises e metas
     const totalVencidas = faturas.filter((f) => {
-      const diasVenc = Math.ceil(
-        (new Date(f.dataVencimento).getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24),
-      );
-      return diasVenc < 0 && f.status === StatusFatura.PENDENTE;
+      const diasVenc = daysUntilDate(f.dataVencimento);
+      return diasVenc < 0 && STATUS_ELEGIVEIS_EM_ABERTO.includes(f.status);
     }).length;
 
     if (totalVencidas > 5) {
@@ -134,7 +145,10 @@ export default function NotificacoesFaturamento({
       return new Date(b.data).getTime() - new Date(a.data).getTime();
     });
 
-    setNotificacoes(novas);
+    setNotificacoes((anteriores) => {
+      const idsLidos = new Set(anteriores.filter((item) => item.lida).map((item) => item.id));
+      return novas.map((item) => (idsLidos.has(item.id) ? { ...item, lida: true } : item));
+    });
   };
 
   const getIconeNotificacao = (tipo: string) => {
@@ -247,6 +261,11 @@ export default function NotificacoesFaturamento({
                         onAbrirFatura(notificacao.faturaId);
                       }
                       if (!notificacao.lida) {
+                        setNotificacoes((anteriores) =>
+                          anteriores.map((item) =>
+                            item.id === notificacao.id ? { ...item, lida: true } : item,
+                          ),
+                        );
                         onMarcarComoLida(notificacao.id);
                       }
                       setMostrarPainel(false);

@@ -877,11 +877,12 @@ const AppRoutes: React.FC = () => {
                   />
                   <Route
                     path="/financeiro/tesouraria"
-                    element={
+                    element={protegerRota(
+                      ModuloEnum.FINANCEIRO,
                       <ModuleUnderConstruction
                         moduleName="Tesouraria"
                         description="Gestão avançada de caixa e investimentos"
-                        estimatedCompletion="Q3 2025"
+                        estimatedCompletion="Roadmap 2026"
                         features={[
                           'Gestão de múltiplas contas',
                           'Aplicações financeiras',
@@ -890,7 +891,7 @@ const AppRoutes: React.FC = () => {
                           'Dashboard executivo',
                         ]}
                       />
-                    }
+                    )}
                   />
                   <Route path="/configuracoes" element={<Navigate to="/configuracoes/empresa" replace />} />
                   <Route path="*" element={<Navigate to="/dashboard" replace />} />

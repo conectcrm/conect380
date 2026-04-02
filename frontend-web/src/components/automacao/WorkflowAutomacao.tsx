@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Fatura, StatusFatura } from '../../services/faturamentoService';
 import { formatarValorCompletoBRL, converterParaNumero } from '../../utils/formatacao';
+import { daysUntilDate } from '../../utils/dateOnly';
 
 export interface WorkflowExecutionResult {
   processados: number;
@@ -99,14 +100,7 @@ const salvarJSON = (key: string, data: unknown): void => {
 };
 
 const getDiasParaVencimento = (dataVencimento: string): number => {
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-
-  const vencimento = new Date(dataVencimento);
-  vencimento.setHours(0, 0, 0, 0);
-
-  const diffTime = vencimento.getTime() - hoje.getTime();
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return daysUntilDate(dataVencimento);
 };
 
 export default function WorkflowAutomacao({ faturas, onExecutarAcao }: WorkflowAutomacaoProps) {

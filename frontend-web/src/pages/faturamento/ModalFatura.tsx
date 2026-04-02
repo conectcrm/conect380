@@ -83,37 +83,17 @@ interface ConfiguracaoTipoFatura {
   intervaloParcelasDias: number;
 }
 
-interface ConfiguracaoFinanceiraAvancada {
-  diasCarenciaJuros: number;
-  percentualJuros: number;
-  percentualMulta: number;
-  valorImpostos: number;
-}
-
 type TipoDocumentoFinanceiro = TipoDocumentoFinanceiroApi;
-
-type TributoCodigo = 'icms' | 'pis' | 'cofins' | 'iss' | 'ipi' | 'outros';
 
 interface DocumentoFinanceiroConfig {
   tipo: TipoDocumentoFinanceiro;
-  modelo: string;
+  referencia: string;
   numero: string;
-  serie: string;
-  chaveAcesso: string;
-  motivoEdicaoManual: string;
 }
-
-interface TributoDetalhadoValor {
-  valor: number;
-  percentual: number;
-}
-
-type TributosDetalhadosConfig = Record<TributoCodigo, TributoDetalhadoValor>;
 
 interface MetadadosFatura {
   versao: number;
   tipo: ConfiguracaoTipoFatura;
-  financeiro: ConfiguracaoFinanceiraAvancada;
 }
 
 const CONFIG_TIPO_PADRAO: ConfiguracaoTipoFatura = {
@@ -123,85 +103,25 @@ const CONFIG_TIPO_PADRAO: ConfiguracaoTipoFatura = {
   intervaloParcelasDias: 30,
 };
 
-const CONFIG_FINANCEIRA_PADRAO: ConfiguracaoFinanceiraAvancada = {
-  diasCarenciaJuros: 0,
-  percentualJuros: 0,
-  percentualMulta: 0,
-  valorImpostos: 0,
-};
-
 const TIPOS_DOCUMENTO_FINANCEIRO: Array<{
   value: TipoDocumentoFinanceiro;
   label: string;
 }> = [
   { value: 'fatura', label: 'Fatura comercial' },
   { value: 'recibo', label: 'Recibo' },
-  { value: 'nfse', label: 'NFS-e (servico)' },
-  { value: 'nfe', label: 'NF-e (produto)' },
-  { value: 'folha_pagamento', label: 'Folha de pagamento' },
   { value: 'outro', label: 'Outro documento' },
 ];
 
-const TIPOS_DOCUMENTO_FISCAL = new Set<TipoDocumentoFinanceiro>(['nfse', 'nfe']);
-
-const TRIBUTOS_META: Array<{ codigo: TributoCodigo; label: string }> = [
-  { codigo: 'icms', label: 'ICMS' },
-  { codigo: 'pis', label: 'PIS' },
-  { codigo: 'cofins', label: 'COFINS' },
-  { codigo: 'iss', label: 'ISS' },
-  { codigo: 'ipi', label: 'IPI' },
-  { codigo: 'outros', label: 'Outros' },
-];
+const TIPOS_DOCUMENTO_FINANCEIRO_SELECIONAVEIS = new Set<TipoDocumentoFinanceiro>([
+  'fatura',
+  'recibo',
+  'outro',
+]);
 
 const DOCUMENTO_FINANCEIRO_PADRAO: DocumentoFinanceiroConfig = {
   tipo: 'fatura',
-  modelo: '',
+  referencia: '',
   numero: '',
-  serie: '',
-  chaveAcesso: '',
-  motivoEdicaoManual: '',
-};
-
-const normalizarDigitos = (value: string): string => String(value || '').replace(/\D/g, '');
-
-const gerarPreviewIdentificadoresFiscais = (
-  tipo: TipoDocumentoFinanceiro,
-): { numero: string; serie: string; chave: string } | null => {
-  if (!TIPOS_DOCUMENTO_FISCAL.has(tipo)) {
-    return null;
-  }
-
-  const agora = new Date();
-  const seed = `${agora.getFullYear()}${String(agora.getMonth() + 1).padStart(2, '0')}${String(
-    agora.getDate(),
-  ).padStart(2, '0')}${String(agora.getHours()).padStart(2, '0')}${String(
-    agora.getMinutes(),
-  ).padStart(2, '0')}${String(agora.getSeconds()).padStart(2, '0')}${String(
-    agora.getMilliseconds(),
-  ).padStart(3, '0')}`;
-
-  if (tipo === 'nfe') {
-    return {
-      numero: seed.slice(-9),
-      serie: '001',
-      chave: 'Gerada na autorizacao SEFAZ (44 digitos)',
-    };
-  }
-
-  return {
-    numero: seed.slice(-10),
-    serie: 'A1',
-    chave: 'Gerada no provedor municipal de NFS-e',
-  };
-};
-
-const TRIBUTOS_DETALHADOS_PADRAO: TributosDetalhadosConfig = {
-  icms: { valor: 0, percentual: 0 },
-  pis: { valor: 0, percentual: 0 },
-  cofins: { valor: 0, percentual: 0 },
-  iss: { valor: 0, percentual: 0 },
-  ipi: { valor: 0, percentual: 0 },
-  outros: { valor: 0, percentual: 0 },
 };
 
 const METADADOS_INICIO = '[CONFIG_FATURA]';
@@ -211,9 +131,6 @@ const normalizarNumero = (valor: unknown, fallback = 0): number => {
   const numero = typeof valor === 'number' ? valor : Number(valor);
   return Number.isFinite(numero) ? numero : fallback;
 };
-
-const roundMoney = (valor: number): number =>
-  Math.round((normalizarNumero(valor, 0) + Number.EPSILON) * 100) / 100;
 
 const extrairMensagemErro = (error: unknown, fallback: string): string => {
   const responseMessage =
@@ -270,15 +187,6 @@ const extrairMetadadosObservacoes = (observacoes?: string): {
           1,
           normalizarNumero(parsed?.tipo?.intervaloParcelasDias, 30),
         ),
-      },
-      financeiro: {
-        diasCarenciaJuros: Math.max(
-          0,
-          Math.trunc(normalizarNumero(parsed?.financeiro?.diasCarenciaJuros, 0)),
-        ),
-        percentualJuros: Math.max(0, normalizarNumero(parsed?.financeiro?.percentualJuros, 0)),
-        percentualMulta: Math.max(0, normalizarNumero(parsed?.financeiro?.percentualMulta, 0)),
-        valorImpostos: Math.max(0, normalizarNumero(parsed?.financeiro?.valorImpostos, 0)),
       },
     };
 
@@ -338,66 +246,13 @@ const extrairDocumentoFinanceiroDosDetalhes = (
 
   const documento = documentoRaw as Record<string, unknown>;
   const tipoRaw = String(documento.tipo || 'fatura').trim().toLowerCase() as TipoDocumentoFinanceiro;
-  const tipo = TIPOS_DOCUMENTO_FINANCEIRO.some((option) => option.value === tipoRaw)
-    ? tipoRaw
-    : 'fatura';
+  const tipo = TIPOS_DOCUMENTO_FINANCEIRO_SELECIONAVEIS.has(tipoRaw) ? tipoRaw : 'outro';
 
   return {
     tipo,
-    modelo: String(documento.modelo || '').trim(),
+    referencia: String(documento.referencia || documento.modelo || '').trim(),
     numero: String(documento.numero || '').trim(),
-    serie: String(documento.serie || '').trim(),
-    chaveAcesso: String(documento.chaveAcesso || '').trim(),
-    motivoEdicaoManual: String(
-      documento.motivoEdicaoManual || documento.manualReason || documento.motivoManual || '',
-    ).trim(),
   };
-};
-
-const extrairTributosDetalhadosDosDetalhes = (
-  detalhes?: Record<string, unknown> | null,
-): TributosDetalhadosConfig => {
-  const base: TributosDetalhadosConfig = {
-    icms: { ...TRIBUTOS_DETALHADOS_PADRAO.icms },
-    pis: { ...TRIBUTOS_DETALHADOS_PADRAO.pis },
-    cofins: { ...TRIBUTOS_DETALHADOS_PADRAO.cofins },
-    iss: { ...TRIBUTOS_DETALHADOS_PADRAO.iss },
-    ipi: { ...TRIBUTOS_DETALHADOS_PADRAO.ipi },
-    outros: { ...TRIBUTOS_DETALHADOS_PADRAO.outros },
-  };
-
-  if (!detalhes || typeof detalhes !== 'object' || Array.isArray(detalhes)) {
-    return base;
-  }
-
-  const tributosRaw = detalhes.tributos;
-  if (!tributosRaw || typeof tributosRaw !== 'object' || Array.isArray(tributosRaw)) {
-    return base;
-  }
-
-  const itens = (tributosRaw as Record<string, unknown>).itens;
-  if (!Array.isArray(itens)) {
-    return base;
-  }
-
-  itens.forEach((item) => {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) {
-      return;
-    }
-
-    const raw = item as Record<string, unknown>;
-    const codigoRaw = String(raw.codigo || '').trim().toLowerCase() as TributoCodigo;
-    if (!TRIBUTOS_META.some((tributo) => tributo.codigo === codigoRaw)) {
-      return;
-    }
-
-    base[codigoRaw] = {
-      valor: Math.max(0, normalizarNumero(raw.valor, 0)),
-      percentual: Math.max(0, Math.min(100, normalizarNumero(raw.percentual, 0))),
-    };
-  });
-
-  return base;
 };
 
 export default function ModalFatura({
@@ -408,39 +263,7 @@ export default function ModalFatura({
 }: ModalFaturaProps) {
   const { user } = useAuth();
   const usuarioResponsavelId = String(user?.id || '').trim();
-  const roleNormalizado = String(user?.role || '')
-    .trim()
-    .toLowerCase();
-  const permissoesNormalizadas = React.useMemo(() => {
-    return new Set(
-      [
-        ...(Array.isArray(user?.permissions) ? user.permissions : []),
-        ...(Array.isArray(user?.permissoes) ? user.permissoes : []),
-      ]
-        .map((item) => String(item || '').trim().toLowerCase())
-        .filter(Boolean),
-    );
-  }, [user?.permissions, user?.permissoes]);
-  const podeUsarDocumentoFiscalManual =
-    roleNormalizado === 'superadmin' ||
-    roleNormalizado === 'admin' ||
-    roleNormalizado === 'financeiro' ||
-    permissoesNormalizadas.has('admin.empresas.manage');
   const financeiroFeatureFlags = getFinanceiroFeatureFlags();
-  const tiposDocumentoFiscal = useMemo(
-    () =>
-      financeiroFeatureFlags.fiscalDocumentsEnabled
-        ? TIPOS_DOCUMENTO_FISCAL
-        : new Set<TipoDocumentoFinanceiro>(),
-    [financeiroFeatureFlags.fiscalDocumentsEnabled],
-  );
-  const tiposDocumentoDisponiveis = useMemo(
-    () =>
-      financeiroFeatureFlags.fiscalDocumentsEnabled
-        ? TIPOS_DOCUMENTO_FINANCEIRO
-        : TIPOS_DOCUMENTO_FINANCEIRO.filter((option) => !TIPOS_DOCUMENTO_FISCAL.has(option.value)),
-    [financeiroFeatureFlags.fiscalDocumentsEnabled],
-  );
   const opcoesFormaPagamento = useMemo(() => {
     const opcoes: Array<{ value: FormaPagamento; label: string }> = [
       { value: FormaPagamento.PIX, label: 'PIX' },
@@ -466,24 +289,6 @@ export default function ModalFatura({
     return valor;
   };
 
-  const normalizarDocumentoFinanceiroPorEscopo = (
-    documento: DocumentoFinanceiroConfig,
-  ): DocumentoFinanceiroConfig => {
-    if (
-      !financeiroFeatureFlags.fiscalDocumentsEnabled &&
-      (documento.tipo === 'nfe' || documento.tipo === 'nfse')
-    ) {
-      return {
-        ...documento,
-        tipo: 'fatura',
-        chaveAcesso: '',
-        motivoEdicaoManual: '',
-      };
-    }
-
-    return documento;
-  };
-
   const [formData, setFormData] = useState<NovaFatura>(() => criarFaturaPadrao(''));
   const [novoItem, setNovoItem] = useState<ItemFormulario>(() => criarNovoItemPadrao());
 
@@ -500,23 +305,15 @@ export default function ModalFatura({
     itens?: string;
     configuracaoTipo?: string;
     documentoFinanceiro?: string;
-    financeiro?: string;
     geral?: string;
   }>({});
 
   const [salvando, setSalvando] = useState(false);
   const [configTipo, setConfigTipo] = useState<ConfiguracaoTipoFatura>(CONFIG_TIPO_PADRAO);
-  const [configFinanceira, setConfigFinanceira] = useState<ConfiguracaoFinanceiraAvancada>(
-    CONFIG_FINANCEIRA_PADRAO,
-  );
   const [documentoFinanceiro, setDocumentoFinanceiro] = useState<DocumentoFinanceiroConfig>(
     DOCUMENTO_FINANCEIRO_PADRAO,
   );
-  const [documentoFiscalAuto, setDocumentoFiscalAuto] = useState(true);
   const [gerandoNumeroDocumento, setGerandoNumeroDocumento] = useState(false);
-  const [tributosDetalhados, setTributosDetalhados] = useState<TributosDetalhadosConfig>(
-    TRIBUTOS_DETALHADOS_PADRAO,
-  );
 
   // Estados para os selects de cliente e contrato
   const [clienteSelecionado, setClienteSelecionado] = useState<ClienteSelectValue | null>(null);
@@ -541,24 +338,6 @@ export default function ModalFatura({
     formData.tipo === TipoFatura.PARCELA ||
     formData.tipo === TipoFatura.ADICIONAL;
 
-  const totalTributosDetalhados = TRIBUTOS_META.reduce((acc, tributo) => {
-    return acc + Math.max(0, normalizarNumero(tributosDetalhados[tributo.codigo]?.valor, 0));
-  }, 0);
-  const ajusteManualImpostos = Math.max(0, normalizarNumero(configFinanceira.valorImpostos, 0));
-  const valorImpostosEfetivo = roundMoney(totalTributosDetalhados + ajusteManualImpostos);
-  const totalComImpostos = Math.max(0, totais.total + valorImpostosEfetivo);
-  const jurosEstimado = Math.max(0, (totalComImpostos * configFinanceira.percentualJuros) / 100);
-  const multaEstimada = Math.max(0, (totalComImpostos * configFinanceira.percentualMulta) / 100);
-  const totalProjetadoAtraso = totalComImpostos + jurosEstimado + multaEstimada;
-  const tipoDocumentoFiscalSelecionado = tiposDocumentoFiscal.has(documentoFinanceiro.tipo);
-  const previewDocumentoFiscal = React.useMemo(
-    () =>
-      documentoFiscalAuto
-        ? gerarPreviewIdentificadoresFiscais(documentoFinanceiro.tipo)
-        : null,
-    [documentoFiscalAuto, documentoFinanceiro.tipo, fatura?.id, isOpen],
-  );
-
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -570,30 +349,6 @@ export default function ModalFatura({
       const documentoFinanceiroEstruturado = extrairDocumentoFinanceiroDosDetalhes(
         fatura.detalhesTributarios,
       );
-      const tributosDetalhadosEstruturados = extrairTributosDetalhadosDosDetalhes(
-        fatura.detalhesTributarios,
-      );
-
-      const configFinanceiraEstruturada: ConfiguracaoFinanceiraAvancada = {
-        diasCarenciaJuros: Math.max(
-          0,
-          Math.trunc(
-            normalizarNumero(fatura.diasCarenciaJuros, metadados?.financeiro?.diasCarenciaJuros || 0),
-          ),
-        ),
-        percentualJuros: Math.max(
-          0,
-          normalizarNumero(fatura.percentualJuros, metadados?.financeiro?.percentualJuros || 0),
-        ),
-        percentualMulta: Math.max(
-          0,
-          normalizarNumero(fatura.percentualMulta, metadados?.financeiro?.percentualMulta || 0),
-        ),
-        valorImpostos: Math.max(
-          0,
-          normalizarNumero(fatura.valorImpostos, metadados?.financeiro?.valorImpostos || 0),
-        ),
-      };
 
       setFormData({
         contratoId: fatura.contratoId ? String(fatura.contratoId) : '',
@@ -607,12 +362,12 @@ export default function ModalFatura({
         observacoes: textoLimpo || '',
         percentualDesconto: fatura.percentualDesconto || 0,
         valorDesconto: fatura.valorDesconto || 0,
-        valorImpostos: configFinanceiraEstruturada.valorImpostos,
+        valorImpostos: Math.max(0, normalizarNumero(fatura.valorImpostos, 0)),
         percentualImpostos:
           fatura.percentualImpostos === undefined ? null : (fatura.percentualImpostos ?? null),
-        diasCarenciaJuros: configFinanceiraEstruturada.diasCarenciaJuros,
-        percentualJuros: configFinanceiraEstruturada.percentualJuros,
-        percentualMulta: configFinanceiraEstruturada.percentualMulta,
+        diasCarenciaJuros: Math.max(0, Math.trunc(normalizarNumero(fatura.diasCarenciaJuros, 0))),
+        percentualJuros: Math.max(0, normalizarNumero(fatura.percentualJuros, 0)),
+        percentualMulta: Math.max(0, normalizarNumero(fatura.percentualMulta, 0)),
         detalhesTributarios:
           fatura.detalhesTributarios && typeof fatura.detalhesTributarios === 'object'
             ? fatura.detalhesTributarios
@@ -652,31 +407,13 @@ export default function ModalFatura({
       }
 
       setConfigTipo(configTipoEstruturada ?? metadados?.tipo ?? CONFIG_TIPO_PADRAO);
-      setConfigFinanceira(configFinanceiraEstruturada);
-      const documentoFinanceiroEscopo = normalizarDocumentoFinanceiroPorEscopo(
-        documentoFinanceiroEstruturado,
-      );
-      setDocumentoFinanceiro(documentoFinanceiroEscopo);
-      if (tiposDocumentoFiscal.has(documentoFinanceiroEscopo.tipo)) {
-        const possuiIdentificadoresManuais = Boolean(
-          documentoFinanceiroEscopo.numero.trim() ||
-            documentoFinanceiroEscopo.serie.trim() ||
-            documentoFinanceiroEscopo.chaveAcesso.trim(),
-        );
-        setDocumentoFiscalAuto(!possuiIdentificadoresManuais);
-      } else {
-        setDocumentoFiscalAuto(true);
-      }
-      setTributosDetalhados(tributosDetalhadosEstruturados);
+      setDocumentoFinanceiro(documentoFinanceiroEstruturado);
     } else {
       setFormData(criarFaturaPadrao(usuarioResponsavelId));
       setClienteSelecionado(null);
       setContratoSelecionado(null);
       setConfigTipo(CONFIG_TIPO_PADRAO);
-      setConfigFinanceira(CONFIG_FINANCEIRA_PADRAO);
       setDocumentoFinanceiro(DOCUMENTO_FINANCEIRO_PADRAO);
-      setDocumentoFiscalAuto(true);
-      setTributosDetalhados(TRIBUTOS_DETALHADOS_PADRAO);
     }
 
     setNovoItem(criarNovoItemPadrao());
@@ -697,15 +434,6 @@ export default function ModalFatura({
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [isOpen, onClose, salvando]);
-
-  useEffect(() => {
-    if (tiposDocumentoFiscal.has(documentoFinanceiro.tipo)) {
-      return;
-    }
-    if (!documentoFiscalAuto) {
-      setDocumentoFiscalAuto(true);
-    }
-  }, [documentoFinanceiro.tipo, documentoFiscalAuto, tiposDocumentoFiscal]);
 
   // Handlers para mudança dos selects
   const handleClienteChange = (cliente: typeof clienteSelecionado) => {
@@ -744,40 +472,15 @@ export default function ModalFatura({
     campo: K,
     valor: DocumentoFinanceiroConfig[K],
   ) => {
-    setDocumentoFinanceiro((prev) =>
-      normalizarDocumentoFinanceiroPorEscopo({
-        ...prev,
-        [campo]: valor,
-      } as DocumentoFinanceiroConfig),
-    );
+    setDocumentoFinanceiro((prev) => ({
+      ...prev,
+      [campo]: valor,
+    }));
     setErros((prev) => ({ ...prev, documentoFinanceiro: undefined }));
-  };
-
-  const handleToggleDocumentoFiscalAuto = (value: boolean) => {
-    if (!value && !podeUsarDocumentoFiscalManual) {
-      setErros((prev) => ({
-        ...prev,
-        documentoFinanceiro:
-          'Modo manual restrito a perfis financeiro/admin. Mantenha geracao automatica.',
-      }));
-      return;
-    }
-
-    setDocumentoFiscalAuto(value);
-    setErros((prev) => ({ ...prev, documentoFinanceiro: undefined }));
-    if (value) {
-      setDocumentoFinanceiro((prev) => ({
-        ...prev,
-        numero: '',
-        serie: '',
-        chaveAcesso: '',
-        motivoEdicaoManual: '',
-      }));
-    }
   };
 
   const handleGerarNumeroDocumentoFinanceiro = async () => {
-    if (tipoDocumentoFiscalSelecionado || gerandoNumeroDocumento || salvando) {
+    if (gerandoNumeroDocumento || salvando) {
       return;
     }
 
@@ -803,23 +506,6 @@ export default function ModalFatura({
     } finally {
       setGerandoNumeroDocumento(false);
     }
-  };
-
-  const handleTributoDetalhadoChange = (
-    codigo: TributoCodigo,
-    campo: keyof TributoDetalhadoValor,
-    valor: number,
-  ) => {
-    setTributosDetalhados((prev) => ({
-      ...prev,
-      [codigo]: {
-        ...prev[codigo],
-        [campo]:
-          campo === 'percentual'
-            ? Math.max(0, Math.min(100, normalizarNumero(valor, 0)))
-            : Math.max(0, normalizarNumero(valor, 0)),
-      },
-    }));
   };
 
   useEffect(() => {
@@ -959,50 +645,6 @@ export default function ModalFatura({
       }
     }
 
-    const tipoDocumentoFiscal = tiposDocumentoFiscal.has(documentoFinanceiro.tipo);
-    if (tipoDocumentoFiscal && !documentoFiscalAuto) {
-      const numeroDocumento = documentoFinanceiro.numero.trim();
-      const serieDocumento = documentoFinanceiro.serie.trim();
-      const chaveAcesso = documentoFinanceiro.chaveAcesso.trim();
-      const motivoManual = documentoFinanceiro.motivoEdicaoManual.trim();
-
-      if (!numeroDocumento) {
-        novosErros.documentoFinanceiro =
-          'Informe o numero fiscal ou habilite a geracao automatica.';
-      }
-
-      if (!motivoManual && podeUsarDocumentoFiscalManual) {
-        novosErros.documentoFinanceiro =
-          'Informe o motivo da edicao manual ou habilite a geracao automatica.';
-      }
-
-      if (documentoFinanceiro.tipo === 'nfe') {
-        const numeroNfe = normalizarDigitos(numeroDocumento);
-        const serieNfe = normalizarDigitos(serieDocumento);
-        const chaveNfe = normalizarDigitos(chaveAcesso);
-
-        if (numeroDocumento && (numeroNfe.length === 0 || numeroNfe.length > 9)) {
-          novosErros.documentoFinanceiro = 'Para NF-e, o numero deve ter ate 9 digitos.';
-        } else if (serieDocumento && (serieNfe.length === 0 || serieNfe.length > 3)) {
-          novosErros.documentoFinanceiro = 'Para NF-e, a serie deve ter ate 3 digitos.';
-        } else if (chaveAcesso && chaveNfe.length !== 44) {
-          novosErros.documentoFinanceiro =
-            'Para NF-e, a chave de acesso deve ter exatamente 44 digitos.';
-        }
-      }
-    }
-
-    if (
-      configFinanceira.percentualJuros < 0 ||
-      configFinanceira.percentualJuros > 100 ||
-      configFinanceira.percentualMulta < 0 ||
-      configFinanceira.percentualMulta > 100 ||
-      configFinanceira.valorImpostos < 0 ||
-      configFinanceira.diasCarenciaJuros < 0
-    ) {
-      novosErros.financeiro = 'Revise juros, multa, impostos e carência para valores válidos.';
-    }
-
     setErros(novosErros);
     return Object.keys(novosErros).length === 0;
   };
@@ -1026,87 +668,44 @@ export default function ModalFatura({
 
     try {
       const observacoesBase = formData.observacoes?.trim() || '';
-      const ajusteManualImpostosSubmit = Math.max(0, configFinanceira.valorImpostos || 0);
-      const tributosItens = TRIBUTOS_META.map((tributo) => {
-        const valor = Math.max(0, normalizarNumero(tributosDetalhados[tributo.codigo]?.valor, 0));
-        const percentual = Math.max(
-          0,
-          Math.min(100, normalizarNumero(tributosDetalhados[tributo.codigo]?.percentual, 0)),
-        );
-        return {
-          codigo: tributo.codigo,
-          descricao: tributo.label,
-          valor: roundMoney(valor),
-          percentual: Number(percentual.toFixed(4)),
-        };
-      }).filter((item) => item.valor > 0 || item.percentual > 0);
+      const referenciaDocumento = documentoFinanceiro.referencia.trim() || null;
+      const numeroDocumento = documentoFinanceiro.numero.trim() || null;
+      const valorImpostos = Math.max(0, normalizarNumero(formData.valorImpostos, 0));
+      const percentualImpostos =
+        formData.percentualImpostos === null || formData.percentualImpostos === undefined
+          ? null
+          : Math.max(0, Math.min(100, normalizarNumero(formData.percentualImpostos, 0)));
 
-      const valorTributosDetalhados = roundMoney(
-        tributosItens.reduce((acc, item) => acc + item.valor, 0),
-      );
-      const valorImpostos = roundMoney(valorTributosDetalhados + ajusteManualImpostosSubmit);
-      const percentualImpostosCalculado =
-        totais.total > 0 && valorImpostos > 0
-          ? Number(((valorImpostos / totais.total) * 100).toFixed(4))
-          : null;
-      const tipoDocumentoFiscal = tiposDocumentoFiscal.has(documentoFinanceiro.tipo);
-      const modeloDocumento =
-        documentoFinanceiro.modelo.trim() ||
-        (documentoFinanceiro.tipo === 'nfe'
-          ? '55'
-          : documentoFinanceiro.tipo === 'nfse'
-            ? 'NFS-e'
-            : '');
-      const numeroDocumento =
-        tipoDocumentoFiscal && documentoFiscalAuto
-          ? null
-          : documentoFinanceiro.numero.trim() || null;
-      const serieDocumento =
-        tipoDocumentoFiscal && documentoFiscalAuto
-          ? null
-          : documentoFinanceiro.serie.trim() || null;
-      const chaveDocumento =
-        tipoDocumentoFiscal && documentoFiscalAuto
-          ? null
-          : documentoFinanceiro.chaveAcesso.trim() || null;
-      const motivoManualDocumento =
-        tipoDocumentoFiscal && !documentoFiscalAuto
-          ? documentoFinanceiro.motivoEdicaoManual.trim() || null
-          : null;
+      const detalhesOriginais =
+        formData.detalhesTributarios &&
+        typeof formData.detalhesTributarios === 'object' &&
+        !Array.isArray(formData.detalhesTributarios)
+          ? { ...formData.detalhesTributarios }
+          : {};
+
+      delete (detalhesOriginais as Record<string, unknown>).tributos;
+      delete (detalhesOriginais as Record<string, unknown>).fiscal;
 
       await onSave({
         ...formData,
         usuarioResponsavelId: formData.usuarioResponsavelId || usuarioResponsavelId,
         observacoes: observacoesBase,
         valorImpostos,
-        percentualImpostos: percentualImpostosCalculado,
-        diasCarenciaJuros: Math.max(0, Math.trunc(configFinanceira.diasCarenciaJuros || 0)),
-        percentualJuros: Math.max(0, Math.min(100, configFinanceira.percentualJuros || 0)),
-        percentualMulta: Math.max(0, Math.min(100, configFinanceira.percentualMulta || 0)),
+        percentualImpostos,
+        diasCarenciaJuros: Math.max(0, Math.trunc(normalizarNumero(formData.diasCarenciaJuros, 0))),
+        percentualJuros: Math.max(0, Math.min(100, normalizarNumero(formData.percentualJuros, 0))),
+        percentualMulta: Math.max(0, Math.min(100, normalizarNumero(formData.percentualMulta, 0))),
         detalhesTributarios: {
+          ...detalhesOriginais,
           versao: 2,
           origem: 'modal_fatura',
           tipo: configTipo,
           documento: {
             tipo: documentoFinanceiro.tipo,
-            modelo: modeloDocumento || null,
+            referencia: referenciaDocumento,
             numero: numeroDocumento,
-            serie: serieDocumento,
-            chaveAcesso: chaveDocumento,
-            geracaoAutomatica: tipoDocumentoFiscal ? documentoFiscalAuto : false,
-            motivoEdicaoManual: motivoManualDocumento,
-            emissorEsperado:
-              documentoFinanceiro.tipo === 'nfe'
-                ? 'sefaz'
-                : documentoFinanceiro.tipo === 'nfse'
-                  ? 'provedor_municipal'
-                  : 'interno',
-          },
-          tributos: {
-            total: valorTributosDetalhados,
-            ajusteManual: roundMoney(ajusteManualImpostosSubmit),
-            valorImpostosAplicado: valorImpostos,
-            itens: tributosItens,
+            geracaoAutomatica: false,
+            emissorEsperado: 'interno',
           },
         },
         itens: formData.itens.map((item) => ({
@@ -1276,11 +875,6 @@ export default function ModalFatura({
             <h3 className="text-sm font-semibold uppercase tracking-wide text-[#173A4D]">
               Documento financeiro
             </h3>
-            {!financeiroFeatureFlags.fiscalDocumentsEnabled && (
-              <p className="rounded-md border border-[#DCE8EC] bg-white px-3 py-2 text-xs text-[#5E7784]">
-                {financeiroFeatureFlags.fiscalDisabledReason}
-              </p>
-            )}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -1296,7 +890,7 @@ export default function ModalFatura({
                   }
                   className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1A9E87]/15"
                 >
-                  {tiposDocumentoDisponiveis.map((option) => (
+                  {TIPOS_DOCUMENTO_FINANCEIRO.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
@@ -1306,66 +900,32 @@ export default function ModalFatura({
 
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Modelo / referencia
+                  Referencia interna
                 </label>
                 <input
                   type="text"
-                  value={documentoFinanceiro.modelo}
+                  value={documentoFinanceiro.referencia}
                   onChange={(event) =>
-                    handleDocumentoFinanceiroChange('modelo', event.target.value)
+                    handleDocumentoFinanceiroChange('referencia', event.target.value)
                   }
                   className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1A9E87]/15"
-                  placeholder="Ex: 55, NFS-e, recibo interno"
+                  placeholder="Ex: recibo interno, contrato, pedido"
                 />
               </div>
-
-              {tipoDocumentoFiscalSelecionado && (
-                <div className="md:col-span-2 rounded-md border border-[#DCE8EC] bg-white p-3">
-                  <label className="flex items-center gap-2 text-sm font-medium text-[#173A4D]">
-                    <input
-                      type="checkbox"
-                      checked={documentoFiscalAuto}
-                      onChange={(event) => handleToggleDocumentoFiscalAuto(event.target.checked)}
-                      disabled={!podeUsarDocumentoFiscalManual}
-                      className="h-4 w-4 rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]/30"
-                    />
-                    Gerar identificadores fiscais automaticamente (recomendado)
-                  </label>
-                  <p className="mt-1 text-xs text-[#5E7784]">
-                    No modo automatico, numero/serie/chave sao definidos no fluxo fiscal na emissao
-                    (SEFAZ para NF-e e provedor municipal para NFS-e).
-                  </p>
-                  {!podeUsarDocumentoFiscalManual && (
-                    <p className="mt-1 text-xs font-medium text-[#87614A]">
-                      Modo manual disponivel apenas para perfis financeiro/admin.
-                    </p>
-                  )}
-                  {documentoFiscalAuto && previewDocumentoFiscal && (
-                    <div className="mt-2 rounded-md border border-dashed border-[#C9DCE2] bg-[#F8FBFC] px-3 py-2 text-xs text-[#46616F]">
-                      <p className="font-medium text-[#173A4D]">Pre-visualizacao do padrao automatico</p>
-                      <p>Numero sugerido: <strong>{previewDocumentoFiscal.numero}</strong></p>
-                      <p>Serie sugerida: <strong>{previewDocumentoFiscal.serie}</strong></p>
-                      <p>{previewDocumentoFiscal.chave}</p>
-                    </div>
-                  )}
-                </div>
-              )}
 
               <div>
                 <div className="mb-1 flex items-center justify-between gap-2">
                   <label className="block text-sm font-medium text-gray-700">
                     Numero do documento
                   </label>
-                  {!tipoDocumentoFiscalSelecionado && (
-                    <button
-                      type="button"
-                      onClick={handleGerarNumeroDocumentoFinanceiro}
-                      disabled={gerandoNumeroDocumento || salvando}
-                      className="inline-flex h-7 items-center rounded-md border border-[#BFD3DB] bg-white px-2.5 text-xs font-medium text-[#173A4D] transition hover:border-[#159A9C] hover:text-[#117C7E] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {gerandoNumeroDocumento ? 'Gerando...' : 'Gerar numero'}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={handleGerarNumeroDocumentoFinanceiro}
+                    disabled={gerandoNumeroDocumento || salvando}
+                    className="inline-flex h-7 items-center rounded-md border border-[#BFD3DB] bg-white px-2.5 text-xs font-medium text-[#173A4D] transition hover:border-[#159A9C] hover:text-[#117C7E] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {gerandoNumeroDocumento ? 'Gerando...' : 'Gerar numero'}
+                  </button>
                 </div>
                 <input
                   type="text"
@@ -1373,88 +933,13 @@ export default function ModalFatura({
                   onChange={(event) =>
                     handleDocumentoFinanceiroChange('numero', event.target.value)
                   }
-                  disabled={
-                    (tipoDocumentoFiscalSelecionado && documentoFiscalAuto) ||
-                    (tipoDocumentoFiscalSelecionado &&
-                      !documentoFiscalAuto &&
-                      !podeUsarDocumentoFiscalManual)
-                  }
                   className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1A9E87]/15"
-                  placeholder={
-                    tipoDocumentoFiscalSelecionado && documentoFiscalAuto
-                      ? 'Gerado automaticamente na emissao'
-                      : 'Numero da nota/recibo/documento'
-                  }
+                  placeholder="Numero do recibo/documento"
                 />
-                {!tipoDocumentoFiscalSelecionado && (
-                  <p className="mt-1 text-xs text-[#5E7784]">
-                    Gere automaticamente seguindo o padrao por tipo e ano (empresa atual).
-                  </p>
-                )}
+                <p className="mt-1 text-xs text-[#5E7784]">
+                  Gere automaticamente seguindo o padrao por tipo e ano (empresa atual).
+                </p>
               </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Serie</label>
-                <input
-                  type="text"
-                  value={documentoFinanceiro.serie}
-                  onChange={(event) =>
-                    handleDocumentoFinanceiroChange('serie', event.target.value)
-                  }
-                  disabled={
-                    (tipoDocumentoFiscalSelecionado && documentoFiscalAuto) ||
-                    (tipoDocumentoFiscalSelecionado &&
-                      !documentoFiscalAuto &&
-                      !podeUsarDocumentoFiscalManual)
-                  }
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1A9E87]/15"
-                  placeholder={
-                    tipoDocumentoFiscalSelecionado && documentoFiscalAuto
-                      ? 'Gerada automaticamente na emissao'
-                      : 'Serie (quando houver)'
-                  }
-                />
-              </div>
-
-              {tipoDocumentoFiscalSelecionado && (
-                <div className="md:col-span-2">
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Chave de acesso / protocolo
-                  </label>
-                  <input
-                    type="text"
-                    value={documentoFinanceiro.chaveAcesso}
-                    onChange={(event) =>
-                      handleDocumentoFinanceiroChange('chaveAcesso', event.target.value)
-                    }
-                    disabled={documentoFiscalAuto || !podeUsarDocumentoFiscalManual}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1A9E87]/15"
-                    placeholder={
-                      documentoFiscalAuto
-                        ? 'Gerada automaticamente no autorizador fiscal'
-                        : 'Opcional (44 digitos para NF-e)'
-                    }
-                  />
-                </div>
-              )}
-
-              {tipoDocumentoFiscalSelecionado && !documentoFiscalAuto && (
-                <div className="md:col-span-2">
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Motivo da edicao manual *
-                  </label>
-                  <textarea
-                    value={documentoFinanceiro.motivoEdicaoManual}
-                    onChange={(event) =>
-                      handleDocumentoFinanceiroChange('motivoEdicaoManual', event.target.value)
-                    }
-                    disabled={!podeUsarDocumentoFiscalManual}
-                    rows={2}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A9E87]/15"
-                    placeholder="Ex: documento emitido fora do sistema / ajuste de migracao."
-                  />
-                </div>
-              )}
             </div>
             {erros.documentoFinanceiro && (
               <p className="text-xs font-medium text-red-600">{erros.documentoFinanceiro}</p>
@@ -1807,128 +1292,6 @@ export default function ModalFatura({
                 />
               </div>
 
-              <div className="space-y-3 rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-4">
-                <h4 className="text-sm font-semibold text-[#173A4D]">Configuração financeira avançada</h4>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-700">
-                      Carência para juros (dias)
-                    </label>
-                    <NumberInput
-                      value={configFinanceira.diasCarenciaJuros}
-                      onValueChange={(value) =>
-                        setConfigFinanceira((prev) => ({
-                          ...prev,
-                          diasCarenciaJuros: Math.max(0, Math.trunc(value || 0)),
-                        }))
-                      }
-                      min={0}
-                      allowDecimals={false}
-                      placeholder="0"
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A9E87]/15"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-700">
-                      Juros por atraso (%)
-                    </label>
-                    <PercentInput
-                      value={configFinanceira.percentualJuros}
-                      onValueChange={(value) =>
-                        setConfigFinanceira((prev) => ({
-                          ...prev,
-                          percentualJuros: Math.max(0, Math.min(100, value || 0)),
-                        }))
-                      }
-                      min={0}
-                      max={100}
-                      placeholder="0,00%"
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A9E87]/15"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-700">
-                      Multa (%)
-                    </label>
-                    <PercentInput
-                      value={configFinanceira.percentualMulta}
-                      onValueChange={(value) =>
-                        setConfigFinanceira((prev) => ({
-                          ...prev,
-                          percentualMulta: Math.max(0, Math.min(100, value || 0)),
-                        }))
-                      }
-                      min={0}
-                      max={100}
-                      placeholder="0,00%"
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A9E87]/15"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-700">
-                      Ajuste manual de impostos/taxas (R$)
-                    </label>
-                    <MoneyInputNoPrefix
-                      value={configFinanceira.valorImpostos}
-                      onValueChange={(value) =>
-                        setConfigFinanceira((prev) => ({
-                          ...prev,
-                          valorImpostos: Math.max(0, value || 0),
-                        }))
-                      }
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A9E87]/15"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2 rounded-md border border-[#DCE8EC] bg-white/70 p-3">
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#315567]">
-                      Tributos detalhados
-                    </p>
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                      {TRIBUTOS_META.map((tributo) => (
-                        <div key={tributo.codigo} className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="mb-1 block text-[11px] font-medium text-gray-700">
-                              {tributo.label} (R$)
-                            </label>
-                            <MoneyInputNoPrefix
-                              value={tributosDetalhados[tributo.codigo].valor}
-                              onValueChange={(value) =>
-                                handleTributoDetalhadoChange(tributo.codigo, 'valor', value)
-                              }
-                              className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#1A9E87]/15"
-                            />
-                          </div>
-                          <div>
-                            <label className="mb-1 block text-[11px] font-medium text-gray-700">
-                              {tributo.label} (%)
-                            </label>
-                            <PercentInput
-                              value={tributosDetalhados[tributo.codigo].percentual}
-                              onValueChange={(value) =>
-                                handleTributoDetalhadoChange(tributo.codigo, 'percentual', value)
-                              }
-                              min={0}
-                              max={100}
-                              placeholder="0,00%"
-                              className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#1A9E87]/15"
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-2 flex justify-between text-xs text-[#46616F]">
-                      <span>Total tributos detalhados:</span>
-                      <strong>R$ {formatarValorMonetario(totalTributosDetalhados)}</strong>
-                    </div>
-                  </div>
-                </div>
-                {erros.financeiro && <p className="text-xs font-medium text-red-600">{erros.financeiro}</p>}
-              </div>
-
               <div className="bg-gray-50 p-4 rounded-lg space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>Subtotal:</span>
@@ -1940,54 +1303,14 @@ export default function ModalFatura({
                     - R$ {formatarValorMonetario(totais.desconto)}
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span>Impostos/Taxas (total):</span>
-                  <span className="text-amber-700">
-                    + R$ {formatarValorMonetario(valorImpostosEfetivo)}
-                  </span>
-                </div>
-                {totalTributosDetalhados > 0 && (
-                  <div className="flex justify-between text-xs text-[#6B7F89]">
-                    <span>Tributos detalhados</span>
-                    <span>+ R$ {formatarValorMonetario(totalTributosDetalhados)}</span>
-                  </div>
-                )}
-                {ajusteManualImpostos > 0 && (
-                  <div className="flex justify-between text-xs text-[#6B7F89]">
-                    <span>Ajuste manual</span>
-                    <span>+ R$ {formatarValorMonetario(ajusteManualImpostos)}</span>
-                  </div>
-                )}
                 <div className="flex justify-between text-lg font-semibold border-t pt-2">
-                  <span>Total base:</span>
+                  <span>Total final:</span>
                   <span className="text-green-600 flex items-center gap-1">
                     <DollarSign className="w-4 h-4" />
-                    R$ {formatarValorMonetario(totalComImpostos)}
+                    R$ {formatarValorMonetario(totais.total)}
                   </span>
                 </div>
-                {(configFinanceira.percentualJuros > 0 || configFinanceira.percentualMulta > 0) && (
-                  <>
-                    <div className="flex justify-between text-sm">
-                      <span>Juros em atraso:</span>
-                      <span className="text-[#0F7B7D]">
-                        + R$ {formatarValorMonetario(jurosEstimado)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Multa:</span>
-                      <span className="text-[#0F7B7D]">
-                        + R$ {formatarValorMonetario(multaEstimada)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between border-t pt-2 text-sm font-semibold text-[#173A4D]">
-                      <span>Total projetado em atraso:</span>
-                      <span>R$ {formatarValorMonetario(totalProjetadoAtraso)}</span>
-                    </div>
-                    <p className="text-[11px] text-[#5E7784]">
-                      Juros e multa aplicados após {configFinanceira.diasCarenciaJuros} dia(s) de atraso.
-                    </p>
-                  </>
-                )}
+                
               </div>
             </div>
           </div>

@@ -1,4 +1,5 @@
 import { api } from './api';
+import { isBeforeTodayLocal } from '../utils/dateOnly';
 
 // Enums
 export enum StatusFatura {
@@ -151,6 +152,31 @@ export interface NovoPagamento {
   transacaoId?: string;
   comprovante?: string;
   observacoes?: string;
+}
+
+export interface RegistrarPagamentoManualPayload {
+  faturaId: number;
+  valor: number;
+  metodoPagamento: string;
+  dataPagamento?: string;
+  observacoes?: string;
+  correlationId?: string;
+  origemId?: string;
+}
+
+export interface ProcessarPagamentoPayload {
+  gatewayTransacaoId: string;
+  novoStatus: StatusPagamento;
+  motivoRejeicao?: string;
+  webhookData?: Record<string, unknown>;
+  correlationId?: string;
+  origemId?: string;
+}
+
+export interface WorkflowOperacaoResultado {
+  processados: number;
+  sucesso: number;
+  falhas: number;
 }
 
 const toPagamento = (raw: any): Pagamento => {
@@ -324,6 +350,27 @@ export interface ResultadoCobrancaLote {
   falhas: number;
   ignoradas: number;
   resultados: ResultadoCobrancaLoteItem[];
+}
+
+export type StatusProntidaoCobranca = 'ok' | 'alerta' | 'bloqueio';
+
+export interface CanalProntidaoCobranca {
+  operacional: boolean;
+  simulado: boolean;
+  status: StatusProntidaoCobranca;
+  detalhe: string;
+  bloqueios: string[];
+  alertas: string[];
+}
+
+export interface ProntidaoCobranca {
+  statusGeral: StatusProntidaoCobranca;
+  prontoParaCobrancaOnline: boolean;
+  prontoParaCobrancaPorEmail: boolean;
+  recomendacaoOperacional: string;
+  gateway: CanalProntidaoCobranca;
+  email: CanalProntidaoCobranca;
+  geradoEm: string;
 }
 
 export type TipoDocumentoFinanceiro =
@@ -780,6 +827,37 @@ export const faturamentoService = {
     }
   },
 
+  async gerarCobrancaFaturasVencidas(): Promise<ResultadoCobrancaLote> {
+    try {
+      const response = await api.post('/faturamento/faturas/cobranca-vencidas');
+      const responsePayload = response?.data ?? {};
+      const data = responsePayload?.data ?? {};
+      const resultadosRaw = Array.isArray(data?.resultados) ? data.resultados : [];
+
+      return {
+        solicitadas: Number(data?.solicitadas || 0),
+        processadas: Number(data?.processadas || resultadosRaw.length || 0),
+        sucesso: Number(data?.sucesso || 0),
+        simuladas: Number(data?.simuladas || 0),
+        falhas: Number(data?.falhas || 0),
+        ignoradas: Number(data?.ignoradas || 0),
+        resultados: resultadosRaw.map((item: any) => ({
+          faturaId: Number(item?.faturaId || 0),
+          numero: item?.numero ? String(item.numero) : undefined,
+          statusOriginal: item?.statusOriginal as StatusFatura | undefined,
+          statusFinal: item?.statusFinal as StatusFatura | undefined,
+          enviado: Boolean(item?.enviado),
+          simulado: Boolean(item?.simulado),
+          motivo: item?.motivo ? String(item.motivo) : undefined,
+          detalhes: item?.detalhes ? String(item.detalhes) : undefined,
+        })),
+      };
+    } catch (error) {
+      console.error('Erro ao gerar cobranca para faturas vencidas:', error);
+      throw error;
+    }
+  },
+
   async gerarNumeroDocumentoFinanceiro(
     tipoDocumento: TipoDocumentoFinanceiro,
     anoReferencia?: number,
@@ -803,85 +881,48 @@ export const faturamentoService = {
     id: number,
     payload?: DocumentoFiscalPayload,
   ): Promise<DocumentoFiscalStatus> {
-    try {
-      const body = payload || {};
-      const response = await api.post(`/faturamento/faturas/${id}/documento-fiscal/rascunho`, body);
-      return response.data?.data || response.data;
-    } catch (error) {
-      console.error('Erro ao criar rascunho fiscal:', error);
-      throw error;
-    }
+    void id;
+    void payload;
+    throw new Error('Emissao fiscal fora do escopo desta fase do financeiro.');
   },
 
   async emitirDocumentoFiscal(
     id: number,
     payload?: DocumentoFiscalPayload,
   ): Promise<DocumentoFiscalStatus> {
-    try {
-      const body = payload || {};
-      const response = await api.post(`/faturamento/faturas/${id}/documento-fiscal/emitir`, body);
-      return response.data?.data || response.data;
-    } catch (error) {
-      console.error('Erro ao emitir documento fiscal:', error);
-      throw error;
-    }
+    void id;
+    void payload;
+    throw new Error('Emissao fiscal fora do escopo desta fase do financeiro.');
   },
 
   async obterStatusDocumentoFiscal(
     id: number,
     options?: { sincronizar?: boolean },
   ): Promise<DocumentoFiscalStatus> {
-    try {
-      const sincronizar = options?.sincronizar === true ? '?sincronizar=true' : '';
-      const response = await api.get(`/faturamento/faturas/${id}/documento-fiscal/status${sincronizar}`);
-      return response.data?.data || response.data;
-    } catch (error) {
-      console.error('Erro ao consultar status do documento fiscal:', error);
-      throw error;
-    }
+    void id;
+    void options;
+    throw new Error('Emissao fiscal fora do escopo desta fase do financeiro.');
   },
 
   async cancelarOuInutilizarDocumentoFiscal(
     id: number,
     payload: DocumentoFiscalCancelamentoPayload,
   ): Promise<DocumentoFiscalStatus> {
-    try {
-      const response = await api.post(`/faturamento/faturas/${id}/documento-fiscal/cancelar`, payload);
-      return response.data?.data || response.data;
-    } catch (error) {
-      console.error('Erro ao cancelar/inutilizar documento fiscal:', error);
-      throw error;
-    }
+    void id;
+    void payload;
+    throw new Error('Emissao fiscal fora do escopo desta fase do financeiro.');
   },
 
   async obterDiagnosticoConfiguracaoFiscal(): Promise<DocumentoFiscalConfiguracaoDiagnostico> {
-    try {
-      const response = await api.get('/faturamento/documento-fiscal/configuracao');
-      return response.data?.data || response.data;
-    } catch (error) {
-      console.error('Erro ao consultar diagnostico de configuracao fiscal:', error);
-      throw error;
-    }
+    throw new Error('Emissao fiscal fora do escopo desta fase do financeiro.');
   },
 
   async testarConectividadeFiscal(): Promise<DocumentoFiscalConectividadeDiagnostico> {
-    try {
-      const response = await api.get('/faturamento/documento-fiscal/conectividade');
-      return response.data?.data || response.data;
-    } catch (error) {
-      console.error('Erro ao testar conectividade fiscal:', error);
-      throw error;
-    }
+    throw new Error('Emissao fiscal fora do escopo desta fase do financeiro.');
   },
 
   async executarPreflightFiscal(): Promise<DocumentoFiscalPreflightDiagnostico> {
-    try {
-      const response = await api.get('/faturamento/documento-fiscal/preflight');
-      return response.data?.data || response.data;
-    } catch (error) {
-      console.error('Erro ao executar preflight fiscal:', error);
-      throw error;
-    }
+    throw new Error('Emissao fiscal fora do escopo desta fase do financeiro.');
   },
 
   async gerarLinkPagamento(id: number): Promise<string> {
@@ -901,14 +942,25 @@ export const faturamentoService = {
 
   async baixarPDF(id: number): Promise<Blob> {
     try {
-      void id;
-      throw new Error(
-        'Download de PDF de fatura ainda nao esta disponivel na API de faturamento desta versao',
-      );
+      const response = await api.get(`/faturamento/faturas/${id}/pdf`, {
+        responseType: 'blob',
+      });
+      const payload = response.data;
+      return payload instanceof Blob ? payload : new Blob([payload], { type: 'application/pdf' });
     } catch (error) {
       console.error('Erro ao baixar PDF da fatura:', error);
       throw error;
     }
+  },
+
+  suportaDownloadPdfFatura(): boolean {
+    const envFlag = String(process.env.REACT_APP_FATURAMENTO_PDF_ENABLED || '')
+      .trim()
+      .toLowerCase();
+    if (!envFlag) {
+      return true;
+    }
+    return envFlag === 'true';
   },
 
   // ==================== PAGAMENTOS ====================
@@ -938,7 +990,20 @@ export const faturamentoService = {
     }
   },
 
-  async processarPagamento(id: number, dadosProcessamento: any): Promise<Pagamento> {
+  async registrarPagamentoManual(dadosPagamento: RegistrarPagamentoManualPayload): Promise<Pagamento> {
+    try {
+      const response = await api.post('/faturamento/pagamentos/manual', dadosPagamento);
+      return toPagamento(response.data.data || response.data);
+    } catch (error) {
+      console.error('Erro ao registrar pagamento manual:', error);
+      throw error;
+    }
+  },
+
+  async processarPagamento(
+    id: number,
+    dadosProcessamento: ProcessarPagamentoPayload,
+  ): Promise<Pagamento> {
     try {
       // O endpoint não usa o ID, mas sim o gatewayTransacaoId no body
       void id;
@@ -1110,29 +1175,60 @@ export const faturamentoService = {
     }
   },
 
-  async enviarLembretesVencimento(): Promise<void> {
+  async enviarLembretesVencimento(): Promise<WorkflowOperacaoResultado> {
     try {
-      await api.post('/faturamento/enviar-lembretes-vencimento');
+      const response = await api.post('/faturamento/enviar-lembretes-vencimento');
+      return (
+        response?.data?.data || {
+          processados: 0,
+          sucesso: 0,
+          falhas: 0,
+        }
+      );
     } catch (error) {
       console.error('Erro ao enviar lembretes de vencimento:', error);
       throw error;
     }
   },
 
-  async verificarFaturasVencidas(): Promise<void> {
+  async verificarFaturasVencidas(): Promise<WorkflowOperacaoResultado> {
     try {
-      await api.post('/faturamento/verificar-faturas-vencidas');
+      const response = await api.post('/faturamento/verificar-faturas-vencidas');
+      return (
+        response?.data?.data || {
+          processados: 0,
+          sucesso: 0,
+          falhas: 0,
+        }
+      );
     } catch (error) {
       console.error('Erro ao verificar faturas vencidas:', error);
       throw error;
     }
   },
 
-  async processarCobrancasRecorrentes(): Promise<void> {
+  async processarCobrancasRecorrentes(): Promise<WorkflowOperacaoResultado> {
     try {
-      await api.post('/faturamento/processar-cobrancas-recorrentes');
+      const response = await api.post('/faturamento/processar-cobrancas-recorrentes');
+      return (
+        response?.data?.data || {
+          processados: 0,
+          sucesso: 0,
+          falhas: 0,
+        }
+      );
     } catch (error) {
       console.error('Erro ao processar cobrancas recorrentes:', error);
+      throw error;
+    }
+  },
+
+  async obterProntidaoCobranca(): Promise<ProntidaoCobranca> {
+    try {
+      const response = await api.get('/faturamento/operacao/prontidao-cobranca');
+      return response?.data?.data || response?.data;
+    } catch (error) {
+      console.error('Erro ao obter prontidao de cobranca:', error);
       throw error;
     }
   },
@@ -1187,7 +1283,7 @@ export const faturamentoService = {
   },
 
   verificarVencimento(dataVencimento: string): boolean {
-    return new Date(dataVencimento) < new Date();
+    return isBeforeTodayLocal(dataVencimento);
   },
 };
 

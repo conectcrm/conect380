@@ -72,6 +72,9 @@ export interface ConfiguracoesEmpresa {
   // Integracoes
   apiHabilitada: boolean;
   webhooksAtivos: number;
+  gatewayPagamentoProvider?: string | null;
+  gatewayPagamentoAccessToken?: string | null;
+  gatewayPagamentoWebhookSecret?: string | null;
   fiscalProvider?: string | null;
   fiscalOfficialHttpEnabled?: boolean | null;
   fiscalRequireOfficialProvider?: boolean | null;
@@ -136,6 +139,9 @@ export interface UpdateEmpresaConfigDto {
   // Integracoes
   apiHabilitada?: boolean;
   webhooksAtivos?: number;
+  gatewayPagamentoProvider?: string;
+  gatewayPagamentoAccessToken?: string;
+  gatewayPagamentoWebhookSecret?: string;
   fiscalProvider?: string;
   fiscalOfficialHttpEnabled?: boolean;
   fiscalRequireOfficialProvider?: boolean;

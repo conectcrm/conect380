@@ -23,10 +23,8 @@ const parseBooleanEnv = (rawValue: string | undefined, fallback: boolean): boole
 
 export const getFinanceiroFeatureFlags = (): FinanceiroFeatureFlags => {
   const mvpMode = parseBooleanEnv(process.env.REACT_APP_MVP_MODE, false);
-  const fiscalDocumentsEnabled = parseBooleanEnv(
-    process.env.REACT_APP_FINANCEIRO_FISCAL_DOCS_ENABLED,
-    false,
-  );
+  // Emissao fiscal permanece fora do escopo desta fase do financeiro.
+  const fiscalDocumentsEnabled = false;
   const boletoEnabled = parseBooleanEnv(process.env.REACT_APP_FINANCEIRO_BOLETO_ENABLED, false);
 
   if (mvpMode) {
@@ -49,4 +47,3 @@ export const getFinanceiroFeatureFlags = (): FinanceiroFeatureFlags => {
       : 'Boleto desabilitado neste ambiente para foco no fluxo financeiro essencial.',
   };
 };
-

@@ -286,7 +286,7 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
         description: 'Gest?o de caixa, movimenta??es banc?rias e controle de liquidez.',
         href: '/financeiro/tesouraria',
         icon: Repeat,
-        badge: 'Q3 2025',
+        badge: 'Roadmap 2026',
         badgeColor: 'red',
         status: 'coming_soon',
       },

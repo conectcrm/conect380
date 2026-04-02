@@ -4,6 +4,7 @@ import {
   faturamentoService,
   Fatura,
   FormaPagamento,
+  StatusFatura,
   StatusPagamento,
 } from '../../services/faturamentoService';
 import MoneyInputNoPrefix from '../../components/inputs/MoneyInputNoPrefix';
@@ -123,6 +124,7 @@ export default function ModalPagamentos({
     0,
   );
   const valorRestante = Math.max(0, fatura.valorTotal - valorPago);
+  const podeRegistrarNovoPagamento = fatura.status !== StatusFatura.CANCELADA && valorRestante > 0;
   const formatarMoeda = (valor: number): string =>
     valor.toLocaleString('pt-BR', {
       style: 'currency',
@@ -132,6 +134,10 @@ export default function ModalPagamentos({
     });
 
   const handleRegistrarPagamento = async () => {
+    if (fatura.status === StatusFatura.CANCELADA) {
+      setErroFormulario('Nao e permitido registrar pagamento para fatura cancelada.');
+      return;
+    }
     if (novoPagamento.valor <= 0 || novoPagamento.valor > valorRestante) {
       setErroFormulario('Informe um valor valido, maior que zero e ate o valor restante.');
       return;
@@ -352,7 +358,7 @@ export default function ModalPagamentos({
             )}
           </div>
 
-          {valorRestante > 0 && (
+          {podeRegistrarNovoPagamento && (
             <div>
               <h3 className="mb-4 text-lg font-semibold text-gray-900">Registrar novo pagamento</h3>
 
@@ -467,6 +473,12 @@ export default function ModalPagamentos({
                   Registrar pagamento
                 </button>
               </div>
+            </div>
+          )}
+
+          {fatura.status === StatusFatura.CANCELADA && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              Esta fatura esta cancelada. O registro manual de pagamento permanece bloqueado.
             </div>
           )}
         </div>

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Fatura, StatusFatura } from '../../services/faturamentoService';
 import { formatarValorCompletoBRL } from '../../utils/formatacao';
+import { daysUntilDate, parseDateToLocalDay, startOfLocalDay } from '../../utils/dateOnly';
 
 interface TemplateEmail {
   id: string;
@@ -32,7 +33,8 @@ interface EmailEnviado {
   destinatario: string;
   assunto: string;
   dataEnvio: Date;
-  status: 'enviado' | 'falha' | 'pendente';
+  status: 'enviado' | 'falha' | 'pendente' | 'simulado';
+  detalhe?: string;
 }
 
 export interface EnvioEmailAutomacaoPayload {
@@ -42,9 +44,17 @@ export interface EnvioEmailAutomacaoPayload {
   conteudo: string;
 }
 
+export interface ResultadoEnvioEmailAutomacao {
+  faturaId: number;
+  status: 'enviado' | 'simulado' | 'falha';
+  detalhe?: string;
+}
+
 interface EmailAutomacaoProps {
   faturas: Fatura[];
-  onEnviarEmail: (envios: EnvioEmailAutomacaoPayload[]) => Promise<void>;
+  onEnviarEmail: (
+    envios: EnvioEmailAutomacaoPayload[],
+  ) => Promise<ResultadoEnvioEmailAutomacao[]>;
 }
 
 const STORAGE_KEY = 'faturamento-email-templates-v1';
@@ -167,17 +177,11 @@ export default function EmailAutomacao({ faturas, onEnviarEmail }: EmailAutomaca
   const templatesAtivos = useMemo(() => templates.filter((template) => template.ativo), [templates]);
 
   const getFaturasParaNotificacao = (tipo: 'vencimento' | 'vencido') => {
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
+    const hoje = startOfLocalDay();
 
     if (tipo === 'vencimento') {
       return faturas.filter((fatura) => {
-        const dataVencimento = new Date(fatura.dataVencimento);
-        dataVencimento.setHours(0, 0, 0, 0);
-
-        const diffDias = Math.ceil(
-          (dataVencimento.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24),
-        );
+        const diffDias = daysUntilDate(fatura.dataVencimento);
         return (
           diffDias <= 3 &&
           diffDias >= 0 &&
@@ -189,8 +193,7 @@ export default function EmailAutomacao({ faturas, onEnviarEmail }: EmailAutomaca
     }
 
     return faturas.filter((fatura) => {
-      const dataVencimento = new Date(fatura.dataVencimento);
-      dataVencimento.setHours(0, 0, 0, 0);
+      const dataVencimento = parseDateToLocalDay(fatura.dataVencimento);
 
       return (
         dataVencimento < hoje &&
@@ -200,11 +203,9 @@ export default function EmailAutomacao({ faturas, onEnviarEmail }: EmailAutomaca
   };
 
   const processarTemplate = (template: TemplateEmail, fatura: Fatura): { assunto: string; conteudo: string } => {
-    const hoje = new Date();
-    const dataVencimento = new Date(fatura.dataVencimento);
-    const diasParaVencimento = Math.ceil(
-      (dataVencimento.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24),
-    );
+    const hoje = startOfLocalDay();
+    const dataVencimento = parseDateToLocalDay(fatura.dataVencimento);
+    const diasParaVencimento = daysUntilDate(fatura.dataVencimento);
     const diasAtraso = Math.max(
       0,
       Math.ceil((hoje.getTime() - dataVencimento.getTime()) / (1000 * 60 * 60 * 24)),
@@ -256,11 +257,15 @@ export default function EmailAutomacao({ faturas, onEnviarEmail }: EmailAutomaca
         } as EnvioEmailAutomacaoPayload;
       });
 
-      await onEnviarEmail(envios);
+      const resultados = await onEnviarEmail(envios);
+      const resultadoPorFatura = new Map<number, ResultadoEnvioEmailAutomacao>(
+        resultados.map((item) => [item.faturaId, item]),
+      );
 
       const enviados: EmailEnviado[] = faturasSelecionadas.map((faturaId) => {
         const fatura = faturas.find((item) => item.id === faturaId);
         const renderizado = fatura ? processarTemplate(templateSelecionado, fatura) : null;
+        const resultado = resultadoPorFatura.get(faturaId);
 
         return {
           id: `email_${Date.now()}_${faturaId}`,
@@ -269,7 +274,8 @@ export default function EmailAutomacao({ faturas, onEnviarEmail }: EmailAutomaca
           destinatario: fatura?.cliente?.email || `cliente_${faturaId}@sem-email.local`,
           assunto: renderizado?.assunto || templateSelecionado.assunto,
           dataEnvio: new Date(),
-          status: 'enviado',
+          status: resultado?.status || 'falha',
+          detalhe: resultado?.detalhe,
         };
       });
 
@@ -336,6 +342,18 @@ export default function EmailAutomacao({ faturas, onEnviarEmail }: EmailAutomaca
     primeiraFaturaSelecionada && previewConteudo
       ? gerarHtmlEmailCliente(previewConteudo, primeiraFaturaSelecionada)
       : '';
+  const getStatusClasse = (status: EmailEnviado['status']) => {
+    if (status === 'enviado') return 'bg-green-500';
+    if (status === 'simulado') return 'bg-amber-500';
+    if (status === 'pendente') return 'bg-blue-500';
+    return 'bg-red-500';
+  };
+  const getStatusRotulo = (status: EmailEnviado['status']) => {
+    if (status === 'enviado') return 'enviado';
+    if (status === 'simulado') return 'simulado';
+    if (status === 'pendente') return 'pendente';
+    return 'falha';
+  };
 
   return (
     <div className="space-y-6">
@@ -344,6 +362,10 @@ export default function EmailAutomacao({ faturas, onEnviarEmail }: EmailAutomaca
           <div>
             <h2 className="mb-2 text-xl font-semibold text-[#002333]">Automação de E-mails</h2>
             <p className="text-[#4F6B79]">Disparo em lote para vencimento, atraso e cobrança.</p>
+            <p className="mt-1 text-xs text-[#6E8794]">
+              Templates e historico desta aba sao locais por navegador/usuario e nao substituem a
+              auditoria oficial do backend.
+            </p>
           </div>
           <button
             onClick={() => setModalTemplate(true)}
@@ -387,7 +409,7 @@ export default function EmailAutomacao({ faturas, onEnviarEmail }: EmailAutomaca
             </div>
             <div>
               <div className="text-2xl font-bold text-gray-900">{emailsEnviados.length}</div>
-              <div className="text-sm text-gray-500">E-mails enviados</div>
+              <div className="text-sm text-gray-500">Envios processados</div>
             </div>
           </div>
         </div>
@@ -460,10 +482,15 @@ export default function EmailAutomacao({ faturas, onEnviarEmail }: EmailAutomaca
             {emailsEnviados.slice(0, 8).map((email) => (
               <div key={email.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center gap-3">
-                  <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                  <div className={`w-2.5 h-2.5 rounded-full ${getStatusClasse(email.status)}`} />
                   <div>
                     <div className="text-sm font-medium text-gray-900">{email.destinatario}</div>
-                    <div className="text-xs text-gray-500">{email.assunto}</div>
+                    <div className="text-xs text-gray-500">
+                      {email.assunto} - {getStatusRotulo(email.status)}
+                    </div>
+                    {email.detalhe ? (
+                      <div className="text-xs text-gray-500">{email.detalhe}</div>
+                    ) : null}
                   </div>
                 </div>
                 <div className="text-xs text-gray-500">{email.dataEnvio.toLocaleString('pt-BR')}</div>
@@ -779,3 +806,5 @@ export default function EmailAutomacao({ faturas, onEnviarEmail }: EmailAutomaca
     </div>
   );
 }
+
+
