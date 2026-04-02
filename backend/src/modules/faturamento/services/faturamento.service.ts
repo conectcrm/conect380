@@ -2736,7 +2736,6 @@ export class FaturamentoService {
       case FormaPagamento.PIX:
         return permitirSomenteTiposPagamento(['bank_transfer'], {
           defaultPaymentTypeId: 'bank_transfer',
-          defaultPaymentMethodId: 'pix',
         });
       case FormaPagamento.CARTAO_CREDITO:
         return permitirSomenteTiposPagamento(['credit_card'], {

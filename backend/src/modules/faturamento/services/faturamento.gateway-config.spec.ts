@@ -132,12 +132,19 @@ describe('FaturamentoService - configuracao de gateway por empresa', () => {
       expect.objectContaining({
         payment_methods: expect.objectContaining({
           default_payment_type_id: 'bank_transfer',
-          default_payment_method_id: 'pix',
           excluded_payment_types: expect.arrayContaining([
             expect.objectContaining({ id: 'credit_card' }),
             expect.objectContaining({ id: 'debit_card' }),
             expect.objectContaining({ id: 'ticket' }),
           ]),
+        }),
+      }),
+      expect.any(Object),
+    );
+    expect(mercadoPagoService.createPreference).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payment_methods: expect.not.objectContaining({
+          default_payment_method_id: expect.anything(),
         }),
       }),
       expect.any(Object),
