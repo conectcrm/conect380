@@ -12,6 +12,8 @@ import {
   MoreVertical,
   Send,
   Link2,
+  Copy,
+  ExternalLink,
   Calendar,
   Activity,
   Settings,
@@ -1096,6 +1098,58 @@ export default function FaturamentoPage() {
       notificacao.erro.operacaoFalhou(
         'gerar link de pagamento',
         obterMensagemErro(error, 'Recurso indisponível no backend atual.'),
+      );
+    }
+  };
+
+  const obterLinkPagamentoValido = (fatura: Fatura): string | null => {
+    const link = String(fatura.linkPagamento || '').trim();
+    return link.length > 0 ? link : null;
+  };
+
+  const abrirBoleto = (fatura: Fatura) => {
+    const link = obterLinkPagamentoValido(fatura);
+    if (!link) {
+      notificacao.mostrarAviso(
+        'Boleto indisponivel',
+        'Esta fatura ainda nao possui link de pagamento. Gere o link primeiro.',
+      );
+      return;
+    }
+
+    const aba = window.open(link, '_blank', 'noopener,noreferrer');
+    if (!aba) {
+      notificacao.mostrarAviso(
+        'Popup bloqueado',
+        'Nao foi possivel abrir o boleto em nova aba. Verifique o bloqueador de popups.',
+      );
+      return;
+    }
+
+    notificacao.mostrarSucesso('Checkout aberto', 'O boleto foi aberto em uma nova aba.');
+  };
+
+  const copiarLinkBoleto = async (fatura: Fatura) => {
+    const link = obterLinkPagamentoValido(fatura);
+    if (!link) {
+      notificacao.mostrarAviso(
+        'Link indisponivel',
+        'Esta fatura ainda nao possui link de pagamento. Gere o link primeiro.',
+      );
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(link);
+      notificacao.mostrarSucesso(
+        'Link copiado',
+        'Link de pagamento copiado para a area de transferencia.',
+      );
+    } catch (error) {
+      console.error('Erro ao copiar link de pagamento:', error);
+      notificacao.erro.operacaoFalhou(
+        'copiar link de pagamento',
+        'Nao foi possivel copiar o link automaticamente.',
       );
     }
   };
@@ -2890,6 +2944,26 @@ export default function FaturamentoPage() {
                                               <Link2 className="w-3 h-3" />
                                               {linkPagamentoHabilitado ? 'Gerar Link' : 'Gerar Link (off)'}
                                             </button>
+                                            <button
+                                              onClick={() => {
+                                                fecharMenuAcoes();
+                                                abrirBoleto(fatura);
+                                              }}
+                                              className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-cyan-50 hover:text-cyan-700 flex items-center gap-2 transition-colors"
+                                            >
+                                              <ExternalLink className="w-3 h-3" />
+                                              Abrir Boleto
+                                            </button>
+                                            <button
+                                              onClick={() => {
+                                                fecharMenuAcoes();
+                                                void copiarLinkBoleto(fatura);
+                                              }}
+                                              className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2 transition-colors"
+                                            >
+                                              <Copy className="w-3 h-3" />
+                                              Copiar Link
+                                            </button>
                                           </>
                                         )}
 
@@ -3292,6 +3366,38 @@ export default function FaturamentoPage() {
                                       <Link2 className="w-4 h-4" />
                                       <div>
                                         <div className="font-medium">Gerar Link</div>
+                                        <div className="text-xs text-gray-500">Pagamento</div>
+                                      </div>
+                                    </button>
+                                  )}
+
+                                  {statusPermiteCobranca(fatura.status) && (
+                                    <button
+                                      onClick={() => {
+                                        fecharMenuAcoes();
+                                        abrirBoleto(fatura);
+                                      }}
+                                      className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-cyan-50 hover:text-cyan-700 flex items-center gap-3 transition-colors"
+                                    >
+                                      <ExternalLink className="w-4 h-4" />
+                                      <div>
+                                        <div className="font-medium">Abrir Boleto</div>
+                                        <div className="text-xs text-gray-500">Checkout</div>
+                                      </div>
+                                    </button>
+                                  )}
+
+                                  {statusPermiteCobranca(fatura.status) && (
+                                    <button
+                                      onClick={() => {
+                                        fecharMenuAcoes();
+                                        void copiarLinkBoleto(fatura);
+                                      }}
+                                      className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-3 transition-colors"
+                                    >
+                                      <Copy className="w-4 h-4" />
+                                      <div>
+                                        <div className="font-medium">Copiar Link</div>
                                         <div className="text-xs text-gray-500">Pagamento</div>
                                       </div>
                                     </button>
