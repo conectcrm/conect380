@@ -15,6 +15,7 @@ import { OportunidadesStaleMonitorService } from './oportunidades-stale-monitor.
 import { Lead } from '../leads/lead.entity';
 import { User } from '../users/user.entity';
 import { NotificationModule } from '../../notifications/notification.module';
+import { AtendimentoModule } from '../atendimento/atendimento.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { NotificationModule } from '../../notifications/notification.module';
     ]),
     DashboardV2Module,
     NotificationModule,
+    forwardRef(() => AtendimentoModule),
     ClientesModule,
     forwardRef(() => PropostasModule),
   ],

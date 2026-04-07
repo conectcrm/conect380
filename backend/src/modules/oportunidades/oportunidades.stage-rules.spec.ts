@@ -5,6 +5,7 @@ import {
   getAllowedNextOportunidadeLifecycleStatuses,
   getAllowedNextOportunidadeStages,
   isOportunidadeForwardSkipTransition,
+  resolveOportunidadeEngagementSignal,
   isOportunidadeLifecycleTransitionAllowed,
   isOportunidadeStageTransitionAllowed,
   isOportunidadeTerminalStage,
@@ -154,6 +155,69 @@ describe('Oportunidades stage rules', () => {
     expect(getDefaultOportunidadeProbabilityByStage(EstagioOportunidade.PERDIDO)).toBe(0);
     expect(getDefaultOportunidadeProbabilityByStage('qualificado')).toBe(40);
     expect(getDefaultOportunidadeProbabilityByStage('estagio-inexistente')).toBe(50);
+  });
+
+  it('classifica negociacao quente quando probabilidade alta e acao esta pressionando', () => {
+    expect(
+      resolveOportunidadeEngagementSignal({
+        lifecycleStatus: LifecycleStatusOportunidade.OPEN,
+        stage: EstagioOportunidade.NEGOCIACAO,
+        probabilidade: 85,
+        nextActionStatus: 'due_soon',
+      }),
+    ).toBe('hot');
+  });
+
+  it('nao marca oportunidade stale como quente', () => {
+    expect(
+      resolveOportunidadeEngagementSignal({
+        lifecycleStatus: LifecycleStatusOportunidade.OPEN,
+        stage: EstagioOportunidade.FECHAMENTO,
+        probabilidade: 95,
+        isStale: true,
+        nextActionStatus: 'due_soon',
+      }),
+    ).toBe('normal');
+  });
+
+  it('marca watch quando acao esta atrasada fora da janela quente', () => {
+    expect(
+      resolveOportunidadeEngagementSignal({
+        lifecycleStatus: LifecycleStatusOportunidade.OPEN,
+        stage: EstagioOportunidade.QUALIFICACAO,
+        probabilidade: 30,
+        nextActionStatus: 'overdue',
+      }),
+    ).toBe('watch');
+  });
+
+  it('respeita limiares customizados para classificar negociacao quente', () => {
+    const referenceDate = new Date('2026-04-05T10:00:00.000Z');
+    const expectedCloseDate = new Date('2026-04-25T10:00:00.000Z');
+
+    expect(
+      resolveOportunidadeEngagementSignal({
+        lifecycleStatus: LifecycleStatusOportunidade.OPEN,
+        stage: EstagioOportunidade.NEGOCIACAO,
+        probabilidade: 78,
+        nextActionStatus: 'future',
+        expectedCloseDate,
+        referenceDate,
+      }),
+    ).toBe('normal');
+
+    expect(
+      resolveOportunidadeEngagementSignal({
+        lifecycleStatus: LifecycleStatusOportunidade.OPEN,
+        stage: EstagioOportunidade.NEGOCIACAO,
+        probabilidade: 78,
+        nextActionStatus: 'future',
+        expectedCloseDate,
+        referenceDate,
+        hotMinProbability: 70,
+        hotCloseWindowDays: 30,
+      }),
+    ).toBe('hot');
   });
 
   it('permite transicoes validas de lifecycle', () => {

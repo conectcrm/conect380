@@ -5,6 +5,8 @@ describe('OportunidadesController (stale)', () => {
   const oportunidadesService = {
     getStalePolicy: jest.fn(),
     setStalePolicy: jest.fn(),
+    getEngagementPolicy: jest.fn(),
+    setEngagementPolicy: jest.fn(),
     listarOportunidadesParadas: jest.fn(),
     processarAutoArquivamentoStale: jest.fn(),
     findOne: jest.fn(),
@@ -81,6 +83,43 @@ describe('OportunidadesController (stale)', () => {
       autoArchiveEnabled: false,
       autoArchiveAfterDays: 60,
       updatedBy: null,
+    });
+  });
+
+  it('encaminha getEngagementPolicy para o service com empresaId', async () => {
+    const expected = {
+      hotMinProbability: 75,
+      hotMinProbabilitySource: 'tenant',
+      hotCloseWindowDays: 14,
+      hotCloseWindowSource: 'default',
+      nextActionDueSoonDays: 3,
+      nextActionDueSoonSource: 'tenant',
+    };
+    oportunidadesService.getEngagementPolicy.mockResolvedValue(expected);
+
+    const result = await controller.getEngagementPolicy('empresa-eng-1');
+
+    expect(oportunidadesService.getEngagementPolicy).toHaveBeenCalledWith('empresa-eng-1');
+    expect(result).toEqual(expected);
+  });
+
+  it('encaminha setEngagementPolicy com payload e updatedBy do usuario logado', async () => {
+    const body = {
+      hotMinProbability: 80,
+      hotCloseWindowDays: 10,
+      nextActionDueSoonDays: 2,
+    };
+
+    await controller.setEngagementPolicy('empresa-eng-2', body as any, {
+      user: { id: 'user-eng-1' },
+    } as any);
+
+    expect(oportunidadesService.setEngagementPolicy).toHaveBeenCalledWith({
+      empresaId: 'empresa-eng-2',
+      hotMinProbability: 80,
+      hotCloseWindowDays: 10,
+      nextActionDueSoonDays: 2,
+      updatedBy: 'user-eng-1',
     });
   });
 

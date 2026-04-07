@@ -30,13 +30,17 @@ import {
 // ✅ Validação customizada: Exige cliente_id OU nomeContato
 @ValidatorConstraint({ name: 'RequireClienteOuContato', async: false })
 export class RequireClienteOuContatoConstraint implements ValidatorConstraintInterface {
-  validate(value: any, args: ValidationArguments) {
-    const dto = args.object as CreateOportunidadeDto;
-    // Válido se tem cliente_id OU nomeContato preenchido
-    return !!(dto.cliente_id || (dto.nomeContato && dto.nomeContato.trim()));
+  validate(_value: unknown, args: ValidationArguments) {
+    const dto = args.object as {
+      cliente_id?: string | null;
+      nomeContato?: string | null;
+    };
+    const clienteId = typeof dto.cliente_id === 'string' ? dto.cliente_id.trim() : '';
+    const nomeContato = typeof dto.nomeContato === 'string' ? dto.nomeContato.trim() : '';
+    return Boolean(clienteId || nomeContato);
   }
 
-  defaultMessage(args: ValidationArguments) {
+  defaultMessage(_args: ValidationArguments) {
     return 'Informe um cliente (cliente_id) ou pelo menos o nome do contato (nomeContato)';
   }
 }
@@ -90,7 +94,6 @@ export class CreateOportunidadeDto {
 
   @IsOptional()
   @IsUUID('4', { message: 'ID do cliente inválido (deve ser UUID v4)' })
-  @Validate(RequireClienteOuContatoConstraint) // ✅ Validação customizada
   cliente_id?: string;
 
   // Campos de contato (quando não há cliente)
@@ -98,7 +101,6 @@ export class CreateOportunidadeDto {
   @IsString({ message: 'Nome do contato deve ser uma string' })
   @MinLength(3, { message: 'Nome do contato deve ter pelo menos 3 caracteres' })
   @MaxLength(255, { message: 'Nome do contato muito longo (máximo 255 caracteres)' })
-  @Validate(RequireClienteOuContatoConstraint) // ✅ Validação customizada
   nomeContato?: string;
 
   @IsOptional()
@@ -118,6 +120,10 @@ export class CreateOportunidadeDto {
   @IsString({ message: 'Empresa do contato deve ser uma string' })
   @MaxLength(255, { message: 'Empresa do contato muito longa (máximo 255 caracteres)' })
   empresaContato?: string;
+
+  // Executa validacao cruzada mesmo com campos opcionais omitidos.
+  @Validate(RequireClienteOuContatoConstraint)
+  private readonly _clienteOuContatoRule!: boolean;
 }
 
 export class UpdateOportunidadeDto {
@@ -170,19 +176,27 @@ export class UpdateOportunidadeDto {
   cliente_id?: string;
 
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'Nome do contato deve ser uma string' })
+  @MinLength(3, { message: 'Nome do contato deve ter pelo menos 3 caracteres' })
+  @MaxLength(255, { message: 'Nome do contato muito longo (maximo 255 caracteres)' })
   nomeContato?: string;
 
   @IsOptional()
-  @IsString()
+  @IsEmail({}, { message: 'E-mail do contato invalido' })
+  @MaxLength(255, { message: 'E-mail do contato muito longo (maximo 255 caracteres)' })
   emailContato?: string;
 
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'Telefone do contato deve ser uma string' })
+  @MaxLength(20, { message: 'Telefone do contato muito longo (maximo 20 caracteres)' })
+  @Matches(/^[0-9+\-() ]+$/, {
+    message: 'Telefone do contato invalido (apenas numeros e simbolos)',
+  })
   telefoneContato?: string;
 
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'Empresa do contato deve ser uma string' })
+  @MaxLength(255, { message: 'Empresa do contato muito longa (maximo 255 caracteres)' })
   empresaContato?: string;
 }
 
@@ -321,6 +335,16 @@ export class UpdateOportunidadeItemPreliminarDto {
   ordem?: number;
 }
 
+export class AddOportunidadeVendedorEnvolvidoDto {
+  @IsUUID('4', { message: 'ID do vendedor invalido (deve ser UUID v4)' })
+  vendedor_id: string;
+
+  @IsOptional()
+  @IsString({ message: 'Papel do vendedor deve ser uma string' })
+  @MaxLength(40, { message: 'Papel do vendedor muito longo (maximo 40 caracteres)' })
+  papel?: string;
+}
+
 export enum LifecycleViewOportunidade {
   OPEN = 'open',
   CLOSED = 'closed',
@@ -441,6 +465,26 @@ export class UpdateStalePolicyDto {
   autoArchiveAfterDays?: number;
 }
 
+export class UpdateEngagementPolicyDto {
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  hotMinProbability?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(90)
+  hotCloseWindowDays?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(30)
+  nextActionDueSoonDays?: number;
+}
+
 export class UpdateSalesFeatureFlagsDto {
   @IsOptional()
   @IsBoolean()
@@ -458,3 +502,4 @@ export class UpdateSalesFeatureFlagsDto {
   @IsBoolean()
   discountPolicyPerTenant?: boolean;
 }
+

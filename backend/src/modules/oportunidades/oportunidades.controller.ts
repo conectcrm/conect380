@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { OportunidadesService } from './oportunidades.service';
 import {
+  AddOportunidadeVendedorEnvolvidoDto,
   CreateOportunidadeDto,
   UpdateOportunidadeDto,
   UpdateEstagioDto,
@@ -24,6 +25,7 @@ import {
   StaleDealsQueryDto,
   UpdateOportunidadeItemPreliminarDto,
   UpdateLifecycleFeatureFlagDto,
+  UpdateEngagementPolicyDto,
   UpdateStalePolicyDto,
   UpdateSalesFeatureFlagsDto,
 } from './dto/oportunidade.dto';
@@ -174,6 +176,27 @@ export class OportunidadesController {
     });
   }
 
+  @Get('lifecycle/engagement-policy')
+  getEngagementPolicy(@EmpresaId() empresaId: string) {
+    return this.oportunidadesService.getEngagementPolicy(empresaId);
+  }
+
+  @Patch('lifecycle/engagement-policy')
+  @Permissions(Permission.CONFIG_AUTOMACOES_MANAGE)
+  setEngagementPolicy(
+    @EmpresaId() empresaId: string,
+    @Body() body: UpdateEngagementPolicyDto,
+    @Request() req,
+  ) {
+    return this.oportunidadesService.setEngagementPolicy({
+      empresaId,
+      hotMinProbability: body.hotMinProbability,
+      hotCloseWindowDays: body.hotCloseWindowDays,
+      nextActionDueSoonDays: body.nextActionDueSoonDays,
+      updatedBy: req.user?.id || null,
+    });
+  }
+
   @Get('sales/feature-flags')
   getSalesFeatureFlags(@EmpresaId() empresaId: string) {
     return this.oportunidadesService.getSalesFeatureFlags(empresaId);
@@ -238,6 +261,43 @@ export class OportunidadesController {
     });
   }
 
+  @Get('atividades/painel')
+  listarAtividadesPainelComercial(
+    @EmpresaId() empresaId: string,
+    @Query('periodStart') periodStart?: string,
+    @Query('periodEnd') periodEnd?: string,
+    @Query('vendedorId') vendedorId?: string,
+    @Query('onlyMine') onlyMine?: string,
+    @Query('status') status?: string,
+    @Query('tipo') tipo?: string,
+    @Query('busca') busca?: string,
+    @Query('limit') limit?: string,
+    @Query('includeClosed') includeClosed?: string,
+    @Query('includeArchived') includeArchived?: string,
+    @Request() req?: { user?: { id?: string; role?: string } },
+  ) {
+    const parsedLimit = limit ? Number(limit) : undefined;
+    return this.oportunidadesService.listarAtividadesPainelComercial(
+      empresaId,
+      {
+        periodStart,
+        periodEnd,
+        vendedorId,
+        onlyMine,
+        status,
+        tipo,
+        busca,
+        limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
+        includeClosed,
+        includeArchived,
+      },
+      {
+        actorUserId: req?.user?.id,
+        userRole: req?.user?.role,
+      },
+    );
+  }
+
   @Get(':id/itens-preliminares')
   listarItensPreliminares(@Param('id') id: string, @EmpresaId() empresaId: string) {
     return this.oportunidadesService.listarItensPreliminares(id, empresaId);
@@ -272,6 +332,38 @@ export class OportunidadesController {
     @EmpresaId() empresaId: string,
   ) {
     return this.oportunidadesService.removerItemPreliminar(id, itemId, empresaId);
+  }
+
+  @Get(':id/vendedores-envolvidos')
+  listarVendedoresEnvolvidos(@Param('id') id: string, @EmpresaId() empresaId: string) {
+    return this.oportunidadesService.listarVendedoresEnvolvidos(id, empresaId);
+  }
+
+  @Post(':id/vendedores-envolvidos')
+  @Permissions(Permission.CRM_OPORTUNIDADES_UPDATE)
+  adicionarVendedorEnvolvido(
+    @Param('id') id: string,
+    @Body() body: AddOportunidadeVendedorEnvolvidoDto,
+    @EmpresaId() empresaId: string,
+    @Request() req,
+  ) {
+    return this.oportunidadesService.adicionarVendedorEnvolvido(id, body, empresaId, req.user?.id);
+  }
+
+  @Delete(':id/vendedores-envolvidos/:vendedorId')
+  @Permissions(Permission.CRM_OPORTUNIDADES_UPDATE)
+  removerVendedorEnvolvido(
+    @Param('id') id: string,
+    @Param('vendedorId') vendedorId: string,
+    @EmpresaId() empresaId: string,
+    @Request() req?: { user?: { id?: string } },
+  ) {
+    return this.oportunidadesService.removerVendedorEnvolvido(
+      id,
+      vendedorId,
+      empresaId,
+      req.user?.id,
+    );
   }
 
   @Get(':id')

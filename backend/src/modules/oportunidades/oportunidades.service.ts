@@ -22,6 +22,7 @@ import { Lead, OrigemLead, StatusLead } from '../leads/lead.entity';
 import { ClientesService } from '../clientes/clientes.service';
 import { StatusCliente } from '../clientes/cliente.entity';
 import {
+  AddOportunidadeVendedorEnvolvidoDto,
   CreateOportunidadeDto,
   CreateOportunidadeItemPreliminarDto,
   LifecycleTransitionDto,
@@ -39,6 +40,7 @@ import { NotificationService } from '../../notifications/notification.service';
 import { NotificationType } from '../../notifications/entities/notification.entity';
 import { createHash } from 'crypto';
 import { OportunidadeItemPreliminar } from './oportunidade-item-preliminar.entity';
+import { AtendimentoGateway } from '../atendimento/gateways/atendimento.gateway';
 
 const ALL_OPORTUNIDADE_STAGES = new Set<string>([
   EstagioOportunidade.LEADS,
@@ -72,6 +74,12 @@ const LEGACY_DB_STAGE_VALUES = new Set<string>([
 const OPORTUNIDADES_LIFECYCLE_FLAG_KEY = 'crm_oportunidades_lifecycle_v1';
 const OPORTUNIDADES_STALE_POLICY_FLAG_KEY = 'crm_oportunidades_stale_policy_v1';
 const OPORTUNIDADES_STALE_AUTO_ARCHIVE_FLAG_KEY = 'crm_oportunidades_stale_auto_archive_v1';
+const OPORTUNIDADES_ENGAGEMENT_HOT_PROBABILITY_FLAG_KEY =
+  'crm_oportunidades_engagement_hot_probability_v1';
+const OPORTUNIDADES_ENGAGEMENT_HOT_CLOSE_WINDOW_FLAG_KEY =
+  'crm_oportunidades_engagement_hot_close_window_days_v1';
+const OPORTUNIDADES_ENGAGEMENT_NEXT_ACTION_SOON_FLAG_KEY =
+  'crm_oportunidades_engagement_next_action_due_soon_days_v1';
 const SALES_PIPELINE_DRAFT_WITHOUT_PLACEHOLDER_FLAG_KEY =
   'sales.pipeline_draft_without_placeholder';
 const SALES_OPPORTUNITY_PRELIMINARY_ITEMS_FLAG_KEY = 'sales.opportunity_preliminary_items';
@@ -82,6 +90,15 @@ const STALE_DEFAULT_AUTO_ARCHIVE_DAYS = 60;
 const STALE_MIN_DAYS = 7;
 const STALE_MAX_DAYS = 365;
 const STALE_DEFAULT_SCAN_LIMIT = 300;
+const ENGAGEMENT_NEXT_ACTION_DUE_SOON_DEFAULT_DAYS = 3;
+const ENGAGEMENT_NEXT_ACTION_DUE_SOON_MIN_DAYS = 0;
+const ENGAGEMENT_NEXT_ACTION_DUE_SOON_MAX_DAYS = 30;
+const ENGAGEMENT_HOT_MIN_PROBABILITY_DEFAULT = 75;
+const ENGAGEMENT_HOT_MIN_PROBABILITY_MIN = 0;
+const ENGAGEMENT_HOT_MIN_PROBABILITY_MAX = 100;
+const ENGAGEMENT_HOT_CLOSE_WINDOW_DEFAULT_DAYS = 14;
+const ENGAGEMENT_HOT_CLOSE_WINDOW_MIN_DAYS = 1;
+const ENGAGEMENT_HOT_CLOSE_WINDOW_MAX_DAYS = 90;
 
 const SALES_FEATURE_FLAG_KEY_MAP = {
   pipelineDraftWithoutPlaceholder: SALES_PIPELINE_DRAFT_WITHOUT_PLACEHOLDER_FLAG_KEY,
@@ -173,6 +190,15 @@ type StalePolicyDecision = {
   autoArchiveSource: TenantFlagSource;
 };
 
+type EngagementPolicyDecision = {
+  hotMinProbability: number;
+  hotMinProbabilitySource: TenantFlagSource;
+  hotCloseWindowDays: number;
+  hotCloseWindowSource: TenantFlagSource;
+  nextActionDueSoonDays: number;
+  nextActionDueSoonSource: TenantFlagSource;
+};
+
 type SalesFeatureFlagDecisionItem = {
   flagKey: SalesFeatureFlagKey;
   enabled: boolean;
@@ -215,6 +241,19 @@ type AutoArchiveResult = {
   archivedIds: string[];
   failed: Array<{ id: string; reason: string }>;
   generatedAt: string;
+};
+
+export type OportunidadeNextActionStatus = 'overdue' | 'due_soon' | 'future';
+export type OportunidadeEngagementSignal = 'hot' | 'watch' | 'normal';
+
+type NextPendingActivitySnapshot = {
+  id: string;
+  oportunidadeId: string;
+  tipo: TipoAtividade;
+  descricao: string;
+  dataAtividade: string;
+  status: OportunidadeNextActionStatus;
+  daysDelta: number;
 };
 
 function normalizeLifecycleRuleInput(
@@ -431,6 +470,35 @@ export function normalizeStaleThresholdDays(
   return Math.min(Math.max(Math.floor(numeric), STALE_MIN_DAYS), STALE_MAX_DAYS);
 }
 
+function normalizeEngagementDays(
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return Math.min(Math.max(Math.floor(fallback), min), max);
+  }
+
+  return Math.min(Math.max(Math.floor(numeric), min), max);
+}
+
+function normalizeEngagementProbability(value: unknown, fallback: number): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return Math.min(
+      Math.max(Math.floor(fallback), ENGAGEMENT_HOT_MIN_PROBABILITY_MIN),
+      ENGAGEMENT_HOT_MIN_PROBABILITY_MAX,
+    );
+  }
+
+  return Math.min(
+    Math.max(Math.floor(numeric), ENGAGEMENT_HOT_MIN_PROBABILITY_MIN),
+    ENGAGEMENT_HOT_MIN_PROBABILITY_MAX,
+  );
+}
+
 export function calculateStaleDays(
   lastInteractionAt?: Date | string | null,
   referenceDate: Date = new Date(),
@@ -460,6 +528,79 @@ export function isOportunidadeStale(
 ): boolean {
   const safeThreshold = normalizeStaleThresholdDays(thresholdDays);
   return calculateStaleDays(lastInteractionAt, referenceDate) >= safeThreshold;
+}
+
+function parseRuleDateValue(value: unknown): Date | null {
+  if (!value) return null;
+  const resolved = value instanceof Date ? value : new Date(value as any);
+  return Number.isNaN(resolved.getTime()) ? null : resolved;
+}
+
+function calculateSignedDateDeltaInDays(targetDate: Date, referenceDate: Date): number {
+  const target = new Date(targetDate);
+  target.setHours(0, 0, 0, 0);
+
+  const reference = new Date(referenceDate);
+  reference.setHours(0, 0, 0, 0);
+
+  return Math.round((target.getTime() - reference.getTime()) / (24 * 60 * 60 * 1000));
+}
+
+export function resolveOportunidadeEngagementSignal(input: {
+  lifecycleStatus?: LifecycleStatusOportunidade | string | null;
+  stage?: EstagioOportunidade | string | null;
+  probabilidade?: number | null;
+  isStale?: boolean | null;
+  expectedCloseDate?: Date | string | null;
+  nextActionStatus?: OportunidadeNextActionStatus | null;
+  hotMinProbability?: number | null;
+  hotCloseWindowDays?: number | null;
+  referenceDate?: Date;
+}): OportunidadeEngagementSignal {
+  const lifecycle = normalizeLifecycleRuleInput(input.lifecycleStatus);
+  if (lifecycle && lifecycle !== LifecycleStatusOportunidade.OPEN) {
+    return 'normal';
+  }
+
+  const stage = normalizeStageRuleInput(input.stage);
+  if (!stage || isOportunidadeTerminalStage(stage)) {
+    return 'normal';
+  }
+
+  if (Boolean(input.isStale)) {
+    return input.nextActionStatus === 'overdue' ? 'watch' : 'normal';
+  }
+
+  const probability = Number(input.probabilidade ?? 0);
+  const nextActionStatus = input.nextActionStatus || null;
+  const hasActionPressure = nextActionStatus === 'overdue' || nextActionStatus === 'due_soon';
+
+  const isNegotiationWindow =
+    stage === EstagioOportunidade.NEGOCIACAO || stage === EstagioOportunidade.FECHAMENTO;
+  const referenceDate = input.referenceDate instanceof Date ? input.referenceDate : new Date();
+  const expectedCloseDate = parseRuleDateValue(input.expectedCloseDate);
+  const closeDeltaDays = expectedCloseDate
+    ? calculateSignedDateDeltaInDays(expectedCloseDate, referenceDate)
+    : null;
+
+  const hotMinProbability = Number.isFinite(Number(input.hotMinProbability))
+    ? Number(input.hotMinProbability)
+    : ENGAGEMENT_HOT_MIN_PROBABILITY_DEFAULT;
+  const hotCloseWindowDays = Number.isFinite(Number(input.hotCloseWindowDays))
+    ? Number(input.hotCloseWindowDays)
+    : ENGAGEMENT_HOT_CLOSE_WINDOW_DEFAULT_DAYS;
+  const closeWindowHot =
+    closeDeltaDays !== null && closeDeltaDays <= hotCloseWindowDays && closeDeltaDays >= -3;
+
+  if (isNegotiationWindow && probability >= hotMinProbability && (hasActionPressure || closeWindowHot)) {
+    return 'hot';
+  }
+
+  if (hasActionPressure) {
+    return 'watch';
+  }
+
+  return 'normal';
 }
 
 type OportunidadeActivitiesRange = {
@@ -498,6 +639,80 @@ type OportunidadeAtividadeResumo = {
       avatarUrl?: string | null;
     };
   }>;
+};
+
+type OportunidadeAtividadesPainelStatusFilter =
+  | 'all'
+  | 'pending'
+  | 'completed'
+  | 'overdue'
+  | 'due_today'
+  | 'due_week';
+
+type OportunidadeAtividadesPainelItem = {
+  id: string;
+  tipo: TipoAtividade;
+  descricao: string;
+  status: StatusAtividade;
+  resultadoConclusao?: string | null;
+  dataAtividade: string | null;
+  createdAt: string | null;
+  concluidoEm?: string | null;
+  flags: {
+    overdue: boolean;
+    dueToday: boolean;
+    dueWeek: boolean;
+    daysDelta: number | null;
+  };
+  oportunidade: {
+    id: string;
+    titulo: string;
+    estagio: EstagioOportunidade;
+    lifecycleStatus: LifecycleStatusOportunidade;
+    valor: number;
+    probabilidade: number;
+  };
+  criadoPor?: {
+    id: string;
+    nome: string;
+    avatarUrl?: string | null;
+  };
+  responsavel?: {
+    id: string;
+    nome: string;
+    avatarUrl?: string | null;
+  };
+  concluidoPor?: {
+    id: string;
+    nome: string;
+    avatarUrl?: string | null;
+  };
+};
+
+type OportunidadeAtividadesPainelResult = {
+  generatedAt: string;
+  range: {
+    periodStart: string;
+    periodEnd: string;
+  };
+  filters: {
+    vendedorId?: string;
+    onlyMine: boolean;
+    status: OportunidadeAtividadesPainelStatusFilter;
+    tipo?: TipoAtividade;
+    busca?: string;
+    includeClosed: boolean;
+    includeArchived: boolean;
+  };
+  resumo: {
+    total: number;
+    pending: number;
+    completed: number;
+    overdue: number;
+    dueToday: number;
+    dueWeek: number;
+  };
+  items: OportunidadeAtividadesPainelItem[];
 };
 
 type OportunidadeHistoricoEstagioItem = {
@@ -567,6 +782,26 @@ type OportunidadeFindFilters = {
   dataFim?: string;
 } & OportunidadeLifecycleFilters;
 
+type OportunidadeVendedorEnvolvidoRow = {
+  id: string;
+  vendedor_id: string;
+  papel: string;
+  created_at: string | null;
+  vendedor_nome: string | null;
+  vendedor_email: string | null;
+  vendedor_avatar_url: string | null;
+};
+
+type OportunidadeVendedorEnvolvidoPayload = {
+  id: string;
+  vendedorId: string;
+  nome: string;
+  email: string | null;
+  avatarUrl: string | null;
+  papel: string;
+  createdAt: string | null;
+};
+
 @Injectable()
 export class OportunidadesService {
   private readonly logger = new Logger(OportunidadesService.name);
@@ -574,9 +809,11 @@ export class OportunidadesService {
   private tableColumnMetadataCache = new Map<string, Map<string, TableColumnMetadata>>();
   private enumValuesCache = new Map<string, Set<string>>();
   private atividadesSchemaRefreshAttempted = false;
+  private oportunidadesContactSchemaRefreshAttempted = false;
   private stageEventsTableAvailable?: boolean;
   private featureFlagsTableAvailable?: boolean;
   private itensPreliminaresTableAvailable?: boolean;
+  private vendedoresEnvolvidosTableAvailable?: boolean;
 
   private readonly canonicalStageOrder: EstagioOportunidade[] = [
     EstagioOportunidade.LEADS,
@@ -612,6 +849,8 @@ export class OportunidadesService {
     private readonly notificationService?: NotificationService,
     @Optional()
     private readonly dashboardV2JobsService?: DashboardV2JobsService,
+    @Optional()
+    private readonly atendimentoGateway?: AtendimentoGateway,
   ) {}
 
   private formatCurrencyBrl(value: unknown): string {
@@ -640,6 +879,33 @@ export class OportunidadesService {
     }
   }
 
+  private normalizeVendedorEnvolvidoPapel(rawValue?: string | null): string {
+    const normalized = String(rawValue || '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '_');
+
+    if (!normalized) {
+      return 'apoio';
+    }
+
+    return normalized.slice(0, 40);
+  }
+
+  private mapOportunidadeVendedorEnvolvidoRow(
+    row: OportunidadeVendedorEnvolvidoRow,
+  ): OportunidadeVendedorEnvolvidoPayload {
+    return {
+      id: String(row.id || ''),
+      vendedorId: String(row.vendedor_id || ''),
+      nome: String(row.vendedor_nome || '').trim() || 'Usuario',
+      email: row.vendedor_email || null,
+      avatarUrl: row.vendedor_avatar_url || null,
+      papel: this.normalizeVendedorEnvolvidoPapel(row.papel),
+      createdAt: this.toIsoStringOrNull(row.created_at),
+    };
+  }
+
   private async notifyAssignedUserOnActivityCreated(input: {
     empresaId: string;
     oportunidade: Oportunidade;
@@ -656,9 +922,6 @@ export class OportunidadesService {
     }
 
     const actorUserId = String(input.actorUserId || '').trim();
-    if (actorUserId && actorUserId === assignedUserId) {
-      return;
-    }
 
     try {
       const destinatario = await this.userRepository.findOne({
@@ -697,8 +960,7 @@ export class OportunidadesService {
 
       const title = 'Nova tarefa da pipeline';
       const message = `${actorName} atribuiu ${tipoLabel.toLowerCase()} para ${dataAtividadeLabel} na oportunidade "${oportunidadeTitulo}".`;
-
-      await this.notificationService.create({
+      const notificationPayload = {
         empresaId: input.empresaId,
         userId: destinatario.id,
         type: NotificationType.SISTEMA,
@@ -716,10 +978,87 @@ export class OportunidadesService {
           dataAtividade: dataAtividadeValida.toISOString(),
           assignedByUserId: actorUserId || null,
         },
+      };
+
+      const createdNotification = await this.notificationService.create(notificationPayload);
+
+      this.atendimentoGateway?.notificarUsuario(destinatario.id, 'atividade_atribuida', {
+        id: createdNotification.id,
+        title,
+        message,
+        type: NotificationType.SISTEMA,
+        data: notificationPayload.data,
       });
     } catch (error) {
       this.logger.warn(
         `Falha ao notificar responsavel por atividade atribuida (${input.atividade.id}): ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  private async notifyUserOnSellerLinked(input: {
+    empresaId: string;
+    oportunidade: Oportunidade;
+    vendedorId: string;
+    papel: string;
+    actorUserId?: string;
+  }): Promise<void> {
+    if (!this.notificationService) {
+      return;
+    }
+
+    const vendedorId = String(input.vendedorId || '').trim();
+    if (!vendedorId) {
+      return;
+    }
+
+    const actorUserId = String(input.actorUserId || '').trim();
+
+    try {
+      const destinatario = await this.userRepository.findOne({
+        where: {
+          id: vendedorId,
+          empresa_id: input.empresaId,
+          ativo: true,
+        },
+        select: ['id'],
+      });
+
+      if (!destinatario) {
+        return;
+      }
+
+      const actorName = actorUserId
+        ? (
+            await this.userRepository.findOne({
+              where: { id: actorUserId, empresa_id: input.empresaId },
+              select: ['nome'],
+            })
+          )?.nome || 'Equipe comercial'
+        : 'Equipe comercial';
+
+      const oportunidadeTitulo = String(input.oportunidade.titulo || 'Oportunidade').trim();
+      const papelLabel = this.normalizeVendedorEnvolvidoPapel(input.papel).replace(/_/g, ' ');
+
+      await this.notificationService.create({
+        empresaId: input.empresaId,
+        userId: destinatario.id,
+        type: NotificationType.SISTEMA,
+        title: 'Voce foi adicionado a uma oportunidade',
+        message: `${actorName} vinculou voce como ${papelLabel} na oportunidade "${oportunidadeTitulo}".`,
+        data: {
+          category: 'comercial',
+          event: 'vendedor_envolvido_adicionado',
+          module: 'pipeline',
+          oportunidadeId: String(input.oportunidade.id || ''),
+          oportunidadeTitulo,
+          papel: this.normalizeVendedorEnvolvidoPapel(input.papel),
+          linkedByUserId: actorUserId || null,
+        },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao notificar vendedor vinculado (${vendedorId}): ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -1039,6 +1378,32 @@ export class OportunidadesService {
     return normalized.length > 0 ? normalized : undefined;
   }
 
+  private normalizeContactValue(value: unknown): string | undefined {
+    if (typeof value === 'string') {
+      return this.normalizeText(value);
+    }
+
+    if (value === null || value === undefined) {
+      return undefined;
+    }
+
+    return this.normalizeText(String(value));
+  }
+
+  private assertClienteOuContatoRule(input: {
+    clienteId?: unknown;
+    nomeContato?: unknown;
+  }): void {
+    const clienteId = this.normalizeContactValue(input.clienteId);
+    const nomeContato = this.normalizeContactValue(input.nomeContato);
+
+    if (!clienteId && !nomeContato) {
+      throw new BadRequestException(
+        'Informe um cliente (cliente_id) ou pelo menos o nome do contato (nomeContato).',
+      );
+    }
+  }
+
   private normalizeEmail(value?: string | null): string | undefined {
     const normalized = this.normalizeText(value);
     return normalized ? normalized.toLowerCase() : undefined;
@@ -1083,6 +1448,73 @@ export class OportunidadesService {
       default:
         return OrigemLead.MANUAL;
     }
+  }
+
+  private async getLeadColumnEnumValues(columnName: 'origem' | 'status'): Promise<Set<string> | null> {
+    const metadata = await this.getTableColumnMetadata('leads', columnName);
+    const isUserDefined =
+      metadata?.dataType?.toLowerCase() === 'user-defined' && Boolean(metadata?.udtName);
+
+    if (!isUserDefined) {
+      return null;
+    }
+
+    const values = await this.getEnumValues(metadata!.udtName);
+    return values.size > 0 ? values : null;
+  }
+
+  private async mapLeadOriginToDatabaseValue(origem: OrigemLead): Promise<string> {
+    const normalized = String(origem || OrigemLead.MANUAL).trim().toLowerCase();
+    const enumValues = await this.getLeadColumnEnumValues('origem');
+
+    if (!enumValues) {
+      return normalized;
+    }
+
+    if (enumValues.has(normalized)) {
+      return normalized;
+    }
+
+    const candidatesByOrigin: Record<OrigemLead, string[]> = {
+      [OrigemLead.FORMULARIO]: ['formulario', 'site', 'website', 'outros'],
+      [OrigemLead.IMPORTACAO]: ['importacao', 'campanha', 'outros'],
+      [OrigemLead.API]: ['api', 'outros'],
+      [OrigemLead.WHATSAPP]: ['whatsapp', 'chat', 'redes_sociais', 'outros'],
+      [OrigemLead.MANUAL]: ['manual', 'outros'],
+      [OrigemLead.INDICACAO]: ['indicacao', 'outros'],
+      [OrigemLead.OUTRO]: ['outro', 'outros'],
+    };
+
+    for (const candidate of candidatesByOrigin[origem] || []) {
+      if (enumValues.has(candidate)) {
+        return candidate;
+      }
+    }
+
+    return Array.from(enumValues.values())[0] || normalized;
+  }
+
+  private async mapLeadStatusToDatabaseValue(status: StatusLead): Promise<string> {
+    const normalized = String(status || StatusLead.NOVO).trim().toLowerCase();
+    const enumValues = await this.getLeadColumnEnumValues('status');
+
+    if (!enumValues) {
+      return normalized;
+    }
+
+    if (enumValues.has(normalized)) {
+      return normalized;
+    }
+
+    if (normalized === StatusLead.DESQUALIFICADO && enumValues.has('perdido')) {
+      return 'perdido';
+    }
+
+    if (enumValues.has(StatusLead.NOVO)) {
+      return StatusLead.NOVO;
+    }
+
+    return Array.from(enumValues.values())[0] || normalized;
   }
 
   private mapOpportunityStageToLeadStatus(
@@ -1259,6 +1691,8 @@ export class OportunidadesService {
       if (!snapshot) {
         return;
       }
+      const snapshotOrigemPersist = await this.mapLeadOriginToDatabaseValue(snapshot.origem);
+      const snapshotStatusPersist = await this.mapLeadStatusToDatabaseValue(snapshot.status);
 
       const existingLead = await this.findLeadCandidateForOpportunity(empresaId, snapshot);
       const nowIso = new Date().toISOString();
@@ -1270,8 +1704,8 @@ export class OportunidadesService {
           email: snapshot.email,
           telefone: snapshot.telefone,
           empresa_nome: snapshot.empresa_nome,
-          status: snapshot.status,
-          origem: snapshot.origem,
+          status: snapshotStatusPersist as any,
+          origem: snapshotOrigemPersist as any,
           observacoes: snapshot.observacoes,
           responsavel_id: snapshot.responsavel_id,
           oportunidade_id: snapshot.oportunidadeId,
@@ -1305,6 +1739,7 @@ export class OportunidadesService {
         existingLead.status === StatusLead.CONVERTIDO && !isPipelineMirror
           ? StatusLead.CONVERTIDO
           : snapshot.status;
+      const nextStatusPersist = await this.mapLeadStatusToDatabaseValue(nextStatus);
 
       existingLead.nome = snapshot.nome;
 
@@ -1321,8 +1756,8 @@ export class OportunidadesService {
         existingLead.responsavel_id = snapshot.responsavel_id;
       }
 
-      existingLead.status = nextStatus;
-      existingLead.origem = snapshot.origem;
+      existingLead.status = nextStatusPersist as any;
+      existingLead.origem = snapshotOrigemPersist as any;
       if (!existingLead.oportunidade_id) {
         existingLead.oportunidade_id = snapshot.oportunidadeId;
       }
@@ -1346,7 +1781,7 @@ export class OportunidadesService {
         telefone: this.normalizeText(existingLead.telefone),
         empresa_nome: this.normalizeText(existingLead.empresa_nome),
         observacoes: this.normalizeText(existingLead.observacoes),
-        status: existingLead.status,
+        status: nextStatus,
       });
 
       await this.leadRepository.save(existingLead);
@@ -1406,6 +1841,26 @@ export class OportunidadesService {
     }
 
     return { start, end };
+  }
+
+  private normalizeAtividadesPainelStatusFilter(
+    value?: string | null,
+  ): OportunidadeAtividadesPainelStatusFilter {
+    const normalized = String(value || '')
+      .trim()
+      .toLowerCase();
+
+    if (
+      normalized === 'pending' ||
+      normalized === 'completed' ||
+      normalized === 'overdue' ||
+      normalized === 'due_today' ||
+      normalized === 'due_week'
+    ) {
+      return normalized;
+    }
+
+    return 'all';
   }
 
   private toIsoStringOrNull(value: unknown): string | null {
@@ -1543,7 +1998,25 @@ export class OportunidadesService {
   }
 
   private async resolveOportunidadesSchema() {
-    const columns = await this.getTableColumns('oportunidades');
+    let columns = await this.getTableColumns('oportunidades');
+    const hasContactColumns =
+      columns.has('nomeContato') ||
+      columns.has('nome_contato') ||
+      columns.has('nomecontato') ||
+      columns.has('emailContato') ||
+      columns.has('email_contato') ||
+      columns.has('emailcontato') ||
+      columns.has('telefoneContato') ||
+      columns.has('telefone_contato') ||
+      columns.has('telefonecontato') ||
+      columns.has('empresaContato') ||
+      columns.has('empresa_contato') ||
+      columns.has('empresacontato');
+
+    if (!hasContactColumns && !this.oportunidadesContactSchemaRefreshAttempted) {
+      this.oportunidadesContactSchemaRefreshAttempted = true;
+      columns = await this.getTableColumns('oportunidades', { refresh: true });
+    }
 
     const responsavelColumn = columns.has('responsavel_id')
       ? 'responsavel_id'
@@ -1603,6 +2076,34 @@ export class OportunidadesService {
       : columns.has('reopenedBy')
         ? 'reopenedBy'
         : null;
+    const nomeContatoColumn = columns.has('nomeContato')
+      ? 'nomeContato'
+      : columns.has('nome_contato')
+        ? 'nome_contato'
+        : columns.has('nomecontato')
+          ? 'nomecontato'
+          : null;
+    const emailContatoColumn = columns.has('emailContato')
+      ? 'emailContato'
+      : columns.has('email_contato')
+        ? 'email_contato'
+        : columns.has('emailcontato')
+          ? 'emailcontato'
+          : null;
+    const telefoneContatoColumn = columns.has('telefoneContato')
+      ? 'telefoneContato'
+      : columns.has('telefone_contato')
+        ? 'telefone_contato'
+        : columns.has('telefonecontato')
+          ? 'telefonecontato'
+          : null;
+    const empresaContatoColumn = columns.has('empresaContato')
+      ? 'empresaContato'
+      : columns.has('empresa_contato')
+        ? 'empresa_contato'
+        : columns.has('empresacontato')
+          ? 'empresacontato'
+          : null;
     const estagioMode = await this.resolveDatabaseEstagioMode(columns);
 
     return {
@@ -1620,6 +2121,10 @@ export class OportunidadesService {
       deletedByColumn,
       reopenedAtColumn,
       reopenedByColumn,
+      nomeContatoColumn,
+      emailContatoColumn,
+      telefoneContatoColumn,
+      empresaContatoColumn,
       estagioMode,
     };
   }
@@ -2077,6 +2582,41 @@ export class OportunidadesService {
     return this.itensPreliminaresTableAvailable;
   }
 
+  private async isVendedoresEnvolvidosTableAvailable(): Promise<boolean> {
+    if (this.vendedoresEnvolvidosTableAvailable !== undefined) {
+      return this.vendedoresEnvolvidosTableAvailable;
+    }
+
+    try {
+      const columns = await this.getTableColumns('oportunidade_vendedores_envolvidos');
+      this.vendedoresEnvolvidosTableAvailable =
+        columns.has('empresa_id') &&
+        columns.has('oportunidade_id') &&
+        columns.has('vendedor_id') &&
+        columns.has('papel');
+    } catch {
+      this.vendedoresEnvolvidosTableAvailable = false;
+    }
+
+    if (!this.vendedoresEnvolvidosTableAvailable) {
+      this.logger.warn(
+        'Tabela "oportunidade_vendedores_envolvidos" indisponivel. Gestao de co-vendedores permanece desabilitada.',
+      );
+    }
+
+    return this.vendedoresEnvolvidosTableAvailable;
+  }
+
+  private async assertVendedoresEnvolvidosTableAvailable(): Promise<void> {
+    if (await this.isVendedoresEnvolvidosTableAvailable()) {
+      return;
+    }
+
+    throw new ServiceUnavailableException(
+      'Gestao de vendedores envolvidos indisponivel neste ambiente. Execute as migrations pendentes.',
+    );
+  }
+
   private async assertItensPreliminaresTableAvailable(): Promise<void> {
     if (await this.isItensPreliminaresTableAvailable()) {
       return;
@@ -2181,6 +2721,17 @@ export class OportunidadesService {
       );
     }
 
+    const normalizedClienteId = this.normalizeContactValue(createOportunidadeDto.cliente_id);
+    const normalizedNomeContato = this.normalizeContactValue(createOportunidadeDto.nomeContato);
+    const normalizedEmailContato = this.normalizeEmail(createOportunidadeDto.emailContato);
+    const normalizedTelefoneContato = this.normalizeContactValue(createOportunidadeDto.telefoneContato);
+    const normalizedEmpresaContato = this.normalizeContactValue(createOportunidadeDto.empresaContato);
+
+    this.assertClienteOuContatoRule({
+      clienteId: normalizedClienteId,
+      nomeContato: normalizedNomeContato,
+    });
+
     const columns: string[] = [
       'titulo',
       'descricao',
@@ -2199,7 +2750,7 @@ export class OportunidadesService {
       this.toDatabaseEstagio(createOportunidadeDto.estagio, schema.estagioMode),
       empresaId,
       createOportunidadeDto.responsavel_id,
-      createOportunidadeDto.cliente_id ?? null,
+      normalizedClienteId ?? null,
     ];
 
     // Compatibilidade com schemas hibridos que mantem usuario_id e responsavel_id.
@@ -2239,21 +2790,21 @@ export class OportunidadesService {
       );
     }
 
-    if (schema.columns.has('nomeContato')) {
-      columns.push('nomeContato');
-      values.push(createOportunidadeDto.nomeContato ?? null);
+    if (schema.nomeContatoColumn) {
+      columns.push(schema.nomeContatoColumn);
+      values.push(normalizedNomeContato ?? null);
     }
-    if (schema.columns.has('emailContato')) {
-      columns.push('emailContato');
-      values.push(createOportunidadeDto.emailContato ?? null);
+    if (schema.emailContatoColumn) {
+      columns.push(schema.emailContatoColumn);
+      values.push(normalizedEmailContato ?? null);
     }
-    if (schema.columns.has('telefoneContato')) {
-      columns.push('telefoneContato');
-      values.push(createOportunidadeDto.telefoneContato ?? null);
+    if (schema.telefoneContatoColumn) {
+      columns.push(schema.telefoneContatoColumn);
+      values.push(normalizedTelefoneContato ?? null);
     }
-    if (schema.columns.has('empresaContato')) {
-      columns.push('empresaContato');
-      values.push(createOportunidadeDto.empresaContato ?? null);
+    if (schema.empresaContatoColumn) {
+      columns.push(schema.empresaContatoColumn);
+      values.push(normalizedEmpresaContato ?? null);
     }
 
     const placeholders = values.map((_, index) => `$${index + 1}`).join(', ');
@@ -2296,6 +2847,7 @@ export class OportunidadesService {
   async findAll(empresaId: string, filters?: OportunidadeFindFilters): Promise<Oportunidade[]> {
     const schema = await this.resolveOportunidadesSchema();
     const usersColumns = await this.getTableColumns('users');
+    const clientesColumns = await this.getTableColumns('clientes');
     const propostasColumns = await this.getTableColumns('propostas');
     const lifecycleEnabled = await this.isLifecycleEnabledForTenant({ empresaId, schema });
     const responsavelRef = `oportunidade.${this.quoteIdentifier(schema.responsavelColumn)}`;
@@ -2304,6 +2856,7 @@ export class OportunidadesService {
     const responsavelAvatarExpr = usersColumns.has('avatar_url')
       ? 'responsavel.avatar_url'
       : 'NULL';
+    const clienteEmpresaExpr = clientesColumns.has('empresa') ? 'cliente.empresa' : 'NULL';
     const dataFechamentoEsperadoExpr = schema.dataFechamentoEsperadoColumn
       ? `oportunidade.${this.quoteIdentifier(schema.dataFechamentoEsperadoColumn)}`
       : 'NULL';
@@ -2319,17 +2872,17 @@ export class OportunidadesService {
     const tagsExpr = schema.columns.has('tags')
       ? `oportunidade.${this.quoteIdentifier('tags')}`
       : 'NULL';
-    const nomeContatoExpr = schema.columns.has('nomeContato')
-      ? `oportunidade.${this.quoteIdentifier('nomeContato')}`
+    const nomeContatoExpr = schema.nomeContatoColumn
+      ? `oportunidade.${this.quoteIdentifier(schema.nomeContatoColumn)}`
       : 'NULL';
-    const emailContatoExpr = schema.columns.has('emailContato')
-      ? `oportunidade.${this.quoteIdentifier('emailContato')}`
+    const emailContatoExpr = schema.emailContatoColumn
+      ? `oportunidade.${this.quoteIdentifier(schema.emailContatoColumn)}`
       : 'NULL';
-    const telefoneContatoExpr = schema.columns.has('telefoneContato')
-      ? `oportunidade.${this.quoteIdentifier('telefoneContato')}`
+    const telefoneContatoExpr = schema.telefoneContatoColumn
+      ? `oportunidade.${this.quoteIdentifier(schema.telefoneContatoColumn)}`
       : 'NULL';
-    const empresaContatoExpr = schema.columns.has('empresaContato')
-      ? `oportunidade.${this.quoteIdentifier('empresaContato')}`
+    const empresaContatoExpr = schema.empresaContatoColumn
+      ? `oportunidade.${this.quoteIdentifier(schema.empresaContatoColumn)}`
       : 'NULL';
     const lifecycleStatusExpr = schema.lifecycleStatusColumn
       ? `oportunidade.${this.quoteIdentifier(schema.lifecycleStatusColumn)}`
@@ -2396,6 +2949,7 @@ export class OportunidadesService {
       .addSelect('cliente.nome', 'cliente__nome')
       .addSelect('cliente.email', 'cliente__email')
       .addSelect('cliente.telefone', 'cliente__telefone')
+      .addSelect(clienteEmpresaExpr, 'cliente__empresa')
       .where('oportunidade.empresa_id = :empresaId', { empresaId })
       .orderBy(updatedAtRef, 'DESC');
 
@@ -2456,65 +3010,93 @@ export class OportunidadesService {
     }
 
     const oportunidades = await queryBuilder.getRawMany();
+    const engagementPolicy = await this.getEngagementPolicy(empresaId);
+    const nextActivityByOpportunity = await this.loadNextPendingActivityByOportunidade(
+      empresaId,
+      oportunidades.map((item) => String(item.id)),
+      new Date(),
+      engagementPolicy.nextActionDueSoonDays,
+    );
 
-    return oportunidades.map((item) => ({
-      id: item.id,
-      empresa_id: item.empresa_id,
-      titulo: item.titulo,
-      descricao: item.descricao,
-      valor: Number(item.valor || 0),
-      probabilidade: Number(item.probabilidade || 0),
-      estagio: this.fromDatabaseEstagio(item.estagio),
-      prioridade: item.prioridade || 'medium',
-      origem: item.origem || 'website',
-      tags: this.parseSimpleArray(item.tags),
-      dataFechamentoEsperado: item.dataFechamentoEsperado ?? null,
-      dataFechamentoReal: item.dataFechamentoReal ?? null,
-      lifecycle_status: this.fromDatabaseLifecycleStatus(item.lifecycle_status, item.estagio),
-      archived_at: item.archived_at ?? null,
-      archived_by: item.archived_by ?? null,
-      deleted_at: item.deleted_at ?? null,
-      deleted_by: item.deleted_by ?? null,
-      reopened_at: item.reopened_at ?? null,
-      reopened_by: item.reopened_by ?? null,
-      responsavel_id: item.responsavel_id?.toString?.() ?? item.responsavel_id,
-      cliente_id: item.cliente_id,
-      responsavel: item.responsavel__id
-        ? {
-            id: item.responsavel__id,
-            nome: item.responsavel__nome,
-            email: item.responsavel__email,
-            avatar_url: item.responsavel__avatar_url,
-          }
-        : undefined,
-      cliente: item.cliente__id
-        ? {
-            id: item.cliente__id,
-            nome: item.cliente__nome,
-            email: item.cliente__email,
-            telefone: item.cliente__telefone,
-          }
-        : undefined,
-      nomeContato: item.nomeContato ?? undefined,
-      emailContato: item.emailContato ?? undefined,
-      telefoneContato: item.telefoneContato ?? undefined,
-      empresaContato: item.empresaContato ?? undefined,
-      proposta_principal_id: item.proposta_principal_id ?? null,
-      propostaPrincipal: item.proposta_principal__id
-        ? {
-            id: item.proposta_principal__id,
-            numero: item.proposta_principal__numero || '',
-            titulo: item.proposta_principal__titulo || '',
-            status: item.proposta_principal__status || 'rascunho',
-            sugerePerda: ['rejeitada', 'expirada'].includes(
-              String(item.proposta_principal__status || '').trim().toLowerCase(),
-            ),
-          }
-        : undefined,
-      atividades: [],
-      createdAt: item.createdAt,
-      updatedAt: item.updatedAt,
-    })) as unknown as Oportunidade[];
+    return oportunidades.map((item) => {
+      const estagio = this.fromDatabaseEstagio(item.estagio);
+      const lifecycleStatus = this.fromDatabaseLifecycleStatus(item.lifecycle_status, item.estagio);
+      const nextAction = nextActivityByOpportunity.get(String(item.id));
+
+      return {
+        id: item.id,
+        empresa_id: item.empresa_id,
+        titulo: item.titulo,
+        descricao: item.descricao,
+        valor: Number(item.valor || 0),
+        probabilidade: Number(item.probabilidade || 0),
+        estagio,
+        prioridade: item.prioridade || 'medium',
+        origem: item.origem || 'website',
+        tags: this.parseSimpleArray(item.tags),
+        dataFechamentoEsperado: item.dataFechamentoEsperado ?? null,
+        dataFechamentoReal: item.dataFechamentoReal ?? null,
+        lifecycle_status: lifecycleStatus,
+        archived_at: item.archived_at ?? null,
+        archived_by: item.archived_by ?? null,
+        deleted_at: item.deleted_at ?? null,
+        deleted_by: item.deleted_by ?? null,
+        reopened_at: item.reopened_at ?? null,
+        reopened_by: item.reopened_by ?? null,
+        responsavel_id: item.responsavel_id?.toString?.() ?? item.responsavel_id,
+        cliente_id: item.cliente_id,
+        responsavel: item.responsavel__id
+          ? {
+              id: item.responsavel__id,
+              nome: item.responsavel__nome,
+              email: item.responsavel__email,
+              avatar_url: item.responsavel__avatar_url,
+            }
+          : undefined,
+        cliente: item.cliente__id
+          ? {
+              id: item.cliente__id,
+              nome: item.cliente__nome,
+              email: item.cliente__email,
+              telefone: item.cliente__telefone,
+              empresa: item.cliente__empresa ?? undefined,
+            }
+          : undefined,
+        nomeContato: item.nomeContato ?? undefined,
+        emailContato: item.emailContato ?? undefined,
+        telefoneContato: item.telefoneContato ?? undefined,
+        empresaContato: item.empresaContato ?? undefined,
+        proposta_principal_id: item.proposta_principal_id ?? null,
+        propostaPrincipal: item.proposta_principal__id
+          ? {
+              id: item.proposta_principal__id,
+              numero: item.proposta_principal__numero || '',
+              titulo: item.proposta_principal__titulo || '',
+              status: item.proposta_principal__status || 'rascunho',
+              sugerePerda: ['rejeitada', 'expirada'].includes(
+                String(item.proposta_principal__status || '').trim().toLowerCase(),
+              ),
+            }
+          : undefined,
+        next_action_at: nextAction?.dataAtividade || null,
+        next_action_type: nextAction?.tipo || null,
+        next_action_description: nextAction?.descricao || null,
+        next_action_status: nextAction?.status || null,
+        next_action_days_delta: nextAction?.daysDelta ?? null,
+        engagement_signal: resolveOportunidadeEngagementSignal({
+          lifecycleStatus,
+          stage: estagio,
+          probabilidade: Number(item.probabilidade || 0),
+          expectedCloseDate: item.dataFechamentoEsperado ?? null,
+          nextActionStatus: nextAction?.status || null,
+          hotMinProbability: engagementPolicy.hotMinProbability,
+          hotCloseWindowDays: engagementPolicy.hotCloseWindowDays,
+        }),
+        atividades: [],
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+      };
+    }) as unknown as Oportunidade[];
   }
 
   async findOne(
@@ -2539,6 +3121,290 @@ export class OportunidadesService {
     }
 
     return oportunidade;
+  }
+
+  async listarVendedoresEnvolvidos(
+    oportunidadeId: string,
+    empresaId: string,
+  ): Promise<OportunidadeVendedorEnvolvidoPayload[]> {
+    const oportunidadeIdNormalizado = String(oportunidadeId || '').trim();
+    if (!oportunidadeIdNormalizado) {
+      throw new BadRequestException('Oportunidade invalida.');
+    }
+
+    await this.findOne(oportunidadeIdNormalizado, empresaId, { include_deleted: true });
+
+    if (!(await this.isVendedoresEnvolvidosTableAvailable())) {
+      return [];
+    }
+
+    const usersColumns = await this.getTableColumns('users');
+    const avatarExpr = usersColumns.has('avatar_url') ? 'u.avatar_url' : 'NULL::varchar';
+
+    const rows = (await this.oportunidadeRepository.query(
+      `
+        SELECT
+          ov.id,
+          ov.vendedor_id,
+          ov.papel,
+          ov.created_at,
+          u.nome AS vendedor_nome,
+          u.email AS vendedor_email,
+          ${avatarExpr} AS vendedor_avatar_url
+        FROM "oportunidade_vendedores_envolvidos" ov
+        LEFT JOIN "users" u
+          ON u.id = ov.vendedor_id
+         AND u.empresa_id = ov.empresa_id
+        WHERE ov.empresa_id = $1
+          AND ov.oportunidade_id = $2
+        ORDER BY ov.created_at ASC
+      `,
+      [empresaId, oportunidadeIdNormalizado],
+    )) as OportunidadeVendedorEnvolvidoRow[];
+
+    return rows.map((row) => this.mapOportunidadeVendedorEnvolvidoRow(row));
+  }
+
+  async adicionarVendedorEnvolvido(
+    oportunidadeId: string,
+    payload: AddOportunidadeVendedorEnvolvidoDto,
+    empresaId: string,
+    actorUserId?: string,
+  ): Promise<OportunidadeVendedorEnvolvidoPayload> {
+    const oportunidadeIdNormalizado = String(oportunidadeId || '').trim();
+    if (!oportunidadeIdNormalizado) {
+      throw new BadRequestException('Oportunidade invalida.');
+    }
+
+    await this.assertVendedoresEnvolvidosTableAvailable();
+
+    const oportunidade = await this.findOne(oportunidadeIdNormalizado, empresaId, {
+      include_deleted: true,
+    });
+    const lifecycleAtual = this.fromDatabaseLifecycleStatus(
+      (oportunidade as any).lifecycle_status,
+      oportunidade.estagio,
+    );
+
+    if (lifecycleAtual === LifecycleStatusOportunidade.DELETED) {
+      throw new BadRequestException(
+        'Nao e permitido incluir vendedor em oportunidade na lixeira. Restaure antes.',
+      );
+    }
+    if (lifecycleAtual === LifecycleStatusOportunidade.ARCHIVED) {
+      throw new BadRequestException(
+        'Nao e permitido incluir vendedor em oportunidade arquivada. Restaure antes.',
+      );
+    }
+
+    const vendedorId = String(payload?.vendedor_id || '').trim();
+    if (!vendedorId) {
+      throw new BadRequestException('Informe o vendedor para incluir na oportunidade.');
+    }
+
+    if (String(oportunidade.responsavel_id || '').trim() === vendedorId) {
+      throw new BadRequestException(
+        'Este usuario ja e o responsavel principal da oportunidade.',
+      );
+    }
+
+    const vendedor = await this.userRepository.findOne({
+      where: {
+        id: vendedorId,
+        empresa_id: empresaId,
+        ativo: true,
+      },
+      select: ['id'],
+    });
+
+    if (!vendedor) {
+      throw new BadRequestException(
+        'Vendedor informado nao pertence a empresa atual.',
+      );
+    }
+
+    const papel = this.normalizeVendedorEnvolvidoPapel(payload?.papel);
+    const actorUserIdNormalizado = String(actorUserId || '').trim() || null;
+
+    const rows = (await this.oportunidadeRepository.query(
+      `
+        INSERT INTO "oportunidade_vendedores_envolvidos" (
+          "empresa_id",
+          "oportunidade_id",
+          "vendedor_id",
+          "papel",
+          "criado_por"
+        )
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT ("empresa_id", "oportunidade_id", "vendedor_id")
+        DO UPDATE SET
+          "papel" = EXCLUDED."papel",
+          "updated_at" = now()
+        RETURNING
+          "id",
+          "vendedor_id",
+          "papel",
+          "created_at"
+      `,
+      [empresaId, oportunidadeIdNormalizado, vendedorId, papel, actorUserIdNormalizado],
+    )) as Array<{
+      id: string;
+      vendedor_id: string;
+      papel: string;
+      created_at: string | null;
+    }>;
+
+    const payloadBase = rows?.[0];
+    if (!payloadBase) {
+      throw new BadRequestException('Nao foi possivel salvar o vendedor envolvido.');
+    }
+
+    const usersColumns = await this.getTableColumns('users');
+    const avatarExpr = usersColumns.has('avatar_url') ? 'u.avatar_url' : 'NULL::varchar';
+    const enrichedRows = (await this.oportunidadeRepository.query(
+      `
+        SELECT
+          $1::uuid AS id,
+          u.id AS vendedor_id,
+          $2::varchar AS papel,
+          $3::timestamptz AS created_at,
+          u.nome AS vendedor_nome,
+          u.email AS vendedor_email,
+          ${avatarExpr} AS vendedor_avatar_url
+        FROM "users" u
+        WHERE u.id = $4
+          AND u.empresa_id = $5
+        LIMIT 1
+      `,
+      [payloadBase.id, payloadBase.papel, payloadBase.created_at, vendedorId, empresaId],
+    )) as OportunidadeVendedorEnvolvidoRow[];
+
+    const vinculo =
+      enrichedRows.length > 0
+        ? this.mapOportunidadeVendedorEnvolvidoRow(enrichedRows[0])
+        : {
+            id: String(payloadBase.id),
+            vendedorId,
+            nome: 'Usuario',
+            email: null,
+            avatarUrl: null,
+            papel,
+            createdAt: this.toIsoStringOrNull(payloadBase.created_at),
+          };
+
+    void this.notifyUserOnSellerLinked({
+      empresaId,
+      oportunidade,
+      vendedorId,
+      papel,
+      actorUserId,
+    });
+
+    const createdByUserId =
+      actorUserIdNormalizado || String(oportunidade.responsavel_id || '').trim() || undefined;
+    const papelLabel = this.normalizeVendedorEnvolvidoPapel(papel).replace(/_/g, ' ');
+    void this.createAtividade(
+      {
+        tipo: TipoAtividade.NOTA,
+        descricao: `Vendedor de apoio vinculado: ${vinculo.nome}. Papel: ${papelLabel}.`,
+        oportunidade_id: oportunidadeIdNormalizado,
+      },
+      {
+        userId: createdByUserId,
+        empresaId,
+      },
+    ).catch(() => undefined);
+
+    return vinculo;
+  }
+
+  async removerVendedorEnvolvido(
+    oportunidadeId: string,
+    vendedorId: string,
+    empresaId: string,
+    actorUserId?: string,
+  ): Promise<{ removed: true; vendedorId: string }> {
+    const oportunidadeIdNormalizado = String(oportunidadeId || '').trim();
+    if (!oportunidadeIdNormalizado) {
+      throw new BadRequestException('Oportunidade invalida.');
+    }
+
+    const vendedorIdNormalizado = String(vendedorId || '').trim();
+    if (!vendedorIdNormalizado) {
+      throw new BadRequestException('Vendedor invalido.');
+    }
+
+    await this.assertVendedoresEnvolvidosTableAvailable();
+
+    const oportunidade = await this.findOne(oportunidadeIdNormalizado, empresaId, {
+      include_deleted: true,
+    });
+    const lifecycleAtual = this.fromDatabaseLifecycleStatus(
+      (oportunidade as any).lifecycle_status,
+      oportunidade.estagio,
+    );
+
+    if (lifecycleAtual === LifecycleStatusOportunidade.DELETED) {
+      throw new BadRequestException(
+        'Nao e permitido remover vendedor em oportunidade na lixeira. Restaure antes.',
+      );
+    }
+    if (lifecycleAtual === LifecycleStatusOportunidade.ARCHIVED) {
+      throw new BadRequestException(
+        'Nao e permitido remover vendedor em oportunidade arquivada. Restaure antes.',
+      );
+    }
+
+    if (String(oportunidade.responsavel_id || '').trim() === vendedorIdNormalizado) {
+      throw new BadRequestException(
+        'Nao e permitido remover o responsavel principal neste fluxo.',
+      );
+    }
+
+    const rows = await this.oportunidadeRepository.query(
+      `
+        DELETE FROM "oportunidade_vendedores_envolvidos"
+        WHERE "empresa_id" = $1
+          AND "oportunidade_id" = $2
+          AND "vendedor_id" = $3
+        RETURNING "vendedor_id"
+      `,
+      [empresaId, oportunidadeIdNormalizado, vendedorIdNormalizado],
+    );
+
+    if (!rows?.[0]?.vendedor_id) {
+      throw new NotFoundException(
+        'Vendedor envolvido nao encontrado para esta oportunidade.',
+      );
+    }
+
+    const vendedor = await this.userRepository.findOne({
+      where: {
+        id: vendedorIdNormalizado,
+        empresa_id: empresaId,
+      },
+      select: ['id', 'nome'],
+    });
+    const vendedorNome = String(vendedor?.nome || 'Usuario').trim() || 'Usuario';
+    const actorUserIdNormalizado = String(actorUserId || '').trim();
+    const createdByUserId =
+      actorUserIdNormalizado || String(oportunidade.responsavel_id || '').trim() || undefined;
+    void this.createAtividade(
+      {
+        tipo: TipoAtividade.NOTA,
+        descricao: `Vendedor de apoio removido: ${vendedorNome}.`,
+        oportunidade_id: oportunidadeIdNormalizado,
+      },
+      {
+        userId: createdByUserId,
+        empresaId,
+      },
+    ).catch(() => undefined);
+
+    return {
+      removed: true,
+      vendedorId: vendedorIdNormalizado,
+    };
   }
 
   async update(
@@ -2642,8 +3508,34 @@ export class OportunidadesService {
       }
     }
 
-    if (updateOportunidadeDto.cliente_id !== undefined) {
-      updateData.cliente_id = updateOportunidadeDto.cliente_id ?? null;
+    const payloadHasClienteId = Object.prototype.hasOwnProperty.call(
+      updateOportunidadeDto,
+      'cliente_id',
+    );
+    const payloadHasNomeContato = Object.prototype.hasOwnProperty.call(
+      updateOportunidadeDto,
+      'nomeContato',
+    );
+    const currentClienteId = this.normalizeContactValue(
+      (oportunidade as any).cliente_id ?? oportunidade.cliente?.id,
+    );
+    const currentNomeContato = this.normalizeContactValue((oportunidade as any).nomeContato);
+    const nextClienteId = payloadHasClienteId
+      ? this.normalizeContactValue((updateOportunidadeDto as any).cliente_id)
+      : currentClienteId;
+    const nextNomeContato = payloadHasNomeContato
+      ? this.normalizeContactValue((updateOportunidadeDto as any).nomeContato)
+      : currentNomeContato;
+
+    if (payloadHasClienteId || payloadHasNomeContato) {
+      this.assertClienteOuContatoRule({
+        clienteId: nextClienteId,
+        nomeContato: nextNomeContato,
+      });
+    }
+
+    if (payloadHasClienteId) {
+      updateData.cliente_id = nextClienteId ?? null;
     }
 
     if (
@@ -2665,23 +3557,20 @@ export class OportunidadesService {
       updateData.tags =
         updateOportunidadeDto.tags.length > 0 ? updateOportunidadeDto.tags.join(',') : null;
     }
-    if (schema.columns.has('nomeContato') && updateOportunidadeDto.nomeContato !== undefined) {
-      updateData.nomeContato = updateOportunidadeDto.nomeContato;
+    if (schema.nomeContatoColumn && payloadHasNomeContato) {
+      updateData[schema.nomeContatoColumn] = nextNomeContato ?? null;
     }
-    if (schema.columns.has('emailContato') && updateOportunidadeDto.emailContato !== undefined) {
-      updateData.emailContato = updateOportunidadeDto.emailContato;
+    if (schema.emailContatoColumn && updateOportunidadeDto.emailContato !== undefined) {
+      updateData[schema.emailContatoColumn] =
+        this.normalizeEmail(updateOportunidadeDto.emailContato) ?? null;
     }
-    if (
-      schema.columns.has('telefoneContato') &&
-      updateOportunidadeDto.telefoneContato !== undefined
-    ) {
-      updateData.telefoneContato = updateOportunidadeDto.telefoneContato;
+    if (schema.telefoneContatoColumn && updateOportunidadeDto.telefoneContato !== undefined) {
+      updateData[schema.telefoneContatoColumn] =
+        this.normalizeContactValue(updateOportunidadeDto.telefoneContato) ?? null;
     }
-    if (
-      schema.columns.has('empresaContato') &&
-      updateOportunidadeDto.empresaContato !== undefined
-    ) {
-      updateData.empresaContato = updateOportunidadeDto.empresaContato;
+    if (schema.empresaContatoColumn && updateOportunidadeDto.empresaContato !== undefined) {
+      updateData[schema.empresaContatoColumn] =
+        this.normalizeContactValue(updateOportunidadeDto.empresaContato) ?? null;
     }
 
     if (Object.keys(updateData).length > 0) {
@@ -3084,6 +3973,147 @@ export class OportunidadesService {
     return this.getSalesFeatureFlags(input.empresaId);
   }
 
+  private getDefaultEngagementHotMinProbability(): number {
+    return normalizeEngagementProbability(
+      process.env.OPORTUNIDADES_ENGAGEMENT_HOT_MIN_PROBABILITY,
+      ENGAGEMENT_HOT_MIN_PROBABILITY_DEFAULT,
+    );
+  }
+
+  private getDefaultEngagementHotCloseWindowDays(): number {
+    return normalizeEngagementDays(
+      process.env.OPORTUNIDADES_ENGAGEMENT_HOT_CLOSE_WINDOW_DAYS,
+      ENGAGEMENT_HOT_CLOSE_WINDOW_DEFAULT_DAYS,
+      ENGAGEMENT_HOT_CLOSE_WINDOW_MIN_DAYS,
+      ENGAGEMENT_HOT_CLOSE_WINDOW_MAX_DAYS,
+    );
+  }
+
+  private getDefaultEngagementNextActionDueSoonDays(): number {
+    return normalizeEngagementDays(
+      process.env.OPORTUNIDADES_ENGAGEMENT_NEXT_ACTION_DUE_SOON_DAYS,
+      ENGAGEMENT_NEXT_ACTION_DUE_SOON_DEFAULT_DAYS,
+      ENGAGEMENT_NEXT_ACTION_DUE_SOON_MIN_DAYS,
+      ENGAGEMENT_NEXT_ACTION_DUE_SOON_MAX_DAYS,
+    );
+  }
+
+  async getEngagementPolicy(empresaId: string): Promise<EngagementPolicyDecision> {
+    const defaultHotMinProbability = this.getDefaultEngagementHotMinProbability();
+    const defaultHotCloseWindowDays = this.getDefaultEngagementHotCloseWindowDays();
+    const defaultNextActionDueSoonDays = this.getDefaultEngagementNextActionDueSoonDays();
+
+    const configs = await this.resolveTenantFlagConfigs(empresaId, [
+      OPORTUNIDADES_ENGAGEMENT_HOT_PROBABILITY_FLAG_KEY,
+      OPORTUNIDADES_ENGAGEMENT_HOT_CLOSE_WINDOW_FLAG_KEY,
+      OPORTUNIDADES_ENGAGEMENT_NEXT_ACTION_SOON_FLAG_KEY,
+    ]);
+    const hotProbabilityFlag =
+      configs.get(OPORTUNIDADES_ENGAGEMENT_HOT_PROBABILITY_FLAG_KEY) ||
+      this.buildDefaultTenantFlagConfig();
+    const hotCloseWindowFlag =
+      configs.get(OPORTUNIDADES_ENGAGEMENT_HOT_CLOSE_WINDOW_FLAG_KEY) ||
+      this.buildDefaultTenantFlagConfig();
+    const nextActionSoonFlag =
+      configs.get(OPORTUNIDADES_ENGAGEMENT_NEXT_ACTION_SOON_FLAG_KEY) ||
+      this.buildDefaultTenantFlagConfig();
+
+    return {
+      hotMinProbability:
+        hotProbabilityFlag.source === 'tenant'
+          ? normalizeEngagementProbability(hotProbabilityFlag.numericValue, defaultHotMinProbability)
+          : defaultHotMinProbability,
+      hotMinProbabilitySource: hotProbabilityFlag.source,
+      hotCloseWindowDays:
+        hotCloseWindowFlag.source === 'tenant'
+          ? normalizeEngagementDays(
+              hotCloseWindowFlag.numericValue,
+              defaultHotCloseWindowDays,
+              ENGAGEMENT_HOT_CLOSE_WINDOW_MIN_DAYS,
+              ENGAGEMENT_HOT_CLOSE_WINDOW_MAX_DAYS,
+            )
+          : defaultHotCloseWindowDays,
+      hotCloseWindowSource: hotCloseWindowFlag.source,
+      nextActionDueSoonDays:
+        nextActionSoonFlag.source === 'tenant'
+          ? normalizeEngagementDays(
+              nextActionSoonFlag.numericValue,
+              defaultNextActionDueSoonDays,
+              ENGAGEMENT_NEXT_ACTION_DUE_SOON_MIN_DAYS,
+              ENGAGEMENT_NEXT_ACTION_DUE_SOON_MAX_DAYS,
+            )
+          : defaultNextActionDueSoonDays,
+      nextActionDueSoonSource: nextActionSoonFlag.source,
+    };
+  }
+
+  async setEngagementPolicy(input: {
+    empresaId: string;
+    hotMinProbability?: number;
+    hotCloseWindowDays?: number;
+    nextActionDueSoonDays?: number;
+    updatedBy?: string | null;
+  }): Promise<EngagementPolicyDecision> {
+    if (!(await this.isFeatureFlagsTableAvailable())) {
+      throw new BadRequestException(
+        'Tabela de feature flags indisponivel. Execute as migrations antes de configurar a politica de aquecimento.',
+      );
+    }
+
+    const currentPolicy = await this.getEngagementPolicy(input.empresaId);
+    const hotMinProbability = normalizeEngagementProbability(
+      input.hotMinProbability,
+      currentPolicy.hotMinProbability,
+    );
+    const hotCloseWindowDays = normalizeEngagementDays(
+      input.hotCloseWindowDays,
+      currentPolicy.hotCloseWindowDays,
+      ENGAGEMENT_HOT_CLOSE_WINDOW_MIN_DAYS,
+      ENGAGEMENT_HOT_CLOSE_WINDOW_MAX_DAYS,
+    );
+    const nextActionDueSoonDays = normalizeEngagementDays(
+      input.nextActionDueSoonDays,
+      currentPolicy.nextActionDueSoonDays,
+      ENGAGEMENT_NEXT_ACTION_DUE_SOON_MIN_DAYS,
+      ENGAGEMENT_NEXT_ACTION_DUE_SOON_MAX_DAYS,
+    );
+
+    try {
+      await Promise.all([
+        this.upsertTenantFlagConfig({
+          empresaId: input.empresaId,
+          flagKey: OPORTUNIDADES_ENGAGEMENT_HOT_PROBABILITY_FLAG_KEY,
+          enabled: true,
+          numericValue: hotMinProbability,
+          updatedBy: input.updatedBy || null,
+        }),
+        this.upsertTenantFlagConfig({
+          empresaId: input.empresaId,
+          flagKey: OPORTUNIDADES_ENGAGEMENT_HOT_CLOSE_WINDOW_FLAG_KEY,
+          enabled: true,
+          numericValue: hotCloseWindowDays,
+          updatedBy: input.updatedBy || null,
+        }),
+        this.upsertTenantFlagConfig({
+          empresaId: input.empresaId,
+          flagKey: OPORTUNIDADES_ENGAGEMENT_NEXT_ACTION_SOON_FLAG_KEY,
+          enabled: true,
+          numericValue: nextActionDueSoonDays,
+          updatedBy: input.updatedBy || null,
+        }),
+      ]);
+    } catch (error) {
+      if (this.isFeatureFlagTimeoutError(error)) {
+        throw new ServiceUnavailableException(
+          'Nao foi possivel salvar a politica de aquecimento agora. Tente novamente em instantes.',
+        );
+      }
+      throw error;
+    }
+
+    return this.getEngagementPolicy(input.empresaId);
+  }
+
   private getDefaultStalePolicyEnabled(): boolean {
     return this.parseBooleanFlag(process.env.OPORTUNIDADES_STALE_POLICY_ENABLED);
   }
@@ -3430,6 +4460,82 @@ export class OportunidadesService {
       if (parsed) {
         results.set(row.oportunidade_id, parsed);
       }
+    });
+
+    return results;
+  }
+
+  private async loadNextPendingActivityByOportunidade(
+    empresaId: string,
+    oportunidadeIds: string[],
+    referenceDate: Date = new Date(),
+    dueSoonDays: number = ENGAGEMENT_NEXT_ACTION_DUE_SOON_DEFAULT_DAYS,
+  ): Promise<Map<string, NextPendingActivitySnapshot>> {
+    const results = new Map<string, NextPendingActivitySnapshot>();
+    if (!oportunidadeIds.length) {
+      return results;
+    }
+
+    const atividadeSchema = await this.resolveAtividadesSchema();
+    const dateRef = `atividade.${this.quoteIdentifier(atividadeSchema.dateColumn)}`;
+    const statusRef = atividadeSchema.statusColumn
+      ? `LOWER(COALESCE(atividade.${this.quoteIdentifier(atividadeSchema.statusColumn)}::text, '${StatusAtividade.PENDENTE}'))`
+      : atividadeSchema.legacyCompletedColumn
+        ? `CASE WHEN COALESCE(atividade.${this.quoteIdentifier(atividadeSchema.legacyCompletedColumn)}, FALSE) THEN '${StatusAtividade.CONCLUIDA}' ELSE '${StatusAtividade.PENDENTE}' END`
+        : `'${StatusAtividade.PENDENTE}'`;
+
+    const rows = await this.atividadeRepository.query(
+      `
+        WITH ranked AS (
+          SELECT
+            atividade.id::text AS id,
+            atividade.oportunidade_id::text AS oportunidade_id,
+            atividade.tipo::text AS tipo,
+            atividade.descricao::text AS descricao,
+            ${dateRef} AS data_atividade,
+            ROW_NUMBER() OVER (
+              PARTITION BY atividade.oportunidade_id
+              ORDER BY ${dateRef} ASC, atividade.id ASC
+            ) AS rn
+          FROM "atividades" atividade
+          WHERE atividade.empresa_id = $1
+            AND atividade.oportunidade_id::text = ANY($2::text[])
+            AND COALESCE(atividade.tipo::text, '') <> '${TipoAtividade.NOTA}'
+            AND ${dateRef} IS NOT NULL
+            AND ${statusRef} <> '${StatusAtividade.CONCLUIDA}'
+        )
+        SELECT
+          id,
+          oportunidade_id,
+          tipo,
+          descricao,
+          data_atividade
+        FROM ranked
+        WHERE rn = 1
+      `,
+      [empresaId, oportunidadeIds],
+    );
+
+    rows.forEach((row: any) => {
+      const oportunidadeId = String(row?.oportunidade_id || '').trim();
+      if (!oportunidadeId) return;
+
+      const dataAtividade = this.parseDateValue(row?.data_atividade);
+      if (!dataAtividade) return;
+
+      const daysDelta = calculateSignedDateDeltaInDays(dataAtividade, referenceDate);
+      const status: OportunidadeNextActionStatus =
+        daysDelta < 0 ? 'overdue' : daysDelta <= dueSoonDays ? 'due_soon' : 'future';
+
+      results.set(oportunidadeId, {
+        id: String(row?.id || ''),
+        oportunidadeId,
+        tipo: (String(row?.tipo || '').toLowerCase() || TipoAtividade.TAREFA) as TipoAtividade,
+        descricao: String(row?.descricao || '').trim(),
+        dataAtividade: dataAtividade.toISOString(),
+        status,
+        daysDelta,
+      });
     });
 
     return results;
@@ -4299,11 +5405,12 @@ export class OportunidadesService {
       );
     }
 
+    const responsavelSolicitadoId = this.normalizeText(createAtividadeDto.responsavel_id);
     let responsavelAtividadeId: string | null = null;
-    if (atividadeSchema.responsavelColumn && createAtividadeDto.responsavel_id) {
+    if (responsavelSolicitadoId) {
       const responsavel = await this.userRepository.findOne({
         where: {
-          id: createAtividadeDto.responsavel_id,
+          id: responsavelSolicitadoId,
           empresa_id: context.empresaId,
         },
         select: ['id'],
@@ -4343,6 +5450,10 @@ export class OportunidadesService {
     if (atividadeSchema.responsavelColumn) {
       columns.push(atividadeSchema.responsavelColumn);
       values.push(responsavelAtividadeId);
+    } else if (responsavelAtividadeId) {
+      this.logger.warn(
+        `Atividade ${oportunidade.id}: responsavel informado (${responsavelAtividadeId}), mas coluna responsavel_id nao existe no schema atual.`,
+      );
     }
 
     if (atividadeSchema.titleColumn) {
@@ -4403,7 +5514,7 @@ export class OportunidadesService {
       resultadoConclusao: atividade.resultado_conclusao ?? null,
       oportunidade_id: atividade.oportunidade_id,
       criado_por_id: atividade.criado_por_id,
-      responsavel_id: atividade.responsavel_id,
+      responsavel_id: atividade.responsavel_id ?? responsavelAtividadeId,
       concluido_por: atividade.concluido_por ?? null,
       concluidoEm: atividade.concluido_em ?? null,
       dataAtividade: atividade.dataAtividade,
@@ -4553,6 +5664,416 @@ export class OportunidadesService {
           }
         : undefined,
     })) as Atividade[];
+  }
+
+  async listarAtividadesPainelComercial(
+    empresaId: string,
+    options?: {
+      periodStart?: string;
+      periodEnd?: string;
+      vendedorId?: string;
+      onlyMine?: boolean | string;
+      status?: string;
+      tipo?: string;
+      busca?: string;
+      limit?: number;
+      includeClosed?: boolean | string;
+      includeArchived?: boolean | string;
+    },
+    context?: {
+      actorUserId?: string;
+      userRole?: UserRole | string | null;
+    },
+  ): Promise<OportunidadeAtividadesPainelResult> {
+    const atividadeSchema = await this.resolveAtividadesSchema();
+    const oportunidadeSchema = await this.resolveOportunidadesSchema();
+    const usersColumns = await this.getTableColumns('users');
+    const range = this.resolveActivitiesRange(options?.periodStart, options?.periodEnd);
+
+    const actorUserId = this.normalizeText(context?.actorUserId);
+    const actorCanViewTeam = canBypassOportunidadeStageTransitionByRole(context?.userRole);
+    const requestedOnlyMine =
+      options?.onlyMine === undefined ? true : this.parseBooleanFlag(options?.onlyMine);
+    const onlyMine = actorCanViewTeam ? requestedOnlyMine : true;
+    const requestedVendedorId = this.normalizeText(options?.vendedorId);
+    const vendedorId = onlyMine ? actorUserId : requestedVendedorId;
+
+    if (onlyMine && !vendedorId) {
+      throw new ForbiddenException('Nao foi possivel identificar o usuario da sessao.');
+    }
+
+    const statusFilter = this.normalizeAtividadesPainelStatusFilter(options?.status);
+    const tipoFilterRaw = this.normalizeText(options?.tipo)?.toLowerCase();
+    const tipoFilter = Object.values(TipoAtividade).includes(tipoFilterRaw as TipoAtividade)
+      ? (tipoFilterRaw as TipoAtividade)
+      : undefined;
+    const busca = this.normalizeText(options?.busca);
+    const includeClosed =
+      options?.includeClosed === undefined ? true : this.parseBooleanFlag(options?.includeClosed);
+    const includeArchived =
+      options?.includeArchived === undefined
+        ? false
+        : this.parseBooleanFlag(options?.includeArchived);
+    const parsedLimit = Number(options?.limit ?? 180);
+    const limit = Number.isFinite(parsedLimit)
+      ? Math.min(Math.max(Math.floor(parsedLimit), 1), 500)
+      : 180;
+
+    const userRef = `atividade.${this.quoteIdentifier(atividadeSchema.userColumn)}`;
+    const responsavelRef = atividadeSchema.responsavelColumn
+      ? `atividade.${this.quoteIdentifier(atividadeSchema.responsavelColumn)}`
+      : null;
+    const completedByRef = atividadeSchema.completedByColumn
+      ? `atividade.${this.quoteIdentifier(atividadeSchema.completedByColumn)}`
+      : null;
+    const legacyCompletedRef = atividadeSchema.legacyCompletedColumn
+      ? `atividade.${this.quoteIdentifier(atividadeSchema.legacyCompletedColumn)}`
+      : null;
+    const statusRef = atividadeSchema.statusColumn
+      ? `atividade.${this.quoteIdentifier(atividadeSchema.statusColumn)}`
+      : legacyCompletedRef
+        ? `CASE WHEN COALESCE(${legacyCompletedRef}, FALSE) THEN '${StatusAtividade.CONCLUIDA}' ELSE '${StatusAtividade.PENDENTE}' END`
+        : `'${StatusAtividade.PENDENTE}'`;
+    const statusRefNormalized = `LOWER(COALESCE((${statusRef})::text, '${StatusAtividade.PENDENTE}'))`;
+    const completionResultRef = atividadeSchema.completionResultColumn
+      ? `atividade.${this.quoteIdentifier(atividadeSchema.completionResultColumn)}`
+      : legacyCompletedRef
+        ? `CASE WHEN ${legacyCompletedRef} THEN 'Concluida sem observacoes.' ELSE NULL::text END`
+        : atividadeSchema.statusColumn
+          ? `CASE WHEN atividade.${this.quoteIdentifier(atividadeSchema.statusColumn)} = '${StatusAtividade.CONCLUIDA}' THEN 'Concluida sem observacoes.' ELSE NULL::text END`
+          : 'NULL::text';
+    const completedAtRef = atividadeSchema.completedAtColumn
+      ? `atividade.${this.quoteIdentifier(atividadeSchema.completedAtColumn)}`
+      : 'NULL::timestamptz';
+    const dateRef = `atividade.${this.quoteIdentifier(atividadeSchema.dateColumn)}`;
+    const createdAtRef = `atividade.${this.quoteIdentifier(atividadeSchema.createdAtColumn)}`;
+    const assignedOwnerRefText = responsavelRef
+      ? `COALESCE(${responsavelRef}::text, ${userRef}::text)`
+      : `${userRef}::text`;
+    const lifecycleRef = oportunidadeSchema.lifecycleStatusColumn
+      ? `oportunidade.${this.quoteIdentifier(oportunidadeSchema.lifecycleStatusColumn)}`
+      : this.buildLifecycleFromStageExpression('oportunidade.estagio');
+    const createdAvatarExpr = usersColumns.has('avatar_url') ? 'criado_por_user.avatar_url' : 'NULL';
+    const responsavelAvatarExpr = usersColumns.has('avatar_url') ? 'responsavel.avatar_url' : 'NULL';
+    const concluidoPorAvatarExpr = usersColumns.has('avatar_url')
+      ? 'concluido_por_user.avatar_url'
+      : 'NULL';
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(todayStart);
+    todayEnd.setHours(23, 59, 59, 999);
+    const weekEnd = new Date(todayStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+
+    const isPendingExpr = `${statusRefNormalized} = '${StatusAtividade.PENDENTE}'`;
+    const isCompletedExpr = `${statusRefNormalized} = '${StatusAtividade.CONCLUIDA}'`;
+    const isOverdueExpr = `(${isPendingExpr} AND ${dateRef} < :todayStart)`;
+    const isDueTodayExpr = `(${isPendingExpr} AND ${dateRef} BETWEEN :todayStart AND :todayEnd)`;
+    const isDueWeekExpr = `(${isPendingExpr} AND ${dateRef} BETWEEN :todayStart AND :weekEnd)`;
+    const ownerSearchExpr = responsavelRef
+      ? "COALESCE(responsavel.nome, criado_por_user.nome, '')"
+      : "COALESCE(criado_por_user.nome, '')";
+
+    const applyFilters = (
+      query: ReturnType<Repository<Atividade>['createQueryBuilder']>,
+      includeStatusFilter: boolean,
+    ) => {
+      query
+        .where('atividade.empresa_id = :empresaId', { empresaId })
+        .andWhere('oportunidade.id IS NOT NULL')
+        .andWhere(`${dateRef} BETWEEN :periodStart AND :periodEnd`, {
+          periodStart: range.start.toISOString(),
+          periodEnd: range.end.toISOString(),
+        })
+        .andWhere(`${lifecycleRef}::text <> :deletedLifecycle`, {
+          deletedLifecycle: LifecycleStatusOportunidade.DELETED,
+        })
+        .setParameters({
+          todayStart: todayStart.toISOString(),
+          todayEnd: todayEnd.toISOString(),
+          weekEnd: weekEnd.toISOString(),
+        });
+
+      if (!includeClosed) {
+        query.andWhere(`${lifecycleRef}::text = :openLifecycle`, {
+          openLifecycle: LifecycleStatusOportunidade.OPEN,
+        });
+      }
+
+      if (!includeArchived) {
+        query.andWhere(`${lifecycleRef}::text <> :archivedLifecycle`, {
+          archivedLifecycle: LifecycleStatusOportunidade.ARCHIVED,
+        });
+      }
+
+      if (vendedorId) {
+        query.andWhere(`${assignedOwnerRefText} = :vendedorId`, { vendedorId });
+      }
+
+      if (tipoFilter) {
+        query.andWhere('atividade.tipo = :tipoFilter', { tipoFilter });
+      }
+
+      if (busca) {
+        query.andWhere(
+          `(atividade.descricao ILIKE :busca OR oportunidade.titulo ILIKE :busca OR ${ownerSearchExpr} ILIKE :busca)`,
+          {
+            busca: `%${busca}%`,
+          },
+        );
+      }
+
+      if (includeStatusFilter) {
+        switch (statusFilter) {
+          case 'pending':
+            query.andWhere(isPendingExpr);
+            break;
+          case 'completed':
+            query.andWhere(isCompletedExpr);
+            break;
+          case 'overdue':
+            query.andWhere(isOverdueExpr);
+            break;
+          case 'due_today':
+            query.andWhere(isDueTodayExpr);
+            break;
+          case 'due_week':
+            query.andWhere(isDueWeekExpr);
+            break;
+          default:
+            break;
+        }
+      }
+
+      return query;
+    };
+
+    const summaryQuery = this.atividadeRepository
+      .createQueryBuilder('atividade')
+      .leftJoin(
+        'oportunidades',
+        'oportunidade',
+        'oportunidade.id::text = atividade.oportunidade_id::text AND oportunidade.empresa_id = atividade.empresa_id',
+      )
+      .leftJoin('users', 'criado_por_user', `criado_por_user.id = ${userRef}`)
+      .select('COUNT(*)::int', 'total')
+      .addSelect(`SUM(CASE WHEN ${isPendingExpr} THEN 1 ELSE 0 END)::int`, 'pending')
+      .addSelect(`SUM(CASE WHEN ${isCompletedExpr} THEN 1 ELSE 0 END)::int`, 'completed')
+      .addSelect(`SUM(CASE WHEN ${isOverdueExpr} THEN 1 ELSE 0 END)::int`, 'overdue')
+      .addSelect(`SUM(CASE WHEN ${isDueTodayExpr} THEN 1 ELSE 0 END)::int`, 'due_today')
+      .addSelect(`SUM(CASE WHEN ${isDueWeekExpr} THEN 1 ELSE 0 END)::int`, 'due_week');
+
+    if (responsavelRef) {
+      summaryQuery.leftJoin('users', 'responsavel', `responsavel.id = ${responsavelRef}`);
+    }
+
+    applyFilters(summaryQuery, false);
+
+    const itemsQuery = this.atividadeRepository
+      .createQueryBuilder('atividade')
+      .leftJoin(
+        'oportunidades',
+        'oportunidade',
+        'oportunidade.id::text = atividade.oportunidade_id::text AND oportunidade.empresa_id = atividade.empresa_id',
+      )
+      .leftJoin('users', 'criado_por_user', `criado_por_user.id = ${userRef}`)
+      .select('atividade.id', 'id')
+      .addSelect('atividade.tipo', 'tipo')
+      .addSelect('atividade.descricao', 'descricao')
+      .addSelect(statusRef, 'status')
+      .addSelect(completionResultRef, 'resultado_conclusao')
+      .addSelect(completedAtRef, 'concluido_em')
+      .addSelect(dateRef, 'data_atividade')
+      .addSelect(createdAtRef, 'created_at')
+      .addSelect('oportunidade.id', 'oportunidade_id')
+      .addSelect('oportunidade.titulo', 'oportunidade_titulo')
+      .addSelect('oportunidade.estagio', 'oportunidade_estagio')
+      .addSelect(lifecycleRef, 'oportunidade_lifecycle_status')
+      .addSelect('oportunidade.valor', 'oportunidade_valor')
+      .addSelect('oportunidade.probabilidade', 'oportunidade_probabilidade')
+      .addSelect('criado_por_user.id', 'criado_por_id')
+      .addSelect('criado_por_user.nome', 'criado_por_nome')
+      .addSelect(createdAvatarExpr, 'criado_por_avatar_url');
+
+    if (responsavelRef) {
+      itemsQuery
+        .leftJoin('users', 'responsavel', `responsavel.id = ${responsavelRef}`)
+        .addSelect('responsavel.id', 'responsavel_id')
+        .addSelect('responsavel.nome', 'responsavel_nome')
+        .addSelect(responsavelAvatarExpr, 'responsavel_avatar_url');
+    } else {
+      itemsQuery
+        .addSelect('NULL::uuid', 'responsavel_id')
+        .addSelect('NULL', 'responsavel_nome')
+        .addSelect('NULL', 'responsavel_avatar_url');
+    }
+
+    if (completedByRef) {
+      itemsQuery
+        .leftJoin('users', 'concluido_por_user', `concluido_por_user.id = ${completedByRef}`)
+        .addSelect('concluido_por_user.id', 'concluido_por_id')
+        .addSelect('concluido_por_user.nome', 'concluido_por_nome')
+        .addSelect(concluidoPorAvatarExpr, 'concluido_por_avatar_url');
+    } else {
+      itemsQuery
+        .addSelect('NULL::uuid', 'concluido_por_id')
+        .addSelect('NULL', 'concluido_por_nome')
+        .addSelect('NULL', 'concluido_por_avatar_url');
+    }
+
+    applyFilters(itemsQuery, true);
+
+    const [summaryRow, rows] = await Promise.all([
+      summaryQuery.getRawOne<{
+        total?: string;
+        pending?: string;
+        completed?: string;
+        overdue?: string;
+        due_today?: string;
+        due_week?: string;
+      }>(),
+      itemsQuery
+        .orderBy(dateRef, 'DESC')
+        .addOrderBy('atividade.id', 'DESC')
+        .limit(limit)
+        .getRawMany<{
+          id?: string;
+          tipo?: string;
+          descricao?: string;
+          status?: string;
+          resultado_conclusao?: string | null;
+          concluido_em?: string | Date | null;
+          data_atividade?: string | Date | null;
+          created_at?: string | Date | null;
+          oportunidade_id?: string;
+          oportunidade_titulo?: string;
+          oportunidade_estagio?: string;
+          oportunidade_lifecycle_status?: string | null;
+          oportunidade_valor?: string | number;
+          oportunidade_probabilidade?: string | number;
+          criado_por_id?: string | null;
+          criado_por_nome?: string | null;
+          criado_por_avatar_url?: string | null;
+          responsavel_id?: string | null;
+          responsavel_nome?: string | null;
+          responsavel_avatar_url?: string | null;
+          concluido_por_id?: string | null;
+          concluido_por_nome?: string | null;
+          concluido_por_avatar_url?: string | null;
+        }>(),
+    ]);
+
+    const referenceToday = new Date();
+    referenceToday.setHours(0, 0, 0, 0);
+
+    const items = rows.map((row) => {
+      const dataAtividade = this.parseDateValue(row.data_atividade);
+      const createdAt = this.parseDateValue(row.created_at);
+      const concluidoEm = this.parseDateValue(row.concluido_em);
+      const estagio = this.fromDatabaseEstagio(
+        row.oportunidade_estagio || EstagioOportunidade.LEADS,
+      );
+      const lifecycleStatus = this.fromDatabaseLifecycleStatus(
+        row.oportunidade_lifecycle_status || undefined,
+        row.oportunidade_estagio || undefined,
+      );
+      const status =
+        String(row.status || StatusAtividade.PENDENTE).trim().toLowerCase() ===
+        StatusAtividade.CONCLUIDA
+          ? StatusAtividade.CONCLUIDA
+          : StatusAtividade.PENDENTE;
+
+      let daysDelta: number | null = null;
+      if (dataAtividade) {
+        const atividadeDate = new Date(dataAtividade);
+        atividadeDate.setHours(0, 0, 0, 0);
+        daysDelta = Math.round(
+          (atividadeDate.getTime() - referenceToday.getTime()) / (24 * 60 * 60 * 1000),
+        );
+      }
+
+      const overdue = status === StatusAtividade.PENDENTE && (daysDelta ?? 0) < 0;
+      const dueToday = status === StatusAtividade.PENDENTE && (daysDelta ?? 0) === 0;
+      const dueWeek =
+        status === StatusAtividade.PENDENTE &&
+        daysDelta !== null &&
+        daysDelta >= 0 &&
+        daysDelta <= 6;
+
+      return {
+        id: String(row.id || ''),
+        tipo: (row.tipo || TipoAtividade.NOTA) as TipoAtividade,
+        descricao: row.descricao || '',
+        status,
+        resultadoConclusao: row.resultado_conclusao || null,
+        dataAtividade: this.toIsoStringOrNull(dataAtividade),
+        createdAt: this.toIsoStringOrNull(createdAt),
+        concluidoEm: this.toIsoStringOrNull(concluidoEm),
+        flags: {
+          overdue,
+          dueToday,
+          dueWeek,
+          daysDelta,
+        },
+        oportunidade: {
+          id: String(row.oportunidade_id || ''),
+          titulo: String(row.oportunidade_titulo || 'Oportunidade'),
+          estagio,
+          lifecycleStatus,
+          valor: Number(row.oportunidade_valor || 0),
+          probabilidade: Number(row.oportunidade_probabilidade || 0),
+        },
+        criadoPor: row.criado_por_id
+          ? {
+              id: row.criado_por_id,
+              nome: row.criado_por_nome || 'Usuario removido',
+              avatarUrl: row.criado_por_avatar_url || null,
+            }
+          : undefined,
+        responsavel: row.responsavel_id
+          ? {
+              id: row.responsavel_id,
+              nome: row.responsavel_nome || 'Usuario removido',
+              avatarUrl: row.responsavel_avatar_url || null,
+            }
+          : undefined,
+        concluidoPor: row.concluido_por_id
+          ? {
+              id: row.concluido_por_id,
+              nome: row.concluido_por_nome || 'Usuario removido',
+              avatarUrl: row.concluido_por_avatar_url || null,
+            }
+          : undefined,
+      } satisfies OportunidadeAtividadesPainelItem;
+    });
+
+    return {
+      generatedAt: new Date().toISOString(),
+      range: {
+        periodStart: range.start.toISOString(),
+        periodEnd: range.end.toISOString(),
+      },
+      filters: {
+        vendedorId: vendedorId || undefined,
+        onlyMine,
+        status: statusFilter,
+        tipo: tipoFilter,
+        busca: busca || undefined,
+        includeClosed,
+        includeArchived,
+      },
+      resumo: {
+        total: Number(summaryRow?.total || 0),
+        pending: Number(summaryRow?.pending || 0),
+        completed: Number(summaryRow?.completed || 0),
+        overdue: Number(summaryRow?.overdue || 0),
+        dueToday: Number(summaryRow?.due_today || 0),
+        dueWeek: Number(summaryRow?.due_week || 0),
+      },
+      items,
+    };
   }
 
   async concluirAtividade(

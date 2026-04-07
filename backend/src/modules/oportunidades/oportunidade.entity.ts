@@ -10,7 +10,7 @@ import {
 } from 'typeorm';
 import { User } from '../users/user.entity';
 import { Cliente } from '../clientes/cliente.entity';
-import { Atividade } from './atividade.entity';
+import { Atividade, TipoAtividade } from './atividade.entity';
 import { OportunidadeStageEvent } from './oportunidade-stage-event.entity';
 import { Empresa } from '../../empresas/entities/empresa.entity';
 
@@ -200,4 +200,10 @@ export class Oportunidade {
   stale_days?: number;
   last_interaction_at?: Date | string | null;
   stale_since?: Date | string | null;
+  next_action_at?: Date | string | null;
+  next_action_type?: TipoAtividade | string | null;
+  next_action_description?: string | null;
+  next_action_status?: 'overdue' | 'due_soon' | 'future' | null;
+  next_action_days_delta?: number | null;
+  engagement_signal?: 'hot' | 'watch' | 'normal';
 }
