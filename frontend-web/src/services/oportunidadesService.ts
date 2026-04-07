@@ -9,6 +9,7 @@ import {
   EstatisticasOportunidades,
   DadosKanban,
   EstagioOportunidade,
+  TipoAtividade,
   LifecycleFeatureFlagDecision,
   SalesFeatureFlagsDecision,
   UpdateSalesFeatureFlagsPayload,
@@ -16,12 +17,19 @@ import {
   LifecycleViewOportunidade,
   OportunidadeHistoricoEstagioItem,
   OportunidadeAtividadeResumo,
+  OportunidadeAtividadesPainelResult,
+  OportunidadeAtividadesPainelStatusFilter,
+  OportunidadeVendedorEnvolvido,
   StaleDealsResult,
   StalePolicyDecision,
+  EngagementPolicyDecision,
+  UpdateEngagementPolicyPayload,
 } from '../types/oportunidades/index';
 
 class OportunidadesService {
   private readonly basePath = '/oportunidades';
+  private readonly clienteOuContatoRuleMessage =
+    'Informe um cliente (cliente_id) ou pelo menos o nome do contato (nomeContato).';
 
   private getUrl(path: string = ''): string {
     return `${this.basePath}${path}`;
@@ -72,6 +80,9 @@ class OportunidadesService {
     data: Partial<Omit<NovaOportunidade, 'dataFechamentoEsperado'>> & {
       dataFechamentoEsperado?: string | null;
     },
+    options?: {
+      requireClienteOuContato?: boolean;
+    },
   ) {
     const cleanedResponsavel = this.sanitizeString(data.responsavel_id);
 
@@ -79,6 +90,17 @@ class OportunidadesService {
       throw new Error(
         'Não foi possível identificar o responsável pela oportunidade. Recarregue a página e tente novamente.',
       );
+    }
+
+    const cleanedClienteId = this.sanitizeString(data.cliente_id);
+    const cleanedNomeContato = this.sanitizeString(data.nomeContato);
+    const shouldValidateClienteOuContato =
+      options?.requireClienteOuContato === true ||
+      Object.prototype.hasOwnProperty.call(data, 'cliente_id') ||
+      Object.prototype.hasOwnProperty.call(data, 'nomeContato');
+
+    if (shouldValidateClienteOuContato && !cleanedClienteId && !cleanedNomeContato) {
+      throw new Error(this.clienteOuContatoRuleMessage);
     }
 
     return {
@@ -92,8 +114,8 @@ class OportunidadesService {
       tags: data.tags && data.tags.length > 0 ? data.tags : undefined,
       dataFechamentoEsperado: data.dataFechamentoEsperado || undefined,
       responsavel_id: cleanedResponsavel,
-      cliente_id: this.sanitizeString(data.cliente_id),
-      nomeContato: this.sanitizeString(data.nomeContato),
+      cliente_id: cleanedClienteId,
+      nomeContato: cleanedNomeContato,
       emailContato: this.sanitizeString(data.emailContato),
       telefoneContato: this.sanitizeString(data.telefoneContato),
       empresaContato: this.sanitizeString(data.empresaContato),
@@ -109,7 +131,7 @@ class OportunidadesService {
     return response.data.map((oportunidade: any) => this.formatarOportunidade(oportunidade));
   }
 
-  async obterOportunidade(id: number): Promise<Oportunidade> {
+  async obterOportunidade(id: number | string): Promise<Oportunidade> {
     const response = await api.get(this.getUrl(`/${id}`));
     return this.formatarOportunidade(response.data);
   }
@@ -123,6 +145,8 @@ class OportunidadesService {
       ...oportunidade,
       cliente_id,
       dataFechamentoEsperado: dataFechamento,
+    }, {
+      requireClienteOuContato: true,
     });
 
     const response = await api.post(this.getUrl(), dadosBackend);
@@ -144,16 +168,16 @@ class OportunidadesService {
     return this.formatarOportunidade(response.data);
   }
 
-  async excluirOportunidade(id: number): Promise<void> {
+  async excluirOportunidade(id: number | string): Promise<void> {
     await api.delete(this.getUrl(`/${id}`));
   }
 
-  async excluirOportunidadePermanente(id: number): Promise<void> {
+  async excluirOportunidadePermanente(id: number | string): Promise<void> {
     await api.delete(this.getUrl(`/${id}/permanente`));
   }
 
   async arquivarOportunidade(
-    id: number,
+    id: number | string,
     payload?: { motivo?: string; comentario?: string },
   ): Promise<Oportunidade> {
     const response = await api.post(this.getUrl(`/${id}/arquivar`), payload || {});
@@ -161,7 +185,7 @@ class OportunidadesService {
   }
 
   async restaurarOportunidade(
-    id: number,
+    id: number | string,
     payload?: { motivo?: string; comentario?: string },
   ): Promise<Oportunidade> {
     const response = await api.post(this.getUrl(`/${id}/restaurar`), payload || {});
@@ -169,7 +193,7 @@ class OportunidadesService {
   }
 
   async reabrirOportunidade(
-    id: number,
+    id: number | string,
     payload?: { motivo?: string; comentario?: string },
   ): Promise<Oportunidade> {
     const response = await api.post(this.getUrl(`/${id}/reabrir`), payload || {});
@@ -205,6 +229,18 @@ class OportunidadesService {
     autoArchiveAfterDays?: number;
   }): Promise<StalePolicyDecision> {
     const response = await api.patch(this.getUrl('/lifecycle/stale-policy'), payload);
+    return response.data;
+  }
+
+  async obterEngagementPolicy(): Promise<EngagementPolicyDecision> {
+    const response = await api.get(this.getUrl('/lifecycle/engagement-policy'));
+    return response.data;
+  }
+
+  async atualizarEngagementPolicy(
+    payload: UpdateEngagementPolicyPayload,
+  ): Promise<EngagementPolicyDecision> {
+    const response = await api.patch(this.getUrl('/lifecycle/engagement-policy'), payload);
     return response.data;
   }
 
@@ -249,14 +285,17 @@ class OportunidadesService {
     return response.data;
   }
 
-  async moverOportunidade(id: number, novoEstagio: EstagioOportunidade): Promise<Oportunidade> {
+  async moverOportunidade(
+    id: number | string,
+    novoEstagio: EstagioOportunidade,
+  ): Promise<Oportunidade> {
     const response = await api.patch(this.getUrl(`/${id}/estagio`), { estagio: novoEstagio });
     return this.formatarOportunidade(response.data);
   }
 
   // ✅ Atualizar estágio com motivo de perda (quando PERDIDO)
   async atualizarEstagio(
-    id: number,
+    id: number | string,
     dados: {
       estagio: EstagioOportunidade;
       forcarTransicao?: boolean;
@@ -272,7 +311,7 @@ class OportunidadesService {
   }
 
   async gerarProposta(
-    oportunidadeId: number,
+    oportunidadeId: number | string,
   ): Promise<{ success: boolean; message: string; proposta: any }> {
     const response = await api.post(this.getUrl(`/${oportunidadeId}/gerar-proposta`));
     return response.data;
@@ -326,13 +365,53 @@ class OportunidadesService {
   }
 
   async listarHistoricoEstagios(
-    oportunidadeId: number,
+    oportunidadeId: number | string,
     limit = 50,
   ): Promise<OportunidadeHistoricoEstagioItem[]> {
     const response = await api.get(this.getUrl(`/${oportunidadeId}/historico-estagios`), {
       params: { limit },
     });
     return response.data;
+  }
+
+  async listarVendedoresEnvolvidos(
+    oportunidadeId: number | string,
+  ): Promise<OportunidadeVendedorEnvolvido[]> {
+    const response = await api.get(this.getUrl(`/${oportunidadeId}/vendedores-envolvidos`));
+    const data = Array.isArray(response.data) ? response.data : [];
+    return data.map((item: any) => ({
+      id: String(item.id || ''),
+      vendedorId: String(item.vendedorId || item.vendedor_id || ''),
+      nome: String(item.nome || item.vendedor_nome || 'Usuario'),
+      email: item.email ?? item.vendedor_email ?? null,
+      avatarUrl: item.avatarUrl ?? item.vendedor_avatar_url ?? null,
+      papel: String(item.papel || 'apoio'),
+      createdAt: item.createdAt || item.created_at || null,
+    }));
+  }
+
+  async adicionarVendedorEnvolvido(
+    oportunidadeId: number | string,
+    payload: { vendedor_id: string; papel?: string },
+  ): Promise<OportunidadeVendedorEnvolvido> {
+    const response = await api.post(this.getUrl(`/${oportunidadeId}/vendedores-envolvidos`), payload);
+    const item = response.data || {};
+    return {
+      id: String(item.id || ''),
+      vendedorId: String(item.vendedorId || item.vendedor_id || payload.vendedor_id),
+      nome: String(item.nome || item.vendedor_nome || 'Usuario'),
+      email: item.email ?? item.vendedor_email ?? null,
+      avatarUrl: item.avatarUrl ?? item.vendedor_avatar_url ?? null,
+      papel: String(item.papel || payload.papel || 'apoio'),
+      createdAt: item.createdAt || item.created_at || null,
+    };
+  }
+
+  async removerVendedorEnvolvido(
+    oportunidadeId: number | string,
+    vendedorId: string,
+  ): Promise<void> {
+    await api.delete(this.getUrl(`/${oportunidadeId}/vendedores-envolvidos/${vendedorId}`));
   }
 
   async obterResumoAtividadesComerciais(params?: {
@@ -345,6 +424,61 @@ class OportunidadesService {
       params,
     });
     return response.data;
+  }
+
+  async obterPainelAtividadesComerciais(params?: {
+    periodStart?: string;
+    periodEnd?: string;
+    vendedorId?: string;
+    onlyMine?: boolean;
+    status?: OportunidadeAtividadesPainelStatusFilter;
+    tipo?: TipoAtividade | '';
+    busca?: string;
+    limit?: number;
+    includeClosed?: boolean;
+    includeArchived?: boolean;
+  }): Promise<OportunidadeAtividadesPainelResult> {
+    const response = await api.get(this.getUrl('/atividades/painel'), {
+      params: {
+        periodStart: params?.periodStart,
+        periodEnd: params?.periodEnd,
+        vendedorId: params?.vendedorId,
+        onlyMine: params?.onlyMine,
+        status: params?.status,
+        tipo: params?.tipo || undefined,
+        busca: params?.busca,
+        limit: params?.limit,
+        includeClosed: params?.includeClosed,
+        includeArchived: params?.includeArchived,
+      },
+    });
+
+    const data = response.data || {};
+    return {
+      generatedAt: data.generatedAt || new Date().toISOString(),
+      range: {
+        periodStart: data.range?.periodStart || new Date().toISOString(),
+        periodEnd: data.range?.periodEnd || new Date().toISOString(),
+      },
+      filters: {
+        vendedorId: data.filters?.vendedorId || undefined,
+        onlyMine: Boolean(data.filters?.onlyMine ?? true),
+        status: (data.filters?.status || 'all') as OportunidadeAtividadesPainelStatusFilter,
+        tipo: data.filters?.tipo || undefined,
+        busca: data.filters?.busca || undefined,
+        includeClosed: Boolean(data.filters?.includeClosed ?? true),
+        includeArchived: Boolean(data.filters?.includeArchived ?? false),
+      },
+      resumo: {
+        total: Number(data.resumo?.total || 0),
+        pending: Number(data.resumo?.pending || 0),
+        completed: Number(data.resumo?.completed || 0),
+        overdue: Number(data.resumo?.overdue || 0),
+        dueToday: Number(data.resumo?.dueToday || 0),
+        dueWeek: Number(data.resumo?.dueWeek || 0),
+      },
+      items: Array.isArray(data.items) ? data.items : [],
+    };
   }
 
   async criarAtividade(atividade: NovaAtividade): Promise<Atividade> {
@@ -536,6 +670,16 @@ class OportunidadesService {
   }
   // Utilitarios
   private formatarOportunidade(oportunidade: any): Oportunidade {
+    const nomeContato =
+      oportunidade.nomeContato ?? oportunidade.nome_contato ?? oportunidade.nomecontato;
+    const emailContato =
+      oportunidade.emailContato ?? oportunidade.email_contato ?? oportunidade.emailcontato;
+    const telefoneContato =
+      oportunidade.telefoneContato ??
+      oportunidade.telefone_contato ??
+      oportunidade.telefonecontato;
+    const empresaContato =
+      oportunidade.empresaContato ?? oportunidade.empresa_contato ?? oportunidade.empresacontato;
     const createdAt = oportunidade.createdAt ? new Date(oportunidade.createdAt) : new Date();
     const updatedAt = oportunidade.updatedAt ? new Date(oportunidade.updatedAt) : createdAt;
     const lifecycleStatus: LifecycleStatusOportunidade =
@@ -585,15 +729,15 @@ class OportunidadesService {
             nome: oportunidade.cliente.nome,
             email: oportunidade.cliente.email,
             telefone: oportunidade.cliente.telefone,
-            empresa: oportunidade.cliente.empresa,
+            empresa: oportunidade.cliente.empresa ?? oportunidade.cliente.nome,
           }
         : undefined,
 
       // Informações de contato direto
-      nomeContato: oportunidade.nomeContato,
-      emailContato: oportunidade.emailContato,
-      telefoneContato: oportunidade.telefoneContato,
-      empresaContato: oportunidade.empresaContato,
+      nomeContato,
+      emailContato,
+      telefoneContato,
+      empresaContato,
       observacoes: oportunidade.observacoes,
       criadoEm: oportunidade.criadoEm ?? createdAt,
       atualizadoEm: oportunidade.atualizadoEm ?? updatedAt,
@@ -629,6 +773,25 @@ class OportunidadesService {
         ? new Date(oportunidade.last_interaction_at)
         : null,
       stale_since: oportunidade.stale_since ? new Date(oportunidade.stale_since) : null,
+      next_action_at: oportunidade.next_action_at ? new Date(oportunidade.next_action_at) : null,
+      next_action_type: oportunidade.next_action_type ?? null,
+      next_action_description: oportunidade.next_action_description ?? null,
+      next_action_status: ['overdue', 'due_soon', 'future'].includes(
+        String(oportunidade.next_action_status || '').toLowerCase(),
+      )
+        ? (String(oportunidade.next_action_status).toLowerCase() as
+            | 'overdue'
+            | 'due_soon'
+            | 'future')
+        : null,
+      next_action_days_delta: Number.isFinite(Number(oportunidade.next_action_days_delta))
+        ? Number(oportunidade.next_action_days_delta)
+        : null,
+      engagement_signal: ['hot', 'watch', 'normal'].includes(
+        String(oportunidade.engagement_signal || '').toLowerCase(),
+      )
+        ? (String(oportunidade.engagement_signal).toLowerCase() as 'hot' | 'watch' | 'normal')
+        : undefined,
       proposta_principal_id: oportunidade.proposta_principal_id ?? null,
       propostaPrincipal: oportunidade.propostaPrincipal
         ? {

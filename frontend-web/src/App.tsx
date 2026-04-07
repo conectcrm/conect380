@@ -116,6 +116,8 @@ const GestaoNiveisAtendimentoPage = React.lazy(() => import('./pages/GestaoNivei
 const GestaoTiposServicoPage = React.lazy(() => import('./pages/GestaoTiposServicoPage'));
 
 const PipelinePage = React.lazy(() => import('./pages/PipelinePage'));
+const OportunidadeDetalhePage = React.lazy(() => import('./pages/OportunidadeDetalhePage'));
+const AtividadesComerciaisPage = React.lazy(() => import('./pages/AtividadesComerciaisPage'));
 const PropostasPage = React.lazy(() => import('./features/propostas/PropostasPage'));
 const PropostaDetalhePage = React.lazy(() => import('./features/propostas/PropostaDetalhePage'));
 const CotacaoPage = React.lazy(() => import('./features/comercial/pages/CotacaoPage'));
@@ -687,11 +689,19 @@ const AppRoutes: React.FC = () => {
                   />
                   <Route
                     path="/interacoes"
-                    element={<Navigate to="/pipeline" replace />}
+                    element={<Navigate to="/atividades" replace />}
+                  />
+                  <Route
+                    path="/atividades"
+                    element={protegerRota(ModuloEnum.CRM, <AtividadesComerciaisPage />)}
                   />
                   <Route
                     path="/pipeline"
                     element={protegerRota(ModuloEnum.CRM, <PipelinePage />)}
+                  />
+                  <Route
+                    path="/pipeline/oportunidades/:id"
+                    element={protegerRota(ModuloEnum.CRM, <OportunidadeDetalhePage />)}
                   />
                   {/* Redirects - Consolidação de telas */}
                   <Route path="/funil-vendas" element={<Navigate to="/pipeline" replace />} />
@@ -788,11 +798,19 @@ const AppRoutes: React.FC = () => {
                   <Route path="/crm/leads" element={protegerRota(ModuloEnum.CRM, <LeadsPage />)} />
                   <Route
                     path="/crm/interacoes"
-                    element={<Navigate to="/crm/pipeline" replace />}
+                    element={<Navigate to="/crm/atividades" replace />}
+                  />
+                  <Route
+                    path="/crm/atividades"
+                    element={protegerRota(ModuloEnum.CRM, <AtividadesComerciaisPage />)}
                   />
                   <Route
                     path="/crm/pipeline"
                     element={protegerRota(ModuloEnum.CRM, <PipelinePage />)}
+                  />
+                  <Route
+                    path="/crm/pipeline/oportunidades/:id"
+                    element={protegerRota(ModuloEnum.CRM, <OportunidadeDetalhePage />)}
                   />
                   {/* Portal do Cliente - Gestão */}
                   <Route path="/portal" element={<PortalClientePage />} />

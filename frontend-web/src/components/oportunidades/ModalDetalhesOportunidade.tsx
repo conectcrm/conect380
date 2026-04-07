@@ -44,6 +44,7 @@ interface ModalDetalhesOportunidadeProps {
   oportunidade: Oportunidade | null;
   onClose: () => void;
   onEditar: (oportunidade: Oportunidade) => void;
+  displayMode?: 'modal' | 'page';
   initialTab?: 'detalhes' | 'atividades';
   eventContext?: ModalDetalhesEventoContext | null;
   onClonar?: (oportunidade: Oportunidade) => void;
@@ -73,6 +74,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
   oportunidade,
   onClose,
   onEditar,
+  displayMode = 'modal',
   initialTab = 'detalhes',
   eventContext = null,
   onClonar,
@@ -580,16 +582,20 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
   const podeCarregarMaisHistorico =
     historicoEstagios.length >= limiteHistoricoEstagios && limiteHistoricoEstagios < 200;
 
-  const handleEditarOportunidade = () => {
-    if (!podeFecharModal()) return;
+  const handleEditarOportunidade = async () => {
+    if (!(await podeFecharModal())) return;
     onEditar(oportunidade);
-    onClose();
+    if (displayMode === 'modal') {
+      onClose();
+    }
   };
 
-  const handleClonarOportunidade = () => {
-    if (!onClonar || !podeFecharModal()) return;
+  const handleClonarOportunidade = async () => {
+    if (!onClonar || !(await podeFecharModal())) return;
     onClonar(oportunidade);
-    onClose();
+    if (displayMode === 'modal') {
+      onClose();
+    }
   };
 
   const handleCarregarMaisHistorico = () => {
@@ -605,7 +611,9 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
       title={oportunidade.titulo}
       subtitle="Detalhes da oportunidade e acompanhamento comercial"
       maxWidth="5xl"
-      modalClassName="max-h-[90vh] overflow-hidden rounded-2xl"
+      showCloseButton={displayMode !== 'page'}
+      placement={displayMode === 'page' ? 'page' : 'right-drawer'}
+      modalClassName={displayMode === 'page' ? 'overflow-visible' : 'overflow-hidden'}
     >
       <div className="border-b border-[#B4BEC9]/25 bg-[#DEEFE7]/20 px-6 py-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -627,7 +635,9 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
           </div>
           {onClonar && (
             <button
-              onClick={handleClonarOportunidade}
+              onClick={() => {
+                void handleClonarOportunidade();
+              }}
               type="button"
               className="inline-flex items-center gap-1.5 rounded-lg border border-[#B4BEC9]/70 bg-white px-3 py-1.5 text-sm font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/50"
             >
@@ -1451,10 +1461,12 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
             type="button"
             className="px-4 py-2 border border-[#B4BEC9]/70 text-[#002333] rounded-lg hover:bg-[#DEEFE7]/55 transition-colors text-sm font-medium"
           >
-            Fechar
+            {displayMode === 'page' ? 'Voltar ao pipeline' : 'Fechar'}
           </button>
           <button
-            onClick={handleEditarOportunidade}
+            onClick={() => {
+              void handleEditarOportunidade();
+            }}
             type="button"
             className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors flex items-center gap-2 text-sm font-medium"
           >

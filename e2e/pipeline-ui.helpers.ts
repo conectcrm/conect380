@@ -86,6 +86,31 @@ export async function mockPipelineUiApis(page: Page, options: PipelineUiMockOpti
       return json(route, 200, options.metricas);
     }
 
+    const oportunidadeDetalheMatch = pathname.match(/\/oportunidades\/([^/]+)$/);
+    if (method === 'GET' && oportunidadeDetalheMatch) {
+      const oportunidadeId = decodeURIComponent(oportunidadeDetalheMatch[1]);
+      const endpointReservado = ['metricas', 'pipeline'].includes(oportunidadeId.toLowerCase());
+      if (endpointReservado) {
+        return route.continue();
+      }
+
+      const oportunidade = (options.oportunidades || []).find(
+        (item: any) =>
+          String(item?.id) === oportunidadeId ||
+          (Number.isFinite(Number(oportunidadeId)) && Number(item?.id) === Number(oportunidadeId)),
+      );
+
+      if (oportunidade) {
+        return json(route, 200, oportunidade);
+      }
+
+      return json(route, 404, {
+        statusCode: 404,
+        message: 'Oportunidade nao encontrada',
+        error: 'Not Found',
+      });
+    }
+
     if (method === 'GET' && pathname.endsWith('/users')) {
       return json(route, 200, {
         usuarios: [

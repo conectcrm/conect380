@@ -55,6 +55,9 @@ interface ValidationError {
   message: string;
 }
 
+const CLIENTE_OU_CONTATO_RULE_MESSAGE =
+  'Informe um cliente (cliente_id) ou pelo menos o nome do contato (nomeContato).';
+
 type TabType = 'detalhes' | 'atividades';
 
 // ========================================
@@ -422,7 +425,7 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
     if (!formData.cliente_id && !formData.nomeContato?.trim()) {
       newErrors.push({
         field: 'contato',
-        message: 'Informe um cliente cadastrado ou pelo menos o nome do contato',
+        message: CLIENTE_OU_CONTATO_RULE_MESSAGE,
       });
     }
 

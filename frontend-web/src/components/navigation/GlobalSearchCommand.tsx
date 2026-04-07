@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { ChevronRight, Command, History, Search, TrendingUp, X } from 'lucide-react';
+import { ChevronRight, History, Search, TrendingUp, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { matchesLocalSearchTerm, normalizeSearchValue } from '../../utils/localSearch';
 
@@ -471,24 +471,9 @@ const GlobalSearchCommand: React.FC<GlobalSearchCommandProps> = ({ entries }) =>
       <button
         type="button"
         onClick={openCommand}
-        className="hidden h-10 min-w-[220px] items-center justify-between rounded-xl border border-[#D3E2E7] bg-white px-3 text-sm text-[#486572] transition-colors hover:bg-[#F6FBFC] lg:inline-flex"
-        aria-label="Abrir busca global"
-      >
-        <span className="inline-flex items-center gap-2">
-          <Search className="h-4 w-4 text-[#5D7A88]" />
-          Buscar no sistema
-        </span>
-        <span className="inline-flex items-center gap-1 rounded-md border border-[#D5E2E7] bg-[#F8FBFC] px-1.5 py-0.5 text-[11px] text-[#607B89]">
-          <Command className="h-3 w-3" />
-          K
-        </span>
-      </button>
-
-      <button
-        type="button"
-        onClick={openCommand}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#D4E2E7] bg-white text-[#4B6775] transition-colors hover:bg-[#F4FAFC] lg:hidden"
-        aria-label="Abrir busca global"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#D4E2E7] bg-white text-[#4B6775] transition-colors hover:bg-[#F4FAFC]"
+        aria-label="Buscar no sistema (Ctrl/Cmd + K)"
+        title="Buscar no sistema (Ctrl/Cmd + K)"
       >
         <Search className="h-4 w-4" />
       </button>

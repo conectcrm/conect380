@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { toastService } from '../services/toastService';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -47,6 +47,7 @@ import {
   RefreshCw,
   Save,
   Bookmark,
+  ArrowLeft,
   ArrowUp,
   Archive,
   RotateCcw,
@@ -66,6 +67,7 @@ import {
   EstatisticasOportunidades,
   StaleDealsResult,
   StalePolicyDecision,
+  EngagementPolicyDecision,
 } from '../types/oportunidades';
 import {
   EstagioOportunidade,
@@ -77,16 +79,14 @@ import {
 } from '../types/oportunidades/enums';
 import ModalOportunidadeRefatorado from '../components/oportunidades/ModalOportunidadeRefatorado';
 import ModalMudancaEstagio from '../components/oportunidades/ModalMudancaEstagio';
-import ModalDetalhesOportunidade, {
-  ModalDetalhesEventoContext,
-} from '../components/oportunidades/ModalDetalhesOportunidade';
+import { ModalDetalhesEventoContext } from '../components/oportunidades/ModalDetalhesOportunidade';
 import ModalExport from '../components/oportunidades/ModalExport';
 import ModalMotivoPerda from '../components/oportunidades/ModalMotivoPerda';
 import { triggerSalesCelebration } from '../components/feedback/SalesCelebrationHost';
 import { useAuth } from '../contexts/AuthContext';
 import { userHasPermission } from '../config/menuConfig';
 import { useGlobalConfirmation } from '../contexts/GlobalConfirmationContext';
-import { DataTableCard, InlineStats, PageHeader, SectionCard } from '../components/layout-v2';
+import { DataTableCard, SectionCard } from '../components/layout-v2';
 
 // Configuração do localizador do calendário (date-fns)
 const locales = {
@@ -127,7 +127,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.LEADS,
     nome: 'Leads',
-    headerClass: 'bg-white border border-[#B4BEC9]/40 border-b-0 border-t-4 border-t-[#002333]',
+    headerClass:
+      'bg-gradient-to-r from-[#EAF3F8] via-white to-[#F6FBFD] border border-[#B4BEC9]/45 border-b-0 border-t-4 border-t-[#1F4C63]',
     legendClass: 'bg-[#002333]',
     badgeTextClass: 'text-[#002333]',
     badgeBgClass: 'bg-[#DEEFE7]',
@@ -136,7 +137,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.QUALIFICACAO,
     nome: 'Qualificação',
-    headerClass: 'bg-white border border-[#B4BEC9]/40 border-b-0 border-t-4 border-t-[#0F7B7D]',
+    headerClass:
+      'bg-gradient-to-r from-[#E9F7F5] via-white to-[#F4FCFA] border border-[#B4BEC9]/45 border-b-0 border-t-4 border-t-[#0F7B7D]',
     legendClass: 'bg-[#0F7B7D]',
     badgeTextClass: 'text-[#0F7B7D]',
     badgeBgClass: 'bg-[#DEEFE7]',
@@ -145,7 +147,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.PROPOSTA,
     nome: 'Proposta',
-    headerClass: 'bg-white border border-[#B4BEC9]/40 border-b-0 border-t-4 border-t-[#159A9C]',
+    headerClass:
+      'bg-gradient-to-r from-[#EAF8F6] via-white to-[#F5FCFA] border border-[#B4BEC9]/45 border-b-0 border-t-4 border-t-[#159A9C]',
     legendClass: 'bg-[#159A9C]',
     badgeTextClass: 'text-[#0F7B7D]',
     badgeBgClass: 'bg-[#DEEFE7]',
@@ -154,7 +157,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.NEGOCIACAO,
     nome: 'Negociação',
-    headerClass: 'bg-white border border-[#B4BEC9]/40 border-b-0 border-t-4 border-t-[#0F7B7D]',
+    headerClass:
+      'bg-gradient-to-r from-[#ECF7F3] via-white to-[#F4FCF9] border border-[#B4BEC9]/45 border-b-0 border-t-4 border-t-[#137F72]',
     legendClass: 'bg-[#0F7B7D]',
     badgeTextClass: 'text-[#0F7B7D]',
     badgeBgClass: 'bg-[#DEEFE7]',
@@ -163,7 +167,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.FECHAMENTO,
     nome: 'Fechamento',
-    headerClass: 'bg-white border border-[#B4BEC9]/40 border-b-0 border-t-4 border-t-[#159A9C]',
+    headerClass:
+      'bg-gradient-to-r from-[#EEF8F8] via-white to-[#F7FCFC] border border-[#B4BEC9]/45 border-b-0 border-t-4 border-t-[#1A9AA0]',
     legendClass: 'bg-[#159A9C]',
     badgeTextClass: 'text-[#0F7B7D]',
     badgeBgClass: 'bg-[#DEEFE7]',
@@ -172,7 +177,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.GANHO,
     nome: 'Ganho',
-    headerClass: 'bg-white border border-[#B4BEC9]/40 border-b-0 border-t-4 border-t-green-600',
+    headerClass:
+      'bg-gradient-to-r from-green-50 via-white to-green-50/60 border border-[#B4BEC9]/45 border-b-0 border-t-4 border-t-green-600',
     legendClass: 'bg-green-600',
     badgeTextClass: 'text-green-700',
     badgeBgClass: 'bg-green-50',
@@ -181,7 +187,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.PERDIDO,
     nome: 'Perdido',
-    headerClass: 'bg-white border border-[#B4BEC9]/40 border-b-0 border-t-4 border-t-red-600',
+    headerClass:
+      'bg-gradient-to-r from-red-50 via-white to-red-50/60 border border-[#B4BEC9]/45 border-b-0 border-t-4 border-t-red-600',
     legendClass: 'bg-red-600',
     badgeTextClass: 'text-red-700',
     badgeBgClass: 'bg-red-50',
@@ -223,6 +230,36 @@ const FORWARD_STAGE_ORDER: readonly EstagioOportunidade[] = [
   EstagioOportunidade.NEGOCIACAO,
   EstagioOportunidade.FECHAMENTO,
 ];
+
+const STAGE_MONOGRAM: Record<EstagioOportunidade, string> = {
+  [EstagioOportunidade.LEADS]: 'LD',
+  [EstagioOportunidade.QUALIFICACAO]: 'QL',
+  [EstagioOportunidade.PROPOSTA]: 'PR',
+  [EstagioOportunidade.NEGOCIACAO]: 'NG',
+  [EstagioOportunidade.FECHAMENTO]: 'FC',
+  [EstagioOportunidade.GANHO]: 'OK',
+  [EstagioOportunidade.PERDIDO]: 'NO',
+};
+
+const STAGE_COLUMN_SURFACE_CLASS: Record<EstagioOportunidade, string> = {
+  [EstagioOportunidade.LEADS]: 'bg-[#EEF4F8]/80',
+  [EstagioOportunidade.QUALIFICACAO]: 'bg-[#ECF7F4]/80',
+  [EstagioOportunidade.PROPOSTA]: 'bg-[#EBF8F6]/80',
+  [EstagioOportunidade.NEGOCIACAO]: 'bg-[#EDF7F3]/80',
+  [EstagioOportunidade.FECHAMENTO]: 'bg-[#EEF8F8]/80',
+  [EstagioOportunidade.GANHO]: 'bg-green-50/85',
+  [EstagioOportunidade.PERDIDO]: 'bg-red-50/85',
+};
+
+const STAGE_EMPTY_HINT: Record<EstagioOportunidade, string> = {
+  [EstagioOportunidade.LEADS]: 'Adicione novos leads para iniciar o funil.',
+  [EstagioOportunidade.QUALIFICACAO]: 'Traga oportunidades para validar fit e potencial.',
+  [EstagioOportunidade.PROPOSTA]: 'Mova negociacoes aprovadas para proposta comercial.',
+  [EstagioOportunidade.NEGOCIACAO]: 'Conduza propostas para a fase final de decisao.',
+  [EstagioOportunidade.FECHAMENTO]: 'Concentre aqui os negocios prontos para decidir.',
+  [EstagioOportunidade.GANHO]: 'Negocios ganhos aparecem aqui.',
+  [EstagioOportunidade.PERDIDO]: 'Negocios perdidos aparecem aqui.',
+};
 
 const LIFECYCLE_VIEW_OPTIONS: Array<{
   id: LifecycleViewOportunidade;
@@ -276,6 +313,15 @@ const STALE_THRESHOLD_MIN = 7;
 const STALE_THRESHOLD_MAX = 120;
 const STALE_AUTO_ARCHIVE_MIN = 7;
 const STALE_AUTO_ARCHIVE_MAX = 365;
+const ENGAGEMENT_HOT_MIN_PROBABILITY_MIN = 0;
+const ENGAGEMENT_HOT_MIN_PROBABILITY_MAX = 100;
+const ENGAGEMENT_HOT_MIN_PROBABILITY_DEFAULT = 75;
+const ENGAGEMENT_HOT_CLOSE_WINDOW_MIN = 1;
+const ENGAGEMENT_HOT_CLOSE_WINDOW_MAX = 90;
+const ENGAGEMENT_HOT_CLOSE_WINDOW_DEFAULT = 14;
+const ENGAGEMENT_NEXT_ACTION_SOON_MIN = 0;
+const ENGAGEMENT_NEXT_ACTION_SOON_MAX = 30;
+const ENGAGEMENT_NEXT_ACTION_SOON_DEFAULT = 3;
 
 const CORES_GRAFICOS = [
   '#002333',
@@ -324,7 +370,8 @@ interface EventoCalendarioPipeline {
 const PipelinePage: React.FC = () => {
   const { confirm } = useGlobalConfirmation();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { isAuthenticated, user } = useAuth();
 
   const [loading, setLoading] = useState(true);
@@ -343,6 +390,14 @@ const PipelinePage: React.FC = () => {
   });
   const [stalePolicyLoading, setStalePolicyLoading] = useState(false);
   const [stalePolicySaving, setStalePolicySaving] = useState(false);
+  const [engagementPolicy, setEngagementPolicy] = useState<EngagementPolicyDecision | null>(null);
+  const [engagementPolicyDraft, setEngagementPolicyDraft] = useState({
+    hotMinProbability: ENGAGEMENT_HOT_MIN_PROBABILITY_DEFAULT,
+    hotCloseWindowDays: ENGAGEMENT_HOT_CLOSE_WINDOW_DEFAULT,
+    nextActionDueSoonDays: ENGAGEMENT_NEXT_ACTION_SOON_DEFAULT,
+  });
+  const [engagementPolicyLoading, setEngagementPolicyLoading] = useState(false);
+  const [engagementPolicySaving, setEngagementPolicySaving] = useState(false);
   const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>('pipeline');
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loadingUsuarios, setLoadingUsuarios] = useState(false);
@@ -379,10 +434,6 @@ const PipelinePage: React.FC = () => {
   const [oportunidadeDeletar, setOportunidadeDeletar] = useState<Oportunidade | null>(null);
   const [deleteMode, setDeleteMode] = useState<'soft' | 'permanente'>('soft');
   const [loadingDeletar, setLoadingDeletar] = useState(false);
-  const [oportunidadeDetalhes, setOportunidadeDetalhes] = useState<Oportunidade | null>(null);
-  const [detalhesAbaInicial, setDetalhesAbaInicial] = useState<AbaDetalhesOportunidade>('detalhes');
-  const [contextoEventoCalendario, setContextoEventoCalendario] =
-    useState<ModalDetalhesEventoContext | null>(null);
   const [oportunidadeEditando, setOportunidadeEditando] = useState<Oportunidade | null>(null);
   const [estagioNovaOportunidade, setEstagioNovaOportunidade] = useState<EstagioOportunidade>(
     EstagioOportunidade.LEADS,
@@ -649,6 +700,30 @@ const PipelinePage: React.FC = () => {
     );
   }, [stalePolicy, stalePolicyDraft]);
 
+  const engagementPolicyHasChanges = useMemo(() => {
+    if (!engagementPolicy) return false;
+    return (
+      engagementPolicy.hotMinProbability !==
+        normalizeIntegerWithinRange(
+          engagementPolicyDraft.hotMinProbability,
+          ENGAGEMENT_HOT_MIN_PROBABILITY_MIN,
+          ENGAGEMENT_HOT_MIN_PROBABILITY_MAX,
+        ) ||
+      engagementPolicy.hotCloseWindowDays !==
+        normalizeIntegerWithinRange(
+          engagementPolicyDraft.hotCloseWindowDays,
+          ENGAGEMENT_HOT_CLOSE_WINDOW_MIN,
+          ENGAGEMENT_HOT_CLOSE_WINDOW_MAX,
+        ) ||
+      engagementPolicy.nextActionDueSoonDays !==
+        normalizeIntegerWithinRange(
+          engagementPolicyDraft.nextActionDueSoonDays,
+          ENGAGEMENT_NEXT_ACTION_SOON_MIN,
+          ENGAGEMENT_NEXT_ACTION_SOON_MAX,
+        )
+    );
+  }, [engagementPolicy, engagementPolicyDraft]);
+
   const syncStalePolicyDraft = useCallback((policy: StalePolicyDecision) => {
     setStalePolicyDraft({
       enabled: Boolean(policy.enabled),
@@ -657,6 +732,26 @@ const PipelinePage: React.FC = () => {
       autoArchiveAfterDays: policy.autoArchiveAfterDays,
     });
   }, []);
+
+  const syncEngagementPolicyDraft = useCallback((policy: EngagementPolicyDecision) => {
+    setEngagementPolicyDraft({
+      hotMinProbability: policy.hotMinProbability,
+      hotCloseWindowDays: policy.hotCloseWindowDays,
+      nextActionDueSoonDays: policy.nextActionDueSoonDays,
+    });
+  }, []);
+
+  const effectiveEngagementPolicy = useMemo(
+    () => ({
+      hotMinProbability:
+        engagementPolicy?.hotMinProbability ?? ENGAGEMENT_HOT_MIN_PROBABILITY_DEFAULT,
+      hotCloseWindowDays:
+        engagementPolicy?.hotCloseWindowDays ?? ENGAGEMENT_HOT_CLOSE_WINDOW_DEFAULT,
+      nextActionDueSoonDays:
+        engagementPolicy?.nextActionDueSoonDays ?? ENGAGEMENT_NEXT_ACTION_SOON_DEFAULT,
+    }),
+    [engagementPolicy],
+  );
 
   // Verificar autenticação ao carregar
   useEffect(() => {
@@ -671,38 +766,63 @@ const PipelinePage: React.FC = () => {
     void carregarDados();
   }, [isAuthenticated, navigate, lifecycleView]);
 
-  useEffect(() => {
-    const oportunidadeIdParam = searchParams.get('oportunidadeId');
-    if (!oportunidadeIdParam || loading) {
-      return;
-    }
-
-    const oportunidade = oportunidades.find((item) => String(item.id) === oportunidadeIdParam);
-    if (!oportunidade) {
-      return;
-    }
-
-    setDetalhesAbaInicial('detalhes');
-    setContextoEventoCalendario(null);
-    setOportunidadeDetalhes(oportunidade);
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.delete('oportunidadeId');
-    setSearchParams(nextParams, { replace: true });
-  }, [loading, oportunidades, searchParams, setSearchParams]);
+  const pipelineBasePath = useMemo(
+    () => (location.pathname.startsWith('/crm/') ? '/crm/pipeline' : '/pipeline'),
+    [location.pathname],
+  );
 
   const abrirDetalhesOportunidade = useCallback(
     (
       oportunidade: Oportunidade,
       aba: AbaDetalhesOportunidade = 'detalhes',
       contextoEvento: ModalDetalhesEventoContext | null = null,
+      replace = false,
     ) => {
       captureKanbanScrollSnapshot();
-      setDetalhesAbaInicial(aba);
-      setContextoEventoCalendario(contextoEvento);
-      setOportunidadeDetalhes(oportunidade);
+      const params = new URLSearchParams();
+      const fromParams = new URLSearchParams(location.search);
+      fromParams.delete('oportunidadeId');
+      const fromSearch = fromParams.toString();
+      const fromPath = `${location.pathname}${fromSearch ? `?${fromSearch}` : ''}`;
+      if (aba === 'atividades') {
+        params.set('tab', 'atividades');
+      }
+
+      const targetPath = `${pipelineBasePath}/oportunidades/${oportunidade.id}`;
+      const targetUrl = params.toString() ? `${targetPath}?${params.toString()}` : targetPath;
+
+      navigate(targetUrl, {
+        replace,
+        state: {
+          from: fromPath,
+          initialTab: aba,
+          eventContext: contextoEvento,
+        },
+      });
     },
-    [captureKanbanScrollSnapshot],
+    [captureKanbanScrollSnapshot, location.pathname, location.search, navigate, pipelineBasePath],
   );
+
+  useEffect(() => {
+    const oportunidadeIdParam = String(searchParams.get('oportunidadeId') || '').trim();
+    if (!oportunidadeIdParam) {
+      return;
+    }
+
+    const fromParams = new URLSearchParams(location.search);
+    fromParams.delete('oportunidadeId');
+    const fromSearch = fromParams.toString();
+    const fromPath = `${location.pathname}${fromSearch ? `?${fromSearch}` : ''}`;
+    const encodedId = encodeURIComponent(oportunidadeIdParam);
+
+    navigate(`${pipelineBasePath}/oportunidades/${encodedId}`, {
+      replace: true,
+      state: {
+        from: fromPath,
+        initialTab: 'detalhes',
+      },
+    });
+  }, [location.pathname, location.search, navigate, pipelineBasePath, searchParams]);
 
   const carregarDados = async () => {
     try {
@@ -732,21 +852,27 @@ const PipelinePage: React.FC = () => {
           : Promise.resolve(null);
 
       let stalePolicyPromise: Promise<StalePolicyDecision | null> = Promise.resolve(null);
+      let engagementPolicyPromise: Promise<EngagementPolicyDecision | null> = Promise.resolve(null);
       if (lifecycleEnabled) {
         setStalePolicyLoading(true);
+        setEngagementPolicyLoading(true);
         stalePolicyPromise = oportunidadesService.obterStalePolicy().catch(() => null);
+        engagementPolicyPromise = oportunidadesService.obterEngagementPolicy().catch(() => null);
       } else {
         setStalePolicy(null);
+        setEngagementPolicy(null);
       }
 
       // Carregar oportunidades e usuários em paralelo
-      const [dados, stats, usuariosData, staleDealsResult, stalePolicyData] = await Promise.all([
-        oportunidadesService.listarOportunidades(lifecycleFilters),
-        oportunidadesService.obterEstatisticas(lifecycleFilters),
-        carregarUsuarios(),
-        staleDealsPromise,
-        stalePolicyPromise,
-      ]);
+      const [dados, stats, usuariosData, staleDealsResult, stalePolicyData, engagementPolicyData] =
+        await Promise.all([
+          oportunidadesService.listarOportunidades(lifecycleFilters),
+          oportunidadesService.obterEstatisticas(lifecycleFilters),
+          carregarUsuarios(),
+          staleDealsPromise,
+          stalePolicyPromise,
+          engagementPolicyPromise,
+        ]);
 
       const staleById = new Map(
         (staleDealsResult?.stale || []).map((oportunidade: Oportunidade) => [
@@ -778,6 +904,12 @@ const PipelinePage: React.FC = () => {
       } else if (lifecycleEnabled) {
         setStalePolicy(null);
       }
+      if (engagementPolicyData) {
+        setEngagementPolicy(engagementPolicyData);
+        syncEngagementPolicyDraft(engagementPolicyData);
+      } else if (lifecycleEnabled) {
+        setEngagementPolicy(null);
+      }
     } catch (err: any) {
       console.error('Erro ao carregar dados:', err);
 
@@ -798,6 +930,7 @@ const PipelinePage: React.FC = () => {
     } finally {
       setLoading(false);
       setStalePolicyLoading(false);
+      setEngagementPolicyLoading(false);
     }
   };
 
@@ -844,6 +977,53 @@ const PipelinePage: React.FC = () => {
   const handleResetStalePolicyDraft = () => {
     if (!stalePolicy) return;
     syncStalePolicyDraft(stalePolicy);
+  };
+
+  const handleSalvarEngagementPolicy = async () => {
+    if (!canManageStalePolicy) {
+      toastService.warning('Você não possui permissão para alterar essa configuração.');
+      return;
+    }
+
+    const payload = {
+      hotMinProbability: normalizeIntegerWithinRange(
+        engagementPolicyDraft.hotMinProbability,
+        ENGAGEMENT_HOT_MIN_PROBABILITY_MIN,
+        ENGAGEMENT_HOT_MIN_PROBABILITY_MAX,
+      ),
+      hotCloseWindowDays: normalizeIntegerWithinRange(
+        engagementPolicyDraft.hotCloseWindowDays,
+        ENGAGEMENT_HOT_CLOSE_WINDOW_MIN,
+        ENGAGEMENT_HOT_CLOSE_WINDOW_MAX,
+      ),
+      nextActionDueSoonDays: normalizeIntegerWithinRange(
+        engagementPolicyDraft.nextActionDueSoonDays,
+        ENGAGEMENT_NEXT_ACTION_SOON_MIN,
+        ENGAGEMENT_NEXT_ACTION_SOON_MAX,
+      ),
+    };
+
+    try {
+      setEngagementPolicySaving(true);
+      const updatedPolicy = await oportunidadesService.atualizarEngagementPolicy(payload);
+      setEngagementPolicy(updatedPolicy);
+      syncEngagementPolicyDraft(updatedPolicy);
+      toastService.success('Política de aquecimento da pipeline atualizada.');
+      await carregarDados();
+    } catch (err: any) {
+      if (err?.response?.status === 403) {
+        toastService.error('Sem permissão para atualizar a política de aquecimento.');
+      } else {
+        toastService.error('Não foi possível atualizar a política de aquecimento.');
+      }
+    } finally {
+      setEngagementPolicySaving(false);
+    }
+  };
+
+  const handleResetEngagementPolicyDraft = () => {
+    if (!engagementPolicy) return;
+    syncEngagementPolicyDraft(engagementPolicy);
   };
 
   const carregarUsuarios = async (): Promise<Usuario[]> => {
@@ -904,6 +1084,89 @@ const PipelinePage: React.FC = () => {
     !lifecycleFeatureEnabled ||
     getLifecycleStatus(oportunidade) === LifecycleStatusOportunidade.OPEN;
 
+  const resolveNextActionDeltaDays = (oportunidade: Oportunidade): number | null => {
+    const explicitDelta = Number(oportunidade.next_action_days_delta);
+    if (Number.isFinite(explicitDelta)) {
+      return Math.round(explicitDelta);
+    }
+
+    if (!oportunidade.next_action_at) {
+      return null;
+    }
+
+    const nextActionDate = new Date(oportunidade.next_action_at);
+    if (Number.isNaN(nextActionDate.getTime())) {
+      return null;
+    }
+
+    return differenceInDays(nextActionDate, new Date());
+  };
+
+  const getNextActionWarning = (
+    oportunidade: Oportunidade,
+  ): { label: string; className: string } | null => {
+    if (!isOpportunityOpenForProcess(oportunidade) || isTerminalStage(oportunidade.estagio)) {
+      return null;
+    }
+
+    const status = String(oportunidade.next_action_status || '').toLowerCase();
+    const daysDelta = resolveNextActionDeltaDays(oportunidade);
+
+    if (status === 'overdue' || (daysDelta !== null && daysDelta < 0)) {
+      const atrasoDias = daysDelta !== null ? Math.abs(daysDelta) : 0;
+      return {
+        label: `Acao atrasada ${atrasoDias}d`,
+        className: 'bg-red-100 text-red-700 border border-red-200',
+      };
+    }
+
+    const isDueSoon =
+      status === 'due_soon' ||
+      (daysDelta !== null &&
+        daysDelta >= 0 &&
+        daysDelta <= effectiveEngagementPolicy.nextActionDueSoonDays);
+    if (!isDueSoon) {
+      return null;
+    }
+
+    const prazoLabel = daysDelta === 0 ? 'Acao hoje' : `Acao em ${Math.max(daysDelta || 0, 0)}d`;
+    return {
+      label: prazoLabel,
+      className: 'bg-amber-100 text-amber-700 border border-amber-200',
+    };
+  };
+
+  const isHotNegotiationOpportunity = (
+    oportunidade: Oportunidade,
+    diasAteVencimento: number | null,
+  ): boolean => {
+    if (!isOpportunityOpenForProcess(oportunidade) || isTerminalStage(oportunidade.estagio)) {
+      return false;
+    }
+
+    if (Boolean(oportunidade.is_stale)) {
+      return false;
+    }
+
+    const hotStage =
+      oportunidade.estagio === EstagioOportunidade.NEGOCIACAO ||
+      oportunidade.estagio === EstagioOportunidade.FECHAMENTO;
+    if (!hotStage) {
+      return false;
+    }
+
+    if (Number(oportunidade.probabilidade || 0) < effectiveEngagementPolicy.hotMinProbability) {
+      return false;
+    }
+
+    const closeWindowHot =
+      diasAteVencimento !== null &&
+      diasAteVencimento <= effectiveEngagementPolicy.hotCloseWindowDays &&
+      diasAteVencimento >= -3;
+    const nextActionPressure = getNextActionWarning(oportunidade) !== null;
+    return closeWindowHot || nextActionPressure;
+  };
+
   const canEditOpportunity = (oportunidade: Oportunidade): boolean =>
     isOpportunityOpenForProcess(oportunidade) && !isTerminalStage(oportunidade.estagio);
 
@@ -944,9 +1207,9 @@ const PipelinePage: React.FC = () => {
     setShowModal(true);
   };
 
-  // Abrir modal de detalhes
+  // Abrir pagina de detalhes
   const handleVerDetalhes = (oportunidade: Oportunidade) => {
-    abrirDetalhesOportunidade(oportunidade, 'detalhes');
+    abrirDetalhesOportunidade(oportunidade, 'atividades');
   };
 
   // Abrir modal para confirmar exclusao
@@ -969,10 +1232,6 @@ const PipelinePage: React.FC = () => {
         await oportunidadesService.excluirOportunidade(oportunidadeDeletar.id);
         toastService.success('Oportunidade enviada para a lixeira.');
       }
-      if (oportunidadeDetalhes?.id === oportunidadeDeletar.id) {
-        setOportunidadeDetalhes(null);
-      }
-
       // Recarregar estatísticas
       await carregarDados();
     } catch (err) {
@@ -1049,10 +1308,6 @@ const PipelinePage: React.FC = () => {
       await oportunidadesService.atualizarEstagio(oportunidade.id, {
         estagio: EstagioOportunidade.GANHO,
       });
-
-      if (oportunidadeDetalhes?.id === oportunidade.id) {
-        setOportunidadeDetalhes(null);
-      }
 
       await carregarDados();
       toastService.success('Oportunidade marcada como ganha com sucesso!');
@@ -1291,7 +1546,8 @@ const PipelinePage: React.FC = () => {
       }
     } catch (err) {
       console.error('Erro ao salvar oportunidade:', err);
-      toastService.error('Erro ao salvar oportunidade');
+      const errorMessage = extrairMensagemErroApi(err, 'Erro ao salvar oportunidade');
+      toastService.error(errorMessage);
       throw err; // Deixar o modal tratar o erro
     }
   };
@@ -1594,9 +1850,7 @@ const PipelinePage: React.FC = () => {
     }
 
     if (!transitionAllowed && skipForwardRequested && !canSkipPipelineStages) {
-      toastService.warning(
-        'Somente gerente, admin ou superadmin podem pular etapas no pipeline.',
-      );
+      toastService.warning('Somente gerente, admin ou superadmin podem pular etapas no pipeline.');
       setDraggedItem(null);
       return;
     }
@@ -1763,10 +2017,6 @@ const PipelinePage: React.FC = () => {
       setOportunidadeParaPerder(null);
       setDraggedItem(null);
       setErroMotivoPerda(null);
-      if (oportunidadeDetalhes?.id === oportunidadeParaPerder.id) {
-        setOportunidadeDetalhes(null);
-      }
-
       toastService.success('Oportunidade marcada como perdida com sucesso!');
     } catch (err: any) {
       console.error('Erro ao marcar oportunidade como perdida:', err);
@@ -2204,82 +2454,108 @@ const PipelinePage: React.FC = () => {
 
   return (
     <div className="space-y-3 pt-1 sm:pt-2">
-      <SectionCard className="space-y-3 p-3 sm:p-4">
-        <PageHeader
-          title={
-            <span className="inline-flex items-center gap-2">
-              <Target className="h-5 w-5 text-[#159A9C]" />
-              <span>Pipeline de Vendas</span>
-            </span>
-          }
-          description="Gerencie suas oportunidades de venda atraves de um funil visual"
-          actions={
-            <button
-              onClick={() => handleNovaOportunidade()}
-              disabled={lifecycleFeatureEnabled && lifecycleView !== LifecycleViewOportunidade.OPEN}
-              title={
-                lifecycleFeatureEnabled && lifecycleView !== LifecycleViewOportunidade.OPEN
-                  ? 'Troque para "Abertas" para criar oportunidades'
-                  : 'Nova Oportunidade'
-              }
-              className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Plus className="h-4 w-4" />
-              Nova Oportunidade
-            </button>
-          }
-        />
-
-        {estatisticas && (
-          <InlineStats
-            stats={[
-              {
-                label: 'Oportunidades',
-                value: String(estatisticas.totalOportunidades),
-                tone: 'neutral',
-              },
-              {
-                label: 'Pipeline',
-                value: formatarMoeda(estatisticas.valorTotalPipeline),
-                tone: 'accent',
-              },
-              {
-                label: 'Conversão',
-                value: `${estatisticas.taxaConversao.toFixed(1)}%`,
-                tone: 'accent',
-              },
-            ]}
-          />
-        )}
-
-        {lifecycleFeatureEnabled && (
-          <div className="space-y-3 rounded-lg border border-[#B4BEC9]/40 bg-[#DEEFE7]/30 px-3 py-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="inline-flex items-center gap-2 text-xs font-medium text-[#214251]">
-                <Archive className="h-3.5 w-3.5 text-[#159A9C]" />
-                <span>Carteira do Pipeline</span>
-              </div>
-              <button
-                type="button"
-                onClick={() =>
-                  setWorkspaceTab((prev) => (prev === 'parametros' ? 'pipeline' : 'parametros'))
-                }
-                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                  workspaceTab === 'parametros'
-                    ? 'border-[#159A9C] bg-[#DEEFE7]/80 text-[#0F7B7D]'
-                    : 'border-[#B4BEC9]/70 bg-white text-[#002333] hover:bg-[#DEEFE7]/60'
-                }`}
-                title={
-                  workspaceTab === 'parametros'
-                    ? 'Fechar configuracoes da pagina'
-                    : 'Abrir configuracoes da pagina'
-                }
-              >
-                <Settings2 className="h-3.5 w-3.5" />
-                Configurar
-              </button>
+      <SectionCard className="space-y-3 border border-[#BFD4DA]/70 bg-gradient-to-br from-[#F8FCFC] via-white to-[#EAF5F2] p-3 sm:p-4">
+        <div className="rounded-2xl border border-white/70 bg-white/75 p-4 shadow-[0_12px_28px_-22px_rgba(16,57,74,0.45)] backdrop-blur-sm sm:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-3xl space-y-2">
+              <h1 className="text-2xl font-bold tracking-[-0.02em] text-[#19384C] sm:text-3xl">
+                Pipeline de Vendas
+              </h1>
+              <p className="text-xs leading-relaxed text-[#5B7583] sm:text-sm">
+                Acompanhe e avance oportunidades no funil comercial.
+              </p>
             </div>
-            {workspaceTab === 'parametros' && (
+
+            <div className="flex w-full justify-start lg:w-auto lg:justify-end">
+              <div className="flex items-center gap-2">
+                {lifecycleFeatureEnabled ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setWorkspaceTab((prev) => (prev === 'parametros' ? 'pipeline' : 'parametros'))
+                    }
+                    className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#D3E2E7] bg-white text-[#4B6775] transition-colors hover:bg-[#F4FAFC] ${
+                      workspaceTab === 'parametros' ? 'ring-2 ring-[#159A9C]/20' : ''
+                    }`}
+                    aria-label={workspaceTab === 'parametros' ? 'Voltar ao pipeline' : 'Configurar'}
+                    title={workspaceTab === 'parametros' ? 'Voltar ao pipeline' : 'Configurar'}
+                  >
+                    {workspaceTab === 'parametros' ? (
+                      <ArrowLeft className="h-4 w-4" />
+                    ) : (
+                      <Settings2 className="h-4 w-4" />
+                    )}
+                  </button>
+                ) : null}
+
+                <button
+                  onClick={() => handleNovaOportunidade()}
+                  disabled={
+                    lifecycleFeatureEnabled && lifecycleView !== LifecycleViewOportunidade.OPEN
+                  }
+                  title={
+                    lifecycleFeatureEnabled && lifecycleView !== LifecycleViewOportunidade.OPEN
+                      ? 'Troque para "Abertas" para criar oportunidades'
+                      : 'Nova Oportunidade'
+                  }
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#159A9C] px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_24px_-18px_rgba(15,123,125,0.9)] transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Plus className="h-4 w-4" />
+                  Nova Oportunidade
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {estatisticas && (
+            <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
+              <div className="rounded-xl border border-[#D5E4EA] bg-white px-3 py-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#6A8796]">
+                  Oportunidades
+                </p>
+                <p className="mt-1 text-lg font-semibold text-[#173649]">
+                  {estatisticas.totalOportunidades}
+                </p>
+              </div>
+              <div className="rounded-xl border border-[#CFE5DF] bg-[#F3FBF8] px-3 py-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#5B7D7D]">
+                  Valor em Pipeline
+                </p>
+                <p className="mt-1 text-lg font-semibold text-[#0F7B7D]">
+                  {formatarMoeda(estatisticas.valorTotalPipeline)}
+                </p>
+              </div>
+              <div className="rounded-xl border border-[#D5E4EA] bg-white px-3 py-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#6A8796]">
+                  Conversao
+                </p>
+                <p className="mt-1 text-lg font-semibold text-[#173649]">
+                  {estatisticas.taxaConversao.toFixed(1)}%
+                </p>
+              </div>
+              <div className="rounded-xl border border-[#D5E4EA] bg-white px-3 py-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#6A8796]">
+                  Ticket Medio
+                </p>
+                <p className="mt-1 text-lg font-semibold text-[#173649]">
+                  {formatarMoeda(estatisticas.valorMedio)}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {lifecycleFeatureEnabled && workspaceTab === 'parametros' && (
+          <div className="space-y-3 rounded-2xl border border-[#B4BEC9]/35 bg-white/75 px-4 py-3 shadow-[0_12px_28px_-22px_rgba(16,57,74,0.35)] backdrop-blur-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="inline-flex items-center gap-2 text-sm font-semibold text-[#214251]">
+                <Settings2 className="h-4 w-4 text-[#159A9C]" />
+                <span>Configuracoes do pipeline</span>
+              </div>
+              <span className="text-xs text-[#607B89]">Use a engrenagem para voltar ao funil.</span>
+            </div>
+
+            <div className="space-y-3">
               <div className="space-y-3 rounded-lg border border-[#B4BEC9]/35 bg-white/80 p-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
@@ -2463,14 +2739,202 @@ const PipelinePage: React.FC = () => {
                   )}
                 </div>
               </div>
-            )}
+
+              <div className="space-y-3 rounded-lg border border-[#B4BEC9]/35 bg-white/80 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-[#002333]">
+                      Política de aquecimento da negociação
+                    </p>
+                    <p className="text-xs text-[#002333]/65">
+                      Define quando mostrar os sinais "Quente" e "Ação em Xd".
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border border-[#B4BEC9]/45 bg-[#DEEFE7]/50 px-2 py-0.5 text-xs font-medium text-[#0F7B7D]">
+                      {engagementPolicyLoading
+                        ? 'Carregando...'
+                        : engagementPolicy
+                          ? `Hot: ${engagementPolicy.hotMinProbabilitySource}`
+                          : 'Política indisponível'}
+                    </span>
+                    {engagementPolicy && (
+                      <>
+                        <span className="rounded-full border border-[#B4BEC9]/45 bg-white px-2 py-0.5 text-xs font-medium text-[#002333]/70">
+                          Janela: {engagementPolicy.hotCloseWindowSource}
+                        </span>
+                        <span className="rounded-full border border-[#B4BEC9]/45 bg-white px-2 py-0.5 text-xs font-medium text-[#002333]/70">
+                          Ação: {engagementPolicy.nextActionDueSoonSource}
+                        </span>
+                      </>
+                    )}
+                    {engagementPolicyHasChanges && (
+                      <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                        Alterações não salvas
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <div className="rounded-lg border border-[#B4BEC9]/50 bg-white px-3 py-2">
+                    <label className="mb-1 block text-xs font-medium text-[#002333]/70">
+                      Probabilidade mínima para "Quente" (%)
+                    </label>
+                    <input
+                      type="number"
+                      min={ENGAGEMENT_HOT_MIN_PROBABILITY_MIN}
+                      max={ENGAGEMENT_HOT_MIN_PROBABILITY_MAX}
+                      value={engagementPolicyDraft.hotMinProbability}
+                      onChange={(event) => {
+                        const parsed = Number(event.target.value);
+                        if (!Number.isFinite(parsed)) return;
+                        setEngagementPolicyDraft((prev) => ({
+                          ...prev,
+                          hotMinProbability: parsed,
+                        }));
+                      }}
+                      onBlur={(event) => {
+                        const normalized = normalizeIntegerWithinRange(
+                          Number(event.target.value),
+                          ENGAGEMENT_HOT_MIN_PROBABILITY_MIN,
+                          ENGAGEMENT_HOT_MIN_PROBABILITY_MAX,
+                        );
+                        setEngagementPolicyDraft((prev) => ({
+                          ...prev,
+                          hotMinProbability: normalized,
+                        }));
+                      }}
+                      disabled={canManageStalePolicy === false || engagementPolicySaving}
+                      className="w-full rounded-lg border border-[#B4BEC9]/70 px-3 py-1.5 text-sm text-[#002333] focus:border-[#159A9C] focus:outline-none disabled:cursor-not-allowed disabled:bg-[#F8FAFB] disabled:opacity-70"
+                    />
+                    <p className="mt-1 text-[11px] text-[#002333]/55">
+                      Faixa: {ENGAGEMENT_HOT_MIN_PROBABILITY_MIN} a{' '}
+                      {ENGAGEMENT_HOT_MIN_PROBABILITY_MAX}.
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-[#B4BEC9]/50 bg-white px-3 py-2">
+                    <label className="mb-1 block text-xs font-medium text-[#002333]/70">
+                      Janela de fechamento para "Quente" (dias)
+                    </label>
+                    <input
+                      type="number"
+                      min={ENGAGEMENT_HOT_CLOSE_WINDOW_MIN}
+                      max={ENGAGEMENT_HOT_CLOSE_WINDOW_MAX}
+                      value={engagementPolicyDraft.hotCloseWindowDays}
+                      onChange={(event) => {
+                        const parsed = Number(event.target.value);
+                        if (!Number.isFinite(parsed)) return;
+                        setEngagementPolicyDraft((prev) => ({
+                          ...prev,
+                          hotCloseWindowDays: parsed,
+                        }));
+                      }}
+                      onBlur={(event) => {
+                        const normalized = normalizeIntegerWithinRange(
+                          Number(event.target.value),
+                          ENGAGEMENT_HOT_CLOSE_WINDOW_MIN,
+                          ENGAGEMENT_HOT_CLOSE_WINDOW_MAX,
+                        );
+                        setEngagementPolicyDraft((prev) => ({
+                          ...prev,
+                          hotCloseWindowDays: normalized,
+                        }));
+                      }}
+                      disabled={canManageStalePolicy === false || engagementPolicySaving}
+                      className="w-full rounded-lg border border-[#B4BEC9]/70 px-3 py-1.5 text-sm text-[#002333] focus:border-[#159A9C] focus:outline-none disabled:cursor-not-allowed disabled:bg-[#F8FAFB] disabled:opacity-70"
+                    />
+                    <p className="mt-1 text-[11px] text-[#002333]/55">
+                      Faixa: {ENGAGEMENT_HOT_CLOSE_WINDOW_MIN} a {ENGAGEMENT_HOT_CLOSE_WINDOW_MAX}{' '}
+                      dias.
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-[#B4BEC9]/50 bg-white px-3 py-2">
+                    <label className="mb-1 block text-xs font-medium text-[#002333]/70">
+                      Janela de "Ação próxima" (dias)
+                    </label>
+                    <input
+                      type="number"
+                      min={ENGAGEMENT_NEXT_ACTION_SOON_MIN}
+                      max={ENGAGEMENT_NEXT_ACTION_SOON_MAX}
+                      value={engagementPolicyDraft.nextActionDueSoonDays}
+                      onChange={(event) => {
+                        const parsed = Number(event.target.value);
+                        if (!Number.isFinite(parsed)) return;
+                        setEngagementPolicyDraft((prev) => ({
+                          ...prev,
+                          nextActionDueSoonDays: parsed,
+                        }));
+                      }}
+                      onBlur={(event) => {
+                        const normalized = normalizeIntegerWithinRange(
+                          Number(event.target.value),
+                          ENGAGEMENT_NEXT_ACTION_SOON_MIN,
+                          ENGAGEMENT_NEXT_ACTION_SOON_MAX,
+                        );
+                        setEngagementPolicyDraft((prev) => ({
+                          ...prev,
+                          nextActionDueSoonDays: normalized,
+                        }));
+                      }}
+                      disabled={canManageStalePolicy === false || engagementPolicySaving}
+                      className="w-full rounded-lg border border-[#B4BEC9]/70 px-3 py-1.5 text-sm text-[#002333] focus:border-[#159A9C] focus:outline-none disabled:cursor-not-allowed disabled:bg-[#F8FAFB] disabled:opacity-70"
+                    />
+                    <p className="mt-1 text-[11px] text-[#002333]/55">
+                      Faixa: {ENGAGEMENT_NEXT_ACTION_SOON_MIN} a {ENGAGEMENT_NEXT_ACTION_SOON_MAX}{' '}
+                      dias.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-[#002333]/60">
+                    {canManageStalePolicy
+                      ? 'Ajuste esses limiares para calibrar os sinais visuais do time comercial.'
+                      : 'Somente leitura: sem permissão para alterar esta política.'}
+                  </p>
+                  {canManageStalePolicy && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleResetEngagementPolicyDraft}
+                        disabled={
+                          !engagementPolicy || engagementPolicySaving || !engagementPolicyHasChanges
+                        }
+                        className="inline-flex items-center gap-2 rounded-lg border border-[#B4BEC9]/70 bg-white px-3 py-1.5 text-sm font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Reverter
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void handleSalvarEngagementPolicy();
+                        }}
+                        disabled={
+                          !engagementPolicy ||
+                          engagementPolicyLoading ||
+                          engagementPolicySaving ||
+                          !engagementPolicyHasChanges
+                        }
+                        className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <Save className="h-4 w-4" />
+                        {engagementPolicySaving ? 'Salvando...' : 'Salvar política'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </SectionCard>
       {showPipelineWorkspace && (
         <>
           {/* Barra de trabalho sticky */}
-          <SectionCard className="sticky top-2 z-10 border border-[#B4BEC9]/40 bg-white/95 p-3 backdrop-blur supports-[backdrop-filter]:bg-white/85 sm:p-4">
+          <SectionCard className="z-20 border border-[#B4BEC9]/40 bg-white/95 p-3 shadow-[0_16px_26px_-22px_rgba(16,57,74,0.45)] backdrop-blur supports-[backdrop-filter]:bg-white/85 sm:p-4">
             <div className="flex flex-col gap-3">
               {lifecycleFeatureEnabled && (
                 <div className="flex flex-wrap items-center gap-2">
@@ -2505,6 +2969,7 @@ const PipelinePage: React.FC = () => {
                       data-testid="pipeline-view-kanban"
                       onClick={() => setVisualizacao('kanban')}
                       type="button"
+                      aria-label="Visualizacao Cards"
                       aria-pressed={visualizacao === 'kanban'}
                       className={`px-3 py-1.5 rounded-md transition-colors flex items-center justify-center gap-2 text-sm font-medium ${
                         visualizacao === 'kanban'
@@ -2519,6 +2984,7 @@ const PipelinePage: React.FC = () => {
                       data-testid="pipeline-view-lista"
                       onClick={() => setVisualizacao('lista')}
                       type="button"
+                      aria-label="Visualizacao Lista"
                       aria-pressed={visualizacao === 'lista'}
                       className={`px-3 py-1.5 rounded-md transition-colors flex items-center justify-center gap-2 text-sm font-medium ${
                         visualizacao === 'lista'
@@ -2533,6 +2999,7 @@ const PipelinePage: React.FC = () => {
                       data-testid="pipeline-view-calendario"
                       onClick={() => setVisualizacao('calendario')}
                       type="button"
+                      aria-label="Visualizacao Calendario"
                       aria-pressed={visualizacao === 'calendario'}
                       className={`px-3 py-1.5 rounded-md transition-colors flex items-center justify-center gap-2 text-sm font-medium ${
                         visualizacao === 'calendario'
@@ -2547,6 +3014,7 @@ const PipelinePage: React.FC = () => {
                       data-testid="pipeline-view-grafico"
                       onClick={() => setVisualizacao('grafico')}
                       type="button"
+                      aria-label="Visualizacao Graficos"
                       aria-pressed={visualizacao === 'grafico'}
                       className={`px-3 py-1.5 rounded-md transition-colors flex items-center justify-center gap-2 text-sm font-medium ${
                         visualizacao === 'grafico'
@@ -2952,16 +3420,11 @@ const PipelinePage: React.FC = () => {
                       <div className={`${estagio.headerClass} rounded-t-lg p-2.5 sm:p-3`}>
                         <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-2">
-                            <span className="text-xl" aria-hidden="true">
-                              {estagio.id === EstagioOportunidade.LEADS
-                                ? '🎯'
-                                : estagio.id === EstagioOportunidade.QUALIFICACAO
-                                  ? '✅'
-                                  : estagio.id === EstagioOportunidade.PROPOSTA
-                                    ? '📄'
-                                    : estagio.id === EstagioOportunidade.NEGOCIACAO
-                                      ? '🤝'
-                                      : '🎉'}
+                            <span
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/70 bg-white/90 text-[11px] font-bold tracking-wide text-[#214251] shadow-sm"
+                              aria-hidden="true"
+                            >
+                              {STAGE_MONOGRAM[estagio.id]}
                             </span>
                             <h3
                               id={`pipeline-column-title-${estagio.id}`}
@@ -2977,17 +3440,25 @@ const PipelinePage: React.FC = () => {
                             <button
                               onClick={() => handleNovaOportunidade(estagio.id)}
                               type="button"
-                              disabled={!canManipulateKanban}
+                              disabled={
+                                !canManipulateKanban ||
+                                estagio.id === EstagioOportunidade.GANHO ||
+                                estagio.id === EstagioOportunidade.PERDIDO
+                              }
                               className="p-1.5 hover:bg-[#DEEFE7]/70 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25 disabled:cursor-not-allowed disabled:opacity-50"
                               aria-label={
-                                canManipulateKanban
+                                canManipulateKanban &&
+                                estagio.id !== EstagioOportunidade.GANHO &&
+                                estagio.id !== EstagioOportunidade.PERDIDO
                                   ? `Adicionar oportunidade em ${estagio.nome}`
-                                  : 'Criação por coluna disponível apenas na visão Abertas'
+                                  : 'Criacao por coluna disponivel apenas em etapas ativas e na visao Abertas'
                               }
                               title={
-                                canManipulateKanban
+                                canManipulateKanban &&
+                                estagio.id !== EstagioOportunidade.GANHO &&
+                                estagio.id !== EstagioOportunidade.PERDIDO
                                   ? `Adicionar oportunidade em ${estagio.nome}`
-                                  : 'Disponível apenas na visão Abertas'
+                                  : 'Disponivel apenas em etapas ativas e na visao Abertas'
                               }
                               style={{ color: estagio.accentColor }}
                             >
@@ -3012,14 +3483,14 @@ const PipelinePage: React.FC = () => {
                         }}
                         className={
                           kanbanExpanded
-                            ? `bg-[#DEEFE7]/35 rounded-b-lg p-2 space-y-2 border border-[#B4BEC9]/40 border-t-0 flex-1 overflow-y-auto [scrollbar-gutter:stable] min-h-[16rem] ${
+                            ? `${STAGE_COLUMN_SURFACE_CLASS[estagio.id]} rounded-b-lg p-2 space-y-2 border border-[#B4BEC9]/40 border-t-0 flex-1 overflow-y-auto [scrollbar-gutter:stable] min-h-[16rem] ${
                                 dragOverStage === estagio.id
-                                  ? 'ring-2 ring-[#159A9C]/45 bg-[#DEEFE7]/65'
+                                  ? 'ring-2 ring-[#159A9C]/45 bg-[#DFF1EC]/90'
                                   : ''
                               }`
-                            : `bg-[#DEEFE7]/35 rounded-b-lg p-2 space-y-2 border border-[#B4BEC9]/40 border-t-0 min-h-[16rem] ${
+                            : `${STAGE_COLUMN_SURFACE_CLASS[estagio.id]} rounded-b-lg p-2 space-y-2 border border-[#B4BEC9]/40 border-t-0 min-h-[16rem] ${
                                 dragOverStage === estagio.id
-                                  ? 'ring-2 ring-[#159A9C]/45 bg-[#DEEFE7]/65'
+                                  ? 'ring-2 ring-[#159A9C]/45 bg-[#DFF1EC]/90'
                                   : ''
                               }`
                         }
@@ -3038,22 +3509,28 @@ const PipelinePage: React.FC = () => {
                         }
                       >
                         {estagio.oportunidades.length === 0 ? (
-                          <div className="flex flex-col items-center justify-center py-16 text-center">
-                            <div className="text-6xl mb-4 opacity-20">
-                              {estagio.id === EstagioOportunidade.LEADS
-                                ? '🎯'
-                                : estagio.id === EstagioOportunidade.QUALIFICACAO
-                                  ? '✅'
-                                  : estagio.id === EstagioOportunidade.PROPOSTA
-                                    ? '📄'
-                                    : estagio.id === EstagioOportunidade.NEGOCIACAO
-                                      ? '🤝'
-                                      : '🎉'}
+                          <div className="flex flex-col items-center justify-center py-14 text-center">
+                            <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-full border border-[#B4BEC9]/55 bg-white/80 text-sm font-bold tracking-wide text-[#36505F]">
+                              {STAGE_MONOGRAM[estagio.id]}
                             </div>
-                            <p className="text-[#002333]/40 text-sm font-medium">
+                            <p className="text-[#002333]/60 text-sm font-semibold">
                               Nenhuma oportunidade
                             </p>
-                            <p className="text-[#002333]/30 text-xs mt-1">Arraste cards para cá</p>
+                            <p className="mt-1 max-w-[14rem] text-[#002333]/45 text-xs leading-relaxed">
+                              {STAGE_EMPTY_HINT[estagio.id]}
+                            </p>
+                            {canManipulateKanban &&
+                              estagio.id !== EstagioOportunidade.GANHO &&
+                              estagio.id !== EstagioOportunidade.PERDIDO && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleNovaOportunidade(estagio.id)}
+                                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-[#BFD4DA] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#0F7B7D] transition-colors hover:bg-[#F1F8F7]"
+                                >
+                                  <Plus className="h-3.5 w-3.5" />
+                                  Criar nesta etapa
+                                </button>
+                              )}
                           </div>
                         ) : (
                           estagio.oportunidades.map((oportunidade) => {
@@ -3099,6 +3576,11 @@ const PipelinePage: React.FC = () => {
                               diasAteVencimento !== null &&
                               isOpportunityOpenForProcess(oportunidade) &&
                               !isTerminalStage(oportunidade.estagio);
+                            const nextActionWarningCard = getNextActionWarning(oportunidade);
+                            const showHotNegotiationBadgeCard = isHotNegotiationOpportunity(
+                              oportunidade,
+                              diasAteVencimento,
+                            );
                             const isDragEnabled =
                               canManipulateKanban &&
                               (!lifecycleFeatureEnabled ||
@@ -3165,7 +3647,7 @@ const PipelinePage: React.FC = () => {
                               >
                                 {/* Header com avatar e badges */}
                                 <div className="flex items-center justify-between mb-2">
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
                                     {/* Avatar do responsável */}
                                     {oportunidade.responsavel && (
                                       <div
@@ -3190,6 +3672,18 @@ const PipelinePage: React.FC = () => {
                                     {showStaleBadge && (
                                       <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-semibold">
                                         Parada {staleDaysCard}d
+                                      </span>
+                                    )}
+                                    {showHotNegotiationBadgeCard && (
+                                      <span className="px-2 py-0.5 bg-[#FFE6CC] text-[#B45309] rounded-full text-xs font-semibold border border-[#F9C78F]">
+                                        Quente
+                                      </span>
+                                    )}
+                                    {nextActionWarningCard && (
+                                      <span
+                                        className={`px-2 py-0.5 rounded-full text-xs font-semibold ${nextActionWarningCard.className}`}
+                                      >
+                                        {nextActionWarningCard.label}
                                       </span>
                                     )}
                                   </div>
@@ -3352,7 +3846,7 @@ const PipelinePage: React.FC = () => {
                                         void handleLifecyclePrimaryAction(oportunidade);
                                       }}
                                       type="button"
-                                      className="inline-flex items-center gap-1 rounded-lg border border-[#B4BEC9]/70 bg-white px-2 py-1 text-xs font-semibold text-[#0F7B7D] transition-colors hover:bg-[#DEEFE7]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25"
+                                      className="inline-flex items-center gap-1 rounded-lg border border-[#D4E2E7] bg-[#F8FBFC] px-2 py-1 text-xs font-semibold text-[#4F6D7B] transition-colors hover:bg-[#EEF5F7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25"
                                       title={`${lifecyclePrimaryLabel} oportunidade`}
                                     >
                                       {lifecyclePrimaryLabel === 'Arquivar' ? (
@@ -3586,6 +4080,17 @@ const PipelinePage: React.FC = () => {
                           staleDaysList > 0 &&
                           lifecycleStatus === LifecycleStatusOportunidade.OPEN &&
                           !isTerminalStage(oportunidade.estagio);
+                        const diasAteVencimentoList = oportunidade.dataFechamentoEsperado
+                          ? differenceInDays(
+                              new Date(oportunidade.dataFechamentoEsperado),
+                              new Date(),
+                            )
+                          : null;
+                        const nextActionWarningList = getNextActionWarning(oportunidade);
+                        const showHotNegotiationBadgeList = isHotNegotiationOpportunity(
+                          oportunidade,
+                          diasAteVencimentoList,
+                        );
                         const listRowId = String(oportunidade.id);
                         const listActionsMenuOpen = openListActionsMenuId === listRowId;
                         const lifecyclePrimaryLabelList =
@@ -3616,11 +4121,27 @@ const PipelinePage: React.FC = () => {
                                   {oportunidade.descricao}
                                 </div>
                               )}
-                              {showStaleBadgeList && (
-                                <div className="mt-1">
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
-                                    Parada {staleDaysList}d
-                                  </span>
+                              {(showStaleBadgeList ||
+                                showHotNegotiationBadgeList ||
+                                Boolean(nextActionWarningList)) && (
+                                <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                                  {showStaleBadgeList && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+                                      Parada {staleDaysList}d
+                                    </span>
+                                  )}
+                                  {showHotNegotiationBadgeList && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-[#FFE6CC] text-[#B45309] border border-[#F9C78F]">
+                                      Quente
+                                    </span>
+                                  )}
+                                  {nextActionWarningList && (
+                                    <span
+                                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${nextActionWarningList.className}`}
+                                    >
+                                      {nextActionWarningList.label}
+                                    </span>
+                                  )}
                                 </div>
                               )}
                             </td>
@@ -3660,7 +4181,7 @@ const PipelinePage: React.FC = () => {
                                       prev === listRowId ? null : listRowId,
                                     );
                                   }}
-                                  className="inline-flex items-center gap-1 rounded-lg border border-[#B4BEC9]/70 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                  className="inline-flex items-center gap-1 rounded-lg border border-[#D4E2E7] bg-[#F8FBFC] px-2.5 py-1.5 text-xs font-semibold text-[#4F6D7B] transition-colors hover:bg-[#EEF5F7]"
                                   aria-expanded={listActionsMenuOpen}
                                   aria-label="Abrir menu de ações da linha"
                                 >
@@ -4419,39 +4940,6 @@ const PipelinePage: React.FC = () => {
           errorMessage={erroMotivoPerda}
         />
       )}
-
-      {/* Modal de Detalhes */}
-      <ModalDetalhesOportunidade
-        oportunidade={oportunidadeDetalhes}
-        initialTab={detalhesAbaInicial}
-        eventContext={contextoEventoCalendario}
-        onClose={() => {
-          setDetalhesAbaInicial('detalhes');
-          setContextoEventoCalendario(null);
-          setOportunidadeDetalhes(null);
-          restoreKanbanScrollSnapshot({ defer: true });
-        }}
-        onEditar={handleEditarOportunidade}
-        onClonar={handleClonarOportunidade}
-        exclusaoDireta={!lifecycleFeatureEnabled}
-        onMarcarComoGanho={lifecycleFeatureEnabled ? handleMarcarOportunidadeComoGanha : undefined}
-        onMarcarComoPerdido={lifecycleFeatureEnabled ? handlePrepararPerdaOportunidade : undefined}
-        onArquivar={lifecycleFeatureEnabled ? handleArquivarOportunidade : undefined}
-        onRestaurar={lifecycleFeatureEnabled ? handleRestaurarOportunidade : undefined}
-        onReabrir={lifecycleFeatureEnabled ? handleReabrirOportunidade : undefined}
-        onExcluir={async (oportunidade) => {
-          await oportunidadesService.excluirOportunidade(oportunidade.id);
-          toastService.success(
-            lifecycleFeatureEnabled
-              ? 'Oportunidade enviada para a lixeira.'
-              : 'Oportunidade excluida com sucesso.',
-          );
-          await carregarDados();
-        }}
-        onExcluirPermanente={
-          lifecycleFeatureEnabled ? handleExcluirPermanenteOportunidade : undefined
-        }
-      />
 
       {/* Modal de Confirmação de Exclusão */}
       {showModalDeletar && oportunidadeDeletar && (

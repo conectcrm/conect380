@@ -90,6 +90,12 @@ export interface Oportunidade {
   stale_days?: number;
   last_interaction_at?: Date | string | null;
   stale_since?: Date | string | null;
+  next_action_at?: Date | string | null;
+  next_action_type?: TipoAtividade | string | null;
+  next_action_description?: string | null;
+  next_action_status?: 'overdue' | 'due_soon' | 'future' | null;
+  next_action_days_delta?: number | null;
+  engagement_signal?: 'hot' | 'watch' | 'normal';
   proposta_principal_id?: string | null;
   propostaPrincipal?: {
     id: string;
@@ -233,6 +239,90 @@ export interface OportunidadeAtividadeResumo {
   }>;
 }
 
+export type OportunidadeAtividadesPainelStatusFilter =
+  | 'all'
+  | 'pending'
+  | 'completed'
+  | 'overdue'
+  | 'due_today'
+  | 'due_week';
+
+export interface OportunidadeAtividadesPainelItem {
+  id: string;
+  tipo: TipoAtividade;
+  descricao: string;
+  status: 'pending' | 'completed';
+  resultadoConclusao?: string | null;
+  dataAtividade: string | null;
+  createdAt: string | null;
+  concluidoEm?: string | null;
+  flags: {
+    overdue: boolean;
+    dueToday: boolean;
+    dueWeek: boolean;
+    daysDelta: number | null;
+  };
+  oportunidade: {
+    id: string;
+    titulo: string;
+    estagio: EstagioOportunidade;
+    lifecycleStatus: LifecycleStatusOportunidade;
+    valor: number;
+    probabilidade: number;
+  };
+  criadoPor?: {
+    id: string;
+    nome: string;
+    avatarUrl?: string | null;
+  };
+  responsavel?: {
+    id: string;
+    nome: string;
+    avatarUrl?: string | null;
+  };
+  concluidoPor?: {
+    id: string;
+    nome: string;
+    avatarUrl?: string | null;
+  };
+}
+
+export interface OportunidadeAtividadesPainelResult {
+  generatedAt: string;
+  range: {
+    periodStart: string;
+    periodEnd: string;
+  };
+  filters: {
+    vendedorId?: string;
+    onlyMine: boolean;
+    status: OportunidadeAtividadesPainelStatusFilter;
+    tipo?: TipoAtividade;
+    busca?: string;
+    includeClosed: boolean;
+    includeArchived: boolean;
+  };
+  resumo: {
+    total: number;
+    pending: number;
+    completed: number;
+    overdue: number;
+    dueToday: number;
+    dueWeek: number;
+  };
+  items: OportunidadeAtividadesPainelItem[];
+}
+
+export interface OportunidadeVendedorEnvolvido {
+  id: string;
+  vendedorId: string;
+  nome: string;
+  email?: string | null;
+  avatarUrl?: string | null;
+  papel: string;
+  createdAt?: string | null;
+}
+
 export interface LifecycleFeatureFlagDecision {
   enabled: boolean;
   source: 'disabled' | 'enabled' | 'rollout';
@@ -266,6 +356,21 @@ export interface StalePolicyDecision {
   autoArchiveEnabled: boolean;
   autoArchiveAfterDays: number;
   autoArchiveSource: 'tenant' | 'default';
+}
+
+export interface EngagementPolicyDecision {
+  hotMinProbability: number;
+  hotMinProbabilitySource: 'tenant' | 'default';
+  hotCloseWindowDays: number;
+  hotCloseWindowSource: 'tenant' | 'default';
+  nextActionDueSoonDays: number;
+  nextActionDueSoonSource: 'tenant' | 'default';
+}
+
+export interface UpdateEngagementPolicyPayload {
+  hotMinProbability?: number;
+  hotCloseWindowDays?: number;
+  nextActionDueSoonDays?: number;
 }
 
 export interface StaleDealsResult {

@@ -881,6 +881,16 @@ export const menuConfig: MenuConfig[] = [
         group: 'Vendas',
       },
       {
+        id: 'comercial-atividades',
+        title: 'Atividades',
+        shortTitle: 'Atividades',
+        icon: ListChecks,
+        href: '/crm/atividades',
+        color: 'blue',
+        permissions: ['crm.oportunidades.read'],
+        group: 'Vendas',
+      },
+      {
         id: 'comercial-propostas',
         title: 'Propostas',
         icon: FileText,
@@ -1287,7 +1297,10 @@ const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
   { pattern: '/crm/clientes/:id', permissions: ['crm.clientes.read'] },
   { pattern: '/contatos', permissions: ['crm.clientes.read'] },
   { pattern: '/crm/contatos', permissions: ['crm.clientes.read'] },
-  { pattern: '/crm/interacoes', permissions: ['crm.clientes.read'] },
+  { pattern: '/interacoes', permissions: ['crm.oportunidades.read'] },
+  { pattern: '/atividades', permissions: ['crm.oportunidades.read'] },
+  { pattern: '/crm/interacoes', permissions: ['crm.oportunidades.read'] },
+  { pattern: '/crm/atividades', permissions: ['crm.oportunidades.read'] },
   { pattern: '/leads', permissions: ['crm.leads.read'] },
   { pattern: '/crm/leads', permissions: ['crm.leads.read'] },
   { pattern: '/pipeline', permissions: ['crm.oportunidades.read'] },
@@ -1429,6 +1442,8 @@ const ROUTE_PATH_ALIASES: Record<string, string[]> = {
   '/clientes': ['/crm/clientes'],
   '/contatos': ['/crm/contatos'],
   '/leads': ['/crm/leads'],
+  '/interacoes': ['/crm/atividades'],
+  '/atividades': ['/crm/atividades'],
   '/pipeline': ['/crm/pipeline'],
   '/funil-vendas': ['/crm/pipeline'],
   '/oportunidades': ['/crm/pipeline'],
@@ -1490,6 +1505,8 @@ const ROUTE_MODULE_REQUIREMENTS: Array<{ pattern: string; module: LicensedModule
   { pattern: '/contatos', module: 'CRM' },
   { pattern: '/crm', module: 'CRM' },
   { pattern: '/leads', module: 'CRM' },
+  { pattern: '/crm/atividades', module: 'CRM' },
+  { pattern: '/atividades', module: 'CRM' },
   { pattern: '/pipeline', module: 'CRM' },
   { pattern: '/oportunidades', module: 'CRM' },
   { pattern: '/agenda', module: 'CRM' },
@@ -1828,5 +1845,3 @@ export const getDefaultAuthorizedPath = (
 };
 
 export default menuConfig;
-
-

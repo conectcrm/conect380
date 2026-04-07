@@ -191,6 +191,8 @@ const convertSchema = yup.object().shape({
 
 const LEADS_SAVED_VIEWS_STORAGE_KEY = 'conectcrm_leads_saved_views_v1';
 const LEAD_UNASSIGNED_OPTION_VALUE = '__sem_responsavel__';
+const CLIENTE_OU_CONTATO_RULE_MESSAGE =
+  'Informe um cliente (cliente_id) ou pelo menos o nome do contato (nomeContato).';
 
 interface LeadsSavedView {
   id: string;
@@ -260,6 +262,22 @@ const LeadsPage: React.FC = () => {
 
   const notifyPermissionDenied = (actionLabel: string) => {
     toastService.error(`Você não tem permissão para ${actionLabel}.`);
+  };
+
+  const normalizeClienteOuContatoRuleMessage = (message?: string): string | undefined => {
+    if (!message) return undefined;
+    const normalized = message.toLowerCase();
+    const mentionsCliente = normalized.includes('cliente_id') || normalized.includes('cliente');
+    const mentionsContato =
+      normalized.includes('nomecontato') ||
+      normalized.includes('nome contato') ||
+      normalized.includes('nome do contato');
+
+    if (mentionsCliente && mentionsContato) {
+      return CLIENTE_OU_CONTATO_RULE_MESSAGE;
+    }
+
+    return undefined;
   };
   // Estados principais
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -880,7 +898,7 @@ const LeadsPage: React.FC = () => {
   const abrirLeadNoPipeline = (lead?: Lead | null) => {
     const oportunidadeId = getLeadOportunidadeId(lead);
     if (oportunidadeId) {
-      navigate(`/crm/pipeline?oportunidadeId=${oportunidadeId}`);
+      navigate(`/crm/pipeline/oportunidades/${encodeURIComponent(oportunidadeId)}`);
       return;
     }
 
@@ -894,6 +912,13 @@ const LeadsPage: React.FC = () => {
     }
 
     if (!leadToConvert) return;
+
+    const leadNomeContato = String(leadToConvert.nome || '').trim();
+    if (!leadNomeContato) {
+      setError(CLIENTE_OU_CONTATO_RULE_MESSAGE);
+      toastService.error(CLIENTE_OU_CONTATO_RULE_MESSAGE);
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -921,15 +946,15 @@ const LeadsPage: React.FC = () => {
       }
 
       const oportunidade = await leadsService.converter(leadToConvert.id, convertData);
-      const oportunidadeId = Number((oportunidade as any)?.id);
+      const oportunidadeIdRaw = String((oportunidade as any)?.id || '').trim();
 
       toastService.success('Lead convertido em oportunidade com sucesso!');
       setShowConvertDialog(false);
       setLeadToConvert(null);
       resetConvertForm();
 
-      if (Number.isFinite(oportunidadeId) && oportunidadeId > 0) {
-        navigate(`/crm/pipeline?oportunidadeId=${oportunidadeId}`);
+      if (oportunidadeIdRaw) {
+        navigate(`/crm/pipeline/oportunidades/${encodeURIComponent(oportunidadeIdRaw)}`);
         return;
       }
 
@@ -941,7 +966,9 @@ const LeadsPage: React.FC = () => {
         ? responseMessage.join('. ')
         : responseMessage;
       const fallbackMessage = err instanceof Error ? err.message : undefined;
-      const errorMsg = normalizedMessage || fallbackMessage || 'Erro ao converter lead';
+      const rawErrorMessage = normalizedMessage || fallbackMessage;
+      const normalizedRuleMessage = normalizeClienteOuContatoRuleMessage(rawErrorMessage);
+      const errorMsg = normalizedRuleMessage || rawErrorMessage || 'Erro ao converter lead';
       setError(errorMsg);
       toastService.error(errorMsg);
     } finally {
@@ -2666,6 +2693,9 @@ const LeadsPage: React.FC = () => {
                       </div>
                     )}
                   </div>
+                  <p className="mt-3 text-xs text-blue-700">
+                    Regra de vínculo: {CLIENTE_OU_CONTATO_RULE_MESSAGE}
+                  </p>
                 </div>
 
                 {/* Título da Oportunidade */}
