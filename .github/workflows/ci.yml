@@ -20,7 +20,7 @@ jobs:
       - name: Checkout codigo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup Node.js
@@ -32,13 +32,22 @@ jobs:
         run: |
           set -e
 
-          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
-            echo "Verificando diff do commit atual (HEAD^..HEAD)"
-            git diff --name-only --diff-filter=ACMR HEAD^ HEAD > changed_files.txt || true
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.base_ref }}"
+            git fetch --no-tags --prune --depth=1 origin "$BASE_REF"
+            BASE_SHA="$(git merge-base HEAD "origin/$BASE_REF")"
+            HEAD_SHA="HEAD"
           else
-            echo "Sem pai local para HEAD; usando diff-tree no commit atual"
-            git diff-tree --no-commit-id --name-only -r --diff-filter=ACMR HEAD > changed_files.txt || true
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+              HEAD_SHA="HEAD"
+            fi
           fi
+          
+          echo "Verificando diff no range: $BASE_SHA..$HEAD_SHA"
+          git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" > changed_files.txt || true
 
           echo "Arquivos alterados (primeiros 50):"
           head -n 50 changed_files.txt || true
@@ -93,7 +102,14 @@ jobs:
 
       - name: Validar arquitetura (push)
         if: github.event_name != 'pull_request'
-        run: npm run validate:architecture
+        run: |
+          BASE_SHA="${{ github.event.before }}"
+          HEAD_SHA="${{ github.sha }}"
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+            HEAD_SHA="HEAD"
+          fi
+          node scripts/ci/architecture-guardrails.mjs --base "$BASE_SHA" --head "$HEAD_SHA"
 
   backend:
     name: Backend - Testes e Build
@@ -166,17 +182,26 @@ jobs:
       - name: Checkout codigo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Detectar mudancas relevantes (E2E Cotacao)
         id: cotacao_changes
         run: |
-          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
-            CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR HEAD^ HEAD || true)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.base_ref }}"
+            git fetch --no-tags --prune --depth=1 origin "$BASE_REF"
+            BASE_SHA="$(git merge-base HEAD "origin/$BASE_REF")"
+            HEAD_SHA="HEAD"
           else
-            CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r --diff-filter=ACMR HEAD || true)
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+              HEAD_SHA="HEAD"
+            fi
           fi
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" || true)
 
           if echo "$CHANGED_FILES" | grep -E '^(backend/src/modules/cotacao/|backend/src/modules/financeiro/|backend/src/modules/pedidos/|backend/test/cotacao/|backend/test/_support/|backend/package\.json|backend/package-lock\.json)' >/dev/null; then
             echo "run=true" >> $GITHUB_OUTPUT
@@ -252,17 +277,26 @@ jobs:
       - name: Checkout codigo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Detectar mudancas relevantes (E2E Contas Pagar)
         id: contas_pagar_changes
         run: |
-          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
-            CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR HEAD^ HEAD || true)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.base_ref }}"
+            git fetch --no-tags --prune --depth=1 origin "$BASE_REF"
+            BASE_SHA="$(git merge-base HEAD "origin/$BASE_REF")"
+            HEAD_SHA="HEAD"
           else
-            CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r --diff-filter=ACMR HEAD || true)
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+              HEAD_SHA="HEAD"
+            fi
           fi
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" || true)
 
           if echo "$CHANGED_FILES" | grep -E '^(backend/src/modules/financeiro/|backend/src/modules/contas-pagar/|backend/test/financeiro/|backend/test/_support/|backend/package\.json|backend/package-lock\.json)' >/dev/null; then
             echo "run=true" >> $GITHUB_OUTPUT
@@ -338,17 +372,26 @@ jobs:
       - name: Checkout codigo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Detectar mudancas relevantes (E2E Multi-Tenancy)
         id: multi_tenancy_changes
         run: |
-          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
-            CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR HEAD^ HEAD || true)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.base_ref }}"
+            git fetch --no-tags --prune --depth=1 origin "$BASE_REF"
+            BASE_SHA="$(git merge-base HEAD "origin/$BASE_REF")"
+            HEAD_SHA="HEAD"
           else
-            CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r --diff-filter=ACMR HEAD || true)
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+              HEAD_SHA="HEAD"
+            fi
           fi
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" || true)
 
           if echo "$CHANGED_FILES" | grep -E '^(backend/src/|backend/test/multi-tenancy|backend/test/_support/|backend/package\.json|backend/package-lock\.json)' >/dev/null; then
             echo "run=true" >> $GITHUB_OUTPUT
@@ -424,19 +467,28 @@ jobs:
       - name: Checkout codigo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Detectar mudancas relevantes (E2E Vendas)
         id: vendas_changes
         run: |
-          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
-            CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR HEAD^ HEAD || true)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.base_ref }}"
+            git fetch --no-tags --prune --depth=1 origin "$BASE_REF"
+            BASE_SHA="$(git merge-base HEAD "origin/$BASE_REF")"
+            HEAD_SHA="HEAD"
           else
-            CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r --diff-filter=ACMR HEAD || true)
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+              HEAD_SHA="HEAD"
+            fi
           fi
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" || true)
 
-          if echo "$CHANGED_FILES" | grep -E '^(backend/src/modules/propostas/|backend/src/modules/oportunidades/|backend/src/modules/vendas/|backend/test/propostas/|backend/test/vendas/|backend/test/_support/|backend/package\.json|backend/package-lock\.json)' >/dev/null; then
+          if echo "$CHANGED_FILES" | grep -E '^(backend/src/modules/faturamento/|backend/src/modules/pagamentos/|backend/src/modules/financeiro/|backend/src/modules/contas-pagar/|backend/src/modules/propostas/|backend/src/modules/oportunidades/|backend/src/modules/vendas/|backend/src/common/permissions/|backend/src/common/guards/|backend/test/propostas/|backend/test/vendas/|backend/test/permissoes/|backend/test/_support/|backend/package\.json|backend/package-lock\.json)' >/dev/null; then
             echo "run=true" >> $GITHUB_OUTPUT
           else
             echo "run=false" >> $GITHUB_OUTPUT
@@ -466,6 +518,101 @@ jobs:
         if: steps.vendas_changes.outputs.run == 'true'
         run: npm --prefix backend run test:e2e:vendas
 
+  backend-e2e-vendas-permissoes:
+    name: Backend - E2E Vendas Permissoes
+    runs-on: ubuntu-latest
+    needs: backend
+    env:
+      NODE_ENV: test
+      JWT_SECRET: test-jwt-secret
+      DATABASE_HOST: localhost
+      DATABASE_PORT: '5434'
+      DATABASE_USERNAME: conectcrm
+      DATABASE_PASSWORD: conectcrm123
+      DATABASE_NAME: conectcrm_test
+      TYPEORM_USE_TS: 'true'
+      REDIS_HOST: localhost
+      REDIS_PORT: '6379'
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: conectcrm
+          POSTGRES_PASSWORD: conectcrm123
+          POSTGRES_DB: conectcrm_test
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U conectcrm -d conectcrm_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Detectar mudancas relevantes (E2E Vendas Permissoes)
+        id: vendas_permissoes_changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.base_ref }}"
+            git fetch --no-tags --prune --depth=1 origin "$BASE_REF"
+            BASE_SHA="$(git merge-base HEAD "origin/$BASE_REF")"
+            HEAD_SHA="HEAD"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+              HEAD_SHA="HEAD"
+            fi
+          fi
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" || true)
+
+          if echo "$CHANGED_FILES" | grep -E '^(backend/src/modules/faturamento/|backend/src/modules/pagamentos/|backend/src/modules/financeiro/|backend/src/modules/contas-pagar/|backend/src/modules/propostas/|backend/src/modules/oportunidades/|backend/src/modules/vendas/|backend/src/modules/auth/|backend/src/modules/users/|backend/src/common/permissions/|backend/src/common/guards/|backend/test/permissoes/|backend/test/_support/|backend/package\.json|backend/package-lock\.json)' >/dev/null; then
+            echo "run=true" >> $GITHUB_OUTPUT
+          else
+            echo "run=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Pular E2E Vendas Permissoes (sem mudancas relevantes)
+        if: steps.vendas_permissoes_changes.outputs.run != 'true'
+        run: echo "Sem alteracoes no escopo de vendas/permissoes; job finalizado sem executar testes."
+
+      - name: Setup Node.js
+        if: steps.vendas_permissoes_changes.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias backend
+        if: steps.vendas_permissoes_changes.outputs.run == 'true'
+        run: npm --prefix backend ci
+
+      - name: Aplicar migrations na base de teste e2e
+        if: steps.vendas_permissoes_changes.outputs.run == 'true'
+        run: npm --prefix backend run migration:run
+
+      - name: Rodar E2E de vendas permissoes
+        if: steps.vendas_permissoes_changes.outputs.run == 'true'
+        run: npm --prefix backend run test:e2e:vendas:permissoes
+
   backend-e2e-core-admin-hardening:
     name: Backend - E2E Core Admin Hardening
     runs-on: ubuntu-latest
@@ -475,17 +622,26 @@ jobs:
       - name: Checkout codigo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Detectar mudancas relevantes (Core Admin Hardening)
         id: core_admin_hardening_changes
         run: |
-          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
-            CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR HEAD^ HEAD || true)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.base_ref }}"
+            git fetch --no-tags --prune --depth=1 origin "$BASE_REF"
+            BASE_SHA="$(git merge-base HEAD "origin/$BASE_REF")"
+            HEAD_SHA="HEAD"
           else
-            CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r --diff-filter=ACMR HEAD || true)
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+              HEAD_SHA="HEAD"
+            fi
           fi
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" || true)
 
           if echo "$CHANGED_FILES" | grep -E '^(backend/test/core-admin/|backend/test/_support/e2e-app.helper.ts|backend/src/modules/core-admin/|backend/src/common/guards/core-admin-legacy-transition.guard.ts|backend/src/common/guards/core-admin-legacy-transition.guard.spec.ts|backend/src/modules/planos/assinatura-due-date-scheduler.service.ts|backend/src/modules/planos/assinaturas.controller.ts|backend/src/modules/planos/planos.controller.ts|backend/src/main.ts|backend/src/app.module.ts|backend/package\.json|backend/package-lock\.json)' >/dev/null; then
             echo "core_admin_hardening=true" >> $GITHUB_OUTPUT
@@ -557,17 +713,26 @@ jobs:
       - name: Checkout codigo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Detectar mudancas relevantes (Core Admin Security)
         id: core_admin_security_changes
         run: |
-          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
-            CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR HEAD^ HEAD || true)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.base_ref }}"
+            git fetch --no-tags --prune --depth=1 origin "$BASE_REF"
+            BASE_SHA="$(git merge-base HEAD "origin/$BASE_REF")"
+            HEAD_SHA="HEAD"
           else
-            CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r --diff-filter=ACMR HEAD || true)
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+              HEAD_SHA="HEAD"
+            fi
           fi
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" || true)
 
           if echo "$CHANGED_FILES" | grep -E '^(backend/test/core-admin/core-admin-mfa-session.e2e-spec.ts|backend/test/core-admin/core-admin-backend-bypass.e2e-spec.ts|backend/test/_support/e2e-app.helper.ts|backend/src/modules/core-admin/|backend/src/modules/auth/|backend/src/modules/users/|backend/src/modules/planos/|backend/src/common/guards/core-admin-legacy-transition.guard.ts|backend/src/common/guards/core-admin-legacy-transition.guard.spec.ts|backend/src/main.ts|backend/src/app.module.ts|backend/src/config/|backend/package\.json|backend/package-lock\.json)' >/dev/null; then
             echo "core_admin_security=true" >> $GITHUB_OUTPUT
@@ -636,17 +801,26 @@ jobs:
       - name: Checkout codigo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Detectar mudancas relevantes (Comercial Core)
         id: comercial_core_changes
         run: |
-          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
-            CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR HEAD^ HEAD || true)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.base_ref }}"
+            git fetch --no-tags --prune --depth=1 origin "$BASE_REF"
+            BASE_SHA="$(git merge-base HEAD "origin/$BASE_REF")"
+            HEAD_SHA="HEAD"
           else
-            CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r --diff-filter=ACMR HEAD || true)
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+              HEAD_SHA="HEAD"
+            fi
           fi
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" || true)
 
           if echo "$CHANGED_FILES" | grep -E '^(e2e/pipeline-.*\.spec\.ts|e2e/propostas-.*\.spec\.ts|e2e/pipeline-ui.helpers.ts|e2e/fixtures.ts|playwright.config.ts|frontend-web/craco.config.js|frontend-web/src/pages/PipelinePage.tsx|frontend-web/src/features/propostas/|frontend-web/src/components/modals/ModalNovaProposta.tsx|frontend-web/src/components/oportunidades/|frontend-web/src/services/api.ts|frontend-web/src/services/oportunidadesService.ts|frontend-web/src/services/modulosService.ts|frontend-web/src/services/minhasEmpresasService.ts|frontend-web/src/contexts/AuthContext.tsx|frontend-web/src/contexts/EmpresaContextAPIReal.tsx|frontend-web/src/hooks/useModuloAtivo.ts|frontend-web/src/components/licensing/PermissionPathGuard.tsx|frontend-web/src/types/oportunidades/|frontend-web/src/App.tsx|package\.json|package-lock\.json|frontend-web/package\.json|frontend-web/package-lock\.json)' >/dev/null; then
             echo "comercial_core=true" >> $GITHUB_OUTPUT
@@ -734,7 +908,7 @@ jobs:
       - name: Checkout codigo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Detectar mudancas relevantes (Billing Critical)
@@ -835,7 +1009,7 @@ jobs:
       - name: Checkout codigo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Detectar mudancas relevantes (Legacy Exposure Scan)
@@ -888,15 +1062,25 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Detectar mudancas relevantes (Core Admin Billing Governance)
         id: core_admin_billing_governance_changes
         run: |
-          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
-            CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR HEAD^ HEAD || true)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.base_ref }}"
+            git fetch --no-tags --prune --depth=1 origin "$BASE_REF"
+            BASE_SHA="$(git merge-base HEAD "origin/$BASE_REF")"
+            HEAD_SHA="HEAD"
           else
-            CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r --diff-filter=ACMR HEAD || true)
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+              HEAD_SHA="HEAD"
+            fi
           fi
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" || true)
 
           if echo "$CHANGED_FILES" | grep -E '^(e2e/core-admin-billing-governance.spec.ts|e2e/core-admin-responsive-visual.spec.ts|playwright.config.ts|frontend-web/src/|backend/src/modules/core-admin/|backend/src/modules/planos/|package\.json|package-lock\.json|frontend-web/package\.json|frontend-web/package-lock\.json)' >/dev/null; then
             echo "core_admin_billing_governance=true" >> $GITHUB_OUTPUT
@@ -1002,17 +1186,26 @@ jobs:
       - name: Checkout codigo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Verificar arquivos temporarios
         run: |
           echo "Verificando arquivos temporarios alterados no commit..."
-          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
-            CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR HEAD^ HEAD || true)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.base_ref }}"
+            git fetch --no-tags --prune --depth=1 origin "$BASE_REF"
+            BASE_SHA="$(git merge-base HEAD "origin/$BASE_REF")"
+            HEAD_SHA="HEAD"
           else
-            CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r --diff-filter=ACMR HEAD || true)
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+              HEAD_SHA="HEAD"
+            fi
           fi
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" || true)
 
           if [ -z "$CHANGED_FILES" ]; then
             echo "Nenhum arquivo alterado detectado no commit atual."
@@ -1035,7 +1228,7 @@ jobs:
   final-status:
     name: Status Final do CI
     runs-on: ubuntu-latest
-    needs: [encoding-guardrails, release-flags-guardrails, architecture-guardrails, backend, backend-e2e-cotacao, backend-e2e-contas-pagar, backend-e2e-multi-tenancy, backend-e2e-vendas, backend-e2e-core-admin-hardening, backend-e2e-core-admin-security, frontend, frontend-e2e-pipeline-ui, frontend-e2e-billing-critical, frontend-legacy-exposure-scan, frontend-e2e-core-admin-billing-governance, security, check-temp-files]
+    needs: [encoding-guardrails, release-flags-guardrails, architecture-guardrails, backend, backend-e2e-cotacao, backend-e2e-contas-pagar, backend-e2e-multi-tenancy, backend-e2e-vendas, backend-e2e-vendas-permissoes, backend-e2e-core-admin-hardening, backend-e2e-core-admin-security, frontend, frontend-e2e-pipeline-ui, frontend-e2e-billing-critical, frontend-legacy-exposure-scan, frontend-e2e-core-admin-billing-governance, security, check-temp-files]
     if: always()
 
     steps:
@@ -1049,6 +1242,7 @@ jobs:
           echo "Backend E2E Contas Pagar: ${{ needs.backend-e2e-contas-pagar.result }}"
           echo "Backend E2E Multi-Tenancy: ${{ needs.backend-e2e-multi-tenancy.result }}"
           echo "Backend E2E Vendas: ${{ needs.backend-e2e-vendas.result }}"
+          echo "Backend E2E Vendas Permissoes: ${{ needs.backend-e2e-vendas-permissoes.result }}"
           echo "Backend E2E Core Admin Hardening: ${{ needs.backend-e2e-core-admin-hardening.result }}"
           echo "Backend E2E Core Admin Security: ${{ needs.backend-e2e-core-admin-security.result }}"
           echo "Frontend: ${{ needs.frontend.result }}"
@@ -1067,6 +1261,7 @@ jobs:
              [ "${{ needs.backend-e2e-contas-pagar.result }}" != "success" ] || \
              [ "${{ needs.backend-e2e-multi-tenancy.result }}" != "success" ] || \
              [ "${{ needs.backend-e2e-vendas.result }}" != "success" ] || \
+             [ "${{ needs.backend-e2e-vendas-permissoes.result }}" != "success" ] || \
              [ "${{ needs.backend-e2e-core-admin-hardening.result }}" != "success" ] || \
              [ "${{ needs.backend-e2e-core-admin-security.result }}" != "success" ] || \
              [ "${{ needs.frontend.result }}" != "success" ] || \

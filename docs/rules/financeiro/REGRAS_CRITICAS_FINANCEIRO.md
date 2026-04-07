@@ -37,3 +37,11 @@ Quando houver impacto amplo de release:
 npm run preflight:go-live:vendas:core
 npm run preflight:go-live:vendas:full
 ```
+
+## Enforcement no CI obrigatorio
+
+- O check `CI - Testes e Build / Status Final do CI` agrega os jobs:
+  - `Backend - E2E Multi-Tenancy`
+  - `Backend - E2E Vendas`
+  - `Backend - E2E Vendas Permissoes`
+- Com isso, a regressao minima acima fica bloqueante de merge quando houver mudanca de escopo relevante.
