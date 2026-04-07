@@ -627,14 +627,15 @@ export class UsersService {
     metadata?: Record<string, unknown>;
     source?: string;
   }): Promise<void> {
-    const adminRoles = new Set<UserRole>([UserRole.SUPERADMIN, UserRole.ADMIN]);
+    const adminRoles = new Set<UserRole>([UserRole.SUPERADMIN]);
+    const actorUserId = params.actor?.id ?? null;
     const companyUsers = await this.userRepository.find({
       where: { empresa_id: params.empresaId, ativo: true },
       select: ['id', 'nome', 'email', 'role', 'empresa_id'],
     });
 
     const recipients = companyUsers.filter((candidate) => {
-      if (!candidate?.id) {
+      if (!candidate?.id || (actorUserId && candidate.id === actorUserId)) {
         return false;
       }
 

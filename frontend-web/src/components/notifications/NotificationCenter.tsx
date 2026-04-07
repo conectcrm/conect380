@@ -1,6 +1,7 @@
 ﻿import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { useWebSocketStatus } from '../../contexts/WebSocketContext';
 import notificationService from '../../services/notificationService';
 import {
   extractNotificationEntityFromData,
@@ -26,9 +27,35 @@ interface NotificationCenterProps {
 
 type NotificationFilter = 'all' | 'unread' | 'success' | 'error' | 'warning' | 'info' | 'reminder';
 const NOTIFICATION_POLL_INTERVAL_MS = 60_000;
+const WS_UNREAD_SYNC_DEBOUNCE_MS = 500;
 
+const mapRealtimeType = (
+  rawType: unknown,
+): 'success' | 'error' | 'warning' | 'info' | 'reminder' => {
+  const normalized = String(rawType || '')
+    .trim()
+    .toLowerCase();
+  if (!normalized) return 'info';
+  if (['error', 'erro', 'critical', 'critico'].includes(normalized)) return 'error';
+  if (['warning', 'warn', 'aviso'].includes(normalized)) return 'warning';
+  if (['success', 'sucesso', 'ok'].includes(normalized)) return 'success';
+  if (['reminder', 'lembrete'].includes(normalized)) return 'reminder';
+  return 'info';
+};
+const mapRealtimePriority = (
+  rawPriority: unknown,
+): 'low' | 'medium' | 'high' | 'urgent' => {
+  const normalized = String(rawPriority || '')
+    .trim()
+    .toLowerCase();
+  if (normalized === 'urgent') return 'urgent';
+  if (normalized === 'high') return 'high';
+  if (normalized === 'low') return 'low';
+  return 'medium';
+};
 export const NotificationCenter: React.FC<NotificationCenterProps> = ({ className = '' }) => {
   const navigate = useNavigate();
+  const { subscribe } = useWebSocketStatus();
   const {
     notifications,
     markAsRead,
@@ -43,6 +70,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
   const [filter, setFilter] = useState<NotificationFilter>('all');
   const [realUnreadCount, setRealUnreadCount] = useState(0);
   const [isConfirmingClearAll, setIsConfirmingClearAll] = useState(false);
+  const unreadSyncTimeoutRef = useRef<number | null>(null);
 
   // IDs já vistos da API (usado para controlar toasts, não para deduplicar lista)
   const seenApiNotificationsRef = useRef<Set<string>>(new Set());
@@ -54,6 +82,101 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
   const dropdownRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
   const panelTitleId = `${panelId}-title`;
+
+  const syncRealUnreadCountFromApi = async () => {
+    try {
+      const count = await notificationService.contarNaoLidas();
+      setRealUnreadCount(count);
+    } catch (error) {
+      console.error('Erro ao sincronizar contador de notificacoes nao lidas:', error);
+    }
+  };
+
+  const scheduleUnreadCountSync = (delayMs = WS_UNREAD_SYNC_DEBOUNCE_MS) => {
+    if (unreadSyncTimeoutRef.current) {
+      window.clearTimeout(unreadSyncTimeoutRef.current);
+    }
+
+    unreadSyncTimeoutRef.current = window.setTimeout(() => {
+      unreadSyncTimeoutRef.current = null;
+      void syncRealUnreadCountFromApi();
+    }, delayMs);
+  };
+
+  useEffect(() => {
+    const unsubscribe = subscribe('notificacao', (payload: unknown) => {
+      if (!payload || typeof payload !== 'object') {
+        return;
+      }
+
+      const realtimePayload = payload as Record<string, unknown>;
+      const dados =
+        realtimePayload.dados && typeof realtimePayload.dados === 'object'
+          ? (realtimePayload.dados as Record<string, unknown>)
+          : null;
+
+      if (!dados) {
+        return;
+      }
+
+      const title = String(dados.title ?? '').trim();
+      const message = String(dados.message ?? '').trim();
+      if (!title || !message) {
+        return;
+      }
+
+      const eventData =
+        dados.data && typeof dados.data === 'object'
+          ? (dados.data as Record<string, unknown>)
+          : null;
+      const entityHint = extractNotificationEntityFromData(eventData);
+      const notificationId = String(dados.id || '').trim();
+      if (notificationId) {
+        if (seenApiNotificationsRef.current.has(notificationId)) {
+          return;
+        }
+        seenApiNotificationsRef.current.add(notificationId);
+      }
+
+      const parsedTimestamp = new Date(String(realtimePayload.timestamp || new Date().toISOString()));
+      const timestamp = Number.isNaN(parsedTimestamp.getTime()) ? new Date() : parsedTimestamp;
+      const syntheticId =
+        notificationId ||
+        `ws:${String(realtimePayload.tipo || 'geral')}:${timestamp.toISOString()}:${title}`;
+      const normalizedType = mapRealtimeType(dados.type ?? realtimePayload.tipo);
+
+      addNotificationRef.current({
+        id: syntheticId,
+        type: normalizedType,
+        title,
+        message,
+        read: false,
+        timestamp,
+        priority: mapRealtimePriority(dados.priority),
+        entityType: entityHint.entityType,
+        entityId: entityHint.entityId,
+        data: eventData,
+        autoClose: true,
+        duration: 5000,
+      });
+
+      setRealUnreadCount((prev) => prev + 1);
+      scheduleUnreadCountSync();
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [subscribe]);
+
+  useEffect(() => {
+    return () => {
+      if (unreadSyncTimeoutRef.current) {
+        window.clearTimeout(unreadSyncTimeoutRef.current);
+        unreadSyncTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     addNotificationRef.current = addNotification;
@@ -568,3 +691,4 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
 };
 
 export default NotificationCenter;
+

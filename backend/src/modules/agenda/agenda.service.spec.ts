@@ -173,6 +173,51 @@ describe('AgendaService - regras principais', () => {
     );
   });
 
+  it('nao envia notificacao para o proprio ator ao criar evento', async () => {
+    agendaRepository.create.mockImplementation((payload: any) => payload);
+    agendaRepository.save.mockImplementation(async (payload: any) => ({
+      ...payload,
+      id: 'evt-2',
+    }));
+
+    userRepository.findOne.mockResolvedValue({
+      id: 'owner-id',
+      nome: 'Owner Admin',
+      email: 'owner@acme.com',
+    });
+    userRepository.find.mockResolvedValue([
+      {
+        id: 'owner-id',
+        nome: 'Owner Admin',
+        email: 'owner@acme.com',
+      },
+      {
+        id: 'guest-id',
+        nome: 'Guest User',
+        email: 'guest@acme.com',
+      },
+    ]);
+    notificationService.create.mockResolvedValue({ id: 'notif-2' });
+
+    await service.create(
+      {
+        titulo: 'Reuniao interna',
+        inicio: '2026-03-25T15:00:00.000Z',
+        attendees: ['owner@acme.com', 'guest@acme.com'],
+      } as any,
+      'empresa-1',
+      undefined,
+      'owner-id',
+    );
+
+    expect(notificationService.create).toHaveBeenCalledTimes(1);
+    expect(notificationService.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'guest-id',
+      }),
+    );
+  });
+
   it('notifica organizador quando participante responde RSVP com novo status', async () => {
     const existing = buildAgendaEvent({
       attendee_responses: {

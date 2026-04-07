@@ -18,11 +18,15 @@ import { useAuth } from './AuthContext';
 import { resolveSocketBaseUrl } from '../utils/network';
 import { apiPublic } from '../services/api';
 
+type WebSocketEventHandler<T = unknown> = (payload: T) => void;
+
 interface WebSocketContextData {
   connected: boolean;
   connecting: boolean;
   error: string | null;
   reconnect: () => void;
+  subscribe: <T = unknown>(eventName: string, handler: WebSocketEventHandler<T>) => () => void;
+  emit: (eventName: string, payload?: unknown) => boolean;
 }
 
 const WebSocketContext = createContext<WebSocketContextData>({
@@ -30,6 +34,8 @@ const WebSocketContext = createContext<WebSocketContextData>({
   connecting: false,
   error: null,
   reconnect: () => { },
+  subscribe: () => () => { },
+  emit: () => false,
 });
 
 interface WebSocketProviderProps {
@@ -82,6 +88,56 @@ const tokenExpirado = (token: string | null, margemSegundos = 5): boolean => {
 let globalSocket: Socket | null = null;
 let providerInstanceCount = 0;
 let globalCleanupTimer: number | null = null;
+const globalEventListeners = new Map<string, Set<WebSocketEventHandler>>();
+
+const bindGlobalEventListeners = (socket: Socket) => {
+  globalEventListeners.forEach((handlers, eventName) => {
+    handlers.forEach((handler) => {
+      socket.on(eventName, handler as any);
+    });
+  });
+};
+
+const subscribeToGlobalSocketEvent = <T = unknown>(
+  eventName: string,
+  handler: WebSocketEventHandler<T>,
+): (() => void) => {
+  if (!eventName || typeof handler !== 'function') {
+    return () => { };
+  }
+
+  const normalizedEventName = eventName.trim();
+  if (!normalizedEventName) {
+    return () => { };
+  }
+
+  let handlers = globalEventListeners.get(normalizedEventName);
+  if (!handlers) {
+    handlers = new Set<WebSocketEventHandler>();
+    globalEventListeners.set(normalizedEventName, handlers);
+  }
+
+  const alreadySubscribed = handlers.has(handler as WebSocketEventHandler);
+  handlers.add(handler as WebSocketEventHandler);
+
+  if (globalSocket && !alreadySubscribed) {
+    globalSocket.on(normalizedEventName, handler as any);
+  }
+
+  return () => {
+    const currentHandlers = globalEventListeners.get(normalizedEventName);
+    if (!currentHandlers) return;
+
+    currentHandlers.delete(handler as WebSocketEventHandler);
+    if (globalSocket) {
+      globalSocket.off(normalizedEventName, handler as any);
+    }
+
+    if (currentHandlers.size === 0) {
+      globalEventListeners.delete(normalizedEventName);
+    }
+  };
+};
 
 export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }) => {
   const [connected, setConnected] = useState(false);
@@ -246,6 +302,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
         setConnecting(false);
       });
 
+      bindGlobalEventListeners(socket);
       globalSocket = socket;
     } catch (err) {
       console.error('R [WebSocketContext] Erro ao criar socket:', err);
@@ -282,6 +339,23 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
     // Aguardar 500ms antes de reconectar
     window.setTimeout(() => connect(), 500);
+  };
+
+  const subscribe = <T = unknown>(eventName: string, handler: WebSocketEventHandler<T>) =>
+    subscribeToGlobalSocketEvent(eventName, handler);
+
+  const emit = (eventName: string, payload?: unknown): boolean => {
+    const normalizedEventName = String(eventName || '').trim();
+    if (!normalizedEventName) {
+      return false;
+    }
+
+    if (!globalSocket?.connected) {
+      return false;
+    }
+
+    globalSocket.emit(normalizedEventName, payload);
+    return true;
   };
 
   useEffect(() => {
@@ -375,6 +449,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     connecting,
     error,
     reconnect,
+    subscribe,
+    emit,
   };
 
   return <WebSocketContext.Provider value={value}>{children}</WebSocketContext.Provider>;

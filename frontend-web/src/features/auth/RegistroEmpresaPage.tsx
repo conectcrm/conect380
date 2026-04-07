@@ -296,11 +296,6 @@ export const RegistroEmpresaPage: React.FC = () => {
       const response = await empresaService.registrarEmpresa(payload);
       const precisaVerificarEmail = response?.data?.email_verificado === false;
 
-      toastService.success(response.message || 'Empresa registrada com sucesso!');
-      if (precisaVerificarEmail) {
-        toastService.success('Verifique seu e-mail para ativar a conta.');
-      }
-
       navigate('/login', {
         state: {
           message: precisaVerificarEmail

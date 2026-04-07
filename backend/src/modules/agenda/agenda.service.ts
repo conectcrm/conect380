@@ -310,6 +310,12 @@ export class AgendaService {
   }) {
     if (!params.users.length) return;
 
+    const recipients = params.actorUserId
+      ? params.users.filter((user) => !!user.id && user.id !== params.actorUserId)
+      : params.users;
+
+    if (!recipients.length) return;
+
     const titleByAction = {
       created: 'Novo convite na agenda',
       updated: 'Evento atualizado na agenda',
@@ -331,7 +337,7 @@ export class AgendaService {
     } as const;
 
     const results = await Promise.allSettled(
-      params.users.map((user) =>
+      recipients.map((user) =>
         this.notificationService.create({
           empresaId: params.empresaId,
           userId: user.id,
