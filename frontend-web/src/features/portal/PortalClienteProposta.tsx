@@ -170,14 +170,14 @@ const PortalClienteProposta: React.FC = () => {
       const chaveAcesso = tokenParaAceite || identificadorProposta;
 
       if (!chaveAcesso) {
-        setErro('Token da proposta ausente ou inválido.');
+        setErro('Token da proposta ausente ou inv\u00E1lido.');
         return;
       }
 
       const dados = await portalClienteService.obterPropostaPublica(chaveAcesso);
 
       if (!dados) {
-        setErro('Proposta não encontrada ou link inválido.');
+        setErro('Proposta n\u00E3o encontrada ou link inv\u00E1lido.');
         return;
       }
 
@@ -192,35 +192,7 @@ const PortalClienteProposta: React.FC = () => {
 
       setProposta(dados);
 
-      // ✅ Registrar visualização automaticamente se ainda não foi visualizada
-      if (dados.status === 'enviada' && tokenParaAceite) {
-        console.log('🔄 Registrando visualização automática...');
-
-        try {
-          // Registrar via portal API para sincronização automática
-          await fetch(`${PORTAL_API_BASE}/proposta/${tokenParaAceite}/view`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              ip: await obterIP(),
-              userAgent: navigator.userAgent,
-              timestamp: new Date().toISOString(),
-              resolucaoTela: `${window.screen.width}x${window.screen.height}`,
-              referrer: document.referrer,
-            }),
-          });
-
-          // Atualizar status local para "visualizada"
-          setProposta((prev) => (prev ? { ...prev, status: 'visualizada' } : null));
-          console.log('✅ Status atualizado para "visualizada"');
-        } catch (error) {
-          console.warn('⚠️ Erro ao registrar visualização, continuando:', error);
-          // Atualizar localmente mesmo se a API falhar
-          setProposta((prev) => (prev ? { ...prev, status: 'visualizada' } : null));
-        }
-      }
+      // A visualizacao e registrada no servico; evitamos sobrescrever status localmente.
     } catch (error) {
       console.error('Erro ao carregar proposta:', error);
       setErro('Erro ao carregar a proposta. Tente novamente.');
@@ -303,7 +275,7 @@ const PortalClienteProposta: React.FC = () => {
 
     const motivoNormalizado = motivoAjustes.trim();
     if (motivoNormalizado.length < 8) {
-      setErro('Descreva com mais detalhes o ajuste desejado (minimo de 8 caracteres).');
+      setErro('Descreva com mais detalhes o ajuste desejado (m\u00EDnimo de 8 caracteres).');
       return;
     }
 
@@ -323,7 +295,9 @@ const PortalClienteProposta: React.FC = () => {
       setMotivoAjustes('');
     } catch (error) {
       console.error('Erro ao solicitar ajustes:', error);
-      setErro('Nao foi possivel registrar a solicitacao de ajustes. Tente novamente.');
+      setErro(
+        'N\u00E3o foi poss\u00EDvel registrar a solicita\u00E7\u00E3o de ajustes. Tente novamente.',
+      );
     } finally {
       setProcessandoNegociacao(false);
     }
@@ -392,11 +366,21 @@ const PortalClienteProposta: React.FC = () => {
       case 'enviada':
         return 'border border-[#BFDBFE] bg-[#DBEAFE] text-[#1D4ED8]';
       case 'visualizada':
-        return 'border border-[#FDE68A] bg-[#FEF3C7] text-[#92400E]';
       case 'negociacao':
         return 'border border-[#FCD34D] bg-[#FEF3C7] text-[#92400E]';
       case 'aprovada':
         return 'border border-[#BBF7D0] bg-[#DCFCE7] text-[#166534]';
+      case 'contrato_gerado':
+      case 'contrato_assinado':
+      case 'dispensa_contrato_solicitada':
+      case 'dispensa_contrato_aprovada':
+      case 'faturamento_liberado':
+        return 'border border-[#C7DDF8] bg-[#EFF6FF] text-[#1E3A8A]';
+      case 'fatura_criada':
+      case 'aguardando_pagamento':
+        return 'border border-[#FDE68A] bg-[#FFFBEB] text-[#92400E]';
+      case 'pago':
+        return 'border border-[#86EFAC] bg-[#DCFCE7] text-[#166534]';
       case 'rejeitada':
         return 'border border-[#FECACA] bg-[#FEE2E2] text-[#991B1B]';
       case 'expirada':
@@ -415,9 +399,25 @@ const PortalClienteProposta: React.FC = () => {
       case 'visualizada':
         return 'Visualizada';
       case 'negociacao':
-        return 'Negociacao';
+        return 'Negocia\u00E7\u00E3o';
       case 'aprovada':
         return 'Aprovada';
+      case 'contrato_gerado':
+        return 'Contrato gerado';
+      case 'contrato_assinado':
+        return 'Contrato assinado';
+      case 'dispensa_contrato_solicitada':
+        return 'Dispensa solicitada';
+      case 'dispensa_contrato_aprovada':
+        return 'Dispensa aprovada';
+      case 'faturamento_liberado':
+        return 'Faturamento liberado';
+      case 'fatura_criada':
+        return 'Fatura criada';
+      case 'aguardando_pagamento':
+        return 'Aguardando pagamento';
+      case 'pago':
+        return 'Pago';
       case 'rejeitada':
         return 'Rejeitada';
       case 'expirada':
@@ -441,7 +441,41 @@ const PortalClienteProposta: React.FC = () => {
       currency: 'BRL',
     }).format(Number(valor || 0));
 
-  const formatPercent = (valor: number) => `${Number(valor || 0).toFixed(2)}%`;
+  const formatPercent = (valor: number) =>
+    `${new Intl.NumberFormat('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(Number(valor || 0))}%`;
+
+  const normalizarTextoPortal = (value?: string) => {
+    let text = String(value || '').trim();
+    if (!text) return '';
+
+    const replacements: Array<[RegExp, string]> = [
+      [/\bvalidacao\b/gi, 'validação'],
+      [/\bcatalogo\b/gi, 'catálogo'],
+      [/\bconfiguracao\b/gi, 'configuração'],
+      [/\bintegracao\b/gi, 'integração'],
+      [/\bsolucao\b/gi, 'solução'],
+      [/\bgestao\b/gi, 'gestão'],
+      [/\baprovacao\b/gi, 'aprovação'],
+      [/\bnegociacao\b/gi, 'negociação'],
+      [/\bservico\b/gi, 'serviço'],
+      [/\bservicos\b/gi, 'serviços'],
+      [/\bemissao\b/gi, 'emissão'],
+      [/\bnao\b/gi, 'não'],
+      [/\bpossivel\b/gi, 'possível'],
+      [/\bminimo\b/gi, 'mínimo'],
+      [/\bmaximo\b/gi, 'máximo'],
+      [/\buteis\b/gi, 'úteis'],
+    ];
+
+    replacements.forEach(([pattern, replacement]) => {
+      text = text.replace(pattern, replacement);
+    });
+
+    return text;
+  };
 
   const normalizeHexColor = (value?: string, fallback = '#159A9C') => {
     const candidate = String(value || '').trim();
@@ -511,14 +545,14 @@ const PortalClienteProposta: React.FC = () => {
               Proposta aceita com sucesso
             </h2>
             <p className="mt-2 text-center text-sm text-[#607B89]">
-              Recebemos seu aceite. Nosso time vai seguir com a geracao do contrato.
+              {'Recebemos seu aceite. Nosso time vai seguir com a gera\u00E7\u00E3o do contrato.'}
             </p>
 
             <div className="mt-6 rounded-xl border border-[#CFE6D9] bg-[#F4FBF7] p-4">
               <div className="space-y-2 text-sm text-[#166534]">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4" />
-                  <span>Aprovacao registrada no portal</span>
+                  <span>{'Aprova\u00E7\u00E3o registrada no portal'}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4" />
@@ -531,7 +565,8 @@ const PortalClienteProposta: React.FC = () => {
               </div>
 
               <div className="mt-4 rounded-lg border border-[#C7DDF8] bg-[#EFF6FF] p-3 text-sm text-[#1E3A8A]">
-                <strong>Proximos passos:</strong> nossa equipe entra em contato em ate 2 horas uteis
+                <strong>{'Pr\u00F3ximos passos:'}</strong> nossa equipe entra em contato em
+                {' at\u00E9 2 horas \u00FAteis'}
                 para iniciar a etapa de contrato.
               </div>
             </div>
@@ -637,11 +672,11 @@ const PortalClienteProposta: React.FC = () => {
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div>
                   <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[#607B89]">
-                    Informacoes gerais
+                    {'Informa\u00E7\u00F5es gerais'}
                   </h3>
                   <div className="space-y-2 text-sm text-[#244455]">
                     <div>
-                      <span className="font-semibold text-[#19384C]">Titulo:</span>{' '}
+                      <span className="font-semibold text-[#19384C]">{'T\u00EDtulo:'}</span>{' '}
                       {proposta.titulo}
                     </div>
                     <div>
@@ -657,7 +692,7 @@ const PortalClienteProposta: React.FC = () => {
 
                 <div>
                   <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[#607B89]">
-                    Vendedor responsavel
+                    {'Vendedor respons\u00E1vel'}
                   </h3>
                   <div className="space-y-2 text-sm text-[#244455]">
                     <div>
@@ -680,7 +715,7 @@ const PortalClienteProposta: React.FC = () => {
             <section className="rounded-[18px] border border-[#DEE8EC] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)] sm:p-6">
               <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold tracking-[-0.02em] text-[#19384C]">
                 <Package className="h-5 w-5" style={{ color: primaryColor }} />
-                Produtos e servicos
+                {'Produtos e servi\u00E7os'}
               </h2>
 
               <div className="overflow-x-auto">
@@ -690,7 +725,7 @@ const PortalClienteProposta: React.FC = () => {
                       <th className="py-3 text-left text-sm font-semibold text-[#19384C]">Item</th>
                       <th className="py-3 text-center text-sm font-semibold text-[#19384C]">Qtd</th>
                       <th className="py-3 text-right text-sm font-semibold text-[#19384C]">
-                        Valor unit.
+                        {'Valor unit\u00E1rio'}
                       </th>
                       <th className="py-3 text-right text-sm font-semibold text-[#19384C]">
                         Desconto
@@ -706,7 +741,9 @@ const PortalClienteProposta: React.FC = () => {
                         <td className="py-4">
                           <div>
                             <div className="font-medium text-[#19384C]">{produto.nome}</div>
-                            <div className="text-sm text-[#607B89]">{produto.descricao}</div>
+                            <div className="text-sm text-[#607B89]">
+                              {normalizarTextoPortal(produto.descricao)}
+                            </div>
                           </div>
                         </td>
                         <td className="py-4 text-center text-[#244455]">{produto.quantidade}</td>
@@ -741,7 +778,7 @@ const PortalClienteProposta: React.FC = () => {
                     </tr>
                     <tr>
                       <td colSpan={4} className="py-2 text-right text-sm font-medium text-[#607B89]">
-                        Desconto por item (ja aplicado no subtotal):
+                        {'Desconto por item (j\u00E1 aplicado no subtotal):'}
                       </td>
                       <td className="py-2 text-right text-sm font-semibold text-[#B45309]">
                         {formatCurrency(valorDescontoItens)}
@@ -771,7 +808,7 @@ const PortalClienteProposta: React.FC = () => {
             <section className="rounded-[18px] border border-[#DEE8EC] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)] sm:p-6">
               <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold tracking-[-0.02em] text-[#19384C]">
                 <Shield className="h-5 w-5" style={{ color: primaryColor }} />
-                Condicoes comerciais
+                {'Condi\u00E7\u00F5es comerciais'}
               </h2>
 
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
@@ -798,7 +835,7 @@ const PortalClienteProposta: React.FC = () => {
                 {proposta.condicoes.observacoes && (
                   <div>
                     <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[#607B89]">
-                      Observacoes
+                      {'Observa\u00E7\u00F5es'}
                     </h3>
                     <p className="text-sm leading-6 text-[#355166]">
                       {proposta.condicoes.observacoes}
@@ -812,7 +849,7 @@ const PortalClienteProposta: React.FC = () => {
           <aside className="space-y-5 lg:sticky lg:top-6 lg:self-start">
             <section className="rounded-[18px] border border-[#DEE8EC] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)]">
               <h3 className="mb-4 text-lg font-semibold tracking-[-0.01em] text-[#19384C]">
-                Acoes
+                {'A\u00E7\u00F5es'}
               </h3>
 
               <div className="space-y-3">
@@ -865,14 +902,16 @@ const PortalClienteProposta: React.FC = () => {
 
                 {negociacaoAtiva && (
                   <div className="rounded-lg border border-[#FDE68A] bg-[#FFFBEB] p-3 text-sm text-[#92400E]">
-                    Sua solicitacao de ajustes foi registrada. Nosso time comercial vai retornar com uma nova proposta.
+                    {
+                      'Sua solicita\u00E7\u00E3o de ajustes foi registrada. Nosso time comercial vai retornar com uma nova proposta.'
+                    }
                   </div>
                 )}
 
                 {proposta.status === 'expirada' && (
                   <div className="rounded-lg border border-[#FDE68A] bg-[#FFFBEB] p-3">
                     <p className="text-sm text-[#92400E]">
-                      Esta proposta expirou. Entre em contato para uma nova emissao.
+                      {'Esta proposta expirou. Entre em contato para uma nova emiss\u00E3o.'}
                     </p>
                   </div>
                 )}
@@ -882,7 +921,9 @@ const PortalClienteProposta: React.FC = () => {
                   proposta.status !== 'aprovada' &&
                   proposta.status !== 'rejeitada' && (
                     <div className="rounded-lg border border-[#D4E2E7] bg-[#F8FBFC] p-3 text-sm text-[#5A768C]">
-                      O aceite fica disponivel quando a proposta estiver em etapa comercial ativa e
+                      {
+                        'O aceite fica dispon\u00EDvel quando a proposta estiver em etapa comercial ativa e'
+                      }
                       dentro da validade.
                     </div>
                   )}
@@ -932,10 +973,13 @@ const PortalClienteProposta: React.FC = () => {
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="mt-0.5 h-4 w-4 text-[#B45309]" />
                     <div>
-                      <p className="text-xs font-semibold text-[#92400E]">Conferencia financeira</p>
+                      <p className="text-xs font-semibold text-[#92400E]">
+                        {'Confer\u00EAncia financeira'}
+                      </p>
                       <p className="mt-1 text-xs text-[#92400E]">
                         Soma dos itens: {formatCurrency(subtotalItens)} | Subtotal da proposta:{' '}
-                        {formatCurrency(subtotalProposta)} | Diferenca: {formatCurrency(divergenciaSubtotal)}
+                        {formatCurrency(subtotalProposta)} | {'Diferen\u00E7a:'}{' '}
+                        {formatCurrency(divergenciaSubtotal)}
                       </p>
                     </div>
                   </div>
@@ -962,7 +1006,7 @@ const PortalClienteProposta: React.FC = () => {
                     </div>
                   </div>
                   <p className="text-xs font-medium" style={{ color: primaryColor }}>
-                    Codigo unico desta proposta para rastreio de acesso
+                    {'C\u00F3digo \u00FAnico desta proposta para rastreio de acesso'}
                   </p>
                 </div>
               </section>
@@ -992,7 +1036,9 @@ const PortalClienteProposta: React.FC = () => {
           <div className="w-full max-w-lg rounded-[18px] border border-[#F7C78A] bg-white p-6 shadow-2xl">
             <h3 className="text-lg font-semibold text-[#19384C]">Solicitar ajustes</h3>
             <p className="mt-2 text-sm text-[#607B89]">
-              Descreva o que voce gostaria de ajustar nesta proposta para nosso time comercial revisar.
+              {
+                'Descreva o que voc\u00EA gostaria de ajustar nesta proposta para nosso time comercial revisar.'
+              }
             </p>
 
             <div className="mt-4">
@@ -1029,7 +1075,7 @@ const PortalClienteProposta: React.FC = () => {
                 disabled={processandoNegociacao}
                 className="inline-flex h-10 items-center justify-center rounded-lg bg-[#B45309] px-4 text-sm font-semibold text-white transition hover:bg-[#92400E] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {processandoNegociacao ? 'Enviando...' : 'Enviar solicitacao'}
+                {processandoNegociacao ? 'Enviando...' : 'Enviar solicita\u00E7\u00E3o'}
               </button>
             </div>
           </div>
@@ -1039,9 +1085,13 @@ const PortalClienteProposta: React.FC = () => {
       {showConfirmReject && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B1A2B]/55 p-4">
           <div className="w-full max-w-md rounded-[18px] border border-[#FECACA] bg-white p-6 shadow-2xl">
-            <h3 className="text-lg font-semibold text-[#19384C]">Confirmar rejeicao</h3>
+            <h3 className="text-lg font-semibold text-[#19384C]">
+              {'Confirmar rejei\u00E7\u00E3o'}
+            </h3>
             <p className="mt-2 text-sm text-[#607B89]">
-              Tem certeza que deseja rejeitar esta proposta? Essa acao nao pode ser desfeita.
+              {
+                'Tem certeza que deseja rejeitar esta proposta? Essa a\u00E7\u00E3o n\u00E3o pode ser desfeita.'
+              }
             </p>
 
             <div className="mt-6 flex justify-end gap-3">
@@ -1066,3 +1116,4 @@ const PortalClienteProposta: React.FC = () => {
 };
 
 export default PortalClienteProposta;
+
