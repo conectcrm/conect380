@@ -47,7 +47,22 @@ export interface PropostaPublica {
   id: string;
   numero: string;
   titulo: string;
-  status: 'rascunho' | 'enviada' | 'visualizada' | 'negociacao' | 'aprovada' | 'rejeitada' | 'expirada';
+  status:
+    | 'rascunho'
+    | 'enviada'
+    | 'visualizada'
+    | 'negociacao'
+    | 'aprovada'
+    | 'contrato_gerado'
+    | 'contrato_assinado'
+    | 'dispensa_contrato_solicitada'
+    | 'dispensa_contrato_aprovada'
+    | 'faturamento_liberado'
+    | 'fatura_criada'
+    | 'aguardando_pagamento'
+    | 'pago'
+    | 'rejeitada'
+    | 'expirada';
   dataEnvio: Date;
   dataValidade: Date;
   criadaEm: Date;
@@ -113,9 +128,18 @@ class PortalClienteService {
   private mapStatusPortal(status: unknown): PropostaPublica['status'] {
     const normalized = String(status || '').toLowerCase();
     if (normalized === 'rascunho') return 'rascunho';
+    if (normalized === 'enviada') return 'enviada';
     if (normalized === 'visualizada') return 'visualizada';
     if (normalized === 'negociacao' || normalized === 'em_negociacao') return 'negociacao';
-    if (normalized === 'aprovada') return 'aprovada';
+    if (normalized === 'aprovada' || normalized === 'aceita') return 'aprovada';
+    if (normalized === 'contrato_gerado') return 'contrato_gerado';
+    if (normalized === 'contrato_assinado') return 'contrato_assinado';
+    if (normalized === 'dispensa_contrato_solicitada') return 'dispensa_contrato_solicitada';
+    if (normalized === 'dispensa_contrato_aprovada') return 'dispensa_contrato_aprovada';
+    if (normalized === 'faturamento_liberado') return 'faturamento_liberado';
+    if (normalized === 'fatura_criada') return 'fatura_criada';
+    if (normalized === 'aguardando_pagamento') return 'aguardando_pagamento';
+    if (normalized === 'pago') return 'pago';
     if (normalized === 'rejeitada') return 'rejeitada';
     if (normalized === 'expirada') return 'expirada';
     return 'enviada';
@@ -145,7 +169,7 @@ class PortalClienteService {
     const empresaRaw =
       raw?.empresa && typeof raw.empresa === 'object'
         ? raw.empresa
-        : { nome: 'Conect360', endereco: 'Goiânia/GO', telefone: '', email: '' };
+        : { nome: 'Conect360', endereco: 'Goi\u00E2nia/GO', telefone: '', email: '' };
 
     const produtos = Array.isArray(raw?.produtos)
       ? raw.produtos.map((produto: any, index: number) => {
@@ -218,7 +242,7 @@ class PortalClienteService {
             : typeof raw?.site === 'string'
               ? raw.site
               : undefined,
-        endereco: String(empresaRaw?.endereco || 'Goiânia/GO'),
+        endereco: String(empresaRaw?.endereco || 'Goi\u00E2nia/GO'),
         telefone: String(empresaRaw?.telefone || ''),
         email: String(empresaRaw?.email || ''),
       },
@@ -304,7 +328,7 @@ class PortalClienteService {
     });
 
     if (!response.ok) {
-      let mensagemErro = 'Nao foi possivel baixar o PDF da proposta.';
+      let mensagemErro = 'N\u00E3o foi poss\u00EDvel baixar o PDF da proposta.';
 
       try {
         const payload = await response.json();
@@ -340,12 +364,12 @@ class PortalClienteService {
       numero: numeroMock,
       titulo: `Proposta Comercial - ${numeroMock}`,
       cliente: {
-        nome: 'João Silva',
+        nome: 'Jo\u00E3o Silva',
         email: 'joao@exemplo.com',
       },
       empresa: {
         nome: 'ConectCRM',
-        endereco: 'Goiânia/GO',
+        endereco: 'Goi\u00E2nia/GO',
         telefone: '(62) 99668-9991',
         email: 'conectcrm@gmail.com',
         corPrimaria: '#159A9C',
@@ -359,7 +383,7 @@ class PortalClienteService {
         {
           id: 'item-1',
           nome: 'Sistema CRM Premium',
-          descricao: 'Solução completa de gestão de relacionamento com cliente',
+          descricao: 'Solu\u00E7\u00E3o completa de gest\u00E3o de relacionamento com cliente',
           quantidade: 1,
           valorUnitario: 2500.0,
           desconto: 0,
@@ -369,7 +393,7 @@ class PortalClienteService {
         {
           id: 'item-2',
           nome: 'Treinamento e Suporte',
-          descricao: 'Capacitação da equipe e suporte técnico por 12 meses',
+          descricao: 'Capacita\u00E7\u00E3o da equipe e suporte t\u00E9cnico por 12 meses',
           quantidade: 1,
           valorUnitario: 800.0,
           desconto: 0,
@@ -388,10 +412,11 @@ class PortalClienteService {
       dataValidade: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), // 15 dias
       token: identificador.length <= 6 ? identificador : 'DEMO123',
       condicoes: {
-        formaPagamento: 'Cartão de Crédito ou Boleto (12x sem juros)',
-        prazoEntrega: '15 dias úteis após aprovação',
+        formaPagamento: 'Cart\u00E3o de Cr\u00E9dito ou Boleto (12x sem juros)',
+        prazoEntrega: '15 dias \u00FAteis ap\u00F3s aprova\u00E7\u00E3o',
         garantia: '12 meses',
-        observacoes: 'Proposta válida por 15 dias. Entre em contato para esclarecimentos.',
+        observacoes:
+          'Proposta v\u00E1lida por 15 dias. Entre em contato para esclarecimentos.',
       },
     };
   }
@@ -665,7 +690,7 @@ class PortalClienteService {
     const dataValidade = new Date(proposta.dataValidade);
 
     if (proposta.status === 'aprovada') {
-      return { podeAceitar: false, motivo: 'Proposta já foi aprovada' };
+      return { podeAceitar: false, motivo: 'Proposta j\u00E1 foi aprovada' };
     }
 
     if (proposta.status === 'rejeitada') {
