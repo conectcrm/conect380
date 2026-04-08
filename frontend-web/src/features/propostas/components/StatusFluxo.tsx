@@ -26,19 +26,19 @@ type EtapaFluxo = {
   tone: 'neutral' | 'primary' | 'info' | 'warning' | 'success' | 'accent' | 'danger';
 };
 
-const ETAPAS_FLUXO: EtapaFluxo[] = [
+const ETAPAS_PROGRESSO: EtapaFluxo[] = [
   { id: 'rascunho', label: 'Rascunho', icon: FileText, tone: 'neutral' },
   { id: 'enviada', label: 'Enviada', icon: Send, tone: 'primary' },
   { id: 'visualizada', label: 'Visualizada', icon: Eye, tone: 'info' },
   { id: 'negociacao', label: 'Negociacao', icon: Clock, tone: 'warning' },
   { id: 'aprovada', label: 'Aprovada', icon: CheckCircle, tone: 'success' },
   {
-    id: 'contrato_gerado',
-    label: 'Aguardando assinatura do contrato',
+    id: 'formalizacao_venda',
+    label: 'Formalizacao da venda',
     icon: FileSignature,
     tone: 'accent',
   },
-  { id: 'contrato_assinado', label: 'Contrato assinado', icon: CheckCircle, tone: 'success' },
+  { id: 'faturamento_liberado', label: 'Faturamento liberado', icon: DollarSign, tone: 'info' },
   { id: 'fatura_criada', label: 'Fatura criada', icon: CreditCard, tone: 'accent' },
   {
     id: 'aguardando_pagamento',
@@ -49,54 +49,106 @@ const ETAPAS_FLUXO: EtapaFluxo[] = [
   { id: 'pago', label: 'Pago', icon: DollarSign, tone: 'success' },
 ];
 
+const STATUS_METADATA: Record<string, EtapaFluxo> = {
+  rascunho: { id: 'rascunho', label: 'Rascunho', icon: FileText, tone: 'neutral' },
+  enviada: { id: 'enviada', label: 'Enviada', icon: Send, tone: 'primary' },
+  visualizada: { id: 'visualizada', label: 'Visualizada', icon: Eye, tone: 'info' },
+  negociacao: { id: 'negociacao', label: 'Negociacao', icon: Clock, tone: 'warning' },
+  aprovada: { id: 'aprovada', label: 'Aprovada', icon: CheckCircle, tone: 'success' },
+  contrato_gerado: {
+    id: 'formalizacao_venda',
+    label: 'Aguardando assinatura do contrato',
+    icon: FileSignature,
+    tone: 'accent',
+  },
+  contrato_assinado: {
+    id: 'formalizacao_venda',
+    label: 'Contrato assinado',
+    icon: CheckCircle,
+    tone: 'success',
+  },
+  dispensa_contrato_solicitada: {
+    id: 'formalizacao_venda',
+    label: 'Dispensa de contrato solicitada',
+    icon: AlertCircle,
+    tone: 'warning',
+  },
+  dispensa_contrato_aprovada: {
+    id: 'formalizacao_venda',
+    label: 'Dispensa de contrato aprovada',
+    icon: CheckCircle,
+    tone: 'info',
+  },
+  faturamento_liberado: {
+    id: 'faturamento_liberado',
+    label: 'Faturamento liberado',
+    icon: DollarSign,
+    tone: 'info',
+  },
+  fatura_criada: { id: 'fatura_criada', label: 'Fatura criada', icon: CreditCard, tone: 'accent' },
+  aguardando_pagamento: {
+    id: 'aguardando_pagamento',
+    label: 'Aguardando pagamento',
+    icon: Clock,
+    tone: 'warning',
+  },
+  pago: { id: 'pago', label: 'Pago', icon: DollarSign, tone: 'success' },
+};
+
 const STATUS_TERMINAIS: Record<string, EtapaFluxo> = {
   rejeitada: { id: 'rejeitada', label: 'Rejeitada', icon: XCircle, tone: 'danger' },
   expirada: { id: 'expirada', label: 'Expirada', icon: AlertCircle, tone: 'danger' },
 };
 
-const ETAPAS_RAMIFICACAO_PERDA = ['rascunho', 'enviada', 'negociacao'];
+const ETAPAS_RAMIFICACAO_PERDA = ['rascunho', 'enviada', 'visualizada', 'negociacao'];
 
-const TONE_CLASSES: Record<EtapaFluxo['tone'], { active: string; soft: string; line: string }> = {
+const TONE_CLASSES: Record<EtapaFluxo['tone'], { active: string; soft: string }> = {
   neutral: {
     active: 'bg-[#EEF3F5] text-[#607B89]',
     soft: 'bg-[#F6FAFB] text-[#607B89]',
-    line: 'bg-[#D4E2E7]',
   },
   primary: {
     active: 'bg-[#DDF6F4] text-[#0F7B7D]',
     soft: 'bg-[#F2FBFA] text-[#159A9C]',
-    line: 'bg-[#159A9C]',
   },
   info: {
     active: 'bg-[#E8F1FF] text-[#2563EB]',
     soft: 'bg-[#EFF6FF] text-[#3B82F6]',
-    line: 'bg-[#60A5FA]',
   },
   warning: {
     active: 'bg-[#FFF1D6] text-[#B45309]',
     soft: 'bg-[#FFF7ED] text-[#C2410C]',
-    line: 'bg-[#F59E0B]',
   },
   success: {
     active: 'bg-[#DCFCE7] text-[#166534]',
     soft: 'bg-[#F0FDF4] text-[#16A34A]',
-    line: 'bg-[#22C55E]',
   },
   accent: {
-    active: 'bg-[#F3E8FF] text-[#7C3AED]',
-    soft: 'bg-[#FAF5FF] text-[#8B5CF6]',
-    line: 'bg-[#A855F7]',
+    active: 'bg-[#E0F2FE] text-[#0C4A6E]',
+    soft: 'bg-[#F0F9FF] text-[#0369A1]',
   },
   danger: {
     active: 'bg-[#FEE2E2] text-[#B91C1C]',
     soft: 'bg-[#FEF2F2] text-[#DC2626]',
-    line: 'bg-[#EF4444]',
   },
 };
 
-const getToneClasses = (tone: EtapaFluxo['tone'], active: boolean = false) => {
+const getToneClasses = (tone: EtapaFluxo['tone'], active = false) => {
   const config = TONE_CLASSES[tone] || TONE_CLASSES.neutral;
   return active ? config.active : config.soft;
+};
+
+const normalizarStatus = (status: string) => String(status || '').toLowerCase();
+
+const getStatusMeta = (status: string): EtapaFluxo => {
+  const normalized = normalizarStatus(status);
+  return STATUS_METADATA[normalized] || ETAPAS_PROGRESSO[0];
+};
+
+const getEtapaIdProgresso = (status: string): string => {
+  const normalized = normalizarStatus(status);
+  const mapped = STATUS_METADATA[normalized];
+  return mapped?.id || ETAPAS_PROGRESSO[0].id;
 };
 
 const StatusFluxo: React.FC<StatusFluxoProps> = ({
@@ -104,18 +156,17 @@ const StatusFluxo: React.FC<StatusFluxoProps> = ({
   showProgress = false,
   compact = false,
 }) => {
-  const statusAtual = String(status || '').toLowerCase();
+  const statusAtual = normalizarStatus(status);
   const etapaTerminal = STATUS_TERMINAIS[statusAtual];
   const isTerminal = Boolean(etapaTerminal);
 
-  const etapaAtual =
-    etapaTerminal || ETAPAS_FLUXO.find((etapa) => etapa.id === statusAtual) || ETAPAS_FLUXO[0];
-
-  const indiceAtual = ETAPAS_FLUXO.findIndex((etapa) => etapa.id === statusAtual);
+  const etapaAtual = etapaTerminal || getStatusMeta(statusAtual);
+  const etapaIdAtual = getEtapaIdProgresso(statusAtual);
+  const indiceAtual = ETAPAS_PROGRESSO.findIndex((etapa) => etapa.id === etapaIdAtual);
 
   const proximaEtapa =
-    !isTerminal && indiceAtual >= 0 && indiceAtual < ETAPAS_FLUXO.length - 1
-      ? ETAPAS_FLUXO[indiceAtual + 1]
+    !isTerminal && indiceAtual >= 0 && indiceAtual < ETAPAS_PROGRESSO.length - 1
+      ? ETAPAS_PROGRESSO[indiceAtual + 1]
       : null;
 
   if (compact) {
@@ -141,7 +192,7 @@ const StatusFluxo: React.FC<StatusFluxoProps> = ({
   if (showProgress) {
     if (isTerminal) {
       const trilhaPerda = ETAPAS_RAMIFICACAO_PERDA
-        .map((id) => ETAPAS_FLUXO.find((e) => e.id === id))
+        .map((id) => ETAPAS_PROGRESSO.find((e) => e.id === id))
         .filter(Boolean) as EtapaFluxo[];
       const trilhaCompleta = [...trilhaPerda, etapaAtual];
 
@@ -160,9 +211,7 @@ const StatusFluxo: React.FC<StatusFluxoProps> = ({
               return (
                 <React.Fragment key={etapa.id}>
                   <div className="inline-flex items-center gap-1.5 rounded-full border border-[#D4E2E7] bg-white px-2 py-1">
-                    <div
-                      className={`rounded-full p-1 ${getToneClasses(etapa.tone, isCurrent || etapa.id !== 'rejeitada')}`}
-                    >
+                    <div className={`rounded-full p-1 ${getToneClasses(etapa.tone, isCurrent)}`}>
                       <Icone className="h-3 w-3" />
                     </div>
                     <span className="text-xs font-medium text-[#355166]">{etapa.label}</span>
@@ -181,13 +230,13 @@ const StatusFluxo: React.FC<StatusFluxoProps> = ({
         <div className="mb-3 flex items-center justify-between">
           <h4 className="text-sm font-medium text-[#19384C]">Progresso do fluxo</h4>
           <span className="text-xs text-[#607B89]">
-            {Math.max(indiceAtual + 1, 1)} de {ETAPAS_FLUXO.length} etapas
+            {Math.max(indiceAtual + 1, 1)} de {ETAPAS_PROGRESSO.length} etapas
           </span>
         </div>
 
         <div className="relative">
           <div className="flex items-center justify-between">
-            {ETAPAS_FLUXO.map((etapa, index) => {
+            {ETAPAS_PROGRESSO.map((etapa, index) => {
               const completed = index < indiceAtual;
               const current = index === indiceAtual;
               const Icone = etapa.icon;
@@ -214,12 +263,12 @@ const StatusFluxo: React.FC<StatusFluxoProps> = ({
                     {etapa.label}
                   </span>
 
-                  {index < ETAPAS_FLUXO.length - 1 && (
+                  {index < ETAPAS_PROGRESSO.length - 1 && (
                     <div
                       className={`absolute top-4 h-0.5 w-full -z-10 ${completed ? 'bg-[#22C55E]' : 'bg-[#E2ECF0]'}`}
                       style={{
-                        left: `${(100 / (ETAPAS_FLUXO.length - 1)) * index + 50 / ETAPAS_FLUXO.length}%`,
-                        width: `${100 / (ETAPAS_FLUXO.length - 1)}%`,
+                        left: `${(100 / (ETAPAS_PROGRESSO.length - 1)) * index + 50 / ETAPAS_PROGRESSO.length}%`,
+                        width: `${100 / (ETAPAS_PROGRESSO.length - 1)}%`,
                       }}
                     />
                   )}

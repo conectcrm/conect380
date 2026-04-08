@@ -64,6 +64,9 @@ const propostaStatusLabel: Record<Proposta['status'], string> = {
   aprovada: 'Aprovada',
   contrato_gerado: 'Contrato gerado',
   contrato_assinado: 'Contrato assinado',
+  dispensa_contrato_solicitada: 'Dispensa de contrato solicitada',
+  dispensa_contrato_aprovada: 'Dispensa de contrato aprovada',
+  faturamento_liberado: 'Faturamento liberado',
   fatura_criada: 'Fatura criada',
   aguardando_pagamento: 'Aguardando pagamento',
   pago: 'Pago',
@@ -80,9 +83,16 @@ const contratoStatusLabel: Record<Contrato['status'], string> = {
 };
 
 const isPropostaConverted = (status: Proposta['status']): boolean =>
-  ['contrato_gerado', 'contrato_assinado', 'fatura_criada', 'aguardando_pagamento', 'pago'].includes(
-    status,
-  );
+  [
+    'contrato_gerado',
+    'contrato_assinado',
+    'dispensa_contrato_solicitada',
+    'dispensa_contrato_aprovada',
+    'faturamento_liberado',
+    'fatura_criada',
+    'aguardando_pagamento',
+    'pago',
+  ].includes(status);
 
 const ComercialPropostasContratosReportPage: React.FC = () => {
   const navigate = useNavigate();

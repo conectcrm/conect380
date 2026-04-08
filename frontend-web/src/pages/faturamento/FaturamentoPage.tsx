@@ -42,7 +42,7 @@ import {
   FiltrosFatura,
   ProntidaoCobranca,
 } from '../../services/faturamentoService';
-import ModalFatura from './ModalFatura';
+import ModalFatura, { ModalFaturaDraft } from './ModalFatura';
 import ModalDetalhesFatura from './ModalDetalhesFatura';
 import ModalPagamentos from './ModalPagamentos';
 import NotificacoesFaturamento from '../../components/notificacoes/NotificacoesFaturamento';
@@ -73,6 +73,7 @@ import {
   SectionCard,
 } from '../../components/layout-v2';
 import { exportToCSV, exportToExcel, ExportColumn } from '../../utils/exportUtils';
+import { propostasService, Proposta as PropostaComercial } from '../../services/propostasService';
 
 interface DashboardCards {
   totalFaturas: number;
@@ -105,12 +106,30 @@ const STATUS_ELEGIVEIS_COBRANCA: StatusFatura[] = [
   StatusFatura.VENCIDA,
 ];
 
+type StatusFilaFaturamento = 'contrato_assinado' | 'dispensa_contrato_aprovada' | 'faturamento_liberado';
+
+const STATUSS_FILA_FATURAMENTO: StatusFilaFaturamento[] = [
+  'contrato_assinado',
+  'dispensa_contrato_aprovada',
+  'faturamento_liberado',
+];
+
+const STATUSS_FILA_SET = new Set<string>(STATUSS_FILA_FATURAMENTO);
+
+const STATUS_LABELS_FILA: Record<StatusFilaFaturamento, string> = {
+  contrato_assinado: 'Contrato assinado',
+  dispensa_contrato_aprovada: 'Dispensa aprovada',
+  faturamento_liberado: 'Faturamento liberado',
+};
+
 export default function FaturamentoPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const faturaIdParam = searchParams.get('faturaId');
   const clienteIdParam = (searchParams.get('clienteId') || '').trim();
   const clienteNomeParam = (searchParams.get('cliente') || '').trim();
+  const visaoParam = (searchParams.get('visao') || '').trim().toLowerCase();
+  const statusFilaParam = (searchParams.get('statusFila') || '').trim().toLowerCase();
   const [faturas, setFaturas] = useState<Fatura[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [modalAberto, setModalAberto] = useState(false);
@@ -168,14 +187,36 @@ export default function FaturamentoPage() {
   const [progressoAcaoMassa, setProgressoAcaoMassa] = useState(0);
   const [mostrarFiltrosAvancados, setMostrarFiltrosAvancados] = useState(false);
   const [menuAcoesAbertoId, setMenuAcoesAbertoId] = useState<number | null>(null);
+  const [rascunhoFaturaModal, setRascunhoFaturaModal] = useState<ModalFaturaDraft | null>(null);
+  const [filaFaturamento, setFilaFaturamento] = useState<PropostaComercial[]>([]);
+  const [filtroStatusFila, setFiltroStatusFila] = useState<'todos' | StatusFilaFaturamento>('todos');
+  const [carregandoFilaFaturamento, setCarregandoFilaFaturamento] = useState(false);
+  const [erroFilaFaturamento, setErroFilaFaturamento] = useState<string | null>(null);
 
   // Estado para loading e skeleton
 
   // Estados para funcionalidades avançadas da Semana 2
   const [faturaGateway, setFaturaGateway] = useState<Fatura | null>(null);
   const [visaoAtiva, setVisaoAtiva] = useState<
-    'dashboard' | 'prontidao' | 'relatorios' | 'email' | 'workflows'
+    'dashboard' | 'fila' | 'prontidao' | 'relatorios' | 'email' | 'workflows'
   >('dashboard');
+
+  useEffect(() => {
+    if (visaoParam !== 'fila') {
+      return;
+    }
+    setVisaoAtiva('fila');
+  }, [visaoParam]);
+
+  useEffect(() => {
+    if (!statusFilaParam) {
+      return;
+    }
+
+    if (STATUSS_FILA_SET.has(statusFilaParam)) {
+      setFiltroStatusFila(statusFilaParam as StatusFilaFaturamento);
+    }
+  }, [statusFilaParam]);
 
   const [dashboardCards, setDashboardCards] = useState<DashboardCards>({
     totalFaturas: 0,
@@ -311,6 +352,11 @@ export default function FaturamentoPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    void carregarFilaFaturamento();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const buscarFaturas = async () => {
     setPage(1);
     carregarFaturas();
@@ -323,18 +369,27 @@ export default function FaturamentoPage() {
   };
 
   const abrirModalEdicao = (fatura: Fatura) => {
+    setRascunhoFaturaModal(null);
     setFaturaEdicao(fatura);
     setModalAberto(true);
   };
 
   const abrirModalCriacao = () => {
+    setRascunhoFaturaModal(null);
     setFaturaEdicao(null);
+    setModalAberto(true);
+  };
+
+  const abrirModalCriacaoComRascunho = (rascunho: ModalFaturaDraft) => {
+    setFaturaEdicao(null);
+    setRascunhoFaturaModal(rascunho);
     setModalAberto(true);
   };
 
   const fecharModal = () => {
     setModalAberto(false);
     setFaturaEdicao(null);
+    setRascunhoFaturaModal(null);
   };
 
   const abrirModalDetalhes = (fatura: Fatura) => {
@@ -395,6 +450,191 @@ export default function FaturamentoPage() {
       err?.message ||
       fallback
     );
+  };
+
+  const normalizarStatusFila = (status: unknown): StatusFilaFaturamento | null => {
+    const statusNormalizado = String(status || '').trim().toLowerCase();
+    return STATUSS_FILA_SET.has(statusNormalizado)
+      ? (statusNormalizado as StatusFilaFaturamento)
+      : null;
+  };
+
+  const mapearFormaPagamentoProposta = (formaPagamento: unknown): FormaPagamento => {
+    const forma = String(formaPagamento || '').trim().toLowerCase();
+    if (forma === 'boleto') {
+      return FormaPagamento.BOLETO;
+    }
+    if (forma === 'cartao' || forma === 'cartao_credito') {
+      return FormaPagamento.CARTAO_CREDITO;
+    }
+    if (forma === 'cartao_debito') {
+      return FormaPagamento.CARTAO_DEBITO;
+    }
+    if (forma === 'transferencia') {
+      return FormaPagamento.TRANSFERENCIA;
+    }
+    if (forma === 'dinheiro') {
+      return FormaPagamento.DINHEIRO;
+    }
+    if (forma === 'a_combinar') {
+      return FormaPagamento.A_COMBINAR;
+    }
+    return FormaPagamento.PIX;
+  };
+
+  const resolverDataVencimentoRascunho = (proposta: PropostaComercial): string => {
+    const candidatos = [
+      (proposta as any).dataVencimento,
+      (proposta as any).dataValidade,
+      (proposta as any).validade,
+    ];
+
+    for (const candidato of candidatos) {
+      if (typeof candidato !== 'string' || !candidato.trim()) {
+        continue;
+      }
+      const data = new Date(candidato);
+      if (!Number.isNaN(data.getTime())) {
+        return data.toISOString().slice(0, 10);
+      }
+    }
+
+    const fallback = new Date();
+    fallback.setDate(fallback.getDate() + 30);
+    return fallback.toISOString().slice(0, 10);
+  };
+
+  const montarRascunhoFaturaDaProposta = (proposta: PropostaComercial): ModalFaturaDraft => {
+    const cliente =
+      proposta?.cliente && typeof proposta.cliente === 'object' ? proposta.cliente : null;
+
+    const itensOriginais = Array.isArray(proposta?.produtos) ? proposta.produtos : [];
+    const itens: Array<{
+      descricao: string;
+      quantidade: number;
+      valorUnitario: number;
+      unidade: string;
+      codigoProduto?: string;
+      percentualDesconto: number;
+      valorDesconto: number;
+    }> = itensOriginais
+      .map((item, index) => {
+        const registro = item as unknown as Record<string, unknown>;
+        const produto =
+          registro.produto && typeof registro.produto === 'object'
+            ? (registro.produto as Record<string, unknown>)
+            : null;
+
+        const quantidade = Math.max(Number(registro.quantidade || 0), 1);
+        const subtotal = Number(registro.subtotal || 0);
+        const valorUnitarioCalculado = quantidade > 0 ? subtotal / quantidade : 0;
+        const valorUnitario = Number(
+          registro.precoUnitario || registro.valorUnitario || produto?.preco || valorUnitarioCalculado || 0,
+        );
+        const descricao = String(
+          registro.nome || produto?.nome || registro.descricao || `Item ${index + 1}`,
+        ).trim();
+
+        return {
+          descricao: descricao || `Item ${index + 1}`,
+          quantidade,
+          valorUnitario: Number.isFinite(valorUnitario) ? Math.max(valorUnitario, 0.01) : 0.01,
+          unidade: 'un',
+          codigoProduto: produto?.id ? String(produto.id) : undefined,
+          percentualDesconto: Math.max(Number(registro.desconto || registro.percentualDesconto || 0), 0),
+          valorDesconto: Math.max(Number(registro.valorDesconto || 0), 0),
+        };
+      })
+      .filter((item) => item.descricao && item.quantidade > 0 && item.valorUnitario > 0);
+
+    const valorTotalProposta = Number(proposta?.total || 0);
+    if (itens.length === 0 && Number.isFinite(valorTotalProposta) && valorTotalProposta > 0) {
+      itens.push({
+        descricao: String((proposta as any)?.titulo || `Proposta ${proposta?.numero || proposta?.id || ''}`).trim(),
+        quantidade: 1,
+        valorUnitario: valorTotalProposta,
+        unidade: 'un',
+        codigoProduto: undefined,
+        percentualDesconto: 0,
+        valorDesconto: 0,
+      });
+    }
+
+    const numeroProposta = String(proposta?.numero || proposta?.id || '').trim();
+    const statusFila = normalizarStatusFila(proposta?.status);
+    const observacoesFila =
+      statusFila === 'dispensa_contrato_aprovada'
+        ? 'Dispensa de contrato aprovada. Revisar politicas internas antes da emissao.'
+        : statusFila === 'faturamento_liberado'
+          ? 'Faturamento previamente liberado no fluxo comercial.'
+          : 'Contrato assinado. Proposta pronta para faturamento.';
+
+    return {
+      dados: {
+        propostaId: proposta?.id || undefined,
+        clienteId: cliente?.id || '',
+        tipo: TipoFatura.UNICA,
+        dataVencimento: resolverDataVencimentoRascunho(proposta),
+        formaPagamento: mapearFormaPagamentoProposta(proposta?.formaPagamento),
+        observacoes: numeroProposta
+          ? `Fatura gerada a partir da proposta ${numeroProposta}. ${observacoesFila}`
+          : observacoesFila,
+        itens,
+      },
+      cliente: cliente
+        ? {
+            id: String(cliente.id || ''),
+            nome: String(cliente.nome || 'Cliente'),
+            email: typeof cliente.email === 'string' ? cliente.email : '',
+            telefone: typeof cliente.telefone === 'string' ? cliente.telefone : '',
+            documento: typeof cliente.documento === 'string' ? cliente.documento : '',
+          }
+        : null,
+      contrato: null,
+    };
+  };
+
+  const carregarFilaFaturamento = async () => {
+    try {
+      setCarregandoFilaFaturamento(true);
+      setErroFilaFaturamento(null);
+
+      const propostas = await propostasService.findAll();
+      const prontas = (Array.isArray(propostas) ? propostas : [])
+        .filter((proposta) => normalizarStatusFila(proposta?.status))
+        .sort((a, b) => {
+          const aData = new Date(String((a as any)?.updatedAt || (a as any)?.atualizadaEm || 0)).getTime();
+          const bData = new Date(String((b as any)?.updatedAt || (b as any)?.atualizadaEm || 0)).getTime();
+          return bData - aData;
+        });
+
+      setFilaFaturamento(prontas);
+    } catch (error) {
+      console.error('Erro ao carregar fila de faturamento:', error);
+      setFilaFaturamento([]);
+      setErroFilaFaturamento(
+        obterMensagemErro(error, 'Nao foi possivel carregar as propostas prontas para faturar.'),
+      );
+    } finally {
+      setCarregandoFilaFaturamento(false);
+    }
+  };
+
+  const prepararFaturaDaFila = (proposta: PropostaComercial) => {
+    const clienteId =
+      proposta?.cliente && typeof proposta.cliente === 'object'
+        ? String((proposta.cliente as unknown as Record<string, unknown>).id || '').trim()
+        : '';
+
+    if (!clienteId) {
+      notificacao.mostrarAviso(
+        'Cliente pendente',
+        'Esta proposta nao possui cliente vinculado. Selecione o cliente manualmente ao criar a fatura.',
+      );
+    }
+
+    const rascunho = montarRascunhoFaturaDaProposta(proposta);
+    abrirModalCriacaoComRascunho(rascunho);
   };
 
   const obterSinalErro = (error: unknown): { status?: number; texto: string } => {
@@ -984,6 +1224,7 @@ export default function FaturamentoPage() {
 
       fecharModal();
       carregarFaturas();
+      void carregarFilaFaturamento();
     } catch (error) {
       console.error('Erro ao salvar fatura:', error);
       notificacao.erro.operacaoFalhou(
@@ -1741,6 +1982,33 @@ export default function FaturamentoPage() {
     { label: 'Recebido', value: formatCurrency(dashboardCards.valorTotalPago), tone: 'accent' as const },
   ];
 
+  const resumoFilaFaturamento = useMemo(() => {
+    const contadores: Record<StatusFilaFaturamento, number> = {
+      contrato_assinado: 0,
+      dispensa_contrato_aprovada: 0,
+      faturamento_liberado: 0,
+    };
+
+    filaFaturamento.forEach((proposta) => {
+      const status = normalizarStatusFila(proposta?.status);
+      if (status) {
+        contadores[status] += 1;
+      }
+    });
+
+    return contadores;
+  }, [filaFaturamento]);
+
+  const filaFaturamentoFiltrada = useMemo(() => {
+    if (filtroStatusFila === 'todos') {
+      return filaFaturamento;
+    }
+
+    return filaFaturamento.filter(
+      (proposta) => normalizarStatusFila(proposta?.status) === filtroStatusFila,
+    );
+  }, [filaFaturamento, filtroStatusFila]);
+
   const painelDivergencias = useMemo(() => {
     const divergenciasItensVsTotal = faturas.reduce<Array<{ numero: string; diferenca: number }>>(
       (acc, fatura) => {
@@ -1902,11 +2170,12 @@ export default function FaturamentoPage() {
   };
 
   const visoes: Array<{
-    id: 'dashboard' | 'prontidao' | 'relatorios' | 'email' | 'workflows';
+    id: 'dashboard' | 'fila' | 'prontidao' | 'relatorios' | 'email' | 'workflows';
     label: string;
     icon: React.ComponentType<{ className?: string }>;
   }> = [
     { id: 'dashboard', label: 'Faturas', icon: FileText },
+    { id: 'fila', label: 'Fila de faturamento', icon: CreditCard },
     { id: 'prontidao', label: 'Prontidao', icon: Activity },
     { id: 'relatorios', label: 'Relatórios', icon: BarChart3 },
     { id: 'email', label: 'Automação de E-mails', icon: Mail },
@@ -1984,6 +2253,166 @@ export default function FaturamentoPage() {
     refetch();
   };
 
+  const renderFilaFaturamento = () => (
+    <SectionCard className="space-y-4 p-4 sm:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#476776]">
+            Fila operacional
+          </p>
+          <h3 className="mt-1 text-lg font-semibold text-[#173A4D]">
+            Propostas prontas para faturar
+          </h3>
+          <p className="mt-1 text-sm text-[#5E7784]">
+            Vendas com contrato assinado ou dispensa aprovada aguardando emissao da fatura.
+          </p>
+        </div>
+
+        <button
+          onClick={() => void carregarFilaFaturamento()}
+          disabled={carregandoFilaFaturamento}
+          className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {carregandoFilaFaturamento ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Atualizando
+            </>
+          ) : (
+            <>
+              <Activity className="h-4 w-4" />
+              Atualizar fila
+            </>
+          )}
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-2">
+          <span className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-3 py-1 text-xs font-semibold text-[#2D4958]">
+            Total {filaFaturamentoFiltrada.length}
+          </span>
+          <span className="inline-flex items-center rounded-full border border-[#DCEBFF] bg-[#F4F8FF] px-3 py-1 text-xs font-semibold text-[#255E9A]">
+            Contrato assinado {resumoFilaFaturamento.contrato_assinado}
+          </span>
+          <span className="inline-flex items-center rounded-full border border-[#D8EFE9] bg-[#F1FBF8] px-3 py-1 text-xs font-semibold text-[#11795E]">
+            Dispensa aprovada {resumoFilaFaturamento.dispensa_contrato_aprovada}
+          </span>
+          <span className="inline-flex items-center rounded-full border border-[#F5E4CC] bg-[#FFF8EE] px-3 py-1 text-xs font-semibold text-[#9A6112]">
+            Faturamento liberado {resumoFilaFaturamento.faturamento_liberado}
+          </span>
+        </div>
+
+        <div className="w-full sm:w-auto">
+          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#5E7784]">
+            Status da fila
+          </label>
+          <select
+            value={filtroStatusFila}
+            onChange={(event) =>
+              setFiltroStatusFila(event.target.value as 'todos' | StatusFilaFaturamento)
+            }
+            className="h-9 w-full rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#159A9C]/45 focus:ring-2 focus:ring-[#159A9C]/15 sm:w-[220px]"
+          >
+            <option value="todos">Todos os status</option>
+            <option value="contrato_assinado">Contrato assinado</option>
+            <option value="dispensa_contrato_aprovada">Dispensa aprovada</option>
+            <option value="faturamento_liberado">Faturamento liberado</option>
+          </select>
+        </div>
+      </div>
+
+      {carregandoFilaFaturamento ? (
+        <div className="rounded-xl border border-dashed border-[#D4E2E7] bg-[#FAFCFD] p-4 text-sm text-[#5E7784]">
+          Carregando fila de faturamento...
+        </div>
+      ) : erroFilaFaturamento ? (
+        <div className="rounded-xl border border-[#F5D2D7] bg-[#FFF7F8] p-4 text-sm text-[#9F2F46]">
+          {erroFilaFaturamento}
+        </div>
+      ) : filaFaturamentoFiltrada.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-[#D4E2E7] bg-[#FAFCFD] p-4 text-sm text-[#5E7784]">
+          Nenhuma proposta encontrada para o filtro selecionado.
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-[#DCE7EC]">
+          <table className="min-w-full divide-y divide-[#E7EEF2] text-sm">
+            <thead className="bg-[#F7FBFD] text-left text-xs font-semibold uppercase tracking-wide text-[#5E7784]">
+              <tr>
+                <th className="px-3 py-2.5">Proposta</th>
+                <th className="px-3 py-2.5">Cliente</th>
+                <th className="px-3 py-2.5">Status</th>
+                <th className="px-3 py-2.5">Valor</th>
+                <th className="px-3 py-2.5">Atualizada em</th>
+                <th className="px-3 py-2.5 text-right">Acao</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#EEF3F6] bg-white">
+              {filaFaturamentoFiltrada.slice(0, 8).map((proposta, index) => {
+                const statusFila = normalizarStatusFila(proposta.status);
+                const clienteNome =
+                  proposta?.cliente && typeof proposta.cliente === 'object'
+                    ? String(proposta.cliente.nome || 'Cliente')
+                    : String(proposta?.cliente || 'Cliente');
+                const valorProposta = Number(proposta?.total || (proposta as any)?.valor || 0);
+                const dataAtualizacaoRaw =
+                  (proposta as any)?.updatedAt ||
+                  (proposta as any)?.atualizadaEm ||
+                  (proposta as any)?.createdAt ||
+                  (proposta as any)?.criadaEm;
+                const dataAtualizacao = dataAtualizacaoRaw
+                  ? new Date(String(dataAtualizacaoRaw)).toLocaleString('pt-BR')
+                  : '-';
+                const statusTone =
+                  statusFila === 'dispensa_contrato_aprovada'
+                    ? 'border-[#D8EFE9] bg-[#F1FBF8] text-[#11795E]'
+                    : statusFila === 'faturamento_liberado'
+                      ? 'border-[#F5E4CC] bg-[#FFF8EE] text-[#9A6112]'
+                      : 'border-[#DCEBFF] bg-[#F4F8FF] text-[#255E9A]';
+
+                return (
+                  <tr key={String(proposta?.id || proposta?.numero || `fila-${index}`)}>
+                    <td className="px-3 py-3">
+                      <p className="font-semibold text-[#173A4D]">
+                        {String(proposta?.numero || proposta?.id || '-')}
+                      </p>
+                      <p className="text-xs text-[#5E7784]">{String((proposta as any)?.titulo || '-')}</p>
+                    </td>
+                    <td className="px-3 py-3 text-[#244455]">{clienteNome}</td>
+                    <td className="px-3 py-3">
+                      <span
+                        className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${statusTone}`}
+                      >
+                        {statusFila ? STATUS_LABELS_FILA[statusFila] : 'Status nao mapeado'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 font-medium text-[#173A4D]">
+                      {formatCurrency(valorProposta)}
+                    </td>
+                    <td className="px-3 py-3 text-[#5E7784]">{dataAtualizacao}</td>
+                    <td className="px-3 py-3 text-right">
+                      <button
+                        onClick={() => prepararFaturaDaFila(proposta)}
+                        className="inline-flex h-8 items-center rounded-lg border border-[#159A9C]/35 bg-[#EAF8F8] px-3 text-xs font-semibold text-[#0E7E80] transition hover:border-[#159A9C] hover:bg-[#DFF3F3]"
+                      >
+                        Criar fatura
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {filaFaturamentoFiltrada.length > 8 && (
+            <div className="border-t border-[#EEF3F6] bg-[#FBFDFE] px-3 py-2 text-xs text-[#5E7784]">
+              Exibindo as 8 propostas mais recentes da fila ({filaFaturamentoFiltrada.length} no total).
+            </div>
+          )}
+        </div>
+      )}
+    </SectionCard>
+  );
+
   return (
     <div className="space-y-4 pt-1 sm:pt-2">
       <SectionCard className="space-y-4 p-4 sm:p-5">
@@ -2037,9 +2466,11 @@ export default function FaturamentoPage() {
         })}
       </FiltersBar>
 
-        {/* Conteudo baseado na visao ativa */}
-        {(visaoAtiva === 'dashboard' || visaoAtiva === 'prontidao') && (
-          <div className="space-y-4">
+      {/* Conteudo baseado na visao ativa */}
+      {visaoAtiva === 'fila' && renderFilaFaturamento()}
+
+      {(visaoAtiva === 'dashboard' || visaoAtiva === 'prontidao') && (
+        <div className="space-y-4">
             {visaoAtiva === 'prontidao' && (
               <SectionCard className="p-4 sm:p-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -3683,6 +4114,7 @@ export default function FaturamentoPage() {
         onClose={fecharModal}
         onSave={handleSalvarFatura}
         fatura={faturaEdicao}
+        draft={rascunhoFaturaModal}
       />
 
       {faturaDetalhes && (

@@ -87,6 +87,12 @@ const getStatusConfig = (status: string): StatusConfig => {
       return { icon: FileSignature, colorClass: 'text-[#3730A3]', bgClass: 'bg-[#818CF8]/15', label: 'Aguardando assinatura do contrato' };
     case 'contrato_assinado':
       return { icon: CheckCircle, colorClass: 'text-[#166534]', bgClass: 'bg-[#16A34A]/10', label: 'Contrato assinado' };
+    case 'dispensa_contrato_solicitada':
+      return { icon: AlertCircle, colorClass: 'text-[#B45309]', bgClass: 'bg-[#FFF1D6]', label: 'Dispensa de contrato solicitada' };
+    case 'dispensa_contrato_aprovada':
+      return { icon: CheckCircle, colorClass: 'text-[#0F7B7D]', bgClass: 'bg-[#DDF6F4]', label: 'Dispensa de contrato aprovada' };
+    case 'faturamento_liberado':
+      return { icon: DollarSign, colorClass: 'text-[#0C4A6E]', bgClass: 'bg-[#E0F2FE]', label: 'Faturamento liberado' };
     case 'fatura_criada':
       return { icon: CreditCard, colorClass: 'text-[#BE123C]', bgClass: 'bg-[#FB7185]/15', label: 'Fatura criada' };
     case 'aguardando_pagamento':

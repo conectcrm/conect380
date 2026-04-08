@@ -14,12 +14,16 @@ import { Logger,
 } from '@nestjs/common';
 import { PropostasService, Proposta } from './propostas.service';
 import {
+  AprovarDispensaContratoDto,
   AtualizarStatusDto,
   AtualizarPropostaDto,
   CancelarVendaDto,
+  DefinirObrigatoriedadeContratoDto,
+  LiberarFaturamentoPropostaDto,
   PropostaResponseDto,
   CriarPropostaDto,
   PropostaDto,
+  SolicitarDispensaContratoDto,
 } from './dto/proposta.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
@@ -421,6 +425,183 @@ export class PropostasController {
           success: false,
           message: 'Erro ao decidir aprovacao interna',
           error: this.resolveErrorMessage(error, 'Falha ao decidir aprovacao interna'),
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post(':id/contrato/decisao')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_UPDATE)
+  async definirObrigatoriedadeContrato(
+    @EmpresaId() empresaId: string,
+    @Param('id') propostaId: string,
+    @Body() body: DefinirObrigatoriedadeContratoDto,
+    @Request() req: any,
+  ): Promise<PropostaResponseDto> {
+    try {
+      const proposta = await this.propostasService.definirObrigatoriedadeContrato(
+        propostaId,
+        {
+          obrigatorio: body.obrigatorio,
+          motivo: body.motivo,
+        },
+        {
+          id: req?.user?.id,
+          nome: req?.user?.nome || req?.user?.name,
+        },
+        empresaId,
+      );
+
+      return {
+        success: true,
+        message: body.obrigatorio
+          ? 'Obrigatoriedade de contrato definida como obrigatoria'
+          : 'Obrigatoriedade de contrato definida como nao obrigatoria',
+        proposta: this.toPropostaDto(proposta),
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      this.logger.error('[PROPOSTAS] Erro ao definir obrigatoriedade de contrato:', error);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao definir obrigatoriedade de contrato',
+          error: this.resolveErrorMessage(error, 'Falha ao definir obrigatoriedade de contrato'),
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post(':id/contrato/dispensa/solicitar')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_UPDATE)
+  async solicitarDispensaContrato(
+    @EmpresaId() empresaId: string,
+    @Param('id') propostaId: string,
+    @Body() body: SolicitarDispensaContratoDto,
+    @Request() req: any,
+  ): Promise<PropostaResponseDto> {
+    try {
+      const proposta = await this.propostasService.solicitarDispensaContrato(
+        propostaId,
+        {
+          motivo: body.motivo,
+          observacoes: body.observacoes,
+        },
+        {
+          id: req?.user?.id,
+          nome: req?.user?.nome || req?.user?.name,
+        },
+        empresaId,
+      );
+
+      return {
+        success: true,
+        message: 'Solicitacao de dispensa de contrato registrada',
+        proposta: this.toPropostaDto(proposta),
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      this.logger.error('[PROPOSTAS] Erro ao solicitar dispensa de contrato:', error);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao solicitar dispensa de contrato',
+          error: this.resolveErrorMessage(error, 'Falha ao solicitar dispensa de contrato'),
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post(':id/contrato/dispensa/aprovar')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_APPROVE_OVERRIDE)
+  async aprovarDispensaContrato(
+    @EmpresaId() empresaId: string,
+    @Param('id') propostaId: string,
+    @Body() body: AprovarDispensaContratoDto,
+    @Request() req: any,
+  ): Promise<PropostaResponseDto> {
+    try {
+      const proposta = await this.propostasService.aprovarDispensaContrato(
+        propostaId,
+        {
+          motivo: body.motivo,
+          observacoes: body.observacoes,
+        },
+        {
+          id: req?.user?.id,
+          nome: req?.user?.nome || req?.user?.name,
+        },
+        empresaId,
+      );
+
+      return {
+        success: true,
+        message: 'Dispensa de contrato aprovada',
+        proposta: this.toPropostaDto(proposta),
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      this.logger.error('[PROPOSTAS] Erro ao aprovar dispensa de contrato:', error);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao aprovar dispensa de contrato',
+          error: this.resolveErrorMessage(error, 'Falha ao aprovar dispensa de contrato'),
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post(':id/faturamento/liberar')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
+  async liberarFaturamentoProposta(
+    @EmpresaId() empresaId: string,
+    @Param('id') propostaId: string,
+    @Body() body: LiberarFaturamentoPropostaDto,
+    @Request() req: any,
+  ): Promise<PropostaResponseDto> {
+    try {
+      const proposta = await this.propostasService.liberarFaturamentoProposta(
+        propostaId,
+        {
+          motivo: body?.motivo,
+        },
+        {
+          id: req?.user?.id,
+          nome: req?.user?.nome || req?.user?.name,
+        },
+        empresaId,
+      );
+
+      return {
+        success: true,
+        message: 'Faturamento liberado para a proposta',
+        proposta: this.toPropostaDto(proposta),
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      this.logger.error('[PROPOSTAS] Erro ao liberar faturamento da proposta:', error);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao liberar faturamento da proposta',
+          error: this.resolveErrorMessage(error, 'Falha ao liberar faturamento da proposta'),
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );

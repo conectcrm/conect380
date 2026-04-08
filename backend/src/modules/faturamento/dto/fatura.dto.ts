@@ -66,6 +66,10 @@ export class CreateFaturaDto {
   @IsNumber()
   contratoId?: number;
 
+  @IsOptional()
+  @IsUUID(4, { message: 'propostaId deve ser um UUID valido' })
+  propostaId?: string;
+
   // ✅ CORREÇÃO: Usar UUID para cliente
   @IsUUID(4, { message: 'ID do cliente deve ser um UUID válido' })
   clienteId: string;

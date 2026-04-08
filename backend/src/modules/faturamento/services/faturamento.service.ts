@@ -243,6 +243,7 @@ export class FaturamentoService {
   ): Promise<Fatura> {
     try {
       let contrato: Contrato | null = null;
+      let propostaIdReferencia: string | null = null;
 
       if (createFaturaDto.contratoId) {
         // x" MULTI-TENANCY: Validar que contrato pertence  empresa
@@ -253,6 +254,26 @@ export class FaturamentoService {
         if (!contrato) {
           throw new NotFoundException('Contrato no encontrado');
         }
+        propostaIdReferencia = contrato.propostaId ? String(contrato.propostaId) : null;
+      }
+
+      if (createFaturaDto.propostaId) {
+        const propostaIdPayload = String(createFaturaDto.propostaId || '').trim();
+        if (propostaIdPayload) {
+          if (propostaIdReferencia && propostaIdReferencia !== propostaIdPayload) {
+            throw new BadRequestException(
+              'propostaId informado nao corresponde ao contrato vinculado na fatura.',
+            );
+          }
+          propostaIdReferencia = propostaIdPayload;
+        }
+      }
+
+      if (propostaIdReferencia) {
+        await this.propostasService.assertPropostaElegivelParaFaturamento(
+          propostaIdReferencia,
+          empresaId,
+        );
       }
 
       // Gerar nmero nico da fatura

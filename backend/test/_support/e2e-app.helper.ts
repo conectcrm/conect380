@@ -364,6 +364,45 @@ async function ensureE2EDatabaseCompatibility(app: INestApplication): Promise<vo
       ADD COLUMN IF NOT EXISTS "emailDetails" jsonb
     `), queryTimeoutMs, 'ensureE2EDatabaseCompatibility.alter-propostas-email-details');
 
+    // Compatibilidade de empresa_configuracoes para suites que atualizam /empresas/config
+    // em bancos hibridos sem migrations recentes de gateway/fiscal.
+    await withBestEffortTimeout(queryRunner.query(`
+      ALTER TABLE IF EXISTS "empresa_configuracoes"
+      ADD COLUMN IF NOT EXISTS "gateway_pagamento_provider" character varying,
+      ADD COLUMN IF NOT EXISTS "gateway_pagamento_access_token" character varying,
+      ADD COLUMN IF NOT EXISTS "gateway_pagamento_webhook_secret" character varying,
+      ADD COLUMN IF NOT EXISTS "fiscal_provider" character varying,
+      ADD COLUMN IF NOT EXISTS "fiscal_official_http_enabled" boolean,
+      ADD COLUMN IF NOT EXISTS "fiscal_require_official_provider" boolean,
+      ADD COLUMN IF NOT EXISTS "fiscal_official_base_url" character varying,
+      ADD COLUMN IF NOT EXISTS "fiscal_official_strict_response" boolean,
+      ADD COLUMN IF NOT EXISTS "fiscal_official_webhook_allow_insecure" boolean,
+      ADD COLUMN IF NOT EXISTS "fiscal_official_correlation_header" character varying,
+      ADD COLUMN IF NOT EXISTS "fiscal_official_api_token" character varying,
+      ADD COLUMN IF NOT EXISTS "fiscal_official_webhook_secret" character varying
+    `), queryTimeoutMs, 'ensureE2EDatabaseCompatibility.alter-empresa-configuracoes-gateway-fiscal');
+
+    // Compatibilidade do enum de alertas operacionais financeiros para recalculo de saldo critico.
+    await withBestEffortTimeout(queryRunner.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM pg_type WHERE typname = 'alertas_operacionais_financeiro_tipo_enum'
+        ) THEN
+          IF NOT EXISTS (
+            SELECT 1
+            FROM pg_enum e
+            JOIN pg_type t ON t.oid = e.enumtypid
+            WHERE t.typname = 'alertas_operacionais_financeiro_tipo_enum'
+              AND e.enumlabel = 'saldo_caixa_critico'
+          ) THEN
+            ALTER TYPE "public"."alertas_operacionais_financeiro_tipo_enum"
+              ADD VALUE 'saldo_caixa_critico';
+          END IF;
+        END IF;
+      END$$;
+    `), queryTimeoutMs, 'ensureE2EDatabaseCompatibility.alerta-enum-saldo-caixa-critico');
+
     // Compatibilidade da Fase 2 do pipeline: itens preliminares da oportunidade.
     await withBestEffortTimeout(queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "oportunidade_itens_preliminares" (

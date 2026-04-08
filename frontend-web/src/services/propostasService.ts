@@ -54,6 +54,9 @@ export interface Proposta {
     | 'aprovada'
     | 'contrato_gerado'
     | 'contrato_assinado'
+    | 'dispensa_contrato_solicitada'
+    | 'dispensa_contrato_aprovada'
+    | 'faturamento_liberado'
     | 'fatura_criada'
     | 'aguardando_pagamento'
     | 'pago'
@@ -93,6 +96,33 @@ export interface Proposta {
         status?: string;
       };
     }>;
+    contratoGate?: {
+      contratoObrigatorio?: boolean;
+      motivoDecisao?: string;
+      decididaEm?: string;
+      decididaPorId?: string;
+      decididaPorNome?: string;
+      dispensa?: {
+        status?: 'nao_solicitada' | 'solicitada' | 'aprovada' | 'rejeitada';
+        motivoSolicitacao?: string;
+        observacoesSolicitacao?: string;
+        solicitadaEm?: string;
+        solicitadaPorId?: string;
+        solicitadaPorNome?: string;
+        motivoDecisao?: string;
+        observacoesDecisao?: string;
+        decididaEm?: string;
+        decididaPorId?: string;
+        decididaPorNome?: string;
+      };
+      faturamento?: {
+        liberado?: boolean;
+        motivo?: string;
+        liberadoEm?: string;
+        liberadoPorId?: string;
+        liberadoPorNome?: string;
+      };
+    };
   };
 }
 
@@ -696,6 +726,68 @@ class PropostasService {
   ): Promise<any> {
     const response = await api.post(`${this.baseURL}/${propostaId}/aprovacao/decidir`, payload);
     return response.data?.aprovacao || response.data;
+  }
+
+  async definirObrigatoriedadeContrato(
+    propostaId: string,
+    payload: { obrigatorio: boolean; motivo?: string },
+  ): Promise<Proposta> {
+    try {
+      const response = await api.post(`${this.baseURL}/${propostaId}/contrato/decisao`, payload);
+      this.clearCache();
+      return response.data?.proposta || response.data;
+    } catch (error) {
+      console.error('Erro ao definir obrigatoriedade de contrato:', error);
+      throw this.buildDomainError('definir obrigatoriedade de contrato', error);
+    }
+  }
+
+  async solicitarDispensaContrato(
+    propostaId: string,
+    payload: { motivo: string; observacoes?: string },
+  ): Promise<Proposta> {
+    try {
+      const response = await api.post(
+        `${this.baseURL}/${propostaId}/contrato/dispensa/solicitar`,
+        payload,
+      );
+      this.clearCache();
+      return response.data?.proposta || response.data;
+    } catch (error) {
+      console.error('Erro ao solicitar dispensa de contrato:', error);
+      throw this.buildDomainError('solicitar dispensa de contrato', error);
+    }
+  }
+
+  async aprovarDispensaContrato(
+    propostaId: string,
+    payload: { motivo: string; observacoes?: string },
+  ): Promise<Proposta> {
+    try {
+      const response = await api.post(
+        `${this.baseURL}/${propostaId}/contrato/dispensa/aprovar`,
+        payload,
+      );
+      this.clearCache();
+      return response.data?.proposta || response.data;
+    } catch (error) {
+      console.error('Erro ao aprovar dispensa de contrato:', error);
+      throw this.buildDomainError('aprovar dispensa de contrato', error);
+    }
+  }
+
+  async liberarFaturamentoProposta(
+    propostaId: string,
+    payload?: { motivo?: string },
+  ): Promise<Proposta> {
+    try {
+      const response = await api.post(`${this.baseURL}/${propostaId}/faturamento/liberar`, payload || {});
+      this.clearCache();
+      return response.data?.proposta || response.data;
+    } catch (error) {
+      console.error('Erro ao liberar faturamento da proposta:', error);
+      throw this.buildDomainError('liberar faturamento da proposta', error);
+    }
   }
 
   validateProposta(proposta: Partial<Proposta>): { valid: boolean; errors: string[] } {

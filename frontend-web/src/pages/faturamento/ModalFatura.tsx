@@ -24,6 +24,28 @@ interface ModalFaturaProps {
   onClose: () => void;
   onSave: (dadosFatura: NovaFatura) => void;
   fatura?: Fatura | null;
+  draft?: ModalFaturaDraft | null;
+}
+
+export interface ModalFaturaContratoDraft {
+  id: string;
+  numero: string;
+  cliente?: {
+    id?: string;
+    nome: string;
+    email: string;
+  };
+  valor?: number;
+  status?: string;
+  dataEmissao?: Date;
+  dataVencimento?: Date;
+  descricao?: string;
+}
+
+export interface ModalFaturaDraft {
+  dados?: Partial<NovaFatura> | null;
+  cliente?: ClienteSelectValue | null;
+  contrato?: ModalFaturaContratoDraft | null;
 }
 
 type ItemFormulario = Omit<ItemFatura, 'id' | 'valorTotal'>;
@@ -260,6 +282,7 @@ export default function ModalFatura({
   onClose,
   onSave,
   fatura,
+  draft,
 }: ModalFaturaProps) {
   const { user } = useAuth();
   const usuarioResponsavelId = String(user?.id || '').trim();
@@ -408,6 +431,43 @@ export default function ModalFatura({
 
       setConfigTipo(configTipoEstruturada ?? metadados?.tipo ?? CONFIG_TIPO_PADRAO);
       setDocumentoFinanceiro(documentoFinanceiroEstruturado);
+    } else if (draft?.dados) {
+      const dadosRascunho = draft.dados || {};
+      const itensRascunho = Array.isArray(dadosRascunho.itens)
+        ? dadosRascunho.itens.map((item) => ({
+            descricao: String(item.descricao || '').trim(),
+            quantidade: Math.max(0, normalizarNumero(item.quantidade, 0)),
+            valorUnitario: Math.max(0, normalizarNumero(item.valorUnitario, 0)),
+            unidade: normalizarUnidadeItem(item.unidade),
+            codigoProduto: item.codigoProduto ? String(item.codigoProduto) : undefined,
+            percentualDesconto: Math.max(0, normalizarNumero(item.percentualDesconto, 0)),
+            valorDesconto: Math.max(0, normalizarNumero(item.valorDesconto, 0)),
+          }))
+        : [];
+      const dataVencimentoRascunho =
+        typeof dadosRascunho.dataVencimento === 'string' && dadosRascunho.dataVencimento.includes('T')
+          ? dadosRascunho.dataVencimento.split('T')[0]
+          : String(dadosRascunho.dataVencimento || '');
+
+      setFormData({
+        ...criarFaturaPadrao(usuarioResponsavelId),
+        ...dadosRascunho,
+        contratoId: dadosRascunho.contratoId ? String(dadosRascunho.contratoId) : '',
+        clienteId: dadosRascunho.clienteId ? String(dadosRascunho.clienteId) : '',
+        usuarioResponsavelId: String(
+          dadosRascunho.usuarioResponsavelId || usuarioResponsavelId || '',
+        ).trim(),
+        formaPagamento: normalizarFormaPagamento(
+          (dadosRascunho.formaPagamento as FormaPagamento | undefined) || FormaPagamento.PIX,
+        ),
+        dataVencimento: dataVencimentoRascunho,
+        itens: itensRascunho,
+      });
+
+      setClienteSelecionado(draft?.cliente || null);
+      setContratoSelecionado(draft?.contrato || null);
+      setConfigTipo(CONFIG_TIPO_PADRAO);
+      setDocumentoFinanceiro(DOCUMENTO_FINANCEIRO_PADRAO);
     } else {
       setFormData(criarFaturaPadrao(usuarioResponsavelId));
       setClienteSelecionado(null);
@@ -418,7 +478,7 @@ export default function ModalFatura({
 
     setNovoItem(criarNovoItemPadrao());
     setErros({});
-  }, [fatura, isOpen]);
+  }, [fatura, isOpen, draft, usuarioResponsavelId]);
 
   useEffect(() => {
     if (!isOpen || salvando) {

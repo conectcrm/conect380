@@ -441,6 +441,25 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const { confirm } = useGlobalConfirmation();
   const mvpModeAtivo = isMvpModeEnabled();
   const faturamentoDisponivelNoContexto = !mvpModeAtivo;
+  const usuarioLogadoAtual = authService.getUser() as any;
+  const roleUsuarioAtual = String(usuarioLogadoAtual?.role || '')
+    .trim()
+    .toLowerCase();
+  const permissoesUsuarioAtual = [
+    ...(Array.isArray(usuarioLogadoAtual?.permissions) ? usuarioLogadoAtual.permissions : []),
+    ...(Array.isArray(usuarioLogadoAtual?.permissoes) ? usuarioLogadoAtual.permissoes : []),
+  ]
+    .map((permissao) => String(permissao || '').trim().toLowerCase())
+    .filter((permissao) => Boolean(permissao));
+  const perfilPodeOperarFaturamento = ['financeiro', 'admin', 'superadmin'].includes(
+    roleUsuarioAtual,
+  );
+  const permissaoPodeOperarFaturamento = permissoesUsuarioAtual.includes(
+    'financeiro.faturamento.manage',
+  );
+  const faturamentoOperacaoPermitidaNoContexto =
+    faturamentoDisponivelNoContexto &&
+    (perfilPodeOperarFaturamento || permissaoPodeOperarFaturamento);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [clienteData, setClienteData] = useState<{
@@ -1241,6 +1260,9 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       | 'aprovada'
       | 'contrato_gerado'
       | 'contrato_assinado'
+      | 'dispensa_contrato_solicitada'
+      | 'dispensa_contrato_aprovada'
+      | 'faturamento_liberado'
       | 'fatura_criada'
       | 'aguardando_pagamento'
       | 'pago'
@@ -1615,6 +1637,24 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     navigate('/financeiro/faturamento');
   };
 
+  const encaminharParaFilaFaturamento = (
+    statusPreferencial: 'contrato_assinado' | 'dispensa_contrato_aprovada' | 'faturamento_liberado',
+  ) => {
+    navigate(
+      `/financeiro/faturamento?visao=fila&statusFila=${encodeURIComponent(statusPreferencial)}&origem=proposta`,
+    );
+  };
+
+  const registrarHandoffFinanceiro = (
+    statusPreferencial: 'contrato_assinado' | 'dispensa_contrato_aprovada' | 'faturamento_liberado',
+  ) => {
+    toastService.success(
+      'Venda pronta para faturamento. O time financeiro deve revisar e gerar a fatura no modulo Financeiro.',
+    );
+    encaminharParaFilaFaturamento(statusPreferencial);
+    onPropostaUpdated?.();
+  };
+
   type ItemFaturaAutomacao = {
     descricao: string;
     quantidade: number;
@@ -1751,6 +1791,13 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     return status === 'contrato_assinado';
   };
 
+  const getDispensaContratoStatus = (fonte?: PropostaCompleta | PropostaUI): string => {
+    const propostaData = getPropostaData(fonte);
+    return String((propostaData as any)?.emailDetails?.contratoGate?.dispensa?.status || '')
+      .trim()
+      .toLowerCase();
+  };
+
   // Gerar contrato a partir da proposta
   const handleGerarContrato = async () => {
     if (!podeGerarContrato()) {
@@ -1764,6 +1811,11 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         await obterContextoAutomacao();
       const propostaData = getPropostaData(propostaCompleta);
       const valorTotal = Number(propostaData.total || 0);
+
+      await propostasApiService.definirObrigatoriedadeContrato(propostaId, {
+        obrigatorio: true,
+        motivo: 'Fluxo definido para formalizacao com contrato.',
+      });
 
       if (!Number.isFinite(valorTotal) || valorTotal <= 0) {
         throw new Error('A proposta precisa ter valor total maior que zero para gerar contrato.');
@@ -1811,6 +1863,95 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       toastService.error(getErrorMessage(error, 'Erro ao gerar contrato a partir da proposta.'));
     } finally {
       setGerandoContrato(false);
+    }
+  };
+
+  const handleSolicitarDispensaContrato = async (): Promise<boolean> => {
+    try {
+      const { propostaCompleta, propostaId } = await obterContextoAutomacao();
+      const propostaData = getPropostaData(propostaCompleta);
+      const motivo = await askForInput({
+        title: 'Solicitar dispensa de contrato',
+        message:
+          'Informe o motivo da dispensa. Essa solicitacao precisara de aprovacao para liberar o faturamento.',
+        placeholder: 'Ex: venda transacional padrao com aceite em proposta e termos comerciais',
+        confirmText: 'Solicitar dispensa',
+        cancelText: 'Cancelar',
+        required: true,
+        multiline: true,
+        confirmVariant: 'warning',
+      });
+
+      if (motivo === null) {
+        return false;
+      }
+
+      const motivoLimpo = String(motivo || '').trim();
+      if (!motivoLimpo) {
+        toastService.error('Informe um motivo valido para solicitar a dispensa.');
+        return false;
+      }
+
+      await propostasApiService.definirObrigatoriedadeContrato(propostaId, {
+        obrigatorio: false,
+        motivo: motivoLimpo,
+      });
+
+      await propostasApiService.solicitarDispensaContrato(propostaId, {
+        motivo: motivoLimpo,
+        observacoes: `Solicitacao criada via fluxo da proposta ${propostaData.numero || propostaId}.`,
+      });
+
+      toastService.success(
+        'Dispensa de contrato solicitada. Aguarde aprovacao para liberar faturamento.',
+      );
+      onPropostaUpdated?.();
+      return true;
+    } catch (error) {
+      console.error('Erro ao solicitar dispensa de contrato:', error);
+      toastService.error(getErrorMessage(error, 'Erro ao solicitar dispensa de contrato.'));
+      return false;
+    }
+  };
+
+  const handleAprovarDispensaContrato = async (): Promise<boolean> => {
+    try {
+      const { propostaCompleta, propostaId } = await obterContextoAutomacao();
+      const propostaData = getPropostaData(propostaCompleta);
+      const motivo = await askForInput({
+        title: 'Aprovar dispensa de contrato',
+        message:
+          'Informe o motivo da aprovacao. Essa acao libera o caminho sem contrato para faturamento.',
+        placeholder: 'Ex: operacao padrao sem risco juridico e dentro da politica comercial',
+        confirmText: 'Aprovar dispensa',
+        cancelText: 'Cancelar',
+        required: true,
+        multiline: true,
+        confirmVariant: 'success',
+      });
+
+      if (motivo === null) {
+        return false;
+      }
+
+      const motivoLimpo = String(motivo || '').trim();
+      if (!motivoLimpo) {
+        toastService.error('Informe um motivo valido para aprovar a dispensa.');
+        return false;
+      }
+
+      await propostasApiService.aprovarDispensaContrato(propostaId, {
+        motivo: motivoLimpo,
+        observacoes: `Aprovacao registrada via fluxo da proposta ${propostaData.numero || propostaId}.`,
+      });
+
+      toastService.success('Dispensa de contrato aprovada.');
+      onPropostaUpdated?.();
+      return true;
+    } catch (error) {
+      console.error('Erro ao aprovar dispensa de contrato:', error);
+      toastService.error(getErrorMessage(error, 'Erro ao aprovar dispensa de contrato.'));
+      return false;
     }
   };
 
@@ -1990,10 +2131,19 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     );
   };
 
+  const garantirFaturamentoLiberado = async (propostaId: string, motivo: string): Promise<void> => {
+    await propostasApiService.liberarFaturamentoProposta(propostaId, { motivo });
+  };
+
   // Criar fatura automatica
   const handleCriarFatura = async (options?: { ignoreStatusGate?: boolean }) => {
     if (!faturamentoDisponivelNoContexto) {
       toastService.info(AUTOMACAO_FLUXO_MENSAGEM);
+      return;
+    }
+
+    if (!faturamentoOperacaoPermitidaNoContexto) {
+      registrarHandoffFinanceiro('contrato_assinado');
       return;
     }
 
@@ -2025,9 +2175,15 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         );
       }
 
+      await garantirFaturamentoLiberado(
+        propostaId,
+        `Liberacao automatica para faturamento da proposta ${propostaData.numero || propostaId} com contrato assinado.`,
+      );
+
       const payloadFatura = montarPayloadFatura(propostaCompleta);
       const fatura = await faturamentoService.criarFatura({
         contratoId: String(contrato.id),
+        propostaId,
         clienteId,
         usuarioResponsavelId,
         tipo: TipoFatura.UNICA,
@@ -2123,10 +2279,41 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
             break;
           }
 
+          const statusDispensa = getDispensaContratoStatus();
+          if (statusDispensa === 'solicitada') {
+            const aprovarAgora = await confirm({
+              title: 'Dispensa pendente de aprovacao',
+              message:
+                'A dispensa ja foi solicitada para esta proposta. Deseja aprovar agora para liberar o faturamento?',
+              confirmText: 'Aprovar dispensa',
+              cancelText: 'Aguardar',
+              icon: 'warning',
+              confirmButtonClass: 'bg-teal-600 hover:bg-teal-700 focus:ring-teal-500',
+            });
+
+            if (!aprovarAgora) {
+              toastService.info(
+                'Dispensa de contrato pendente. Aguardando aprovacao para seguir com faturamento.',
+              );
+              break;
+            }
+
+            const aprovado = await handleAprovarDispensaContrato();
+            if (aprovado) {
+              registrarHandoffFinanceiro('dispensa_contrato_aprovada');
+            }
+            break;
+          }
+
+          if (statusDispensa === 'aprovada') {
+            registrarHandoffFinanceiro('dispensa_contrato_aprovada');
+            break;
+          }
+
           const desejaGerarContrato = await confirm({
             title: 'Gerar contrato para esta venda?',
             message:
-              'Se optar por gerar contrato, a proposta segue para assinatura. Se nao, a fatura sera criada diretamente.',
+              'Se optar por gerar contrato, a proposta segue para assinatura. Se nao, abriremos a solicitacao formal de dispensa de contrato.',
             confirmText: 'Gerar contrato',
             cancelText: 'Seguir sem contrato',
             icon: 'info',
@@ -2139,9 +2326,10 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           }
 
           const confirmarSemContrato = await confirm({
-            title: 'Confirmar fluxo sem contrato',
-            message: 'A fatura sera criada diretamente para esta proposta. Deseja continuar?',
-            confirmText: 'Sim, criar fatura',
+            title: 'Solicitar dispensa de contrato',
+            message:
+              'A proposta seguira para analise de dispensa. A fatura so sera permitida apos aprovacao da dispensa.',
+            confirmText: 'Sim, solicitar dispensa',
             cancelText: 'Voltar',
             icon: 'warning',
             confirmButtonClass: 'bg-amber-600 hover:bg-amber-700 focus:ring-amber-500',
@@ -2151,7 +2339,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
             break;
           }
 
-          await handleCriarFaturaSemContrato();
+          await handleSolicitarDispensaContrato();
           break;
         }
 
@@ -2195,8 +2383,8 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
             break;
           }
 
-          toastService.success('Assinatura externa confirmada. Prosseguindo para faturamento.');
-          await handleCriarFatura({ ignoreStatusGate: true });
+          toastService.success('Assinatura externa confirmada.');
+          registrarHandoffFinanceiro('contrato_assinado');
           break;
         }
 
@@ -2205,7 +2393,43 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
             toastService.info(AUTOMACAO_FLUXO_MENSAGEM);
             break;
           }
-          await handleCriarFatura(); // Criar fatura
+          registrarHandoffFinanceiro('contrato_assinado');
+          break;
+
+        case 'dispensa_contrato_solicitada': {
+          const aprovarAgora = await confirm({
+            title: 'Dispensa pendente de aprovacao',
+            message:
+              'A dispensa de contrato ainda esta pendente. Deseja aprovar agora para seguir com faturamento?',
+            confirmText: 'Aprovar dispensa',
+            cancelText: 'Manter pendente',
+            icon: 'warning',
+            confirmButtonClass: 'bg-teal-600 hover:bg-teal-700 focus:ring-teal-500',
+          });
+
+          if (!aprovarAgora) {
+            toastService.info('Dispensa mantida como pendente.');
+            break;
+          }
+
+          const aprovado = await handleAprovarDispensaContrato();
+          if (aprovado) {
+            registrarHandoffFinanceiro('dispensa_contrato_aprovada');
+          }
+          break;
+        }
+
+        case 'dispensa_contrato_aprovada':
+        case 'faturamento_liberado':
+          if (!faturamentoDisponivelNoContexto) {
+            toastService.info(AUTOMACAO_FLUXO_MENSAGEM);
+            break;
+          }
+          registrarHandoffFinanceiro(
+            status === 'faturamento_liberado'
+              ? 'faturamento_liberado'
+              : 'dispensa_contrato_aprovada',
+          );
           break;
 
         case 'fatura_criada':
@@ -2257,9 +2481,15 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       return;
     }
 
+    if (!faturamentoOperacaoPermitidaNoContexto) {
+      registrarHandoffFinanceiro('dispensa_contrato_aprovada');
+      return;
+    }
+
     setCriandoFatura(true);
     try {
-      const { propostaCompleta, clienteId, usuarioResponsavelId } = await obterContextoAutomacao();
+      const { propostaCompleta, propostaId, clienteId, usuarioResponsavelId } =
+        await obterContextoAutomacao();
       const propostaData = getPropostaData(propostaCompleta);
       const hoje = new Date();
       const dataVencimento = propostaData.dataValidade
@@ -2267,7 +2497,12 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         : formatDateOnly(addDays(hoje, 30));
 
       const payloadFatura = montarPayloadFatura(propostaCompleta);
+      await garantirFaturamentoLiberado(
+        propostaId,
+        `Liberacao automatica para faturamento sem contrato da proposta ${propostaData.numero || propostaId}.`,
+      );
       const fatura = await faturamentoService.criarFatura({
+        propostaId,
         clienteId,
         usuarioResponsavelId,
         tipo: TipoFatura.UNICA,
@@ -2740,12 +2975,19 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const pagamentoControladoNoFinanceiro = statusFluxoAtual === 'aguardando_pagamento';
   const bloqueiaAvancoFinanceiroNoMvp =
     mvpModeAtivo &&
-    ['contrato_assinado', 'fatura_criada', 'aguardando_pagamento'].includes(statusFluxoAtual);
+    [
+      'contrato_assinado',
+      'dispensa_contrato_solicitada',
+      'dispensa_contrato_aprovada',
+      'faturamento_liberado',
+      'fatura_criada',
+      'aguardando_pagamento',
+    ].includes(statusFluxoAtual);
   const exibirEmailDireto = !statusEncerradoSemAcoesComerciais;
   const exibirWhatsApp = !statusEncerradoSemAcoesComerciais;
   const exibirCompartilhar = !statusEncerradoSemAcoesComerciais;
   const exibirGerarContrato = podeGerarContrato();
-  const exibirCriarFatura = faturamentoDisponivelNoContexto && podeCriarFatura();
+  const exibirCriarFatura = false;
   const exibirAvancarFluxo = !statusEncerradoSemAcoesComerciais && !bloqueiaAvancoFinanceiroNoMvp;
   const exibirAcoesCompartilhamento = actionScope === 'all' || actionScope === 'share';
   const exibirAcoesFluxo = actionScope === 'all' || actionScope === 'flow';
@@ -2785,7 +3027,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         return {
           label: 'Formalizar venda',
           title: faturamentoDisponivelNoContexto
-            ? 'Gerar contrato ou criar fatura a partir da proposta aprovada'
+            ? 'Gerar contrato ou solicitar dispensa para encaminhar ao financeiro'
             : 'Gerar contrato para formalizar a venda no MVP',
         };
       case 'contrato_gerado':
@@ -2797,9 +3039,28 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         };
       case 'contrato_assinado':
         return {
-          label: faturamentoDisponivelNoContexto ? 'Gerar fatura' : 'Fluxo concluido',
+          label: 'Encaminhar ao financeiro',
           title: faturamentoDisponivelNoContexto
-            ? 'Criar fatura automatica a partir do contrato assinado'
+            ? 'Encaminhar proposta assinada para fila de faturamento do financeiro'
+            : AUTOMACAO_FLUXO_MENSAGEM,
+        };
+      case 'dispensa_contrato_solicitada':
+        return {
+          label: 'Aprovar dispensa',
+          title: 'Aprovar dispensa de contrato para seguir com faturamento',
+        };
+      case 'dispensa_contrato_aprovada':
+        return {
+          label: 'Encaminhar ao financeiro',
+          title: faturamentoDisponivelNoContexto
+            ? 'Encaminhar venda com dispensa aprovada para faturamento pelo financeiro'
+            : AUTOMACAO_FLUXO_MENSAGEM,
+        };
+      case 'faturamento_liberado':
+        return {
+          label: 'Encaminhar ao financeiro',
+          title: faturamentoDisponivelNoContexto
+            ? 'Proposta pronta para faturar. O financeiro deve revisar e faturar.'
             : AUTOMACAO_FLUXO_MENSAGEM,
         };
       case 'fatura_criada':

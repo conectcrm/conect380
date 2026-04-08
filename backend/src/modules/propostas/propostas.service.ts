@@ -5,6 +5,7 @@ import {
   Inject,
   Injectable,
   Logger,
+  NotFoundException,
   Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -37,6 +38,9 @@ type SalesFlowStatus =
   | 'aprovada'
   | 'contrato_gerado'
   | 'contrato_assinado'
+  | 'dispensa_contrato_solicitada'
+  | 'dispensa_contrato_aprovada'
+  | 'faturamento_liberado'
   | 'fatura_criada'
   | 'aguardando_pagamento'
   | 'pago'
@@ -52,6 +56,9 @@ const FLOW_STATUS_VALUES = new Set<SalesFlowStatus>([
   'aprovada',
   'contrato_gerado',
   'contrato_assinado',
+  'dispensa_contrato_solicitada',
+  'dispensa_contrato_aprovada',
+  'faturamento_liberado',
   'fatura_criada',
   'aguardando_pagamento',
   'pago',
@@ -75,6 +82,9 @@ const FLOW_STATUS_ALIAS: Record<string, SalesFlowStatus> = {
   contrato_gerado: 'contrato_gerado',
   contratoassinado: 'contrato_assinado',
   contrato_assinado: 'contrato_assinado',
+  dispensa_contrato_solicitada: 'dispensa_contrato_solicitada',
+  dispensa_contrato_aprovada: 'dispensa_contrato_aprovada',
+  faturamento_liberado: 'faturamento_liberado',
   fatura_criada: 'fatura_criada',
   aguardando_pagamento: 'aguardando_pagamento',
   pagamento_pendente: 'aguardando_pagamento',
@@ -90,6 +100,9 @@ const WON_STATUS_VALUES = new Set<SalesFlowStatus>([
   'aprovada',
   'contrato_gerado',
   'contrato_assinado',
+  'dispensa_contrato_solicitada',
+  'dispensa_contrato_aprovada',
+  'faturamento_liberado',
   'fatura_criada',
   'aguardando_pagamento',
   'pago',
@@ -102,7 +115,10 @@ const PROPOSTA_SYNC_STATUS_TO_STAGE: Partial<Record<SalesFlowStatus, EstagioOpor
   negociacao: EstagioOportunidade.NEGOCIACAO,
   aprovada: EstagioOportunidade.FECHAMENTO,
   contrato_gerado: EstagioOportunidade.FECHAMENTO,
+  dispensa_contrato_solicitada: EstagioOportunidade.FECHAMENTO,
+  dispensa_contrato_aprovada: EstagioOportunidade.FECHAMENTO,
   contrato_assinado: EstagioOportunidade.GANHO,
+  faturamento_liberado: EstagioOportunidade.GANHO,
   fatura_criada: EstagioOportunidade.GANHO,
   aguardando_pagamento: EstagioOportunidade.GANHO,
   pago: EstagioOportunidade.GANHO,
@@ -135,9 +151,20 @@ const FLOW_STATUS_TRANSITIONS: Record<SalesFlowStatus, readonly SalesFlowStatus[
   enviada: ['visualizada', 'negociacao', 'aprovada', 'rejeitada', 'expirada'],
   visualizada: ['negociacao', 'aprovada', 'rejeitada', 'expirada'],
   negociacao: ['enviada', 'aprovada', 'rejeitada', 'expirada', 'visualizada'],
-  aprovada: ['contrato_gerado', 'contrato_assinado', 'fatura_criada', 'rejeitada'],
+  aprovada: [
+    'contrato_gerado',
+    'contrato_assinado',
+    'dispensa_contrato_solicitada',
+    'dispensa_contrato_aprovada',
+    'faturamento_liberado',
+    'fatura_criada',
+    'rejeitada',
+  ],
   contrato_gerado: ['contrato_assinado', 'rejeitada'],
-  contrato_assinado: ['fatura_criada', 'rejeitada'],
+  contrato_assinado: ['faturamento_liberado', 'fatura_criada', 'rejeitada'],
+  dispensa_contrato_solicitada: ['dispensa_contrato_aprovada', 'aprovada', 'rejeitada'],
+  dispensa_contrato_aprovada: ['faturamento_liberado', 'rejeitada'],
+  faturamento_liberado: ['fatura_criada', 'aguardando_pagamento', 'pago', 'rejeitada'],
   fatura_criada: ['contrato_assinado', 'aguardando_pagamento', 'pago', 'rejeitada'],
   aguardando_pagamento: ['contrato_assinado', 'pago', 'rejeitada'],
   pago: ['aguardando_pagamento'],
@@ -230,6 +257,40 @@ interface PropostaLembrete {
   diasApos: number;
   observacoes?: string;
   origem?: string;
+}
+
+type DispensaContratoStatus = 'nao_solicitada' | 'solicitada' | 'aprovada' | 'rejeitada';
+
+interface PropostaContratoGateDispensa {
+  status: DispensaContratoStatus;
+  motivoSolicitacao?: string;
+  observacoesSolicitacao?: string;
+  solicitadaEm?: string;
+  solicitadaPorId?: string;
+  solicitadaPorNome?: string;
+  motivoDecisao?: string;
+  observacoesDecisao?: string;
+  decididaEm?: string;
+  decididaPorId?: string;
+  decididaPorNome?: string;
+}
+
+interface PropostaContratoGateFaturamento {
+  liberado: boolean;
+  motivo?: string;
+  liberadoEm?: string;
+  liberadoPorId?: string;
+  liberadoPorNome?: string;
+}
+
+interface PropostaContratoGate {
+  contratoObrigatorio?: boolean;
+  motivoDecisao?: string;
+  decididaEm?: string;
+  decididaPorId?: string;
+  decididaPorNome?: string;
+  dispensa?: PropostaContratoGateDispensa;
+  faturamento?: PropostaContratoGateFaturamento;
 }
 
 type PropostaStatusTransitionContext = {
@@ -1270,6 +1331,9 @@ export class PropostasService {
       'aprovada',
       'contrato_gerado',
       'contrato_assinado',
+      'dispensa_contrato_solicitada',
+      'dispensa_contrato_aprovada',
+      'faturamento_liberado',
       'fatura_criada',
       'aguardando_pagamento',
       'pago',
@@ -1982,6 +2046,9 @@ export class PropostasService {
         case 'aprovada':
         case 'contrato_gerado':
         case 'contrato_assinado':
+        case 'dispensa_contrato_solicitada':
+        case 'dispensa_contrato_aprovada':
+        case 'faturamento_liberado':
         case 'fatura_criada':
         case 'aguardando_pagamento':
         case 'pago':
@@ -2003,6 +2070,9 @@ export class PropostasService {
     switch (status) {
       case 'contrato_gerado':
       case 'contrato_assinado':
+      case 'dispensa_contrato_solicitada':
+      case 'dispensa_contrato_aprovada':
+      case 'faturamento_liberado':
       case 'fatura_criada':
       case 'aguardando_pagamento':
       case 'pago':
@@ -2561,6 +2631,102 @@ export class PropostasService {
     };
   }
 
+  private parseContratoGate(emailDetails: unknown): PropostaContratoGate {
+    const details = this.toObjectRecord(emailDetails);
+    const raw = this.toObjectRecord(details.contratoGate);
+    const dispensaRaw = this.toObjectRecord(raw.dispensa);
+    const faturamentoRaw = this.toObjectRecord(raw.faturamento);
+    const dispensaStatusRaw = String(dispensaRaw.status || '').trim().toLowerCase();
+    const dispensaStatus: DispensaContratoStatus =
+      dispensaStatusRaw === 'solicitada' ||
+      dispensaStatusRaw === 'aprovada' ||
+      dispensaStatusRaw === 'rejeitada'
+        ? (dispensaStatusRaw as DispensaContratoStatus)
+        : 'nao_solicitada';
+
+    return {
+      contratoObrigatorio:
+        typeof raw.contratoObrigatorio === 'boolean' ? raw.contratoObrigatorio : undefined,
+      motivoDecisao: raw.motivoDecisao ? String(raw.motivoDecisao) : undefined,
+      decididaEm: raw.decididaEm ? this.toIsoString(raw.decididaEm) : undefined,
+      decididaPorId: raw.decididaPorId ? String(raw.decididaPorId) : undefined,
+      decididaPorNome: raw.decididaPorNome ? String(raw.decididaPorNome) : undefined,
+      dispensa: {
+        status: dispensaStatus,
+        motivoSolicitacao: dispensaRaw.motivoSolicitacao
+          ? String(dispensaRaw.motivoSolicitacao)
+          : undefined,
+        observacoesSolicitacao: dispensaRaw.observacoesSolicitacao
+          ? String(dispensaRaw.observacoesSolicitacao)
+          : undefined,
+        solicitadaEm: dispensaRaw.solicitadaEm ? this.toIsoString(dispensaRaw.solicitadaEm) : undefined,
+        solicitadaPorId: dispensaRaw.solicitadaPorId ? String(dispensaRaw.solicitadaPorId) : undefined,
+        solicitadaPorNome: dispensaRaw.solicitadaPorNome
+          ? String(dispensaRaw.solicitadaPorNome)
+          : undefined,
+        motivoDecisao: dispensaRaw.motivoDecisao ? String(dispensaRaw.motivoDecisao) : undefined,
+        observacoesDecisao: dispensaRaw.observacoesDecisao
+          ? String(dispensaRaw.observacoesDecisao)
+          : undefined,
+        decididaEm: dispensaRaw.decididaEm ? this.toIsoString(dispensaRaw.decididaEm) : undefined,
+        decididaPorId: dispensaRaw.decididaPorId ? String(dispensaRaw.decididaPorId) : undefined,
+        decididaPorNome: dispensaRaw.decididaPorNome ? String(dispensaRaw.decididaPorNome) : undefined,
+      },
+      faturamento: {
+        liberado: Boolean(faturamentoRaw.liberado),
+        motivo: faturamentoRaw.motivo ? String(faturamentoRaw.motivo) : undefined,
+        liberadoEm: faturamentoRaw.liberadoEm
+          ? this.toIsoString(faturamentoRaw.liberadoEm)
+          : undefined,
+        liberadoPorId: faturamentoRaw.liberadoPorId
+          ? String(faturamentoRaw.liberadoPorId)
+          : undefined,
+        liberadoPorNome: faturamentoRaw.liberadoPorNome
+          ? String(faturamentoRaw.liberadoPorNome)
+          : undefined,
+      },
+    };
+  }
+
+  private upsertContratoGate(
+    emailDetails: unknown,
+    updater: (gate: PropostaContratoGate) => PropostaContratoGate,
+  ): Record<string, unknown> {
+    const details = this.toObjectRecord(emailDetails);
+    const current = this.parseContratoGate(details);
+    const next = updater(current);
+
+    details.contratoGate = {
+      contratoObrigatorio: next.contratoObrigatorio,
+      motivoDecisao: next.motivoDecisao,
+      decididaEm: next.decididaEm,
+      decididaPorId: next.decididaPorId,
+      decididaPorNome: next.decididaPorNome,
+      dispensa: {
+        status: next.dispensa?.status || 'nao_solicitada',
+        motivoSolicitacao: next.dispensa?.motivoSolicitacao,
+        observacoesSolicitacao: next.dispensa?.observacoesSolicitacao,
+        solicitadaEm: next.dispensa?.solicitadaEm,
+        solicitadaPorId: next.dispensa?.solicitadaPorId,
+        solicitadaPorNome: next.dispensa?.solicitadaPorNome,
+        motivoDecisao: next.dispensa?.motivoDecisao,
+        observacoesDecisao: next.dispensa?.observacoesDecisao,
+        decididaEm: next.dispensa?.decididaEm,
+        decididaPorId: next.dispensa?.decididaPorId,
+        decididaPorNome: next.dispensa?.decididaPorNome,
+      },
+      faturamento: {
+        liberado: Boolean(next.faturamento?.liberado),
+        motivo: next.faturamento?.motivo,
+        liberadoEm: next.faturamento?.liberadoEm,
+        liberadoPorId: next.faturamento?.liberadoPorId,
+        liberadoPorNome: next.faturamento?.liberadoPorNome,
+      },
+    };
+
+    return details;
+  }
+
   private getLembretes(emailDetails: unknown): PropostaLembrete[] {
     if (!emailDetails || typeof emailDetails !== 'object') {
       return [];
@@ -2612,6 +2778,13 @@ export class PropostasService {
 
     const raw = (emailDetails as { motivoPerda?: unknown }).motivoPerda;
     return this.sanitizeMotivoPerda(raw);
+  }
+
+  private resolveStatusFluxoAtualProposta(entity: Pick<PropostaEntity, 'status' | 'emailDetails'>): SalesFlowStatus {
+    return (
+      this.extractFlowStatusFromEmailDetails(entity.emailDetails) ||
+      this.mapDatabaseStatusToFlowStatus(entity.status)
+    );
   }
 
   private parseLegacyFlowMetadata(observacoes?: string | null): {
@@ -5774,6 +5947,358 @@ export class PropostasService {
     proposta.emailDetails = emailDetails as any;
     await this.propostaRepository.save(proposta);
     return aprovacao;
+  }
+
+  async definirObrigatoriedadeContrato(
+    propostaId: string,
+    payload: {
+      obrigatorio: boolean;
+      motivo?: string;
+    },
+    actor?: {
+      id?: string;
+      nome?: string;
+    },
+    empresaId?: string,
+  ): Promise<Proposta> {
+    const proposta = await this.propostaRepository.findOne({
+      where: empresaId ? { id: propostaId, empresaId } : { id: propostaId },
+    });
+    if (!proposta) {
+      throw new NotFoundException(this.buildPropostaNotFoundMessage(propostaId));
+    }
+
+    const statusAtual = this.resolveStatusFluxoAtualProposta(proposta);
+    if (
+      ![
+        'aprovada',
+        'contrato_gerado',
+        'contrato_assinado',
+        'dispensa_contrato_solicitada',
+        'dispensa_contrato_aprovada',
+      ].includes(statusAtual)
+    ) {
+      throw new BadRequestException(
+        `Decisao de obrigatoriedade de contrato disponivel apenas para proposta aprovada. Status atual: ${statusAtual}.`,
+      );
+    }
+
+    const motivo = this.normalizeOverrideReason(payload?.motivo);
+    if (!payload?.obrigatorio && !motivo) {
+      throw new BadRequestException(
+        'Informe o motivo da dispensa ao definir contrato como nao obrigatorio.',
+      );
+    }
+
+    const agora = new Date().toISOString();
+    let emailDetails = this.upsertContratoGate(proposta.emailDetails, (gate) => ({
+      ...gate,
+      contratoObrigatorio: Boolean(payload?.obrigatorio),
+      motivoDecisao: motivo || gate.motivoDecisao,
+      decididaEm: agora,
+      decididaPorId: actor?.id,
+      decididaPorNome: actor?.nome,
+      dispensa: payload?.obrigatorio
+        ? {
+            status: 'nao_solicitada',
+          }
+        : gate.dispensa || { status: 'nao_solicitada' },
+      faturamento: payload?.obrigatorio
+        ? {
+            liberado: false,
+          }
+        : gate.faturamento,
+    }));
+
+    emailDetails = this.appendHistoricoEvento(emailDetails, 'contrato_obrigatoriedade_definida', {
+      origem: 'api',
+      status: statusAtual,
+      detalhes: payload?.obrigatorio
+        ? 'Obrigatoriedade de contrato definida como OBRIGATORIA.'
+        : 'Obrigatoriedade de contrato definida como NAO OBRIGATORIA.',
+      metadata: {
+        obrigatorio: Boolean(payload?.obrigatorio),
+        motivo: motivo || undefined,
+        actorUserId: actor?.id,
+        actorNome: actor?.nome,
+      },
+    });
+
+    proposta.emailDetails = emailDetails as any;
+    const salvo = await this.propostaRepository.save(proposta);
+    return this.entityToInterface(salvo);
+  }
+
+  async solicitarDispensaContrato(
+    propostaId: string,
+    payload: {
+      motivo: string;
+      observacoes?: string;
+    },
+    actor?: {
+      id?: string;
+      nome?: string;
+    },
+    empresaId?: string,
+  ): Promise<Proposta> {
+    const proposta = await this.propostaRepository.findOne({
+      where: empresaId ? { id: propostaId, empresaId } : { id: propostaId },
+    });
+    if (!proposta) {
+      throw new NotFoundException(this.buildPropostaNotFoundMessage(propostaId));
+    }
+
+    const statusAtual = this.resolveStatusFluxoAtualProposta(proposta);
+    if (!['aprovada', 'dispensa_contrato_solicitada'].includes(statusAtual)) {
+      throw new BadRequestException(
+        `Solicitacao de dispensa disponivel apenas para proposta aprovada. Status atual: ${statusAtual}.`,
+      );
+    }
+
+    const gate = this.parseContratoGate(proposta.emailDetails);
+    if (gate.contratoObrigatorio !== false) {
+      throw new BadRequestException(
+        'Dispensa de contrato so pode ser solicitada apos definir obrigatoriedade como nao.',
+      );
+    }
+
+    if (gate.dispensa?.status === 'solicitada') {
+      throw new BadRequestException('Dispensa de contrato ja foi solicitada para esta proposta.');
+    }
+
+    if (gate.dispensa?.status === 'aprovada') {
+      throw new BadRequestException('Dispensa de contrato ja foi aprovada para esta proposta.');
+    }
+
+    const motivo = this.normalizeOverrideReason(payload?.motivo);
+    if (!motivo) {
+      throw new BadRequestException('Informe o motivo da solicitacao de dispensa.');
+    }
+
+    const agora = new Date().toISOString();
+    let emailDetails = this.upsertContratoGate(proposta.emailDetails, (currentGate) => ({
+      ...currentGate,
+      contratoObrigatorio: false,
+      dispensa: {
+        status: 'solicitada',
+        motivoSolicitacao: motivo,
+        observacoesSolicitacao: this.normalizeOverrideReason(payload?.observacoes) || undefined,
+        solicitadaEm: agora,
+        solicitadaPorId: actor?.id,
+        solicitadaPorNome: actor?.nome,
+      },
+      faturamento: {
+        liberado: false,
+      },
+    }));
+
+    emailDetails = this.appendHistoricoEvento(emailDetails, 'dispensa_contrato_solicitada', {
+      origem: 'api',
+      status: statusAtual,
+      detalhes: 'Solicitacao de dispensa de contrato registrada.',
+      metadata: {
+        motivo,
+        observacoes: payload?.observacoes || undefined,
+        actorUserId: actor?.id,
+        actorNome: actor?.nome,
+      },
+    });
+
+    const novoStatus: SalesFlowStatus = 'dispensa_contrato_solicitada';
+    emailDetails.fluxoStatus = novoStatus;
+    proposta.status = this.mapFlowStatusToDatabaseStatus(novoStatus, false) as any;
+    proposta.emailDetails = emailDetails as any;
+    const salvo = await this.savePropostaWithStatusFallback(proposta, novoStatus);
+    return this.entityToInterface(salvo);
+  }
+
+  async aprovarDispensaContrato(
+    propostaId: string,
+    payload: {
+      motivo: string;
+      observacoes?: string;
+    },
+    actor?: {
+      id?: string;
+      nome?: string;
+    },
+    empresaId?: string,
+  ): Promise<Proposta> {
+    const proposta = await this.propostaRepository.findOne({
+      where: empresaId ? { id: propostaId, empresaId } : { id: propostaId },
+    });
+    if (!proposta) {
+      throw new NotFoundException(this.buildPropostaNotFoundMessage(propostaId));
+    }
+
+    const statusAtual = this.resolveStatusFluxoAtualProposta(proposta);
+    if (!['aprovada', 'dispensa_contrato_solicitada'].includes(statusAtual)) {
+      throw new BadRequestException(
+        `Aprovacao de dispensa disponivel apenas para proposta aprovada. Status atual: ${statusAtual}.`,
+      );
+    }
+
+    const gate = this.parseContratoGate(proposta.emailDetails);
+    if (gate.contratoObrigatorio !== false) {
+      throw new BadRequestException(
+        'Dispensa de contrato so pode ser aprovada quando a obrigatoriedade estiver definida como nao.',
+      );
+    }
+
+    if (gate.dispensa?.status !== 'solicitada') {
+      throw new BadRequestException(
+        'Dispensa de contrato precisa estar solicitada antes da aprovacao.',
+      );
+    }
+
+    const solicitanteId = String(gate.dispensa?.solicitadaPorId || '').trim();
+    if (actor?.id && solicitanteId && actor.id === solicitanteId) {
+      throw new ForbiddenException(
+        'Autoaprovacao nao permitida: o solicitante da dispensa nao pode aprovar a propria solicitacao.',
+      );
+    }
+
+    const motivo = this.normalizeOverrideReason(payload?.motivo);
+    if (!motivo) {
+      throw new BadRequestException('Informe o motivo da aprovacao da dispensa.');
+    }
+
+    const agora = new Date().toISOString();
+    let emailDetails = this.upsertContratoGate(proposta.emailDetails, (currentGate) => ({
+      ...currentGate,
+      contratoObrigatorio: false,
+      dispensa: {
+        ...(currentGate.dispensa || { status: 'solicitada' }),
+        status: 'aprovada',
+        motivoDecisao: motivo,
+        observacoesDecisao: this.normalizeOverrideReason(payload?.observacoes) || undefined,
+        decididaEm: agora,
+        decididaPorId: actor?.id,
+        decididaPorNome: actor?.nome,
+      },
+      faturamento: {
+        liberado: false,
+      },
+    }));
+
+    emailDetails = this.appendHistoricoEvento(emailDetails, 'dispensa_contrato_aprovada', {
+      origem: 'api',
+      status: statusAtual,
+      detalhes: 'Dispensa de contrato aprovada.',
+      metadata: {
+        motivo,
+        observacoes: payload?.observacoes || undefined,
+        actorUserId: actor?.id,
+        actorNome: actor?.nome,
+      },
+    });
+
+    const novoStatus: SalesFlowStatus = 'dispensa_contrato_aprovada';
+    emailDetails.fluxoStatus = novoStatus;
+    proposta.status = this.mapFlowStatusToDatabaseStatus(novoStatus, false) as any;
+    proposta.emailDetails = emailDetails as any;
+    const salvo = await this.savePropostaWithStatusFallback(proposta, novoStatus);
+    return this.entityToInterface(salvo);
+  }
+
+  async liberarFaturamentoProposta(
+    propostaId: string,
+    payload?: {
+      motivo?: string;
+    },
+    actor?: {
+      id?: string;
+      nome?: string;
+    },
+    empresaId?: string,
+  ): Promise<Proposta> {
+    const proposta = await this.propostaRepository.findOne({
+      where: empresaId ? { id: propostaId, empresaId } : { id: propostaId },
+    });
+    if (!proposta) {
+      throw new NotFoundException(this.buildPropostaNotFoundMessage(propostaId));
+    }
+
+    const statusAtual = this.resolveStatusFluxoAtualProposta(proposta);
+    const gate = this.parseContratoGate(proposta.emailDetails);
+    const dispensaAprovada = gate.dispensa?.status === 'aprovada';
+    const contratoAssinado = statusAtual === 'contrato_assinado';
+    const fluxoFinanceiroIniciado = ['faturamento_liberado', 'fatura_criada', 'aguardando_pagamento', 'pago'].includes(
+      statusAtual,
+    );
+    if (!contratoAssinado && !dispensaAprovada && !fluxoFinanceiroIniciado) {
+      throw new BadRequestException(
+        'Faturamento bloqueado: proposta sem contrato assinado ou dispensa de contrato aprovada.',
+      );
+    }
+
+    const agora = new Date().toISOString();
+    let emailDetails = this.upsertContratoGate(proposta.emailDetails, (currentGate) => ({
+      ...currentGate,
+      faturamento: {
+        liberado: true,
+        motivo: this.normalizeOverrideReason(payload?.motivo) || undefined,
+        liberadoEm: agora,
+        liberadoPorId: actor?.id,
+        liberadoPorNome: actor?.nome,
+      },
+    }));
+
+    emailDetails = this.appendHistoricoEvento(emailDetails, 'faturamento_liberado', {
+      origem: 'api',
+      status: statusAtual,
+      detalhes: 'Faturamento liberado para a proposta.',
+      metadata: {
+        motivo: this.normalizeOverrideReason(payload?.motivo) || undefined,
+        actorUserId: actor?.id,
+        actorNome: actor?.nome,
+      },
+    });
+
+    const novoStatus: SalesFlowStatus = 'faturamento_liberado';
+    emailDetails.fluxoStatus = novoStatus;
+    proposta.status = this.mapFlowStatusToDatabaseStatus(novoStatus, false) as any;
+    proposta.emailDetails = emailDetails as any;
+    const salvo = await this.savePropostaWithStatusFallback(proposta, novoStatus);
+    return this.entityToInterface(salvo);
+  }
+
+  async assertPropostaElegivelParaFaturamento(propostaId: string, empresaId?: string): Promise<void> {
+    const proposta = await this.propostaRepository.findOne({
+      where: empresaId ? { id: propostaId, empresaId } : { id: propostaId },
+    });
+    if (!proposta) {
+      throw new NotFoundException(this.buildPropostaNotFoundMessage(propostaId));
+    }
+
+    const statusAtual = this.resolveStatusFluxoAtualProposta(proposta);
+    const gate = this.parseContratoGate(proposta.emailDetails);
+    const dispensaAprovada = gate.dispensa?.status === 'aprovada';
+    const faturamentoLiberado = Boolean(gate.faturamento?.liberado);
+    if (
+      faturamentoLiberado ||
+      ['faturamento_liberado', 'fatura_criada', 'aguardando_pagamento', 'pago'].includes(
+        statusAtual,
+      )
+    ) {
+      return;
+    }
+
+    if (statusAtual === 'contrato_assinado' || dispensaAprovada) {
+      throw new BadRequestException(
+        'Faturamento bloqueado: proposta elegivel, mas sem liberacao formal de faturamento.',
+      );
+    }
+
+    if (gate.dispensa?.status === 'solicitada') {
+      throw new BadRequestException(
+        'Faturamento bloqueado: solicitacao de dispensa de contrato pendente de aprovacao.',
+      );
+    }
+
+    throw new BadRequestException(
+      'Faturamento bloqueado: proposta sem contrato assinado ou dispensa de contrato aprovada.',
+    );
   }
 
   async obterEstatisticasDashboard(empresaId?: string): Promise<{

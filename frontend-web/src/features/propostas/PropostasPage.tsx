@@ -333,6 +333,24 @@ type MotivoPerdaMap = Record<
   }
 >;
 
+const STATUS_FILTROS_PERMITIDOS = new Set([
+  'rascunho',
+  'enviada',
+  'visualizada',
+  'negociacao',
+  'aprovada',
+  'contrato_gerado',
+  'contrato_assinado',
+  'dispensa_contrato_solicitada',
+  'dispensa_contrato_aprovada',
+  'faturamento_liberado',
+  'fatura_criada',
+  'aguardando_pagamento',
+  'pago',
+  'rejeitada',
+  'expirada',
+]);
+
 const PropostasPage: React.FC = () => {
   const { confirm } = useGlobalConfirmation();
   const { t } = useI18n();
@@ -341,6 +359,9 @@ const PropostasPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const clienteIdParam = (searchParams.get('clienteId') || '').trim();
   const clienteNomeParam = (searchParams.get('cliente') || '').trim();
+  const statusParam = (searchParams.get('status') || '')
+    .trim()
+    .toLowerCase();
   // Estados inicializados com arrays vazios - dados vêm do banco
   const [propostas, setPropostas] = useState<any[]>([]);
   const [filteredPropostas, setFilteredPropostas] = useState<any[]>([]);
@@ -404,12 +425,26 @@ const PropostasPage: React.FC = () => {
 
   // 🆕 Estados para UX Melhorada - Fase 2
   const [propostasSelecionadas, setPropostasSelecionadas] = useState<string[]>([]);
+  const statusParamAplicadoRef = React.useRef<string | null>(null);
 
   useEffect(() => {
     if (clienteNomeParam && !searchTerm.trim()) {
       setSearchTerm(clienteNomeParam);
     }
   }, [clienteNomeParam, searchTerm]);
+
+  useEffect(() => {
+    if (!statusParam || !STATUS_FILTROS_PERMITIDOS.has(statusParam)) {
+      return;
+    }
+
+    if (statusParamAplicadoRef.current === statusParam) {
+      return;
+    }
+
+    statusParamAplicadoRef.current = statusParam;
+    setSelectedStatus(statusParam);
+  }, [statusParam]);
 
   useEffect(() => {
     if (viewMode === 'dashboard' && propostasSelecionadas.length > 0) {
@@ -1338,6 +1373,9 @@ const PropostasPage: React.FC = () => {
       'aprovada',
       'contrato_gerado',
       'contrato_assinado',
+      'dispensa_contrato_solicitada',
+      'dispensa_contrato_aprovada',
+      'faturamento_liberado',
       'fatura_criada',
       'aguardando_pagamento',
       'pago',
@@ -1389,6 +1427,9 @@ const PropostasPage: React.FC = () => {
       'aprovada',
       'contrato_gerado',
       'contrato_assinado',
+      'dispensa_contrato_solicitada',
+      'dispensa_contrato_aprovada',
+      'faturamento_liberado',
       'fatura_criada',
       'aguardando_pagamento',
       'pago',
@@ -1518,8 +1559,12 @@ const PropostasPage: React.FC = () => {
         return <Clock className="w-4 h-4" />;
       case 'contrato_gerado':
       case 'contrato_assinado':
+      case 'dispensa_contrato_aprovada':
       case 'pago':
         return <CheckCircle className="w-4 h-4" />;
+      case 'dispensa_contrato_solicitada':
+        return <Clock className="w-4 h-4" />;
+      case 'faturamento_liberado':
       case 'fatura_criada':
       case 'aguardando_pagamento':
         return <DollarSign className="w-4 h-4" />;
@@ -1547,6 +1592,12 @@ const PropostasPage: React.FC = () => {
       case 'contrato_gerado':
       case 'contrato_assinado':
         return 'bg-[#818CF8]/15 text-[#3730A3]';
+      case 'dispensa_contrato_solicitada':
+        return 'bg-[#FFF1D6] text-[#B45309]';
+      case 'dispensa_contrato_aprovada':
+        return 'bg-[#DDF6F4] text-[#0F7B7D]';
+      case 'faturamento_liberado':
+        return 'bg-[#E0F2FE] text-[#0C4A6E]';
       case 'fatura_criada':
       case 'aguardando_pagamento':
         return 'bg-[#FB7185]/15 text-[#BE123C]';
@@ -1577,6 +1628,12 @@ const PropostasPage: React.FC = () => {
         return 'Aguardando assinatura do contrato';
       case 'contrato_assinado':
         return 'Contrato Assinado';
+      case 'dispensa_contrato_solicitada':
+        return 'Dispensa de Contrato Solicitada';
+      case 'dispensa_contrato_aprovada':
+        return 'Dispensa de Contrato Aprovada';
+      case 'faturamento_liberado':
+        return 'Faturamento Liberado';
       case 'fatura_criada':
         return 'Fatura Criada';
       case 'aguardando_pagamento':
@@ -1613,6 +1670,9 @@ const PropostasPage: React.FC = () => {
       negociacao: 'sent',
       contrato_gerado: 'approved',
       contrato_assinado: 'approved',
+      dispensa_contrato_solicitada: 'approved',
+      dispensa_contrato_aprovada: 'approved',
+      faturamento_liberado: 'approved',
       fatura_criada: 'approved',
       aguardando_pagamento: 'approved',
       pago: 'approved',
@@ -2210,6 +2270,9 @@ const PropostasPage: React.FC = () => {
         'aprovada',
         'contrato_gerado',
         'contrato_assinado',
+        'dispensa_contrato_solicitada',
+        'dispensa_contrato_aprovada',
+        'faturamento_liberado',
         'fatura_criada',
         'aguardando_pagamento',
         'pago',
@@ -2474,6 +2537,9 @@ const PropostasPage: React.FC = () => {
                     <option value="aprovada">Aprovada</option>
                     <option value="contrato_gerado">Aguardando Assinatura do Contrato</option>
                     <option value="contrato_assinado">Contrato Assinado</option>
+                    <option value="dispensa_contrato_solicitada">Dispensa de Contrato Solicitada</option>
+                    <option value="dispensa_contrato_aprovada">Dispensa de Contrato Aprovada</option>
+                    <option value="faturamento_liberado">Faturamento Liberado</option>
                     <option value="fatura_criada">Fatura Criada</option>
                     <option value="aguardando_pagamento">Aguardando Pagamento</option>
                     <option value="pago">Pago</option>

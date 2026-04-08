@@ -123,6 +123,7 @@ export interface Fatura {
 
 export interface NovaFatura {
   contratoId?: string;
+  propostaId?: string;
   clienteId: string; // UUID string
   usuarioResponsavelId: string;
   tipo: TipoFatura;
@@ -670,6 +671,10 @@ export const faturamentoService = {
         !isNaN(Number(dadosFatura.contratoId))
       ) {
         backendData.contratoId = Number(dadosFatura.contratoId);
+      }
+
+      if (typeof dadosFatura.propostaId === 'string' && dadosFatura.propostaId.trim()) {
+        backendData.propostaId = dadosFatura.propostaId.trim();
       }
 
       // Only include formaPagamentoPreferida if provided

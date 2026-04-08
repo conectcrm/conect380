@@ -2,6 +2,7 @@ import {
   IsArray,
   IsBoolean,
   IsInt,
+  IsNotEmpty,
   IsNumber,
   IsObject,
   IsOptional,
@@ -322,6 +323,52 @@ export class AtualizarStatusDto {
   @IsOptional()
   @IsString()
   overrideReason?: string;
+}
+
+export class DefinirObrigatoriedadeContratoDto {
+  @Transform(({ value }) => {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === 'true' || normalized === '1') return true;
+      if (normalized === 'false' || normalized === '0') return false;
+    }
+    return value;
+  })
+  @IsBoolean()
+  obrigatorio: boolean;
+
+  @IsOptional()
+  @IsString()
+  motivo?: string;
+}
+
+export class SolicitarDispensaContratoDto {
+  @IsString()
+  @IsNotEmpty()
+  motivo: string;
+
+  @IsOptional()
+  @IsString()
+  observacoes?: string;
+}
+
+export class AprovarDispensaContratoDto {
+  @IsString()
+  @IsNotEmpty()
+  motivo: string;
+
+  @IsOptional()
+  @IsString()
+  observacoes?: string;
+}
+
+export class LiberarFaturamentoPropostaDto {
+  @IsOptional()
+  @IsString()
+  motivo?: string;
 }
 
 export class CancelarVendaDto {
