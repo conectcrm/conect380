@@ -25,6 +25,7 @@ import {
 import { FaturamentoService } from '../../faturamento/services/faturamento.service';
 import { PagamentoService } from '../../faturamento/services/pagamento.service';
 import { StatusPagamento } from '../../faturamento/entities/pagamento.entity';
+import { TesourariaService } from './tesouraria.service';
 
 type AlertaOperacionalFinanceiroResponse = {
   id: string;
@@ -61,6 +62,7 @@ export class AlertaOperacionalFinanceiroService {
     private readonly exportacaoRepository: Repository<ContaPagarExportacao>,
     private readonly faturamentoService: FaturamentoService,
     private readonly pagamentoService: PagamentoService,
+    private readonly tesourariaService: TesourariaService,
   ) {}
 
   async listar(
@@ -429,12 +431,48 @@ export class AlertaOperacionalFinanceiroService {
       if (foiCriado) gerados += 1;
     }
 
+    const limiteSaldoCritico = this.obterLimiteSaldoCriticoCaixa();
+    if (Number.isFinite(limiteSaldoCritico)) {
+      const posicaoTesouraria = await this.tesourariaService.obterPosicao(empresaId, {
+        janelaDias: 30,
+        incluirInativas: false,
+      });
+
+      if (posicaoTesouraria.saldoProjetadoConsolidado <= limiteSaldoCritico) {
+        const referencia = 'tesouraria:saldo_critico';
+        registrarReferencia(AlertaOperacionalFinanceiroTipo.SALDO_CAIXA_CRITICO, referencia);
+        const foiCriado = await this.upsertAlertaAutomatico(
+          empresaId,
+          {
+            tipo: AlertaOperacionalFinanceiroTipo.SALDO_CAIXA_CRITICO,
+            referencia,
+            severidade: AlertaOperacionalFinanceiroSeveridade.CRITICAL,
+            titulo: 'Saldo de caixa critico',
+            descricao:
+              'Saldo projetado da tesouraria esta abaixo do limite de seguranca configurado',
+            payload: {
+              limiteSaldoCritico,
+              saldoProjetadoConsolidado: posicaoTesouraria.saldoProjetadoConsolidado,
+              saldoAtualConsolidado: posicaoTesouraria.saldoAtualConsolidado,
+              entradasPrevistasConsolidadas: posicaoTesouraria.entradasPrevistasConsolidadas,
+              saidasProgramadasConsolidadas: posicaoTesouraria.saidasProgramadasConsolidadas,
+              referenciaEm: posicaoTesouraria.referenciaEm,
+              janelaDias: posicaoTesouraria.janelaDias,
+            },
+          },
+          usuarioId,
+        );
+        if (foiCriado) gerados += 1;
+      }
+    }
+
     const tiposComMonitoramentoAutomatico: AlertaOperacionalFinanceiroTipo[] = [
       AlertaOperacionalFinanceiroTipo.CONTA_VENCE_EM_3_DIAS,
       AlertaOperacionalFinanceiroTipo.CONTA_VENCIDA,
       AlertaOperacionalFinanceiroTipo.CONCILIACAO_PENDENTE_CRITICA,
       AlertaOperacionalFinanceiroTipo.WEBHOOK_PAGAMENTO_FALHA,
       AlertaOperacionalFinanceiroTipo.EXPORTACAO_CONTABIL_FALHA,
+      AlertaOperacionalFinanceiroTipo.SALDO_CAIXA_CRITICO,
     ];
 
     for (const tipo of tiposComMonitoramentoAutomatico) {
@@ -739,6 +777,18 @@ export class AlertaOperacionalFinanceiroService {
   private toOptionalString(value: unknown): string | undefined {
     const normalized = String(value || '').trim();
     return normalized || undefined;
+  }
+
+  private obterLimiteSaldoCriticoCaixa(): number {
+    const envRaw = String(process.env.FINANCEIRO_ALERTA_SALDO_CRITICO_LIMITE ?? '').trim();
+    if (!envRaw) {
+      return 0;
+    }
+    const parsed = Number(envRaw);
+    if (!Number.isFinite(parsed)) {
+      return 0;
+    }
+    return Number(parsed.toFixed(2));
   }
 
   private normalizarStatusPagamento(value: string): StatusPagamento {

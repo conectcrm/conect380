@@ -19,6 +19,7 @@ export enum AlertaOperacionalFinanceiroTipo {
   STATUS_SINCRONIZACAO_DIVERGENTE = 'status_sincronizacao_divergente',
   REFERENCIA_INTEGRACAO_INVALIDA = 'referencia_integracao_invalida',
   ESTORNO_FALHA = 'estorno_falha',
+  SALDO_CAIXA_CRITICO = 'saldo_caixa_critico',
 }
 
 export enum AlertaOperacionalFinanceiroSeveridade {

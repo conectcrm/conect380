@@ -1,5 +1,5 @@
-/**
- * Tipos para o módulo financeiro do Conect CRM
+﻿/**
+ * Tipos para o modulo financeiro do Conect CRM
  * Inspirado nos melhores ERPs do mercado (Omie, Conta Azul, Nibo)
  */
 
@@ -77,7 +77,7 @@ export interface ContaPagar {
   fornecedorId: string;
   fornecedor: Fornecedor;
   descricao: string;
-  numeroDocumento?: string; // Número da nota fiscal, fatura, etc.
+  numeroDocumento?: string; // Numero da nota fiscal, fatura, etc.
 
   // Datas
   dataEmissao: string;
@@ -106,17 +106,17 @@ export interface ContaPagar {
   centroCustoId?: string;
   comprovantePagamento?: string;
 
-  // Recorrência
+  // Recorrencia
   recorrente: boolean;
   frequenciaRecorrencia?: 'mensal' | 'bimestral' | 'trimestral' | 'semestral' | 'anual';
   proximoVencimento?: string;
 
-  // Aprovação
+  // Aprovacao
   necessitaAprovacao: boolean;
   aprovadoPor?: string;
   dataAprovacao?: string;
 
-  // Anexos e observações
+  // Anexos e observacoes
   anexos: Anexo[];
   observacoes?: string;
   observacoesInternas?: string;
@@ -229,7 +229,265 @@ export interface ResumoFinanceiro {
   proximosVencimentos: ContaPagar[];
 }
 
-// Interfaces para formulários
+
+export type StatusContaReceber = 'pendente' | 'parcial' | 'recebida' | 'vencida' | 'cancelada';
+
+export interface ContaReceber {
+  id: number;
+  numero: string;
+  descricao: string;
+  clienteId: string;
+  clienteNome: string;
+  clienteEmail?: string | null;
+  status: StatusContaReceber;
+  statusFatura: string;
+  createdAt: string;
+  dataEmissao: string;
+  dataVencimento: string;
+  valorTotal: number;
+  valorPago: number;
+  valorEmAberto: number;
+  diasAtraso: number;
+}
+
+export interface FiltrosContasReceber {
+  busca?: string;
+  status?: StatusContaReceber[];
+  clienteId?: string;
+  dataVencimentoInicio?: string;
+  dataVencimentoFim?: string;
+  valorMin?: number;
+  valorMax?: number;
+  page?: number;
+  pageSize?: number;
+  sortBy?: 'dataVencimento' | 'valorTotal' | 'valorEmAberto' | 'createdAt' | 'numero' | 'cliente';
+  sortOrder?: 'ASC' | 'DESC';
+}
+
+export interface ListaContasReceber {
+  data: ContaReceber[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface ResumoContasReceber {
+  totalTitulos: number;
+  valorTotal: number;
+  valorRecebido: number;
+  valorEmAberto: number;
+  valorVencido: number;
+  quantidadePendentes: number;
+  quantidadeParciais: number;
+  quantidadeRecebidas: number;
+  quantidadeVencidas: number;
+  quantidadeCanceladas: number;
+  aging: {
+    aVencer: number;
+    vencido1a30: number;
+    vencido31a60: number;
+    vencido61mais: number;
+  };
+}
+
+export const STATUS_CONTA_RECEBER_LABELS: Record<StatusContaReceber, string> = {
+  pendente: 'Pendente',
+  parcial: 'Parcial',
+  recebida: 'Recebida',
+  vencida: 'Vencida',
+  cancelada: 'Cancelada',
+};
+
+export interface RegistrarRecebimentoContaReceberPayload {
+  valor: number;
+  metodoPagamento: string;
+  dataPagamento?: string;
+  observacoes?: string;
+  correlationId?: string;
+  origemId?: string;
+}
+
+export interface ResultadoRegistrarRecebimentoContaReceber {
+  correlationId: string;
+  origemId: string;
+  pagamento: {
+    id: number;
+    status: string;
+    valor: number;
+    dataPagamento?: string | null;
+    metodoPagamento?: string | null;
+    gatewayTransacaoId?: string | null;
+  };
+  contaReceber: ContaReceber;
+}
+
+export interface ReenviarCobrancaContaReceberPayload {
+  email?: string;
+  assunto?: string;
+  conteudo?: string;
+  correlationId?: string;
+  origemId?: string;
+}
+
+export interface ResultadoReenviarCobrancaContaReceber {
+  correlationId: string;
+  origemId: string;
+  enviado: boolean;
+  simulado: boolean;
+  motivo?: string | null;
+  detalhes?: string | null;
+  contaReceber: ContaReceber;
+}
+
+export type AgrupamentoFluxoCaixa = 'dia' | 'semana' | 'mes';
+
+export interface SerieFluxoCaixaItem {
+  periodoInicio: string;
+  periodoFim: string;
+  entradasRealizadas: number;
+  saidasRealizadas: number;
+  entradasPrevistas: number;
+  saidasPrevistas: number;
+  saldoLiquido: number;
+}
+
+export interface ResumoFluxoCaixa {
+  periodoInicio: string;
+  periodoFim: string;
+  agrupamento: AgrupamentoFluxoCaixa;
+  totais: {
+    entradasRealizadas: number;
+    saidasRealizadas: number;
+    entradasPrevistas: number;
+    saidasPrevistas: number;
+    saldoLiquidoRealizado: number;
+    saldoLiquidoPrevisto: number;
+  };
+  serie: SerieFluxoCaixaItem[];
+}
+
+export interface ProjecaoFluxoCaixaItem {
+  data: string;
+  entradasPrevistas: number;
+  saidasPrevistas: number;
+  saldoProjetadoAcumulado: number;
+}
+
+export interface ProjecaoFluxoCaixa {
+  baseEm: string;
+  ate: string;
+  dias: number;
+  totalEntradasPrevistas: number;
+  totalSaidasPrevistas: number;
+  saldoProjetado: number;
+  itens: ProjecaoFluxoCaixaItem[];
+}
+
+export interface FiltrosFluxoCaixa {
+  dataInicio?: string;
+  dataFim?: string;
+  agrupamento?: AgrupamentoFluxoCaixa;
+  janelaDias?: number;
+}
+
+export interface PosicaoTesourariaContaItem {
+  contaBancariaId: string;
+  nomeConta: string;
+  banco: string;
+  agencia: string;
+  conta: string;
+  tipoConta: string;
+  ativo: boolean;
+  saldoAtual: number;
+  saidasProgramadas: number;
+  saldoProjetado: number;
+}
+
+export interface PosicaoTesouraria {
+  referenciaEm: string;
+  janelaDias: number;
+  totalContas: number;
+  saldoAtualConsolidado: number;
+  entradasPrevistasConsolidadas: number;
+  saidasProgramadasConsolidadas: number;
+  saldoProjetadoConsolidado: number;
+  itens: PosicaoTesourariaContaItem[];
+}
+
+export interface FiltrosTesouraria {
+  incluirInativas?: boolean;
+  janelaDias?: number;
+}
+
+export type StatusMovimentacaoTesouraria = 'pendente' | 'aprovada' | 'cancelada';
+
+export interface MovimentacaoTesouraria {
+  id: string;
+  status: StatusMovimentacaoTesouraria;
+  valor: number;
+  descricao?: string;
+  contaOrigemId: string;
+  contaOrigemNome: string;
+  contaDestinoId: string;
+  contaDestinoNome: string;
+  correlationId: string;
+  origemId?: string;
+  auditoria: Array<Record<string, unknown>>;
+  criadoPor?: string;
+  atualizadoPor?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FiltrosMovimentacoesTesouraria {
+  status?: StatusMovimentacaoTesouraria;
+  limite?: number;
+}
+
+export interface ListaMovimentacoesTesouraria {
+  data: MovimentacaoTesouraria[];
+  total: number;
+  limite: number;
+}
+
+export interface CriarTransferenciaTesourariaPayload {
+  contaOrigemId: string;
+  contaDestinoId: string;
+  valor: number;
+  descricao?: string;
+  correlationId?: string;
+  origemId?: string;
+}
+
+export interface AprovarTransferenciaTesourariaPayload {
+  observacao?: string;
+}
+
+export interface CancelarTransferenciaTesourariaPayload {
+  observacao?: string;
+}
+
+export interface ResultadoCriacaoTransferenciaTesouraria {
+  movimentacao: MovimentacaoTesouraria;
+}
+
+export interface ResultadoAprovacaoTransferenciaTesouraria {
+  movimentacao: MovimentacaoTesouraria;
+  saldoContaOrigem: number;
+  saldoContaDestino: number;
+}
+
+export interface ResultadoCancelamentoTransferenciaTesouraria {
+  movimentacao: MovimentacaoTesouraria;
+}
+
+export const STATUS_MOVIMENTACAO_TESOURARIA_LABELS: Record<StatusMovimentacaoTesouraria, string> = {
+  pendente: 'Pendente',
+  aprovada: 'Aprovada',
+  cancelada: 'Cancelada',
+};
+
+// Interfaces para formularios
 export interface NovaContaPagar {
   fornecedorId: string;
   descricao: string;
@@ -397,7 +655,8 @@ export type TipoAlertaOperacionalFinanceiro =
   | 'exportacao_contabil_falha'
   | 'status_sincronizacao_divergente'
   | 'referencia_integracao_invalida'
-  | 'estorno_falha';
+  | 'estorno_falha'
+  | 'saldo_caixa_critico';
 
 export type SeveridadeAlertaOperacionalFinanceiro = 'info' | 'warning' | 'critical';
 
@@ -467,7 +726,7 @@ export interface AcaoMassa {
   };
 }
 
-// Labels para exibição
+// Labels para exibicao
 export const STATUS_LABELS = {
   [StatusContaPagar.EM_ABERTO]: 'Em Aberto',
   [StatusContaPagar.PAGO]: 'Pago',
@@ -479,22 +738,22 @@ export const STATUS_LABELS = {
 export const FORMA_PAGAMENTO_LABELS = {
   [FormaPagamento.PIX]: 'PIX',
   [FormaPagamento.BOLETO]: 'Boleto',
-  [FormaPagamento.TRANSFERENCIA]: 'Transferência',
-  [FormaPagamento.CARTAO_CREDITO]: 'Cartão de Crédito',
-  [FormaPagamento.CARTAO_DEBITO]: 'Cartão de Débito',
+  [FormaPagamento.TRANSFERENCIA]: 'Transferencia',
+  [FormaPagamento.CARTAO_CREDITO]: 'Cartao de Credito',
+  [FormaPagamento.CARTAO_DEBITO]: 'Cartao de Debito',
   [FormaPagamento.DINHEIRO]: 'Dinheiro',
   [FormaPagamento.CHEQUE]: 'Cheque',
 };
 
 export const CATEGORIA_LABELS = {
   [CategoriaContaPagar.FORNECEDORES]: 'Fornecedores',
-  [CategoriaContaPagar.SALARIOS]: 'Salários',
+  [CategoriaContaPagar.SALARIOS]: 'Salarios',
   [CategoriaContaPagar.IMPOSTOS]: 'Impostos',
   [CategoriaContaPagar.UTILIDADES]: 'Utilidades',
   [CategoriaContaPagar.MARKETING]: 'Marketing',
   [CategoriaContaPagar.TECNOLOGIA]: 'Tecnologia',
-  [CategoriaContaPagar.ESCRITORIO]: 'Escritório',
-  [CategoriaContaPagar.JURIDICO]: 'Jurídico',
+  [CategoriaContaPagar.ESCRITORIO]: 'Escritorio',
+  [CategoriaContaPagar.JURIDICO]: 'Juridico',
   [CategoriaContaPagar.CONTABILIDADE]: 'Contabilidade',
   [CategoriaContaPagar.VIAGEM]: 'Viagem',
   [CategoriaContaPagar.OUTROS]: 'Outros',
@@ -502,7 +761,7 @@ export const CATEGORIA_LABELS = {
 
 export const PRIORIDADE_LABELS = {
   [PrioridadePagamento.BAIXA]: 'Baixa',
-  [PrioridadePagamento.MEDIA]: 'Média',
+  [PrioridadePagamento.MEDIA]: 'Media',
   [PrioridadePagamento.ALTA]: 'Alta',
   [PrioridadePagamento.URGENTE]: 'Urgente',
 };

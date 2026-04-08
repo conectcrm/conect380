@@ -190,6 +190,19 @@ describe('menuConfig permission filtering', () => {
     expect(ids).toContain('atendimento-configuracoes');
   });
 
+  it('shows contas-receber, fluxo-caixa and tesouraria in financeiro menu for faturamento read users', () => {
+    const menu = getMenuParaEmpresa(ALL_MODULES, {
+      email: 'financeiro@empresa.com',
+      role: 'custom',
+      permissions: ['financeiro.faturamento.read'],
+    } as any);
+    const ids = collectIds(menu);
+
+    expect(ids).toContain('financeiro-contas-receber');
+    expect(ids).toContain('financeiro-fluxo-caixa');
+    expect(ids).toContain('financeiro-tesouraria');
+  });
+
   it('resolves first allowed path when dashboard is not permitted', () => {
     const defaultPath = getDefaultAuthorizedPath(ALL_MODULES, {
       email: 'financeiro@empresa.com',
@@ -318,7 +331,7 @@ describe('menuConfig permission filtering', () => {
     expect(withPermissionDetail).toBe(true);
   });
 
-  it('requires CRM read permissions for comercial CRM canonical routes', () => {
+  it('requires respective CRM read permissions for comercial CRM canonical routes', () => {
     const clientesWithoutPermission = canUserAccessPath('/crm/clientes', ALL_MODULES, {
       email: 'agent@empresa.com',
       role: 'custom',
@@ -359,6 +372,11 @@ describe('menuConfig permission filtering', () => {
       role: 'custom',
       permissions: ['crm.clientes.read'],
     } as any);
+    const interacoesWithOportunidadesRead = canUserAccessPath('/crm/interacoes', ALL_MODULES, {
+      email: 'sales@empresa.com',
+      role: 'custom',
+      permissions: ['crm.oportunidades.read'],
+    } as any);
 
     expect(clientesWithoutPermission).toBe(false);
     expect(clientesWithPermission).toBe(true);
@@ -367,7 +385,8 @@ describe('menuConfig permission filtering', () => {
     expect(leadsWithPermission).toBe(true);
     expect(pipelineWithoutPermission).toBe(false);
     expect(pipelineWithPermission).toBe(true);
-    expect(interacoesWithClientesRead).toBe(true);
+    expect(interacoesWithClientesRead).toBe(false);
+    expect(interacoesWithOportunidadesRead).toBe(true);
   });
 
   it('requires comercial.propostas.read for propostas canonical and aliases', () => {
@@ -684,6 +703,34 @@ describe('menuConfig permission filtering', () => {
     expect(faturamentoOnlyFornecedores).toBe(false);
     expect(pagamentosReadContasPagar).toBe(true);
     expect(pagamentosReadFornecedorPerfil).toBe(true);
+  });
+
+  it('requires financeiro.faturamento.read for contas-receber, fluxo-caixa and tesouraria routes', () => {
+    const pagamentosReadContasReceber = canUserAccessPath('/financeiro/contas-receber', ALL_MODULES, {
+      email: 'payments@empresa.com',
+      role: 'custom',
+      permissions: ['financeiro.pagamentos.read'],
+    } as any);
+    const faturamentoReadContasReceber = canUserAccessPath('/financeiro/contas-receber', ALL_MODULES, {
+      email: 'billing@empresa.com',
+      role: 'custom',
+      permissions: ['financeiro.faturamento.read'],
+    } as any);
+    const faturamentoReadFluxoCaixa = canUserAccessPath('/financeiro/fluxo-caixa', ALL_MODULES, {
+      email: 'billing@empresa.com',
+      role: 'custom',
+      permissions: ['financeiro.faturamento.read'],
+    } as any);
+    const faturamentoReadTesouraria = canUserAccessPath('/financeiro/tesouraria', ALL_MODULES, {
+      email: 'billing@empresa.com',
+      role: 'custom',
+      permissions: ['financeiro.faturamento.read'],
+    } as any);
+
+    expect(pagamentosReadContasReceber).toBe(false);
+    expect(faturamentoReadContasReceber).toBe(true);
+    expect(faturamentoReadFluxoCaixa).toBe(true);
+    expect(faturamentoReadTesouraria).toBe(true);
   });
 
   it('keeps legacy gestao/empresas alias with empresas/minhas permission model', () => {

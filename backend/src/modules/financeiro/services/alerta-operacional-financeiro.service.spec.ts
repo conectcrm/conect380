@@ -60,6 +60,18 @@ describe('AlertaOperacionalFinanceiroService', () => {
       estornarPagamento: jest.fn().mockResolvedValue({ id: 99 }),
       processarPagamento: jest.fn().mockResolvedValue({ id: 98 }),
     };
+    const tesourariaService = {
+      obterPosicao: jest.fn().mockResolvedValue({
+        referenciaEm: '2026-04-07',
+        janelaDias: 30,
+        totalContas: 2,
+        saldoAtualConsolidado: 10000,
+        entradasPrevistasConsolidadas: 2000,
+        saidasProgramadasConsolidadas: 1500,
+        saldoProjetadoConsolidado: 10500,
+        itens: [],
+      }),
+    };
 
     const service = new AlertaOperacionalFinanceiroService(
       alertaRepository as any,
@@ -69,6 +81,7 @@ describe('AlertaOperacionalFinanceiroService', () => {
       exportacaoRepository as any,
       faturamentoService as any,
       pagamentoService as any,
+      tesourariaService as any,
     );
     const logger = {
       log: jest.fn(),
@@ -87,6 +100,7 @@ describe('AlertaOperacionalFinanceiroService', () => {
       exportacaoRepository,
       faturamentoService,
       pagamentoService,
+      tesourariaService,
     };
   };
 
@@ -453,6 +467,7 @@ describe('AlertaOperacionalFinanceiroService', () => {
           ],
         }) as any,
       )
+      .mockReturnValueOnce(makeQueryBuilder({ many: [] }) as any)
       .mockReturnValueOnce(makeQueryBuilder({ many: [] }) as any)
       .mockReturnValueOnce(makeQueryBuilder({ many: [] }) as any)
       .mockReturnValueOnce(makeQueryBuilder({ many: [] }) as any);

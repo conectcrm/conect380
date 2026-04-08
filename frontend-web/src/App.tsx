@@ -132,6 +132,9 @@ const VehicleInventoryPage = React.lazy(
   () => import('./features/veiculos/VehicleInventoryPage'),
 );
 
+const ContasReceberPage = React.lazy(
+  () => import('./pages/gestao/financeiro/ContasReceberPage'),
+);
 const ContasPagarPage = React.lazy(() => import('./pages/gestao/financeiro/ContasPagarPage'));
 const FornecedoresPage = React.lazy(
   () => import('./features/financeiro/fornecedores/FornecedoresPage'),
@@ -148,6 +151,8 @@ const AprovacoesFinanceirasPage = React.lazy(
 const ConciliacaoBancariaPage = React.lazy(
   () => import('./pages/gestao/financeiro/ConciliacaoBancariaPage'),
 );
+const FluxoCaixaPage = React.lazy(() => import('./pages/gestao/financeiro/FluxoCaixaPage'));
+const TesourariaPage = React.lazy(() => import('./pages/gestao/financeiro/TesourariaPage'));
 const CentrosCustoPage = React.lazy(
   () => import('./pages/gestao/financeiro/CentrosCustoPage'),
 );
@@ -824,20 +829,7 @@ const AppRoutes: React.FC = () => {
                   />
                   <Route
                     path="/financeiro/contas-receber"
-                    element={protegerRota(
-                      ModuloEnum.FINANCEIRO,
-                      <ModuleUnderConstruction
-                        moduleName="Contas a Receber"
-                        description="Este fluxo ainda esta em desenvolvimento para a versao atual do financeiro."
-                        estimatedCompletion="Q2 2026"
-                        features={[
-                          'Controle de inadimplencia por cliente',
-                          'Reguas de cobranca',
-                          'Consolidado de recebiveis por periodo',
-                          'Relatorio de aging de recebimentos',
-                        ]}
-                      />,
-                    )}
+                    element={protegerRota(ModuloEnum.FINANCEIRO, <ContasReceberPage />)}
                   />
                   <Route
                     path="/financeiro/contas-pagar"
@@ -845,20 +837,7 @@ const AppRoutes: React.FC = () => {
                   />
                   <Route
                     path="/financeiro/fluxo-caixa"
-                    element={protegerRota(
-                      ModuloEnum.FINANCEIRO,
-                      <ModuleUnderConstruction
-                        moduleName="Fluxo de Caixa"
-                        description="Painel consolidado de entradas, saidas e projecoes de caixa."
-                        estimatedCompletion="Q2 2026"
-                        features={[
-                          'Projecao diaria de caixa',
-                          'Comparativo realizado vs previsto',
-                          'Alertas de saldo minimo',
-                          'Exportacao de relatorio gerencial',
-                        ]}
-                      />,
-                    )}
+                    element={protegerRota(ModuloEnum.FINANCEIRO, <FluxoCaixaPage />)}
                   />
                   <Route
                     path="/financeiro/fornecedores"
@@ -895,21 +874,7 @@ const AppRoutes: React.FC = () => {
                   />
                   <Route
                     path="/financeiro/tesouraria"
-                    element={protegerRota(
-                      ModuloEnum.FINANCEIRO,
-                      <ModuleUnderConstruction
-                        moduleName="Tesouraria"
-                        description="Gestão avançada de caixa e investimentos"
-                        estimatedCompletion="Roadmap 2026"
-                        features={[
-                          'Gestão de múltiplas contas',
-                          'Aplicações financeiras',
-                          'Projeção de fluxo de caixa',
-                          'Controle de cheques',
-                          'Dashboard executivo',
-                        ]}
-                      />
-                    )}
+                    element={protegerRota(ModuloEnum.FINANCEIRO, <TesourariaPage />)}
                   />
                   <Route path="/configuracoes" element={<Navigate to="/configuracoes/empresa" replace />} />
                   <Route path="*" element={<Navigate to="/dashboard" replace />} />

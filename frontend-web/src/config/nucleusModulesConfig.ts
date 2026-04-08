@@ -1,12 +1,10 @@
 import type { ComponentType } from 'react';
 import {
   TrendingUp,
-  PiggyBank,
   FileText,
   BarChart3,
   Calculator,
   Building2,
-  Repeat,
   Users,
   Settings,
   Shield,
@@ -202,14 +200,8 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
     color: 'orange',
     modules: [
       {
-        id: 'financeiro-contas-receber',
-        name: 'Contas a Receber',
+        menuId: 'financeiro-contas-receber',
         description: 'Gest?o de recebimentos, controle de inadimpl?ncia e relat?rios de cobran?a.',
-        href: '/financeiro/contas-receber',
-        icon: TrendingUp,
-        badge: 'Em desenvolvimento',
-        badgeColor: 'yellow',
-        status: 'coming_soon',
       },
       {
         menuId: 'financeiro-contas-pagar',
@@ -229,14 +221,8 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
         icon: ListChecks,
       },
       {
-        id: 'financeiro-fluxo-caixa',
-        name: 'Fluxo de Caixa',
+        menuId: 'financeiro-fluxo-caixa',
         description: 'Vis?o completa do fluxo financeiro com proje??es e an?lises detalhadas.',
-        href: '/financeiro/fluxo-caixa',
-        icon: PiggyBank,
-        badge: 'Em desenvolvimento',
-        badgeColor: 'yellow',
-        status: 'coming_soon',
       },
       {
         menuId: 'financeiro-fornecedores',
@@ -281,14 +267,8 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
         icon: Calculator,
       },
       {
-        id: 'tesouraria',
-        name: 'Tesouraria',
+        menuId: 'financeiro-tesouraria',
         description: 'Gest?o de caixa, movimenta??es banc?rias e controle de liquidez.',
-        href: '/financeiro/tesouraria',
-        icon: Repeat,
-        badge: 'Roadmap 2026',
-        badgeColor: 'red',
-        status: 'coming_soon',
       },
     ],
   },

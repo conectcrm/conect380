@@ -65,15 +65,15 @@ const BLOCKED_RELATIONSHIP_INFO: MvpBlockedRouteInfo = {
 };
 
 const BLOCKED_FINANCE_INFO: MvpBlockedRouteInfo = {
-  moduleName: 'Financeiro e Billing',
+  moduleName: 'Billing e Fiscal',
   description:
-    'Somente o fluxo de compras (cotacoes/aprovacoes) esta liberado no MVP. Billing e financeiro avancado seguem pos-MVP.',
+    'Fluxos de billing e emissao fiscal seguem fora do MVP atual.',
   estimatedCompletion: 'Pos-MVP',
   features: [
-    'Fluxo financeiro completo fora de compras',
     'Assinaturas e billing',
-    'Faturamento e cobrancas',
-    'Relatorios financeiros avancados',
+    'Emissao fiscal (NF-e/NFS-e)',
+    'Faturamento de assinaturas',
+    'Cobertura fiscal avancada',
   ],
 };
 
@@ -96,8 +96,8 @@ const BLOCKED_ROUTE_RULES: MvpBlockedRouteRule[] = [
   { prefix: '/billing', info: BLOCKED_FINANCE_INFO },
   { prefix: '/assinaturas', info: BLOCKED_FINANCE_INFO },
   { prefix: '/faturamento', info: BLOCKED_FINANCE_INFO },
-  { prefix: '/financeiro', info: BLOCKED_FINANCE_INFO },
-  { prefix: '/nuclei/financeiro', info: BLOCKED_FINANCE_INFO },
+  { prefix: '/financeiro/fiscal', info: BLOCKED_FINANCE_INFO },
+  { prefix: '/financeiro/notas-fiscais', info: BLOCKED_FINANCE_INFO },
   { prefix: '/contratos', info: BLOCKED_FINANCE_INFO },
   { prefix: '/clientes', info: BLOCKED_RELATIONSHIP_INFO },
   { prefix: '/contatos', info: BLOCKED_RELATIONSHIP_INFO },

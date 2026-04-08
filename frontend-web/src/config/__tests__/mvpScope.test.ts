@@ -36,11 +36,20 @@ describe('mvpScope', () => {
     });
   });
 
-  it('still blocks financial routes outside compras in MVP mode', () => {
+  it('keeps financeiro operacional routes available in MVP mode', () => {
     runWithMvpMode('true', ({ getMvpBlockedRouteInfo }) => {
-      const blocked = getMvpBlockedRouteInfo('/financeiro/contas-pagar');
-      expect(blocked).not.toBeNull();
-      expect(blocked?.moduleName).toBe('Financeiro e Billing');
+      expect(getMvpBlockedRouteInfo('/financeiro/contas-pagar')).toBeNull();
+      expect(getMvpBlockedRouteInfo('/financeiro/contas-receber')).toBeNull();
+      expect(getMvpBlockedRouteInfo('/financeiro/fluxo-caixa')).toBeNull();
+      expect(getMvpBlockedRouteInfo('/financeiro/tesouraria')).toBeNull();
+
+      const blockedBilling = getMvpBlockedRouteInfo('/billing/faturas');
+      expect(blockedBilling).not.toBeNull();
+      expect(blockedBilling?.moduleName).toBe('Billing e Fiscal');
+
+      const blockedFiscal = getMvpBlockedRouteInfo('/financeiro/notas-fiscais');
+      expect(blockedFiscal).not.toBeNull();
+      expect(blockedFiscal?.moduleName).toBe('Billing e Fiscal');
     });
   });
 
