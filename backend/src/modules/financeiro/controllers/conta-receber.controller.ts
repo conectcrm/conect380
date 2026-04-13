@@ -7,6 +7,7 @@ import { Permission } from '../../../common/permissions/permissions.constants';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
 import { CurrentUser } from '../../../common/decorators/user.decorator';
 import {
+  CriarLancamentoAvulsoContaReceberDto,
   QueryContasReceberDto,
   ReenviarCobrancaContaReceberDto,
   RegistrarRecebimentoContaReceberDto,
@@ -27,6 +28,17 @@ export class ContaReceberController {
   @Get('resumo')
   async obterResumo(@EmpresaId() empresaId: string, @Query() query: QueryContasReceberDto) {
     return this.contaReceberService.obterResumo(empresaId, query);
+  }
+
+  @Post('avulsos')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
+  async criarLancamentoAvulso(
+    @EmpresaId() empresaId: string,
+    @Body() dto: CriarLancamentoAvulsoContaReceberDto,
+    @CurrentUser() user: { id?: string; sub?: string },
+  ) {
+    const userId = user?.id || user?.sub || 'sistema';
+    return this.contaReceberService.criarLancamentoAvulso(dto, empresaId, userId);
   }
 
   @Post(':id/registrar-recebimento')

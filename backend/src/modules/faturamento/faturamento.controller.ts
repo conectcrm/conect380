@@ -50,6 +50,8 @@ type StatusFatura =
   | 'vencida'
   | 'cancelada'
   | 'parcialmente_paga';
+type TipoFatura = 'unica' | 'recorrente' | 'parcela' | 'adicional';
+type OrigemFatura = 'faturamento' | 'avulso';
 type StatusPagamento =
   | 'pendente'
   | 'processando'
@@ -65,7 +67,9 @@ export class FaturamentoController {
   private readonly logger = new Logger(FaturamentoController.name);
   private readonly camposOrdenacaoPermitidos = new Set([
     'createdAt',
+    'dataEmissao',
     'dataVencimento',
+    'status',
     'valorTotal',
     'numero',
   ]);
@@ -78,10 +82,16 @@ export class FaturamentoController {
 
   private sanitizarSortBy(
     sortBy?: string,
-  ): 'createdAt' | 'dataVencimento' | 'valorTotal' | 'numero' {
+  ): 'createdAt' | 'dataEmissao' | 'dataVencimento' | 'status' | 'valorTotal' | 'numero' {
     const valor = String(sortBy || '').trim();
     if (this.camposOrdenacaoPermitidos.has(valor)) {
-      return valor as 'createdAt' | 'dataVencimento' | 'valorTotal' | 'numero';
+      return valor as
+        | 'createdAt'
+        | 'dataEmissao'
+        | 'dataVencimento'
+        | 'status'
+        | 'valorTotal'
+        | 'numero';
     }
 
     return 'createdAt';
@@ -89,6 +99,24 @@ export class FaturamentoController {
 
   private sanitizarSortOrder(sortOrder?: string): 'ASC' | 'DESC' {
     return String(sortOrder || '').trim().toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+  }
+
+  private sanitizarDataFiltro(data?: string): string | undefined {
+    const valor = String(data || '').trim();
+    if (!valor) {
+      return undefined;
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(valor)) {
+      return valor;
+    }
+
+    const parsed = new Date(valor);
+    if (Number.isNaN(parsed.getTime())) {
+      return undefined;
+    }
+
+    return parsed.toISOString().slice(0, 10);
   }
 
   // ==================== FATURAS ====================
@@ -135,7 +163,7 @@ export class FaturamentoController {
       const fatura = await this.faturamentoService.gerarFaturaAutomatica(gerarFaturaDto, empresaId);
       return {
         status: HttpStatus.CREATED,
-        message: 'Fatura automÃ¡tica gerada com sucesso',
+        message: 'Fatura automatica gerada com sucesso',
         data: fatura,
       };
     } catch (error) {
@@ -148,6 +176,8 @@ export class FaturamentoController {
   async buscarFaturas(
     @EmpresaId() empresaId: string,
     @Query('status') status?: StatusFatura,
+    @Query('tipo') tipo?: TipoFatura,
+    @Query('origem') origem?: OrigemFatura,
     @Query('clienteId') clienteId?: string,
     @Query('contratoId') contratoId?: number,
     @Query('dataInicio') dataInicio?: string,
@@ -156,25 +186,34 @@ export class FaturamentoController {
     @Query('q') q?: string,
     @Query('page') page = '1',
     @Query('pageSize') pageSize = '10',
-    @Query('sortBy') sortBy: 'createdAt' | 'dataVencimento' | 'valorTotal' | 'numero' = 'createdAt',
+    @Query('sortBy')
+    sortBy:
+      | 'createdAt'
+      | 'dataEmissao'
+      | 'dataVencimento'
+      | 'status'
+      | 'valorTotal'
+      | 'numero' = 'createdAt',
     @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'DESC',
   ) {
     const sortBySeguro = this.sanitizarSortBy(sortBy);
     const sortOrderSeguro = this.sanitizarSortOrder(sortOrder);
     const periodoCampoFiltro: 'emissao' | 'vencimento' =
-      periodoCampo === 'vencimento' ? 'vencimento' : 'emissao';
+      periodoCampo === 'emissao' ? 'emissao' : 'vencimento';
 
     const filtros = {
       status: status as any,
+      tipo: tipo as any,
+      origem: origem as any,
       clienteId: clienteId?.trim() || undefined,
       contratoId: contratoId ? Number(contratoId) : undefined,
-      dataInicio: dataInicio ? new Date(dataInicio) : undefined,
-      dataFim: dataFim ? new Date(dataFim) : undefined,
+      dataInicio: this.sanitizarDataFiltro(dataInicio),
+      dataFim: this.sanitizarDataFiltro(dataFim),
       periodoCampo: periodoCampoFiltro,
       q,
     };
 
-    // MantÃ©m compatibilidade com implementaÃ§Ãµes que esperam paginaÃ§Ã£o flat
+    // Mantem compatibilidade com implementacoes que esperam paginacao flat
     const paginated = await this.faturamentoService.buscarFaturasPaginadas(
       empresaId,
       Number(page) || 1,
@@ -201,6 +240,8 @@ export class FaturamentoController {
   async buscarFaturasPaginadas(
     @EmpresaId() empresaId: string,
     @Query('status') status?: StatusFatura,
+    @Query('tipo') tipo?: TipoFatura,
+    @Query('origem') origem?: OrigemFatura,
     @Query('clienteId') clienteId?: string,
     @Query('contratoId') contratoId?: number,
     @Query('dataInicio') dataInicio?: string,
@@ -209,20 +250,29 @@ export class FaturamentoController {
     @Query('q') q?: string,
     @Query('page') page = '1',
     @Query('pageSize') pageSize = '10',
-    @Query('sortBy') sortBy: 'createdAt' | 'dataVencimento' | 'valorTotal' | 'numero' = 'createdAt',
+    @Query('sortBy')
+    sortBy:
+      | 'createdAt'
+      | 'dataEmissao'
+      | 'dataVencimento'
+      | 'status'
+      | 'valorTotal'
+      | 'numero' = 'createdAt',
     @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'DESC',
   ) {
     const sortBySeguro = this.sanitizarSortBy(sortBy);
     const sortOrderSeguro = this.sanitizarSortOrder(sortOrder);
     const periodoCampoFiltro: 'emissao' | 'vencimento' =
-      periodoCampo === 'vencimento' ? 'vencimento' : 'emissao';
+      periodoCampo === 'emissao' ? 'emissao' : 'vencimento';
 
     const filtros = {
       status: status as any,
+      tipo: tipo as any,
+      origem: origem as any,
       clienteId: clienteId?.trim() || undefined,
       contratoId: contratoId ? Number(contratoId) : undefined,
-      dataInicio: dataInicio ? new Date(dataInicio) : undefined,
-      dataFim: dataFim ? new Date(dataFim) : undefined,
+      dataInicio: this.sanitizarDataFiltro(dataInicio),
+      dataFim: this.sanitizarDataFiltro(dataFim),
       periodoCampo: periodoCampoFiltro,
       q,
     };
@@ -489,22 +539,22 @@ export class FaturamentoController {
     @EmpresaId() empresaId: string,
     @CurrentUser() user: { id?: string; sub?: string },
   ) {
-    this.logger.log(`ðŸ” [CONTROLLER] DELETE /faturamento/faturas/${id} - Iniciando exclusÃ£o`);
+    this.logger.log(`[CONTROLLER] DELETE /faturamento/faturas/${id} - Iniciando exclusao`);
 
     try {
-      this.logger.log(`ðŸ” [CONTROLLER] Chamando excluirFatura para ID: ${id}`);
+      this.logger.log(`[CONTROLLER] Chamando excluirFatura para ID: ${id}`);
       const userId = user?.id || user?.sub;
       await this.faturamentoService.excluirFatura(id, empresaId, userId);
 
-      this.logger.log(`ðŸ” [CONTROLLER] Fatura ${id} excluÃ­da com sucesso`);
+      this.logger.log(`[CONTROLLER] Fatura ${id} excluida com sucesso`);
       return {
         status: HttpStatus.OK,
-        message: 'Fatura excluÃ­da com sucesso',
+        message: 'Fatura excluida com sucesso',
         data: { id },
       };
     } catch (error) {
-      this.logger.log(`ðŸ” [CONTROLLER] Erro ao excluir fatura ID ${id}: ${error.message}`);
-      this.logger.log(`ðŸ” [CONTROLLER] Stack trace: ${error.stack}`);
+      this.logger.log(`[CONTROLLER] Erro ao excluir fatura ID ${id}: ${error.message}`);
+      this.logger.log(`[CONTROLLER] Stack trace: ${error.stack}`);
       throw new BadRequestException(error.message);
     }
   }
@@ -724,12 +774,12 @@ export class FaturamentoController {
 
     return {
       status: HttpStatus.OK,
-      message: 'EstatÃ­sticas recuperadas com sucesso',
+      message: 'Estatisticas recuperadas com sucesso',
       data: estatisticas,
     };
   }
 
-  // ==================== PLANOS DE COBRANÃ‡A ====================
+  // ==================== PLANOS DE COBRANCA ====================
 
   @Post('planos-cobranca')
   @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
@@ -741,7 +791,7 @@ export class FaturamentoController {
       const plano = await this.cobrancaService.criarPlanoCobranca(createPlanoDto, empresaId);
       return {
         status: HttpStatus.CREATED,
-        message: 'Plano de cobranÃ§a criado com sucesso',
+        message: 'Plano de cobranca criado com sucesso',
         data: plano,
       };
     } catch (error) {
@@ -767,7 +817,7 @@ export class FaturamentoController {
 
     return {
       status: HttpStatus.OK,
-      message: 'Planos de cobranÃ§a recuperados com sucesso',
+      message: 'Planos de cobranca recuperados com sucesso',
       data: planos,
       total: planos.length,
     };
@@ -780,7 +830,7 @@ export class FaturamentoController {
 
     return {
       status: HttpStatus.OK,
-      message: 'Plano de cobranÃ§a encontrado',
+      message: 'Plano de cobranca encontrado',
       data: plano,
     };
   }
@@ -792,7 +842,7 @@ export class FaturamentoController {
 
     return {
       status: HttpStatus.OK,
-      message: 'Plano de cobranÃ§a encontrado',
+      message: 'Plano de cobranca encontrado',
       data: plano,
     };
   }
@@ -808,7 +858,7 @@ export class FaturamentoController {
 
     return {
       status: HttpStatus.OK,
-      message: 'Plano de cobranÃ§a atualizado com sucesso',
+      message: 'Plano de cobranca atualizado com sucesso',
       data: plano,
     };
   }
@@ -820,7 +870,7 @@ export class FaturamentoController {
 
     return {
       status: HttpStatus.OK,
-      message: 'Plano de cobranÃ§a pausado com sucesso',
+      message: 'Plano de cobranca pausado com sucesso',
       data: plano,
     };
   }
@@ -835,7 +885,7 @@ export class FaturamentoController {
 
     return {
       status: HttpStatus.OK,
-      message: 'Plano de cobranÃ§a reativado com sucesso',
+      message: 'Plano de cobranca reativado com sucesso',
       data: plano,
     };
   }
@@ -851,7 +901,7 @@ export class FaturamentoController {
 
     return {
       status: HttpStatus.OK,
-      message: 'Plano de cobranÃ§a cancelado com sucesso',
+      message: 'Plano de cobranca cancelado com sucesso',
       data: plano,
     };
   }
@@ -873,7 +923,7 @@ export class FaturamentoController {
     }
   }
 
-  // ==================== UTILITÃRIOS ====================
+  // ==================== UTILITARIOS ====================
 
   @Post('processar-cobrancas-recorrentes')
   @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)

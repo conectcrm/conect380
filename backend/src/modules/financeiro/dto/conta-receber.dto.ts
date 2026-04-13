@@ -13,6 +13,13 @@ import {
 } from 'class-validator';
 
 export type StatusContaReceber = 'pendente' | 'parcial' | 'recebida' | 'vencida' | 'cancelada';
+export type OrigemContaReceber = 'faturamento' | 'avulso';
+export type TipoLancamentoAvulsoContaReceber =
+  | 'instalacao'
+  | 'servico_avulso'
+  | 'reembolso'
+  | 'solicitacao_servico'
+  | 'outro';
 
 export class QueryContasReceberDto {
   @IsOptional()
@@ -21,6 +28,9 @@ export class QueryContasReceberDto {
 
   @IsOptional()
   status?: string | string[];
+
+  @IsOptional()
+  origem?: string | string[];
 
   @IsOptional()
   @IsUUID()
@@ -76,6 +86,8 @@ export type ContaReceberItemResponse = {
   clienteNome: string;
   clienteEmail?: string | null;
   status: StatusContaReceber;
+  origemTitulo: OrigemContaReceber;
+  tipoLancamentoAvulso?: TipoLancamentoAvulsoContaReceber | null;
   statusFatura: string;
   createdAt: string;
   dataEmissao: string;
@@ -125,6 +137,48 @@ export class RegistrarRecebimentoContaReceberDto {
   @IsOptional()
   @IsDateString()
   dataPagamento?: string;
+
+  @IsOptional()
+  @IsString()
+  observacoes?: string;
+
+  @IsOptional()
+  @IsString()
+  correlationId?: string;
+
+  @IsOptional()
+  @IsString()
+  origemId?: string;
+}
+
+export class CriarLancamentoAvulsoContaReceberDto {
+  @IsUUID()
+  clienteId: string;
+
+  @IsOptional()
+  @IsUUID()
+  usuarioResponsavelId?: string;
+
+  @IsDateString()
+  dataVencimento: string;
+
+  @IsString()
+  descricao: string;
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0.01)
+  valor: number;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['instalacao', 'servico_avulso', 'reembolso', 'solicitacao_servico', 'outro'])
+  tipoLancamentoAvulso?: TipoLancamentoAvulsoContaReceber;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['pix', 'boleto', 'transferencia', 'cartao_credito', 'cartao_debito', 'dinheiro', 'a_combinar'])
+  formaPagamentoPreferida?: string;
 
   @IsOptional()
   @IsString()
