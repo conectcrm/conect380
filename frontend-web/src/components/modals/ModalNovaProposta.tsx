@@ -33,6 +33,10 @@ import {
 } from '../../features/propostas/services/propostasService';
 import { MENSAGEM_PROPOSTA_SEM_ITENS } from '../../features/propostas/utils/propostaItens';
 import { clientesService, Cliente as ClienteService } from '../../services/clientesService';
+import comissoesService, {
+  type PropostaComissaoConfig,
+  type PropostaComissaoParticipanteConfig,
+} from '../../services/comissoesService';
 import { gerarTokenNumerico } from '../../utils/tokenUtils';
 import { matchesLocalSearchTerm, normalizeSearchValue } from '../../utils/localSearch';
 import { BadgeProdutoSoftware } from '../common/BadgeProdutoSoftware';
@@ -115,6 +119,11 @@ interface ProdutoProposta {
   subtotal: number;
 }
 
+interface PropostaComissaoForm {
+  participantes: PropostaComissaoParticipanteConfig[];
+  observacoes?: string;
+}
+
 interface PropostaFormData {
   titulo?: string; // Novo campo opcional para título da proposta
   vendedor: Vendedor | null; // Novo campo obrigatório para vendedor responsável
@@ -127,6 +136,7 @@ interface PropostaFormData {
   validadeDias: number;
   observacoes: string;
   incluirImpostosPDF: boolean;
+  comissao: PropostaComissaoForm;
 }
 
 type QuickActionType = 'draft';
@@ -292,6 +302,21 @@ const etapaSchemas = {
       then: () => yup.number().optional(), // Opcional para software
       otherwise: () => yup.number().min(1, 'Validade deve ser pelo menos 1 dia').required(),
     }),
+    comissao: yup.object().shape({
+      participantes: yup.array().of(
+        yup.object().shape({
+          usuarioId: yup.string().required('Selecione um comissionado'),
+          percentual: yup
+            .number()
+            .typeError('Informe o percentual de comissao')
+            .moreThan(0, 'Percentual de comissao deve ser maior que 0')
+            .max(100, 'Percentual de comissao deve ser no maximo 100')
+            .required('Percentual de comissao e obrigatorio'),
+          papel: yup.string().optional(),
+        }),
+      ),
+      observacoes: yup.string().optional(),
+    }),
   }),
   resumo: yup.object().shape({
     // Validação final opcional
@@ -342,6 +367,10 @@ const criarValoresIniciaisProposta = (
       validadeDias: 15,
       observacoes: '',
       incluirImpostosPDF: true,
+      comissao: {
+        participantes: [],
+        observacoes: '',
+      },
     };
   }
 
@@ -425,6 +454,10 @@ const criarValoresIniciaisProposta = (
     validadeDias: Number(propostaInicial.validadeDias || 15),
     observacoes: normalizarObservacoesIniciais(propostaInicial.observacoes),
     incluirImpostosPDF: propostaInicial.incluirImpostosPDF ?? true,
+    comissao: {
+      participantes: [],
+      observacoes: '',
+    },
   };
 };
 
@@ -511,6 +544,10 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       validadeDias: 15, // Valor padrão, será opcional para software
       observacoes: '',
       incluirImpostosPDF: true,
+      comissao: {
+        participantes: [],
+        observacoes: '',
+      },
     },
     mode: 'onChange',
   });
@@ -525,6 +562,16 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
     name: 'produtos',
   });
 
+  const {
+    fields: comissaoParticipantesFields,
+    append: adicionarComissionado,
+    remove: removerComissionado,
+    replace: substituirComissionados,
+  } = useFieldArray({
+    control,
+    name: 'comissao.participantes',
+  });
+
   // Watch dos campos com otimização
   const watchedVendedor = watch('vendedor');
   const watchedCliente = watch('cliente');
@@ -532,6 +579,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
   const watchedDescontoGlobal = watch('descontoGlobal');
   const watchedImpostos = watch('impostos');
   const watchedFormaPagamento = watch('formaPagamento');
+  const watchedComissaoParticipantes = watch('comissao.participantes');
   const rascunhoPipelineSemItens =
     Boolean(contextMessage && contextMessage.toLowerCase().includes('rascunho criado')) &&
     produtos.length === 0;
@@ -649,6 +697,19 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
     },
     [vendedores],
   );
+
+  const totalPercentualComissao = useMemo(() => {
+    const participantes = Array.isArray(watchedComissaoParticipantes)
+      ? watchedComissaoParticipantes
+      : [];
+    return participantes.reduce((sum, item) => sum + Number(item?.percentual || 0), 0);
+  }, [watchedComissaoParticipantes]);
+
+  const estimativaValorComissao = useMemo(() => {
+    const total = Number(totaisCombinados?.total || 0);
+    return (total * totalPercentualComissao) / 100;
+  }, [totaisCombinados?.total, totalPercentualComissao]);
+
   // Consolidado: Reset e carregamento de dados ao abrir modal
   useEffect(() => {
     if (isOpen) {
@@ -721,6 +782,35 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
             setProdutosDisponiveis(produtosCarregados);
             setIsLoadingProdutos(false);
           }
+
+          if (isEditMode && propostaInicial?.id) {
+            try {
+              const res = await comissoesService.obterConfigProposta(propostaInicial.id);
+              const config = (res?.config || null) as PropostaComissaoConfig | null;
+              const participantes = Array.isArray(config?.participantes)
+                ? config!.participantes
+                    .map((p) => ({
+                      usuarioId: String(p?.usuarioId || '').trim(),
+                      percentual: Number(p?.percentual || 0),
+                      papel: p?.papel ? String(p.papel).trim() : undefined,
+                    }))
+                    .filter((p) => Boolean(p.usuarioId))
+                : [];
+
+              substituirComissionados(participantes);
+              setValue('comissao.observacoes', config?.observacoes ? String(config.observacoes) : '', {
+                shouldDirty: false,
+                shouldTouch: false,
+              });
+            } catch (error) {
+              console.warn('Nao foi possivel carregar configuracao de comissao da proposta:', error);
+              substituirComissionados([]);
+              setValue('comissao.observacoes', '', { shouldDirty: false, shouldTouch: false });
+            }
+          } else {
+            substituirComissionados([]);
+            setValue('comissao.observacoes', '', { shouldDirty: false, shouldTouch: false });
+          }
         } catch (error) {
           console.error('Erro ao carregar dados:', error);
           toast.error('Erro ao carregar dados');
@@ -739,7 +829,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       clientesCarregadosRef.current = false;
       produtosCarregadosRef.current = false;
     }
-  }, [getValues, isEditMode, isOpen, propostaInicial, reset, setValue]);
+  }, [getValues, isEditMode, isOpen, propostaInicial, reset, setValue, substituirComissionados]);
 
   // Gerar título automático quando cliente for selecionado com controle otimizado
   useEffect(() => {
@@ -1054,6 +1144,25 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
     } satisfies PropostaCompleta;
   };
 
+  const montarPayloadComissao = (data: PropostaFormData): PropostaComissaoConfig => {
+    const participantes = Array.isArray(data?.comissao?.participantes)
+      ? data.comissao.participantes
+          .map((p) => ({
+            usuarioId: String(p?.usuarioId || '').trim(),
+            percentual: Number(String((p as any)?.percentual ?? 0).toString().replace(',', '.')),
+            papel: p?.papel ? String(p.papel).trim() : undefined,
+          }))
+          .filter((p) => Boolean(p.usuarioId) && Number(p.percentual || 0) > 0)
+      : [];
+
+    const observacoes = data?.comissao?.observacoes ? String(data.comissao.observacoes).trim() : '';
+
+    return {
+      participantes,
+      ...(observacoes ? { observacoes } : {}),
+    };
+  };
+
   // Handler para salvar rascunho na etapa final
 
   const handleSaveAsDraft = async () => {
@@ -1065,6 +1174,19 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
         isEditMode && propostaInicial?.id
           ? await propostasService.atualizarProposta(propostaInicial.id, propostaData)
           : await propostasService.criarProposta(propostaData);
+
+      try {
+        const config = montarPayloadComissao(formData);
+        const shouldPersistConfig =
+          isEditMode || config.participantes.length > 0 || Boolean(config.observacoes);
+
+        if (shouldPersistConfig && proposta?.id) {
+          await comissoesService.salvarConfigProposta(proposta.id, config);
+        }
+      } catch (error) {
+        console.warn('Falha ao salvar configuracao de comissao:', error);
+        toast.error('Proposta salva, mas nao foi possivel salvar a configuracao de comissao.');
+      }
       if (onPropostaCriada) {
         onPropostaCriada(proposta);
       }
@@ -1094,6 +1216,19 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
         isEditMode && propostaInicial?.id
           ? await propostasService.atualizarProposta(propostaInicial.id, propostaData)
           : await propostasService.criarProposta(propostaData);
+
+      try {
+        const config = montarPayloadComissao(data);
+        const shouldPersistConfig =
+          isEditMode || config.participantes.length > 0 || Boolean(config.observacoes);
+
+        if (shouldPersistConfig && propostaCriada?.id) {
+          await comissoesService.salvarConfigProposta(propostaCriada.id, config);
+        }
+      } catch (error) {
+        console.warn('Falha ao salvar configuracao de comissao:', error);
+        toast.error('Proposta salva, mas nao foi possivel salvar a configuracao de comissao.');
+      }
 
       toast.success(
         isEditMode
@@ -2163,6 +2298,204 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                       </div>
                     )}
 
+                    {/* Comissao (opcional) */}
+                    <div className="rounded-lg border border-[#DEE8EC] bg-white p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">Comissao (opcional)</p>
+                          <p className="mt-0.5 text-xs text-gray-600">
+                            Gerada na baixa confirmada e calculada sobre o valor liquido do
+                            pagamento.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const vendedorId = String(watchedVendedor?.id || '').trim();
+                            const selecionados = new Set(
+                              (Array.isArray(watchedComissaoParticipantes)
+                                ? watchedComissaoParticipantes
+                                : []
+                              )
+                                .map((p) => String(p?.usuarioId || '').trim())
+                                .filter(Boolean),
+                            );
+
+                            adicionarComissionado({
+                              usuarioId: vendedorId && !selecionados.has(vendedorId) ? vendedorId : '',
+                              percentual: 0,
+                              papel: '',
+                            });
+                          }}
+                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+                        >
+                          <Plus className="h-4 w-4" />
+                          Adicionar
+                        </button>
+                      </div>
+
+                      {comissaoParticipantesFields.length === 0 ? (
+                        <p className="mt-3 text-sm text-gray-500">Sem comissionados configurados.</p>
+                      ) : (
+                        <div className="mt-3 space-y-3">
+                          {comissaoParticipantesFields.map((row, index) => {
+                            const participantesAtual =
+                              (Array.isArray(watchedComissaoParticipantes)
+                                ? watchedComissaoParticipantes
+                                : []) || [];
+                            const currentId = String(participantesAtual?.[index]?.usuarioId || '').trim();
+                            const selectedIds = new Set(
+                              participantesAtual
+                                .map((p) => String(p?.usuarioId || '').trim())
+                                .filter(Boolean),
+                            );
+                            if (currentId) selectedIds.delete(currentId);
+
+                            const rowErrors = ((errors as any)?.comissao?.participantes?.[index] ||
+                              {}) as any;
+
+                            return (
+                              <div
+                                key={row.id}
+                                className="rounded-lg border border-[#D4E2E7] bg-[#F8FBFC] p-3"
+                              >
+                                <div className="grid grid-cols-1 gap-3 md:grid-cols-12 md:items-end">
+                                  <div className="md:col-span-5">
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                                      Comissionado
+                                    </label>
+                                    <Controller
+                                      name={`comissao.participantes.${index}.usuarioId`}
+                                      control={control}
+                                      render={({ field }) => (
+                                        <select {...field} className={fieldClass}>
+                                          <option value="">Selecione...</option>
+                                          {vendedores.map((v) => (
+                                            <option
+                                              key={v.id}
+                                              value={v.id}
+                                              disabled={selectedIds.has(v.id)}
+                                            >
+                                              {v.nome}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      )}
+                                    />
+                                    {rowErrors?.usuarioId?.message ? (
+                                      <p className="text-red-500 text-xs mt-1">
+                                        {String(rowErrors.usuarioId.message)}
+                                      </p>
+                                    ) : null}
+                                  </div>
+
+                                  <div className="md:col-span-3">
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                                      Percentual (%)
+                                    </label>
+                                    <Controller
+                                      name={`comissao.participantes.${index}.percentual`}
+                                      control={control}
+                                      render={({ field }) => (
+                                        <input
+                                          {...field}
+                                          type="number"
+                                          min="0"
+                                          max="100"
+                                          step="0.01"
+                                          inputMode="decimal"
+                                          className={fieldClass}
+                                          value={field.value ?? 0}
+                                          onFocus={selecionarConteudoNumericoAoFocar}
+                                          onChange={(event) => {
+                                            const value = event.target.value;
+                                            field.onChange(normalizarPercentualInput(value, 0));
+                                          }}
+                                          onBlur={(event) => {
+                                            field.onBlur();
+                                            field.onChange(normalizarPercentualInput(event.target.value, 0));
+                                          }}
+                                        />
+                                      )}
+                                    />
+                                    {rowErrors?.percentual?.message ? (
+                                      <p className="text-red-500 text-xs mt-1">
+                                        {String(rowErrors.percentual.message)}
+                                      </p>
+                                    ) : null}
+                                  </div>
+
+                                  <div className="md:col-span-4 flex items-end gap-2">
+                                    <div className="flex-1">
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Papel (opcional)
+                                      </label>
+                                      <Controller
+                                        name={`comissao.participantes.${index}.papel`}
+                                        control={control}
+                                        render={({ field }) => (
+                                          <input
+                                            {...field}
+                                            type="text"
+                                            className={fieldClass}
+                                            placeholder="Ex: vendedor, SDR, gerente"
+                                          />
+                                        )}
+                                      />
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => removerComissionado(index)}
+                                      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#F2C7C7] bg-white text-[#B42318] transition hover:bg-[#FFF2F2]"
+                                      title="Remover comissionado"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#D4E2E7] bg-[#F8FBFC] px-3 py-2">
+                        <div className="text-xs text-gray-600">
+                          Total configurado:{' '}
+                          <span className="font-semibold text-gray-900">
+                            {Number(totalPercentualComissao || 0).toFixed(2)}%
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          Estimativa (sobre total da proposta):{' '}
+                          <span className="font-semibold text-gray-900">
+                            {new Intl.NumberFormat('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            }).format(Number(estimativaValorComissao || 0))}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mt-3">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Observacoes da comissao (opcional)
+                        </label>
+                        <Controller
+                          name="comissao.observacoes"
+                          control={control}
+                          render={({ field }) => (
+                            <textarea
+                              {...field}
+                              rows={2}
+                              className={fieldClass}
+                              placeholder="Observacoes internas para referencia..."
+                            />
+                          )}
+                        />
+                      </div>
+                    </div>
+
                     {/* Observações */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -2405,6 +2738,48 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                     )}
                   </div>
                 </div>
+
+                {Array.isArray(watchedComissaoParticipantes) &&
+                watchedComissaoParticipantes.some(
+                  (p) => String(p?.usuarioId || '').trim() && Number(p?.percentual || 0) > 0,
+                ) ? (
+                  <div className="p-4 border border-gray-200 rounded-lg">
+                    <h4 className="font-medium text-gray-900 mb-2 flex items-center">
+                      <DollarSign className="h-4 w-4 mr-2" />
+                      Comissao
+                    </h4>
+                    <div className="space-y-1 text-sm">
+                      {watchedComissaoParticipantes
+                        .filter(
+                          (p) =>
+                            String(p?.usuarioId || '').trim() && Number(p?.percentual || 0) > 0,
+                        )
+                        .map((p, idx) => {
+                          const usuarioId = String(p.usuarioId).trim();
+                          const nome =
+                            vendedores.find((v) => v.id === usuarioId)?.nome ||
+                            usuarioId.slice(0, 8);
+                          const papel = p.papel ? String(p.papel).trim() : '';
+                          return (
+                            <div key={`${usuarioId}-${idx}`} className="flex justify-between gap-3">
+                              <span className="truncate">
+                                {nome}
+                                {papel ? ` (${papel})` : ''}
+                              </span>
+                              <span className="font-medium whitespace-nowrap">
+                                {Number(p.percentual || 0).toFixed(2)}%
+                              </span>
+                            </div>
+                          );
+                        })}
+                    </div>
+                    {watch('comissao.observacoes') ? (
+                      <p className="mt-2 text-xs text-gray-600">
+                        <strong>Obs:</strong> {watch('comissao.observacoes')}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             )}
           </div>
