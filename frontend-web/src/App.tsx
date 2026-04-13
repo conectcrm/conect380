@@ -145,6 +145,7 @@ const InadimplenciaOperacionalPage = React.lazy(
 const FluxoCaixaPage = React.lazy(() => import('./pages/gestao/financeiro/FluxoCaixaPage'));
 const TesourariaPage = React.lazy(() => import('./pages/gestao/financeiro/TesourariaPage'));
 const CentrosCustoPage = React.lazy(() => import('./pages/gestao/financeiro/CentrosCustoPage'));
+const ComissoesPage = React.lazy(() => import('./pages/gestao/financeiro/ComissoesPage'));
 
 const PerfilPage = React.lazy(() => import('./features/perfil'));
 const PortalClientePage = React.lazy(() => import('./pages/PortalClientePage'));
@@ -889,6 +890,10 @@ const AppRoutes: React.FC = () => {
                     <Route
                       path="/financeiro/tesouraria"
                       element={protegerRota(ModuloEnum.FINANCEIRO, <TesourariaPage />)}
+                    />
+                    <Route
+                      path="/vendas/comissoes"
+                      element={protegerRota(ModuloEnum.VENDAS, <ComissoesPage />)}
                     />
                     <Route
                       path="/configuracoes"

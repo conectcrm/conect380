@@ -922,6 +922,16 @@ export const menuConfig: MenuConfig[] = [
         group: 'Vendas',
       },
       {
+        id: 'comercial-comissoes',
+        title: 'Comissoes',
+        icon: DollarSign,
+        href: '/vendas/comissoes',
+        color: 'blue',
+        permissions: ['comercial.propostas.read'],
+        requiredModule: 'VENDAS',
+        group: 'Vendas',
+      },
+      {
         id: 'comercial-analytics',
         title: 'Central de Relatorios',
         icon: BarChart3,
@@ -1361,6 +1371,7 @@ const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
   { pattern: '/propostas/:id', permissions: ['comercial.propostas.read'] },
   { pattern: '/vendas/propostas', permissions: ['comercial.propostas.read'] },
   { pattern: '/vendas/propostas/:id', permissions: ['comercial.propostas.read'] },
+  { pattern: '/vendas/comissoes', permissions: ['comercial.propostas.read'] },
   { pattern: '/produtos', permissions: ['crm.produtos.read'] },
   { pattern: '/produtos/categorias', permissions: ['crm.produtos.read'] },
   { pattern: '/vendas/produtos', permissions: ['crm.produtos.read'] },
@@ -1571,6 +1582,7 @@ const ROUTE_MODULE_REQUIREMENTS: Array<{ pattern: string; module: LicensedModule
 
   { pattern: '/contratos', module: 'VENDAS' },
   { pattern: '/propostas', module: 'VENDAS' },
+  { pattern: '/vendas/comissoes', module: 'VENDAS' },
   { pattern: '/relatorios/comercial/propostas-contratos', module: 'VENDAS' },
   { pattern: '/relatorios/comercial/clientes-leads', module: 'CRM' },
 
