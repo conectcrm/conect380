@@ -11,6 +11,15 @@ and no longer reflects the current `layout-v2` standard used in the system.
 
 - `docs/features/ARQUITETURA_PADRONIZACAO_TELAS.md`
 
+## Update 2026-04 (Header + Template Variants)
+
+The canonical document now includes:
+
+- new `PageHeader` baseline (`eyebrow`, `title`, short `description`, `actions`)
+- optional inline title+description behavior on desktop (`inlineDescriptionOnDesktop`)
+- block matrix per screen type (`LIST`, `SETTINGS`, `DASHBOARD`, `FORM`)
+- explicit rule: not every screen should use KPI cards or table blocks
+
 ## Complementary References
 
 - `frontend-web/src/components/layout-v2/RouteTemplateFrame.tsx`
@@ -35,4 +44,3 @@ and no longer reflects the current `layout-v2` standard used in the system.
 Use:
 
 - `docs/features/CHECKLIST_PADRONIZACAO_TELAS.md`
-

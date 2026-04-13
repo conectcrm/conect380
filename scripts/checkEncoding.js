@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
 
 const colors = {
   reset: '\x1b[0m',
@@ -14,6 +15,42 @@ const colors = {
 
 function colorize(message, color) {
   return `${colors[color] || colors.reset}${message}${colors.reset}`;
+}
+
+function runGit(args, repoRoot, options = {}) {
+  const result = spawnSync('git', args, {
+    cwd: repoRoot,
+    encoding: options.buffer ? null : 'utf8',
+    maxBuffer: 32 * 1024 * 1024,
+  });
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  return result;
+}
+
+function getStagedFiles(repoRoot) {
+  const result = runGit(['diff', '--cached', '--name-only', '--diff-filter=ACMR'], repoRoot);
+  if (result.status !== 0) {
+    throw new Error((result.stderr || '').trim() || 'Failed to list staged files');
+  }
+
+  return (result.stdout || '')
+    .split(/\r\n|\n|\r/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function readStagedBuffer(repoRoot, relativePath) {
+  const normalized = relativePath.replace(/\\/g, '/');
+  const result = runGit(['show', `:${normalized}`], repoRoot, { buffer: true });
+  if (result.status !== 0) {
+    return null;
+  }
+
+  return result.stdout;
 }
 
 function isTextFile(filePath) {
@@ -153,9 +190,55 @@ function scanContent(content) {
   return findings;
 }
 
-function scanFile(filePath) {
-  const content = fs.readFileSync(filePath, 'utf8');
-  const findings = scanContent(content).map((f) => {
+function scanFile(fileInfo, options) {
+  const { repoRoot, strictMode, stagedMode, enforceCrLf } = options;
+
+  let buffer = null;
+  if (stagedMode) {
+    buffer = readStagedBuffer(repoRoot, fileInfo.rel);
+  }
+
+  if (!buffer) {
+    buffer = fs.readFileSync(fileInfo.abs);
+  }
+
+  const content = buffer.toString('utf8');
+  const findings = [];
+
+  if (
+    strictMode &&
+    buffer.length >= 3 &&
+    buffer[0] === 0xef &&
+    buffer[1] === 0xbb &&
+    buffer[2] === 0xbf
+  ) {
+    findings.push({
+      pattern: 'UTF-8 BOM no inicio do arquivo',
+      index: 0,
+      sample: 'EF BB BF',
+      line: 1,
+      col: 1,
+      lineText: getLine(content, 1),
+    });
+  }
+
+  if (strictMode && enforceCrLf) {
+    const crlfIndex = content.indexOf('\r\n');
+    const crIndex = crlfIndex >= 0 ? crlfIndex : content.indexOf('\r');
+    if (crIndex >= 0) {
+      const pos = indexToLineCol(content, crIndex);
+      findings.push({
+        pattern: 'Quebra de linha CRLF/CR detectada (esperado LF)',
+        index: crIndex,
+        sample: '\\r',
+        line: pos.line,
+        col: pos.col,
+        lineText: getLine(content, pos.line),
+      });
+    }
+  }
+
+  const scannedFindings = scanContent(content).map((f) => {
     const pos = indexToLineCol(content, f.index);
     const lineText = getLine(content, pos.line);
 
@@ -166,6 +249,8 @@ function scanFile(filePath) {
       lineText,
     };
   });
+
+  findings.push(...scannedFindings);
 
   const lines = content.split(/\r\n|\n|\r/);
   for (let i = 0; i < lines.length; i += 1) {
@@ -222,9 +307,11 @@ async function readStdinLines() {
 }
 
 function printUsage() {
-  console.log('Usage: node scripts/checkEncoding.js [--stdin] [--all] [files...]');
+  console.log('Usage: node scripts/checkEncoding.js [--stdin] [--all] [--strict] [--staged] [files...]');
   console.log('  --stdin  Read file list from stdin (one per line)');
   console.log('  --all    Scan default dirs (frontend-web/src and backend/src)');
+  console.log('  --strict Enable strict checks (BOM + staged CRLF validation)');
+  console.log('  --staged Read file content from git index (staged snapshot)');
 }
 
 async function main() {
@@ -236,7 +323,11 @@ async function main() {
 
   const useStdin = args.includes('--stdin');
   const scanAll = args.includes('--all');
+  const strictMode = args.includes('--strict');
+  const stagedMode = args.includes('--staged');
   const explicitFiles = args.filter((a) => !a.startsWith('--'));
+  const repoRoot = process.cwd();
+  const enforceCrLf = strictMode && stagedMode;
 
   let targets = [];
 
@@ -244,6 +335,8 @@ async function main() {
     targets = await readStdinLines();
   } else if (explicitFiles.length > 0) {
     targets = explicitFiles;
+  } else if (stagedMode) {
+    targets = getStagedFiles(repoRoot);
   } else if (scanAll) {
     targets = ['frontend-web/src', 'backend/src'];
   } else {
@@ -252,12 +345,31 @@ async function main() {
     process.exit(0);
   }
 
-  const repoRoot = process.cwd();
+  if (stagedMode && targets.length === 0) {
+    console.log(colorize('[OK] No staged files to scan', 'green'));
+    process.exit(0);
+  }
+
+  if (strictMode && !stagedMode) {
+    console.log(
+      colorize(
+        '[WARN] Strict mode without --staged validates BOM only. Use --staged to enforce LF policy.',
+        'yellow',
+      ),
+    );
+  }
+
   const fileQueue = [];
 
   for (const t of targets) {
-    const resolved = path.resolve(repoRoot, t);
-    if (!fs.existsSync(resolved)) continue;
+    const normalizedTarget = t.replace(/\\/g, '/');
+    const resolved = path.resolve(repoRoot, normalizedTarget);
+    if (!fs.existsSync(resolved)) {
+      if (stagedMode && !shouldIgnore(normalizedTarget) && isTextFile(normalizedTarget)) {
+        fileQueue.push({ abs: resolved, rel: normalizedTarget });
+      }
+      continue;
+    }
 
     const stat = fs.statSync(resolved);
     if (stat.isDirectory()) {
@@ -273,25 +385,35 @@ async function main() {
           if (entry.isDirectory()) {
             stack.push(fullPath);
           } else if (entry.isFile()) {
-            fileQueue.push(fullPath);
+            fileQueue.push({ abs: fullPath, rel: relPath });
           }
         }
       }
     } else if (stat.isFile()) {
-      fileQueue.push(resolved);
+      const relPath = path.relative(repoRoot, resolved).replace(/\\/g, '/');
+      fileQueue.push({ abs: resolved, rel: relPath });
+    } else if (stagedMode) {
+      fileQueue.push({ abs: resolved, rel: normalizedTarget });
     }
   }
 
   const filesToScan = fileQueue
-    .map((p) => ({ abs: p, rel: path.relative(repoRoot, p).replace(/\\/g, '/') }))
     .filter((f) => !shouldIgnore(f.rel))
     .filter((f) => isTextFile(f.rel));
 
+  const dedupedFilesToScan = [];
+  const seen = new Set();
+  for (const file of filesToScan) {
+    if (seen.has(file.rel)) continue;
+    seen.add(file.rel);
+    dedupedFilesToScan.push(file);
+  }
+
   const allFindings = [];
 
-  for (const file of filesToScan) {
+  for (const file of dedupedFilesToScan) {
     try {
-      const findings = scanFile(file.abs);
+      const findings = scanFile(file, { repoRoot, strictMode, stagedMode, enforceCrLf });
       for (const finding of findings) {
         allFindings.push({ file: file.rel, ...finding });
       }
@@ -309,7 +431,7 @@ async function main() {
   }
 
   if (allFindings.length === 0) {
-    console.log(colorize(`[OK] Encoding OK (${filesToScan.length} file(s) scanned)`, 'green'));
+    console.log(colorize(`[OK] Encoding OK (${dedupedFilesToScan.length} file(s) scanned)`, 'green'));
     process.exit(0);
   }
 

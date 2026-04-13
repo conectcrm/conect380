@@ -184,6 +184,37 @@ Requisitos:
 - acoes principais no canto direito (Atualizar, Exportar, Novo, etc.)
 - `PageHeader.filters` e opcional e nao deve exigir exibicao de "Empresa ativa"
 
+### Padrao de Header 2026-04 (baseline novo)
+
+Este padrao foi validado na tela `Contas a Receber` e pode ser reutilizado nas telas do sistema.
+
+Composicao recomendada:
+
+- `PageHeader.eyebrow` (opcional): selo pequeno para contexto do nucleo (`Nucleo Financeiro`, `Nucleo Comercial`, etc.)
+- `PageHeader.title`: titulo curto, forte e direto
+- `PageHeader.description`: frase curta (evitar textos longos)
+- `PageHeader.actions`: acoes principais do topo (ex.: `Atualizar`)
+- `inlineDescriptionOnDesktop` (opcional): descricao na mesma linha do titulo no desktop
+
+Regras de tipografia e hierarquia:
+
+- titulo entre `text-[28px]` e `text-[32px]` (desktop)
+- descricao entre `text-[12px]` e `text-[14px]`
+- usar contraste alto no titulo e contraste medio no subtitulo
+- evitar serif por padrao (usar serif somente por decisao visual formal)
+- evitar descricao com mais de 90 caracteres quando possivel
+
+Regras visuais:
+
+- evitar duplicidade de informacao (nao repetir mesma funcao em dropdown e chips no mesmo bloco)
+- quando usar descricao inline no desktop, aplicar separador sutil (borda esquerda leve)
+- manter responsividade: no mobile, titulo e descricao devem empilhar
+
+Exemplo de referencia implementada:
+
+- `frontend-web/src/pages/gestao/financeiro/ContasReceberPage.tsx`
+- `frontend-web/src/components/layout-v2/components/PageHeader.tsx`
+
 ### Bloco 2: Filtros e busca
 
 Usar:
@@ -196,6 +227,16 @@ Requisitos:
 - filtros em selects/inputs no mesmo padrao visual
 - acao "Limpar" e/ou "Salvar view" quando existir fluxo de filtros complexos
 - chips de filtros ativos quando houver mais de 1 criterio
+
+Regra obrigatoria de composicao (baseline 2026-04):
+
+- em telas `LIST`, o bloco de busca/filtros deve ficar unificado no mesmo `SectionCard` superior do header
+- ordem recomendada no card superior:
+  1. `PageHeader`
+  2. cards de metrica (quando houver)
+  3. `FiltersBar`
+- nao criar um segundo card/container separado apenas para filtros quando a tela ja possuir card superior
+- excecao permitida somente quando houver necessidade funcional clara (ex.: filtro sticky independente); nesse caso, documentar a excecao no PR e no arquivo da tela
 
 ### Requisito obrigatorio de busca incremental (sem refresh por tecla)
 
@@ -330,7 +371,7 @@ Requisitos:
 
 Validacao tecnica minima antes do merge:
 
-1. executar `rg -n "Ã|Â|�" frontend-web/src` e garantir que nao existem ocorrencias novas nas telas alteradas
+1. executar `rg -n "Ã|Â|\\uFFFD" frontend-web/src` e garantir que nao existem ocorrencias novas nas telas alteradas
 2. validar que o editor esta salvando com `charset = utf-8` (padrao definido em `.editorconfig`)
 
 ### Modais complexos (ex.: permissoes)
@@ -365,6 +406,26 @@ Evitar:
 
 ## Requisitos especificos para telas diferentes (nao forcar padrao unico)
 
+### Matriz de blocos por contexto (obrigatorio x opcional)
+
+Nem toda tela deve ter cards, KPIs ou tabela. A estrutura depende do objetivo da pagina.
+
+`LIST`:
+- obrigatorio: `SectionCard + PageHeader`, `FiltersBar` unificado no mesmo card superior, estado loading/erro/vazio
+- opcional: KPI cards, chips de status, tabela desktop, cards mobile
+
+`SETTINGS`:
+- obrigatorio: `SectionCard + PageHeader`, secoes de formulario
+- opcional: KPIs (somente se houver indicador operacional real)
+
+`DASHBOARD`:
+- obrigatorio: `SectionCard + PageHeader`, blocos de insight
+- opcional: tabela/lista secundaria
+
+`FORM`:
+- obrigatorio: `SectionCard + PageHeader`, secoes por etapa, CTA claro
+- opcional: resumo de KPI (somente quando agrega decisao)
+
 ### Pipeline / Board operacional
 
 Deve seguir parcialmente o padrao de LIST:
@@ -396,7 +457,7 @@ Padrao proprio:
 2. Ajustar `RouteTemplateFrame` se a rota estiver na tipologia errada.
 3. Remover elementos redundantes (logo/titulo/modulo duplicado).
 4. Refatorar topo para `SectionCard + PageHeader`.
-5. Migrar filtros para `FiltersBar`.
+5. Migrar filtros para `FiltersBar` dentro do mesmo `SectionCard` superior.
 6. Padronizar estados (loading/erro/vazio).
 7. Encapsular listagem em `DataTableCard` (se for LIST).
 8. Ajustar responsividade (mobile cards + desktop table ou layout especifico).
@@ -410,6 +471,7 @@ Uma tela so pode ser considerada padronizada se:
 - respeita a tipologia correta da rota
 - usa componentes `layout-v2` nas areas equivalentes
 - nao possui titulo/logo/contexto duplicado
+- busca/filtros estao unificados no container superior (`SectionCard` do header)
 - possui estados loading/erro/vazio
 - possui responsividade funcional (mobile + desktop)
 - possui hierarquia visual consistente (header, filtros, conteudo, acoes)
