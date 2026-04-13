@@ -23,12 +23,18 @@ describe('ContaReceberService', () => {
 
     const faturamentoService = {
       enviarFaturaPorEmail: jest.fn(),
+      criarFatura: jest.fn(),
+    };
+
+    const inadimplenciaOperacionalService = {
+      avaliarCliente: jest.fn(),
     };
 
     const service = new ContaReceberService(
       faturaRepository as any,
       pagamentoService as any,
       faturamentoService as any,
+      inadimplenciaOperacionalService as any,
     );
 
     return {
@@ -37,6 +43,7 @@ describe('ContaReceberService', () => {
       queryBuilder,
       pagamentoService,
       faturamentoService,
+      inadimplenciaOperacionalService,
     };
   };
 
@@ -194,7 +201,8 @@ describe('ContaReceberService', () => {
   });
 
   it('deve registrar recebimento parcial com correlation/origem e retornar conta atualizada', async () => {
-    const { service, faturaRepository, pagamentoService } = createService();
+    const { service, faturaRepository, pagamentoService, inadimplenciaOperacionalService } =
+      createService();
 
     const faturaEmAberto = makeFatura({
       id: 77,
@@ -247,6 +255,14 @@ describe('ContaReceberService', () => {
     expect(resultado.pagamento.id).toBe(55);
     expect(resultado.contaReceber.valorPago).toBe(350);
     expect(resultado.correlationId).toContain('conta-receber:77:recebimento:');
+    expect(inadimplenciaOperacionalService.avaliarCliente).toHaveBeenCalledWith(
+      'empresa-1',
+      '9f98f8ad-7b4b-4a0a-b0fa-1843c4a6f001',
+      expect.objectContaining({
+        actorId: 'user-1',
+        trigger: 'baixa_manual',
+      }),
+    );
   });
 
   it('deve bloquear reenviar cobranca para titulo recebido', async () => {
@@ -273,5 +289,75 @@ describe('ContaReceberService', () => {
     ).rejects.toThrow(/nao e necessario reenviar cobranca/i);
 
     expect(faturamentoService.enviarFaturaPorEmail).not.toHaveBeenCalled();
+  });
+
+  it('deve criar lancamento avulso e marcar origem no retorno', async () => {
+    const { service, faturamentoService, faturaRepository } = createService();
+
+    faturamentoService.criarFatura.mockResolvedValue(
+      makeFatura({
+        id: 321,
+        numero: 'FT-321',
+        tipo: 'adicional',
+        valorTotal: 250,
+        valorPago: 0,
+        metadados: {},
+      }),
+    );
+
+    faturaRepository.findOne.mockResolvedValue(
+      makeFatura({
+        id: 321,
+        numero: 'FT-321',
+        tipo: 'adicional',
+        valorTotal: 250,
+        valorPago: 0,
+        metadados: {
+          origemTitulo: 'avulso',
+          tipoLancamentoAvulso: 'instalacao',
+        },
+      }),
+    );
+    (faturaRepository as any).save = jest.fn().mockResolvedValue(undefined);
+
+    const result = await service.criarLancamentoAvulso(
+      {
+        clienteId: '9f98f8ad-7b4b-4a0a-b0fa-1843c4a6f001',
+        usuarioResponsavelId: '0d6588fb-7952-4b16-a410-3ca3dfde4f74',
+        dataVencimento: '2026-04-30',
+        descricao: 'Servico avulso',
+        valor: 250,
+        tipoLancamentoAvulso: 'instalacao',
+        formaPagamentoPreferida: 'pix',
+      },
+      'empresa-1',
+      '0d6588fb-7952-4b16-a410-3ca3dfde4f74',
+    );
+
+    expect(faturamentoService.criarFatura).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tipo: 'adicional',
+        descricao: 'Servico avulso',
+      }),
+      'empresa-1',
+      expect.objectContaining({
+        id: '0d6588fb-7952-4b16-a410-3ca3dfde4f74',
+      }),
+      expect.objectContaining({
+        origemOperacional: 'avulso',
+      }),
+    );
+    expect((faturaRepository as any).save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadados: expect.objectContaining({
+          origemTitulo: 'avulso',
+          tipoLancamentoAvulso: 'instalacao',
+        }),
+      }),
+    );
+
+    expect(result.contaReceber.id).toBe(321);
+    expect(result.contaReceber.origemTitulo).toBe('avulso');
+    expect(result.contaReceber.tipoLancamentoAvulso).toBe('instalacao');
   });
 });

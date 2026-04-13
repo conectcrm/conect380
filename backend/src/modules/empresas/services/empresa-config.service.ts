@@ -232,6 +232,17 @@ export class EmpresaConfigService {
       );
     }
 
+    const diasAviso =
+      normalizedUpdate.inadimplenciaDiasAviso ?? config.inadimplenciaDiasAviso ?? 3;
+    const diasAcao =
+      normalizedUpdate.inadimplenciaDiasAcao ?? config.inadimplenciaDiasAcao ?? 15;
+
+    if (diasAcao < diasAviso) {
+      throw new BadRequestException(
+        'Os dias para acao de inadimplencia nao podem ser menores que os dias de aviso.',
+      );
+    }
+
     Object.assign(config, normalizedUpdate);
 
     const saved = await this.configRepository.save(config);
@@ -347,6 +358,13 @@ export class EmpresaConfigService {
     config.gatewayPagamentoProvider = null;
     config.gatewayPagamentoAccessToken = null;
     config.gatewayPagamentoWebhookSecret = null;
+    config.inadimplenciaAutomacaoAtiva = false;
+    config.inadimplenciaDiasAviso = 3;
+    config.inadimplenciaDiasAcao = 15;
+    config.inadimplenciaAcao = 'bloquear_operacao';
+    config.inadimplenciaModoExecucao = 'automatico';
+    config.inadimplenciaEscopo = 'cliente';
+    config.inadimplenciaDesbloqueioAutomaticoNaBaixa = true;
     config.fiscalProvider = null;
     config.fiscalOfficialHttpEnabled = null;
     config.fiscalRequireOfficialProvider = null;

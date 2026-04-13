@@ -315,6 +315,31 @@ export class EmpresaConfig {
   })
   gatewayPagamentoWebhookSecret: string | null;
 
+  @Column({ name: 'inadimplencia_automacao_ativa', default: false })
+  inadimplenciaAutomacaoAtiva: boolean;
+
+  @Column({ name: 'inadimplencia_dias_aviso', default: 3 })
+  inadimplenciaDiasAviso: number;
+
+  @Column({ name: 'inadimplencia_dias_acao', default: 15 })
+  inadimplenciaDiasAcao: number;
+
+  @Column({ name: 'inadimplencia_acao', default: 'bloquear_operacao' })
+  inadimplenciaAcao:
+    | 'nenhuma'
+    | 'marcar_em_risco'
+    | 'bloquear_operacao'
+    | 'suspender_acesso';
+
+  @Column({ name: 'inadimplencia_modo_execucao', default: 'automatico' })
+  inadimplenciaModoExecucao: 'automatico' | 'manual_com_sugestao';
+
+  @Column({ name: 'inadimplencia_escopo', default: 'cliente' })
+  inadimplenciaEscopo: 'cliente' | 'servico' | 'contrato' | 'recorrencia';
+
+  @Column({ name: 'inadimplencia_desbloqueio_automatico_na_baixa', default: true })
+  inadimplenciaDesbloqueioAutomaticoNaBaixa: boolean;
+
   @Column({ name: 'fiscal_provider', nullable: true })
   fiscalProvider: string | null;
 

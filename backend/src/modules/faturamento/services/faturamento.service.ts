@@ -30,6 +30,7 @@ import {
   EmailIntegradoService,
 } from '../../propostas/email-integrado.service';
 import { getFinanceiroFeatureFlags } from '../financeiro-feature-flags';
+import { InadimplenciaOperacionalService } from '../../financeiro/services/inadimplencia-operacional.service';
 
 export interface ResultadoEnvioFaturaEmail {
   enviado: boolean;
@@ -150,6 +151,12 @@ interface FaturaActorContext {
   permissoes?: string[];
 }
 
+type OrigemOperacionalFatura = 'faturamento' | 'avulso';
+
+interface CriarFaturaContexto {
+  origemOperacional?: OrigemOperacionalFatura;
+}
+
 interface PoliticaDocumentoFiscalResult {
   detalhes: Record<string, unknown> | null;
   auditoria?: {
@@ -182,9 +189,8 @@ export class FaturamentoService {
     'folha_pagamento',
     'outro',
   ]);
-  private readonly tiposDocumentoFinanceiroBloqueadosNoFaturamento = new Set<TipoDocumentoFinanceiro>([
-    'folha_pagamento',
-  ]);
+  private readonly tiposDocumentoFinanceiroBloqueadosNoFaturamento =
+    new Set<TipoDocumentoFinanceiro>(['folha_pagamento']);
   private readonly tiposDocumentoFiscal = new Set<TipoDocumentoFinanceiro>(['nfe', 'nfse']);
   private readonly formasPagamentoCobrancaOnline = new Set<FormaPagamento>([
     FormaPagamento.PIX,
@@ -210,7 +216,9 @@ export class FaturamentoService {
   };
   private readonly camposOrdenacaoFaturas: Record<string, string> = {
     createdAt: 'fatura.createdAt',
+    dataEmissao: 'fatura.dataEmissao',
     dataVencimento: 'fatura.dataVencimento',
+    status: 'fatura.status',
     valorTotal: 'fatura.valorTotal',
     numero: 'fatura.numero',
   };
@@ -234,16 +242,110 @@ export class FaturamentoService {
     @Optional()
     @InjectRepository(EmpresaConfig)
     private readonly empresaConfigRepository?: Repository<EmpresaConfig>,
+    @Optional()
+    @Inject(forwardRef(() => InadimplenciaOperacionalService))
+    private readonly inadimplenciaOperacionalService?: InadimplenciaOperacionalService,
   ) {}
+
+  private normalizeUuidLike(value: unknown): string | null {
+    const normalized = String(value || '').trim();
+    if (!normalized) {
+      return null;
+    }
+
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(normalized) ? normalized : null;
+  }
+
+  private normalizarOrigemOperacionalFatura(origem?: string | null): OrigemOperacionalFatura {
+    const valor = String(origem || '')
+      .trim()
+      .toLowerCase();
+
+    if (valor === 'avulso') {
+      return 'avulso';
+    }
+
+    return 'faturamento';
+  }
+
+  private appendPropostaReferenciaMetadados(
+    metadadosAtual: unknown,
+    propostaId?: string | null,
+  ): Record<string, unknown> {
+    const metadadosBase =
+      metadadosAtual && typeof metadadosAtual === 'object' && !Array.isArray(metadadosAtual)
+        ? { ...(metadadosAtual as Record<string, unknown>) }
+        : {};
+
+    const propostaIdNormalizada = this.normalizeUuidLike(propostaId);
+    if (!propostaIdNormalizada) {
+      return metadadosBase;
+    }
+
+    const comercialAtual =
+      metadadosBase.comercial &&
+      typeof metadadosBase.comercial === 'object' &&
+      !Array.isArray(metadadosBase.comercial)
+        ? { ...(metadadosBase.comercial as Record<string, unknown>) }
+        : {};
+
+    metadadosBase.propostaId = propostaIdNormalizada;
+    metadadosBase.comercial = {
+      ...comercialAtual,
+      propostaId: propostaIdNormalizada,
+    };
+
+    return metadadosBase;
+  }
+
+  private extrairPropostaIdReferenciaFatura(
+    fatura: Pick<Fatura, 'metadados'> | null | undefined,
+  ): string | null {
+    const metadados =
+      fatura?.metadados && typeof fatura.metadados === 'object' && !Array.isArray(fatura.metadados)
+        ? (fatura.metadados as Record<string, unknown>)
+        : null;
+
+    if (!metadados) {
+      return null;
+    }
+
+    const comercial =
+      metadados.comercial &&
+      typeof metadados.comercial === 'object' &&
+      !Array.isArray(metadados.comercial)
+        ? (metadados.comercial as Record<string, unknown>)
+        : null;
+
+    const candidatos = [
+      metadados.propostaId,
+      comercial?.propostaId,
+      metadados.proposta && typeof metadados.proposta === 'object'
+        ? (metadados.proposta as Record<string, unknown>).id
+        : null,
+    ];
+
+    for (const candidato of candidatos) {
+      const propostaId = this.normalizeUuidLike(candidato);
+      if (propostaId) {
+        return propostaId;
+      }
+    }
+
+    return null;
+  }
 
   async criarFatura(
     createFaturaDto: CreateFaturaDto,
     empresaId: string,
     actor?: FaturaActorContext,
+    contexto: CriarFaturaContexto = {},
   ): Promise<Fatura> {
     try {
       let contrato: Contrato | null = null;
       let propostaIdReferencia: string | null = null;
+      const origemOperacional = this.normalizarOrigemOperacionalFatura(contexto.origemOperacional);
 
       if (createFaturaDto.contratoId) {
         // x" MULTI-TENANCY: Validar que contrato pertence  empresa
@@ -267,6 +369,16 @@ export class FaturamentoService {
           }
           propostaIdReferencia = propostaIdPayload;
         }
+      }
+
+      if (
+        createFaturaDto.tipo === TipoFatura.ADICIONAL &&
+        !createFaturaDto.contratoId &&
+        origemOperacional !== 'avulso'
+      ) {
+        throw new BadRequestException(
+          'Lancamento adicional sem contrato deve ser registrado em Contas a Receber (avulso).',
+        );
       }
 
       if (propostaIdReferencia) {
@@ -312,6 +424,10 @@ export class FaturamentoService {
             })),
           })
         : undefined;
+      const metadadosComReferencias = this.appendPropostaReferenciaMetadados(
+        metadadosIniciais,
+        propostaIdReferencia,
+      );
 
       const fatura = this.faturaRepository.create({
         contratoId: createFaturaDto.contratoId,
@@ -332,7 +448,7 @@ export class FaturamentoService {
         percentualJuros: this.normalizarPercentual(createFaturaDto.percentualJuros),
         percentualMulta: this.normalizarPercentual(createFaturaDto.percentualMulta),
         detalhesTributarios: detalhesTributariosNormalizados,
-        metadados: metadadosIniciais as any,
+        metadados: metadadosComReferencias as any,
         dataEmissao: new Date(),
         status: StatusFatura.PENDENTE,
         empresaId,
@@ -387,6 +503,17 @@ export class FaturamentoService {
         throw new BadRequestException('Contrato deve estar assinado para gerar fatura');
       }
 
+      if (contrato.propostaId) {
+        await this.propostasService.liberarFaturamentoProposta(
+          String(contrato.propostaId),
+          {
+            motivo: `Liberacao automatica ao gerar fatura para o contrato ${contrato.numero}.`,
+          },
+          undefined,
+          empresaId,
+        );
+      }
+
       // Gerar fatura baseada no contrato
       const createFaturaDto: CreateFaturaDto = {
         contratoId: contrato.id,
@@ -417,9 +544,7 @@ export class FaturamentoService {
         await this.enviarFaturaPorEmail(fatura.id, empresaId);
       }
 
-      this.logger.log(
-        `Fatura automtica gerada para contrato ${contrato.numero}: ${fatura.numero}`,
-      );
+      this.logger.log(`Fatura automtica gerada para contrato ${contrato.numero}: ${fatura.numero}`);
 
       return fatura;
     } catch (error) {
@@ -432,10 +557,12 @@ export class FaturamentoService {
     empresaId: string,
     filtros?: {
       status?: StatusFatura;
+      tipo?: TipoFatura;
+      origem?: OrigemOperacionalFatura;
       clienteId?: string;
       contratoId?: number;
-      dataInicio?: Date;
-      dataFim?: Date;
+      dataInicio?: string;
+      dataFim?: string;
       periodoCampo?: 'emissao' | 'vencimento';
     },
   ): Promise<Fatura[]> {
@@ -450,7 +577,45 @@ export class FaturamentoService {
       .andWhere('fatura.empresa_id = :empresaId', { empresaId });
 
     if (filtros?.status) {
-      query.andWhere('fatura.status = :status', { status: filtros.status });
+      if (filtros.status === StatusFatura.VENCIDA) {
+        query.andWhere(
+          new Brackets((qbStatus) => {
+            qbStatus
+              .where('fatura.status = :statusVencida', {
+                statusVencida: StatusFatura.VENCIDA,
+              })
+              .orWhere(
+                'fatura.status = :statusPendenteVencida AND fatura.dataVencimento < CURRENT_DATE',
+                {
+                  statusPendenteVencida: StatusFatura.PENDENTE,
+                },
+              );
+          }),
+        );
+      } else if (filtros.status === StatusFatura.PENDENTE) {
+        query.andWhere(
+          new Brackets((qbStatus) => {
+            qbStatus
+              .where('fatura.status = :statusPendente', {
+                statusPendente: StatusFatura.PENDENTE,
+              })
+              .andWhere('fatura.dataVencimento >= CURRENT_DATE');
+          }),
+        );
+      } else {
+        query.andWhere('fatura.status = :status', { status: filtros.status });
+      }
+    }
+
+    if (filtros?.tipo) {
+      query.andWhere('fatura.tipo = :tipo', { tipo: filtros.tipo });
+    }
+
+    if (filtros?.origem) {
+      query.andWhere(
+        "COALESCE(NULLIF(LOWER(fatura.metadados->>'origemTitulo'), ''), 'faturamento') = :origem",
+        { origem: filtros.origem },
+      );
     }
 
     if (filtros?.clienteId) {
@@ -462,14 +627,16 @@ export class FaturamentoService {
     }
 
     const campoPeriodo =
-      filtros?.periodoCampo === 'vencimento' ? 'fatura.dataVencimento' : 'fatura.dataEmissao';
+      filtros?.periodoCampo === 'emissao' ? 'fatura.dataEmissao' : 'fatura.dataVencimento';
 
     if (filtros?.dataInicio) {
-      query.andWhere(`${campoPeriodo} >= :dataInicio`, { dataInicio: filtros.dataInicio });
+      query.andWhere(`${campoPeriodo} >= CAST(:dataInicio AS date)`, {
+        dataInicio: filtros.dataInicio,
+      });
     }
 
     if (filtros?.dataFim) {
-      query.andWhere(`${campoPeriodo} <= :dataFim`, { dataFim: filtros.dataFim });
+      query.andWhere(`${campoPeriodo} <= CAST(:dataFim AS date)`, { dataFim: filtros.dataFim });
     }
 
     return query.orderBy('fatura.createdAt', 'DESC').getMany();
@@ -483,17 +650,57 @@ export class FaturamentoService {
     sortOrder: 'ASC' | 'DESC' = 'DESC',
     filtros?: {
       status?: StatusFatura;
+      tipo?: TipoFatura;
+      origem?: OrigemOperacionalFatura;
       clienteId?: string;
       contratoId?: number;
-      dataInicio?: Date;
-      dataFim?: Date;
+      dataInicio?: string;
+      dataFim?: string;
       periodoCampo?: 'emissao' | 'vencimento';
       q?: string;
     },
   ): Promise<{ faturas: any[]; total: number; resumo: any }> {
     const aplicarFiltros = (qb: any) => {
       if (filtros?.status) {
-        qb.andWhere('fatura.status = :status', { status: filtros.status });
+        if (filtros.status === StatusFatura.VENCIDA) {
+          qb.andWhere(
+            new Brackets((qbStatus) => {
+              qbStatus
+                .where('fatura.status = :statusVencida', {
+                  statusVencida: StatusFatura.VENCIDA,
+                })
+                .orWhere(
+                  'fatura.status = :statusPendenteVencida AND fatura.dataVencimento < CURRENT_DATE',
+                  {
+                    statusPendenteVencida: StatusFatura.PENDENTE,
+                  },
+                );
+            }),
+          );
+        } else if (filtros.status === StatusFatura.PENDENTE) {
+          qb.andWhere(
+            new Brackets((qbStatus) => {
+              qbStatus
+                .where('fatura.status = :statusPendente', {
+                  statusPendente: StatusFatura.PENDENTE,
+                })
+                .andWhere('fatura.dataVencimento >= CURRENT_DATE');
+            }),
+          );
+        } else {
+          qb.andWhere('fatura.status = :status', { status: filtros.status });
+        }
+      }
+
+      if (filtros?.tipo) {
+        qb.andWhere('fatura.tipo = :tipo', { tipo: filtros.tipo });
+      }
+
+      if (filtros?.origem) {
+        qb.andWhere(
+          "COALESCE(NULLIF(LOWER(fatura.metadados->>'origemTitulo'), ''), 'faturamento') = :origem",
+          { origem: filtros.origem },
+        );
       }
 
       if (filtros?.clienteId) {
@@ -505,14 +712,16 @@ export class FaturamentoService {
       }
 
       const campoPeriodo =
-        filtros?.periodoCampo === 'vencimento' ? 'fatura.dataVencimento' : 'fatura.dataEmissao';
+        filtros?.periodoCampo === 'emissao' ? 'fatura.dataEmissao' : 'fatura.dataVencimento';
 
       if (filtros?.dataInicio) {
-        qb.andWhere(`${campoPeriodo} >= :dataInicio`, { dataInicio: filtros.dataInicio });
+        qb.andWhere(`${campoPeriodo} >= CAST(:dataInicio AS date)`, {
+          dataInicio: filtros.dataInicio,
+        });
       }
 
       if (filtros?.dataFim) {
-        qb.andWhere(`${campoPeriodo} <= :dataFim`, { dataFim: filtros.dataFim });
+        qb.andWhere(`${campoPeriodo} <= CAST(:dataFim AS date)`, { dataFim: filtros.dataFim });
       }
 
       if (filtros?.q?.trim()) {
@@ -634,7 +843,11 @@ export class FaturamentoService {
     const clienteNome = this.escapeHtml(String(fatura.cliente?.nome || fatura.clienteId || '-'));
     const clienteEmail = this.escapeHtml(String(fatura.cliente?.email || '-'));
     const responsavel = this.escapeHtml(
-      String((fatura as any)?.usuarioResponsavel?.nome || (fatura as any)?.usuarioResponsavel?.name || '-'),
+      String(
+        (fatura as any)?.usuarioResponsavel?.nome ||
+          (fatura as any)?.usuarioResponsavel?.name ||
+          '-',
+      ),
     );
     const descricao = this.escapeHtml(String(fatura.descricao || '-'));
     const observacoes = this.escapeHtml(String(fatura.observacoes || '-'));
@@ -812,9 +1025,7 @@ export class FaturamentoService {
     let numero = `${prefixoNumero}${String(sequencial).padStart(6, '0')}`;
 
     // Mitiga colisao quando ha concorrencia de geracao simultanea.
-    while (
-      await this.existeNumeroDocumentoFinanceiro(empresaId, tipoDocumento, numero, ano)
-    ) {
+    while (await this.existeNumeroDocumentoFinanceiro(empresaId, tipoDocumento, numero, ano)) {
       sequencial += 1;
       numero = `${prefixoNumero}${String(sequencial).padStart(6, '0')}`;
     }
@@ -964,9 +1175,7 @@ export class FaturamentoService {
       const boleto = this.extrairDadosBoletoMercadoPago(boletoPayment);
       const linkBoleto = String(boleto.url || '').trim();
       if (!linkBoleto) {
-        throw new BadRequestException(
-          'Gateway nao retornou URL do boleto para esta cobranca.',
-        );
+        throw new BadRequestException('Gateway nao retornou URL do boleto para esta cobranca.');
       }
 
       const paymentId = this.toNullableText(boletoPayment?.id);
@@ -1234,7 +1443,9 @@ export class FaturamentoService {
   }
 
   private isProductionRuntime(): boolean {
-    const runtime = String(process.env.NODE_ENV || process.env.APP_ENV || '').trim().toLowerCase();
+    const runtime = String(process.env.NODE_ENV || process.env.APP_ENV || '')
+      .trim()
+      .toLowerCase();
     return runtime === 'production';
   }
 
@@ -1323,7 +1534,9 @@ export class FaturamentoService {
     }
 
     const itensParaCalculo: ItemCalculoFaturaInput[] = (
-      updateFaturaDto.itens || fatura.itens || []
+      updateFaturaDto.itens ||
+      fatura.itens ||
+      []
     ).map((item) => ({
       quantidade: Number(item.quantidade || 0),
       valorUnitario: Number(item.valorUnitario || 0),
@@ -1433,9 +1646,7 @@ export class FaturamentoService {
     try {
       // x" MULTI-TENANCY: Validar empresa_id
       const fatura = await this.buscarFaturaPorId(id, empresaId);
-      this.logger.log(
-        `x [CANCELAR] Fatura encontrada: ${fatura.numero}, Status: ${fatura.status}`,
-      );
+      this.logger.log(`x [CANCELAR] Fatura encontrada: ${fatura.numero}, Status: ${fatura.status}`);
 
       // Verificao direta do status em vez de usar o mtodo isPaga()
       if (fatura.status === StatusFatura.PAGA) {
@@ -1448,7 +1659,8 @@ export class FaturamentoService {
       fatura.status = StatusFatura.CANCELADA;
       const motivoCancelamento = (motivo || '').trim() || 'Motivo nao informado';
       const responsavel = userId || 'sistema';
-      fatura.observacoes = `${fatura.observacoes || ''}\n\nCancelada por ${responsavel}: ${motivoCancelamento}`.trim();
+      fatura.observacoes =
+        `${fatura.observacoes || ''}\n\nCancelada por ${responsavel}: ${motivoCancelamento}`.trim();
       fatura.metadados = this.appendAuditoriaOperacaoFatura(fatura.metadados, {
         acao: 'fatura_cancelada',
         origem: 'faturamento.cancelamento',
@@ -1525,7 +1737,10 @@ export class FaturamentoService {
     }
   }
 
-  async gerarCobrancaEmLote(faturaIds: number[], empresaId: string): Promise<ResultadoCobrancaLote> {
+  async gerarCobrancaEmLote(
+    faturaIds: number[],
+    empresaId: string,
+  ): Promise<ResultadoCobrancaLote> {
     const idsValidos = Array.from(
       new Set(
         (Array.isArray(faturaIds) ? faturaIds : [])
@@ -1667,7 +1882,34 @@ export class FaturamentoService {
           error && typeof error === 'object' && 'message' in error
             ? String((error as { message?: unknown }).message || 'erro desconhecido')
             : 'erro desconhecido';
-        this.logger.error(`Erro ao atualizar status de vencida para fatura ${fatura.numero}: ${mensagemErro}`);
+        this.logger.error(
+          `Erro ao atualizar status de vencida para fatura ${fatura.numero}: ${mensagemErro}`,
+        );
+      }
+    }
+
+    if (this.inadimplenciaOperacionalService && sucesso > 0) {
+      const clientesImpactados = Array.from(
+        new Set(
+          faturasVencidas
+            .map((fatura) => String(fatura.clienteId || '').trim())
+            .filter((clienteId) => Boolean(clienteId)),
+        ),
+      );
+
+      for (const clienteId of clientesImpactados) {
+        try {
+          await this.inadimplenciaOperacionalService.avaliarCliente(empresaId, clienteId, {
+            actorId: 'sistema:verificacao_vencimento_faturas',
+            trigger: 'vencimento',
+          });
+        } catch (error) {
+          this.logger.warn(
+            `Falha ao reavaliar inadimplencia operacional para cliente ${clienteId}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        }
       }
     }
 
@@ -1702,7 +1944,9 @@ export class FaturamentoService {
         return mensagem;
       }
       if (Array.isArray(mensagem)) {
-        const primeira = mensagem.find((item) => typeof item === 'string' && item.trim().length > 0);
+        const primeira = mensagem.find(
+          (item) => typeof item === 'string' && item.trim().length > 0,
+        );
         if (primeira) {
           return primeira;
         }
@@ -1820,9 +2064,7 @@ export class FaturamentoService {
       if (contexto?.strict) {
         throw error;
       }
-      this.logger.warn(
-        `Falha ao sincronizar proposta pela fatura ${faturaId}: ${error.message}`,
-      );
+      this.logger.warn(`Falha ao sincronizar proposta pela fatura ${faturaId}: ${error.message}`);
     }
   }
 
@@ -1849,18 +2091,22 @@ export class FaturamentoService {
     source: string = 'faturamento',
     contexto?: { correlationId?: string; origemId?: string; strict?: boolean },
   ): Promise<void> {
-    if (!fatura?.contratoId) {
+    if (!fatura) {
       return;
     }
 
-    const contratoComProposta =
-      fatura.contrato?.propostaId
-        ? fatura.contrato
-        : await this.contratoRepository.findOne({
-            where: { id: fatura.contratoId, empresa_id: empresaId },
-          });
+    let propostaId = this.normalizeUuidLike(fatura.contrato?.propostaId);
+    if (!propostaId && fatura.contratoId) {
+      const contratoComProposta = await this.contratoRepository.findOne({
+        where: { id: fatura.contratoId, empresa_id: empresaId },
+      });
+      propostaId = this.normalizeUuidLike(contratoComProposta?.propostaId);
+    }
 
-    const propostaId = contratoComProposta?.propostaId;
+    if (!propostaId) {
+      propostaId = this.extrairPropostaIdReferenciaFatura(fatura);
+    }
+
     if (!propostaId) {
       return;
     }
@@ -2334,7 +2580,8 @@ export class FaturamentoService {
       chaveAcessoDocumento !== documentoAnterior.chaveAcesso;
     const houveMudancaModo = geracaoAutomatica !== documentoAnterior.geracaoAutomatica;
     const houveMudancaMotivoManual = motivoManual !== documentoAnterior.motivoEdicaoManual;
-    const houveMudancaManual = houveMudancaIdentificador || houveMudancaModo || houveMudancaMotivoManual;
+    const houveMudancaManual =
+      houveMudancaIdentificador || houveMudancaModo || houveMudancaMotivoManual;
 
     if (
       statusFiscalAtual &&
@@ -2411,7 +2658,9 @@ export class FaturamentoService {
           ? documento.manualUpdatedAt || null
           : new Date().toISOString(),
       manualUpdatedBy:
-        geracaoAutomatica || !houveMudancaManual ? documento.manualUpdatedBy || null : options.actor?.id || null,
+        geracaoAutomatica || !houveMudancaManual
+          ? documento.manualUpdatedBy || null
+          : options.actor?.id || null,
     };
 
     const alteracoesManual = this.compararCamposDocumentoFiscal(
@@ -2458,9 +2707,7 @@ export class FaturamentoService {
     };
   }
 
-  private extrairStatusFiscalDosDetalhes(
-    detalhes?: Record<string, unknown> | null,
-  ): string | null {
+  private extrairStatusFiscalDosDetalhes(detalhes?: Record<string, unknown> | null): string | null {
     const base = this.normalizarDetalhesTributarios(detalhes);
     if (!base) {
       return null;
@@ -2475,9 +2722,7 @@ export class FaturamentoService {
     return status || null;
   }
 
-  private extrairSnapshotDocumentoFiscal(
-    detalhes?: Record<string, unknown> | null,
-  ): {
+  private extrairSnapshotDocumentoFiscal(detalhes?: Record<string, unknown> | null): {
     numero: string | null;
     serie: string | null;
     chaveAcesso: string | null;
@@ -2549,8 +2794,15 @@ export class FaturamentoService {
     }
 
     const permissoes = new Set(
-      [...(Array.isArray(actor?.permissions) ? actor.permissions : []), ...(Array.isArray(actor?.permissoes) ? actor.permissoes : [])]
-        .map((item) => String(item || '').trim().toLowerCase())
+      [
+        ...(Array.isArray(actor?.permissions) ? actor.permissions : []),
+        ...(Array.isArray(actor?.permissoes) ? actor.permissoes : []),
+      ]
+        .map((item) =>
+          String(item || '')
+            .trim()
+            .toLowerCase(),
+        )
         .filter(Boolean),
     );
 
@@ -2666,7 +2918,10 @@ export class FaturamentoService {
       );
     }
 
-    if (this.tiposDocumentoFiscal.has(tipoDocumento) && !this.financeiroFeatureFlags.fiscalDocumentsEnabled) {
+    if (
+      this.tiposDocumentoFiscal.has(tipoDocumento) &&
+      !this.financeiroFeatureFlags.fiscalDocumentsEnabled
+    ) {
       throw new BadRequestException(
         this.financeiroFeatureFlags.fiscalDisabledReason ||
           'Emissao fiscal (NF-e/NFS-e) desabilitada neste ambiente.',
@@ -2704,7 +2959,11 @@ export class FaturamentoService {
   }
 
   private isTruthy(value?: string | null): boolean {
-    return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
+    return ['1', 'true', 'yes', 'on'].includes(
+      String(value || '')
+        .trim()
+        .toLowerCase(),
+    );
   }
 
   private normalizarGatewayPagamentoProvider(value?: string | null): string | null {
@@ -2720,7 +2979,9 @@ export class FaturamentoService {
     return raw;
   }
 
-  private async carregarConfigGatewayPagamentoEmpresa(empresaId: string): Promise<EmpresaConfig | null> {
+  private async carregarConfigGatewayPagamentoEmpresa(
+    empresaId: string,
+  ): Promise<EmpresaConfig | null> {
     const tenantId = String(empresaId || '').trim();
     if (!tenantId || !this.empresaConfigRepository) {
       return null;
@@ -2742,9 +3003,15 @@ export class FaturamentoService {
     empresaId: string,
   ): Promise<GatewayPagamentoRuntimeConfig> {
     const configEmpresa = await this.carregarConfigGatewayPagamentoEmpresa(empresaId);
-    const tenantProvider = this.normalizarGatewayPagamentoProvider(configEmpresa?.gatewayPagamentoProvider);
-    const tenantAccessToken = this.normalizarTextoDocumento(configEmpresa?.gatewayPagamentoAccessToken);
-    const tenantWebhookSecret = this.normalizarTextoDocumento(configEmpresa?.gatewayPagamentoWebhookSecret);
+    const tenantProvider = this.normalizarGatewayPagamentoProvider(
+      configEmpresa?.gatewayPagamentoProvider,
+    );
+    const tenantAccessToken = this.normalizarTextoDocumento(
+      configEmpresa?.gatewayPagamentoAccessToken,
+    );
+    const tenantWebhookSecret = this.normalizarTextoDocumento(
+      configEmpresa?.gatewayPagamentoWebhookSecret,
+    );
 
     const envAccessToken = this.normalizarTextoDocumento(process.env.MERCADO_PAGO_ACCESS_TOKEN);
     const envWebhookSecret = this.normalizarTextoDocumento(process.env.MERCADO_PAGO_WEBHOOK_SECRET);
@@ -2860,9 +3127,14 @@ export class FaturamentoService {
   }
 
   private resolverEnderecoClienteBoleto(cliente: Cliente): Record<string, unknown> | null {
-    const cep = String(cliente?.cep || '').replace(/\D/g, '').slice(0, 8);
+    const cep = String(cliente?.cep || '')
+      .replace(/\D/g, '')
+      .slice(0, 8);
     const cidade = String(cliente?.cidade || '').trim();
-    const estado = String(cliente?.estado || '').trim().toUpperCase().slice(0, 2);
+    const estado = String(cliente?.estado || '')
+      .trim()
+      .toUpperCase()
+      .slice(0, 2);
     const enderecoRaw = String(cliente?.endereco || '').trim();
 
     if (!cep && !cidade && !estado && !enderecoRaw) {
@@ -2932,8 +3204,7 @@ export class FaturamentoService {
           transactionData.digitable_line ||
           transactionData.line_content ||
           paymentObj.digitable_line,
-      ) ||
-      (barcode && barcode.length >= 44 ? barcode : null);
+      ) || (barcode && barcode.length >= 44 ? barcode : null);
 
     const pdfUrl =
       this.primeiroValorTextoHttp([
@@ -3251,8 +3522,7 @@ export class FaturamentoService {
       existente.gateway = 'mercadopago';
       existente.dadosCompletos = dadosCompletos as any;
       existente.observacoes =
-        existente.observacoes ||
-        `Pagamento pendente via link para a fatura ${fatura.numero}.`;
+        existente.observacoes || `Pagamento pendente via link para a fatura ${fatura.numero}.`;
       await this.pagamentoRepository.save(existente);
       return;
     }

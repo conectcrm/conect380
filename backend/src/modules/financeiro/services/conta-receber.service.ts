@@ -1,17 +1,21 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository } from 'typeorm';
-import { Fatura, StatusFatura } from '../../faturamento/entities/fatura.entity';
+import { Fatura, FormaPagamento, StatusFatura, TipoFatura } from '../../faturamento/entities/fatura.entity';
 import { PagamentoService } from '../../faturamento/services/pagamento.service';
 import { FaturamentoService } from '../../faturamento/services/faturamento.service';
+import { InadimplenciaOperacionalService } from './inadimplencia-operacional.service';
 import {
+  CriarLancamentoAvulsoContaReceberDto,
   ContaReceberItemResponse,
   ListContasReceberResponse,
+  OrigemContaReceber,
   QueryContasReceberDto,
   ReenviarCobrancaContaReceberDto,
   RegistrarRecebimentoContaReceberDto,
   ResumoContasReceberResponse,
   StatusContaReceber,
+  TipoLancamentoAvulsoContaReceber,
 } from '../dto/conta-receber.dto';
 
 @Injectable()
@@ -21,6 +25,7 @@ export class ContaReceberService {
     private readonly faturaRepository: Repository<Fatura>,
     private readonly pagamentoService: PagamentoService,
     private readonly faturamentoService: FaturamentoService,
+    private readonly inadimplenciaOperacionalService: InadimplenciaOperacionalService,
   ) {}
 
   async findAll(
@@ -101,6 +106,73 @@ export class ContaReceberService {
     }, resumoInicial);
   }
 
+  async criarLancamentoAvulso(
+    dto: CriarLancamentoAvulsoContaReceberDto,
+    empresaId: string,
+    userId?: string,
+  ) {
+    const actor = String(userId || 'sistema').trim() || 'sistema';
+    const correlationId =
+      String(dto.correlationId || '').trim() || `conta-receber:avulso:criacao:${Date.now()}`;
+    const origemId =
+      String(dto.origemId || '').trim() || `financeiro.contas-receber.avulso.criar:${actor}`;
+
+    const descricao = String(dto.descricao || '').trim();
+    if (!descricao) {
+      throw new BadRequestException('Descricao do lancamento avulso e obrigatoria');
+    }
+
+    const valor = this.toMoney(dto.valor);
+    if (valor <= 0) {
+      throw new BadRequestException('Valor do lancamento avulso deve ser maior que zero');
+    }
+    const tipoLancamentoAvulso = this.normalizarTipoLancamentoAvulso(dto.tipoLancamentoAvulso);
+
+    const usuarioResponsavelId = this.resolverUsuarioResponsavelId(dto.usuarioResponsavelId, actor);
+
+    const faturaCriada = await this.faturamentoService.criarFatura(
+      {
+        clienteId: dto.clienteId,
+        usuarioResponsavelId,
+        tipo: TipoFatura.ADICIONAL,
+        descricao,
+        formaPagamentoPreferida:
+          (dto.formaPagamentoPreferida as FormaPagamento | undefined) || FormaPagamento.A_COMBINAR,
+        dataVencimento: dto.dataVencimento,
+        observacoes: dto.observacoes,
+        itens: [
+          {
+            descricao,
+            quantidade: 1,
+            valorUnitario: valor,
+            unidade: 'un',
+          },
+        ],
+      },
+      empresaId,
+      { id: actor },
+      { origemOperacional: 'avulso' },
+    );
+
+    const metadadosAtualizados = this.buildMetadadosOrigemAvulso(
+      faturaCriada.metadados as Record<string, unknown> | null | undefined,
+      correlationId,
+      origemId,
+      actor,
+      tipoLancamentoAvulso,
+    );
+    faturaCriada.metadados = metadadosAtualizados as any;
+    await this.faturaRepository.save(faturaCriada);
+
+    const faturaAtualizada = await this.obterFaturaOperacional(faturaCriada.id, empresaId);
+
+    return {
+      correlationId,
+      origemId,
+      contaReceber: this.mapContaReceber(faturaAtualizada),
+    };
+  }
+
   async registrarRecebimento(
     faturaId: number,
     dto: RegistrarRecebimentoContaReceberDto,
@@ -152,6 +224,11 @@ export class ContaReceberService {
     );
 
     const faturaAtualizada = await this.obterFaturaOperacional(faturaId, empresaId);
+    await this.inadimplenciaOperacionalService.avaliarCliente(empresaId, faturaAtualizada.clienteId, {
+      actorId: actor,
+      motivo: 'Reavaliacao automatica apos baixa manual em contas a receber.',
+      trigger: 'baixa_manual',
+    });
     return {
       correlationId,
       origemId,
@@ -214,11 +291,16 @@ export class ContaReceberService {
   ): Promise<ContaReceberItemResponse[]> {
     const faturas = await this.buscarFaturasBase(empresaId, query);
     const statusFiltrados = this.parseStatusFilter(query.status);
+    const origensFiltradas = this.parseOrigemFilter(query.origem);
 
     let itens = faturas.map((fatura) => this.mapContaReceber(fatura));
 
     if (statusFiltrados.length > 0) {
       itens = itens.filter((item) => statusFiltrados.includes(item.status));
+    }
+
+    if (origensFiltradas.length > 0) {
+      itens = itens.filter((item) => origensFiltradas.includes(item.origemTitulo));
     }
 
     itens.sort((a, b) => this.compararItens(a, b, query.sortBy, query.sortOrder));
@@ -291,6 +373,7 @@ export class ContaReceberService {
     const valorEmAberto = this.toMoney(Math.max(valorTotal - valorPago, 0));
     const status = this.resolverStatusContaReceber(fatura, valorEmAberto, valorPago, valorTotal);
     const diasAtraso = this.calcularDiasAtraso(fatura.dataVencimento, status);
+    const origemTitulo = this.resolverOrigemContaReceber(fatura);
 
     return {
       id: fatura.id,
@@ -300,6 +383,8 @@ export class ContaReceberService {
       clienteNome: String(fatura.cliente?.nome || '').trim() || '-',
       clienteEmail: fatura.cliente?.email || null,
       status,
+      origemTitulo,
+      tipoLancamentoAvulso: this.resolverTipoLancamentoAvulso(fatura, origemTitulo),
       statusFatura: String(fatura.status || ''),
       createdAt: this.toDateTimeLabel(fatura.createdAt),
       dataEmissao: this.toDateLabel(fatura.dataEmissao),
@@ -358,6 +443,123 @@ export class ContaReceberService {
     return valores
       .map((valor) => String(valor).trim().toLowerCase())
       .filter((valor): valor is StatusContaReceber => validos.includes(valor as StatusContaReceber));
+  }
+
+  private parseOrigemFilter(input?: string | string[]): OrigemContaReceber[] {
+    if (!input) {
+      return [];
+    }
+
+    const valores = Array.isArray(input)
+      ? input
+      : String(input)
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean);
+
+    const validos: OrigemContaReceber[] = ['faturamento', 'avulso'];
+    return valores
+      .map((valor) => String(valor).trim().toLowerCase())
+      .filter((valor): valor is OrigemContaReceber => validos.includes(valor as OrigemContaReceber));
+  }
+
+  private resolverOrigemContaReceber(fatura: Fatura): OrigemContaReceber {
+    const origemRaw = String(
+      (fatura.metadados as Record<string, unknown> | null | undefined)?.origemTitulo || '',
+    )
+      .trim()
+      .toLowerCase();
+
+    if (origemRaw === 'avulso') {
+      return 'avulso';
+    }
+
+    return 'faturamento';
+  }
+
+  private resolverTipoLancamentoAvulso(
+    fatura: Fatura,
+    origemTitulo: OrigemContaReceber,
+  ): TipoLancamentoAvulsoContaReceber | null {
+    if (origemTitulo !== 'avulso') {
+      return null;
+    }
+
+    const tipoRaw = String(
+      (fatura.metadados as Record<string, unknown> | null | undefined)?.tipoLancamentoAvulso || '',
+    )
+      .trim()
+      .toLowerCase();
+
+    const tipoNormalizado = this.normalizarTipoLancamentoAvulso(tipoRaw as any);
+    return tipoNormalizado;
+  }
+
+  private normalizarTipoLancamentoAvulso(
+    value?: string | null,
+  ): TipoLancamentoAvulsoContaReceber {
+    const normalized = String(value || '')
+      .trim()
+      .toLowerCase();
+
+    const validos: TipoLancamentoAvulsoContaReceber[] = [
+      'instalacao',
+      'servico_avulso',
+      'reembolso',
+      'solicitacao_servico',
+      'outro',
+    ];
+
+    if (validos.includes(normalized as TipoLancamentoAvulsoContaReceber)) {
+      return normalized as TipoLancamentoAvulsoContaReceber;
+    }
+
+    return 'servico_avulso';
+  }
+
+  private resolverUsuarioResponsavelId(usuarioResponsavelId?: string, actor?: string): string {
+    const candidatoDto = String(usuarioResponsavelId || '').trim();
+    if (this.isUuidLike(candidatoDto)) {
+      return candidatoDto;
+    }
+
+    const candidatoActor = String(actor || '').trim();
+    if (this.isUuidLike(candidatoActor)) {
+      return candidatoActor;
+    }
+
+    throw new BadRequestException(
+      'usuarioResponsavelId e obrigatorio para lancamento avulso quando o usuario autenticado nao e UUID valido',
+    );
+  }
+
+  private isUuidLike(value: string): boolean {
+    if (!value) {
+      return false;
+    }
+
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value,
+    );
+  }
+
+  private buildMetadadosOrigemAvulso(
+    metadadosAtuais: Record<string, unknown> | null | undefined,
+    correlationId: string,
+    origemId: string,
+    actor: string,
+    tipoLancamentoAvulso: TipoLancamentoAvulsoContaReceber,
+  ): Record<string, unknown> {
+    return {
+      ...(metadadosAtuais || {}),
+      origemTitulo: 'avulso',
+      origemLancamento: 'financeiro.contas-receber.avulso',
+      tipoLancamentoAvulso,
+      correlationId,
+      origemId,
+      usuarioId: actor,
+      atualizadoEm: new Date().toISOString(),
+    };
   }
 
   private compararItens(

@@ -13,13 +13,22 @@ import { PropostasModule } from '../propostas/propostas.module';
 import { Cliente } from '../clientes/cliente.entity';
 import { MercadoPagoModule } from '../mercado-pago/mercado-pago.module';
 import { EmpresaConfig } from '../empresas/entities/empresa-config.entity';
+import { FinanceiroModule } from '../financeiro/financeiro.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Fatura, ItemFatura, Pagamento, PlanoCobranca, Cliente, EmpresaConfig]),
+    TypeOrmModule.forFeature([
+      Fatura,
+      ItemFatura,
+      Pagamento,
+      PlanoCobranca,
+      Cliente,
+      EmpresaConfig,
+    ]),
     forwardRef(() => ContratosModule), // Para evitar dependencia circular
     PropostasModule, // Para acessar o EmailIntegradoService
     forwardRef(() => MercadoPagoModule),
+    forwardRef(() => FinanceiroModule),
   ],
   controllers: [FaturamentoController],
   providers: [FaturamentoService, PagamentoService, CobrancaService],

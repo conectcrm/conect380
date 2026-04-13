@@ -178,6 +178,40 @@ export class UpdateEmpresaConfigDto {
   @IsString()
   gatewayPagamentoWebhookSecret?: string;
 
+  @IsOptional()
+  @IsBoolean()
+  inadimplenciaAutomacaoAtiva?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(90)
+  inadimplenciaDiasAviso?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(365)
+  inadimplenciaDiasAcao?: number;
+
+  @IsOptional()
+  @IsIn(['nenhuma', 'marcar_em_risco', 'bloquear_operacao', 'suspender_acesso'])
+  inadimplenciaAcao?: 'nenhuma' | 'marcar_em_risco' | 'bloquear_operacao' | 'suspender_acesso';
+
+  @IsOptional()
+  @IsIn(['automatico', 'manual_com_sugestao'])
+  inadimplenciaModoExecucao?: 'automatico' | 'manual_com_sugestao';
+
+  @IsOptional()
+  @IsIn(['cliente', 'servico', 'contrato', 'recorrencia'])
+  inadimplenciaEscopo?: 'cliente' | 'servico' | 'contrato' | 'recorrencia';
+
+  @IsOptional()
+  @IsBoolean()
+  inadimplenciaDesbloqueioAutomaticoNaBaixa?: boolean;
+
   // Integracoes fiscais (multi-CNPJ)
   @IsOptional()
   @IsString()

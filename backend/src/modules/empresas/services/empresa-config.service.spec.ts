@@ -61,4 +61,20 @@ describe('EmpresaConfigService - gateway provider', () => {
     expect(payloadSalvo.gatewayPagamentoProvider).toBe('mercadopago');
     expect(atualizado.gatewayPagamentoProvider).toBe('mercadopago');
   });
+
+  it('bloqueia politica de inadimplencia com dias de acao menores que dias de aviso', async () => {
+    repository.findOne.mockResolvedValueOnce({
+      id: 'cfg-1',
+      empresaId: 'empresa-1',
+      inadimplenciaDiasAviso: 3,
+      inadimplenciaDiasAcao: 15,
+    });
+
+    await expect(
+      service.update('empresa-1', {
+        inadimplenciaDiasAviso: 10,
+        inadimplenciaDiasAcao: 5,
+      } as any),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
 });
