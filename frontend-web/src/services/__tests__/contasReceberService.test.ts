@@ -1,4 +1,4 @@
-﻿import contasReceberService from '../contasReceberService';
+import contasReceberService from '../contasReceberService';
 import api from '../api';
 
 describe('contasReceberService', () => {
@@ -21,6 +21,7 @@ describe('contasReceberService', () => {
     const result = await contasReceberService.listar({
       busca: ' mensalidade ',
       clienteId: 'cliente-1',
+      origem: ['faturamento'],
       dataVencimentoInicio: '2026-04-01',
       dataVencimentoFim: '2026-04-30',
       valorMin: 100,
@@ -33,7 +34,7 @@ describe('contasReceberService', () => {
     });
 
     expect(apiMock.get).toHaveBeenCalledWith(
-      '/contas-receber?busca=mensalidade&clienteId=cliente-1&dataVencimentoInicio=2026-04-01&dataVencimentoFim=2026-04-30&valorMin=100&valorMax=5000&page=2&pageSize=10&sortBy=valorEmAberto&sortOrder=DESC&status=pendente&status=vencida',
+      '/contas-receber?busca=mensalidade&clienteId=cliente-1&dataVencimentoInicio=2026-04-01&dataVencimentoFim=2026-04-30&valorMin=100&valorMax=5000&page=2&pageSize=10&sortBy=valorEmAberto&sortOrder=DESC&status=pendente&status=vencida&origem=faturamento',
     );
 
     expect(result).toEqual({
@@ -159,6 +160,46 @@ describe('contasReceberService', () => {
     });
     expect(result.enviado).toBe(true);
     expect(result.contaReceber.id).toBe(99);
+  });
+
+  it('deve criar lancamento avulso de contas a receber', async () => {
+    apiMock.post.mockResolvedValue({
+      data: {
+        data: {
+          correlationId: 'corr-avulso',
+          origemId: 'origem-avulso',
+          contaReceber: {
+            id: 77,
+            numero: 'FT-077',
+            origemTitulo: 'avulso',
+            tipoLancamentoAvulso: 'instalacao',
+          },
+        },
+      },
+    });
+
+    const result = await contasReceberService.criarLancamentoAvulso({
+      clienteId: '6a91e749-4ff1-4f30-8ab7-6c749d6e2a19',
+      usuarioResponsavelId: 'f07ab4fd-4122-4cc1-a882-2b3f2cb15f3d',
+      dataVencimento: '2026-04-30',
+      descricao: 'Servico avulso',
+      valor: 320,
+      tipoLancamentoAvulso: 'instalacao',
+      formaPagamentoPreferida: 'pix',
+    });
+
+    expect(apiMock.post).toHaveBeenCalledWith('/contas-receber/avulsos', {
+      clienteId: '6a91e749-4ff1-4f30-8ab7-6c749d6e2a19',
+      usuarioResponsavelId: 'f07ab4fd-4122-4cc1-a882-2b3f2cb15f3d',
+      dataVencimento: '2026-04-30',
+      descricao: 'Servico avulso',
+      valor: 320,
+      tipoLancamentoAvulso: 'instalacao',
+      formaPagamentoPreferida: 'pix',
+    });
+
+    expect(result.contaReceber.origemTitulo).toBe('avulso');
+    expect(result.contaReceber.tipoLancamentoAvulso).toBe('instalacao');
   });
 });
 

@@ -16,7 +16,6 @@ import {
   DataTableCard,
   EmptyState,
   FiltersBar,
-  InlineStats,
   LoadingSkeleton,
   PageHeader,
   SectionCard,
@@ -365,17 +364,55 @@ export default function ConciliacaoBancariaPage() {
   const totalEntradas = importacoes.reduce((acc, item) => acc + Number(item.totalEntradas || 0), 0);
   const totalSaidas = importacoes.reduce((acc, item) => acc + Number(item.totalSaidas || 0), 0);
   const hasBusca = buscaArquivo.trim().length > 0;
+  const painelMetricas = [
+    {
+      label: 'Importacoes',
+      value: String(totalImportacoes),
+      hint: 'Arquivos processados',
+      highlightClass: 'text-[#123E52]',
+    },
+    {
+      label: 'Lancamentos',
+      value: String(totalLancamentos),
+      hint: 'Movimentos carregados',
+      highlightClass: 'text-[#0F7B7D]',
+    },
+    {
+      label: 'Entradas',
+      value: moneyFmt.format(totalEntradas),
+      hint: 'Total identificado no extrato',
+      highlightClass: 'text-[#137A42]',
+    },
+    {
+      label: 'Saidas',
+      value: moneyFmt.format(totalSaidas),
+      hint: 'Total identificado no extrato',
+      highlightClass: 'text-[#A86400]',
+    },
+  ];
 
   return (
     <div className="space-y-4 pt-1 sm:pt-2">
-      <SectionCard className="space-y-4 p-4 sm:p-5">
+      <SectionCard className="space-y-[18px] border-[#CBDAE2] bg-gradient-to-br from-white via-white to-[#F3FAF8] p-5 shadow-[0_24px_46px_-34px_rgba(16,57,74,0.38)]">
         <PageHeader
-          title="Conciliação Bancária"
+          eyebrow={
+            <span className="inline-flex items-center rounded-full border border-[#BFD9E2] bg-[#EFF8FB] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#3F6A7C]">
+              Nucleo Financeiro
+            </span>
+          }
+          title={
+            <span className="text-[27px] font-bold leading-[1.03] tracking-[-0.018em] text-[#002333] sm:text-[28px]">
+              Conciliacao <span className="text-[#0F7B7D]">Bancaria</span>
+            </span>
+          }
+          titleClassName="leading-none sm:inline-flex sm:items-center"
           description={
             contaAtual
               ? `Importe extratos OFX/CSV para a conta ${contaAtual.nome}.`
               : 'Importe extratos OFX/CSV e acompanhe os lançamentos pendentes de conciliação.'
           }
+          descriptionClassName="max-w-[64ch] text-[12px] leading-[1.4] text-[#5B7A89] sm:border-l sm:border-[#D7E5EC] sm:pl-3 sm:text-[13px]"
+          inlineDescriptionOnDesktop
           actions={
             <div className="flex flex-wrap items-center gap-2">
               <button
@@ -391,63 +428,65 @@ export default function ConciliacaoBancariaPage() {
           }
         />
 
-        {!carregando && !erro ? (
-          <InlineStats
-            stats={[
-              { label: 'Importações', value: String(totalImportacoes), tone: 'neutral' },
-              { label: 'Lançamentos', value: String(totalLancamentos), tone: 'accent' },
-              { label: 'Entradas', value: moneyFmt.format(totalEntradas), tone: 'neutral' },
-              { label: 'Saídas', value: moneyFmt.format(totalSaidas), tone: 'warning' },
-            ]}
-          />
-        ) : null}
-      </SectionCard>
-
-      <FiltersBar className="p-4">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
-          <div className="lg:col-span-4">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Conta bancária</label>
-            <select
-              value={contaBancariaId}
-              onChange={(event) => setContaBancariaId(event.target.value)}
-              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
-            >
-              {contasBancarias.length === 0 ? <option value="">Nenhuma conta ativa</option> : null}
-              {contasBancarias.map((conta) => (
-                <option key={conta.id} value={conta.id}>
-                  {conta.nome} - {conta.banco} ({conta.conta})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="lg:col-span-4">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Arquivo (OFX/CSV)</label>
-            <input
-              key={inputArquivoKey}
-              type="file"
-              accept=".csv,.ofx"
-              onChange={(event) => setArquivo(event.target.files?.[0] || null)}
-              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] file:mr-3 file:rounded-md file:border-0 file:bg-[#EFF7F9] file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-[#245468]"
-            />
-          </div>
-
-          <div className="lg:col-span-4">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Ações</label>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => void handleImportarExtrato()}
-                className={btnPrimary}
-                disabled={importando || !contaBancariaId || !arquivo}
-              >
-                <UploadCloud className={`h-4 w-4 ${importando ? 'animate-pulse' : ''}`} />
-                {importando ? 'Importando...' : 'Importar extrato'}
-              </button>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {painelMetricas.map((item) => (
+            <div key={item.label} className="rounded-xl border border-[#D2E1E8] bg-white px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[#5F7B89]">
+                {item.label}
+              </p>
+              <p className={`mt-1 text-lg font-semibold ${item.highlightClass}`}>
+                {carregando ? '--' : item.value}
+              </p>
+              <p className="mt-1 text-xs text-[#688390]">{item.hint}</p>
             </div>
-          </div>
+          ))}
         </div>
-      </FiltersBar>
+
+        <div className="pt-1">
+          <FiltersBar className="space-y-4 rounded-2xl border border-[#D4E1E8] bg-gradient-to-br from-[#F7FBFD] to-[#F1F7FA] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#385A6A]">Conta bancaria</label>
+                <select
+                  value={contaBancariaId}
+                  onChange={(event) => setContaBancariaId(event.target.value)}
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                >
+                  {contasBancarias.length === 0 ? <option value="">Nenhuma conta ativa</option> : null}
+                  {contasBancarias.map((conta) => (
+                    <option key={conta.id} value={conta.id}>
+                      {conta.nome} - {conta.banco} ({conta.conta})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#385A6A]">Arquivo (OFX/CSV)</label>
+                <input
+                  key={inputArquivoKey}
+                  type="file"
+                  accept=".csv,.ofx"
+                  onChange={(event) => setArquivo(event.target.files?.[0] || null)}
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] file:mr-3 file:rounded-md file:border-0 file:bg-[#EFF7F9] file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-[#245468]"
+                />
+              </div>
+
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={() => void handleImportarExtrato()}
+                  className={btnPrimary}
+                  disabled={importando || !contaBancariaId || !arquivo}
+                >
+                  <UploadCloud className={`h-4 w-4 ${importando ? 'animate-pulse' : ''}`} />
+                  {importando ? 'Importando...' : 'Importar extrato'}
+                </button>
+              </div>
+            </div>
+          </FiltersBar>
+        </div>
+      </SectionCard>
 
       {carregando ? <LoadingSkeleton lines={8} /> : null}
 
@@ -472,25 +511,32 @@ export default function ConciliacaoBancariaPage() {
             Resultado da última importação ({resultadoImportacao.importacao.nomeArquivo})
           </div>
 
-          <InlineStats
-            stats={[
-              {
-                label: 'Lançamentos importados',
-                value: String(resultadoImportacao.resumo.totalLancamentos),
-                tone: 'accent',
-              },
-              {
-                label: 'Entradas',
-                value: moneyFmt.format(resultadoImportacao.resumo.totalEntradas),
-                tone: 'neutral',
-              },
-              {
-                label: 'Saídas',
-                value: moneyFmt.format(resultadoImportacao.resumo.totalSaidas),
-                tone: 'warning',
-              },
-            ]}
-          />
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="rounded-xl border border-[#D2E1E8] bg-white px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[#5F7B89]">
+                Lancamentos importados
+              </p>
+              <p className="mt-1 text-lg font-semibold text-[#0F7B7D]">
+                {resultadoImportacao.resumo.totalLancamentos}
+              </p>
+            </div>
+            <div className="rounded-xl border border-[#D2E1E8] bg-white px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[#5F7B89]">
+                Entradas
+              </p>
+              <p className="mt-1 text-lg font-semibold text-[#137A42]">
+                {moneyFmt.format(resultadoImportacao.resumo.totalEntradas)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-[#D2E1E8] bg-white px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[#5F7B89]">
+                Saidas
+              </p>
+              <p className="mt-1 text-lg font-semibold text-[#A86400]">
+                {moneyFmt.format(resultadoImportacao.resumo.totalSaidas)}
+              </p>
+            </div>
+          </div>
 
           {resultadoImportacao.erros.length > 0 ? (
             <div className="rounded-xl border border-[#F2D8A6] bg-[#FFF8EA] p-3">
@@ -512,7 +558,7 @@ export default function ConciliacaoBancariaPage() {
 
       {!carregando && !erro ? (
         <>
-          <FiltersBar className="p-4">
+          <FiltersBar className="space-y-4 rounded-2xl border border-[#D4E1E8] bg-gradient-to-br from-[#F7FBFD] to-[#F1F7FA] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
             <div className="flex w-full flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
               <div className="w-full sm:min-w-[280px] sm:flex-1">
                 <label className="mb-2 block text-sm font-medium text-[#385A6A]">

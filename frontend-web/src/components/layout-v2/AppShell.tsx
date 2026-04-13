@@ -23,6 +23,29 @@ type AppShellProps = {
 
 const MOBILE_BREAKPOINT = 768;
 const ENABLE_MOBILE_TOPBAR_AUTO_HIDE = false;
+const EMPRESA_EVENT_NAME = 'empresaAtivaChanged';
+const WORKSPACE_TABS_STORAGE_VERSION = 'v1';
+const WORKSPACE_TABS_MAX_ITEMS = 8;
+const WORKSPACE_TABS_PINNED_ROUTES = new Set(['/dashboard']);
+const WORKSPACE_TABS_EXCLUDED_PREFIXES = ['/portal'];
+const WORKSPACE_TABS_EXCLUDED_PATHS = new Set([
+  '/login',
+  '/registro',
+  '/termos',
+  '/privacidade',
+  '/verificar-email',
+  '/esqueci-minha-senha',
+  '/recuperar-senha',
+  '/trocar-senha',
+  '/capturar-lead',
+]);
+
+type WorkspaceTab = {
+  id: string;
+  path: string;
+  label: string;
+  pinned: boolean;
+};
 
 const isMobileAutoHideEnabledForViewport = (): boolean => {
   if (!ENABLE_MOBILE_TOPBAR_AUTO_HIDE) {
@@ -108,6 +131,89 @@ const hasAgendaRouteAccess = (menuItems: MenuConfig[]): boolean => {
   return false;
 };
 
+const normalizePathname = (pathname: string): string => {
+  const trimmed = String(pathname || '').trim();
+  if (!trimmed || trimmed === '/') {
+    return '/dashboard';
+  }
+
+  if (trimmed.length > 1 && trimmed.endsWith('/')) {
+    return trimmed.slice(0, -1);
+  }
+
+  return trimmed;
+};
+
+const shouldTrackWorkspacePath = (pathname: string): boolean => {
+  const normalized = normalizePathname(pathname);
+  if (WORKSPACE_TABS_EXCLUDED_PATHS.has(normalized)) {
+    return false;
+  }
+  return !WORKSPACE_TABS_EXCLUDED_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+};
+
+const fallbackLabelFromPath = (pathname: string): string => {
+  const normalized = normalizePathname(pathname);
+  const segments = normalized.split('/').filter(Boolean);
+  const lastSegment = segments[segments.length - 1] || 'dashboard';
+
+  const isOpaqueIdentifier =
+    /^[0-9]+$/.test(lastSegment) ||
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      lastSegment,
+    );
+
+  const labelSource =
+    isOpaqueIdentifier && segments.length > 1 ? segments[segments.length - 2] : lastSegment;
+
+  return decodeURIComponent(labelSource)
+    .replace(/[-_]+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const resolveSpecialWorkspaceTabLabel = (pathname: string): string | null => {
+  const normalized = normalizePathname(pathname);
+
+  if (/^\/clientes\/[^/]+$/i.test(normalized) || /^\/crm\/clientes\/[^/]+$/i.test(normalized)) {
+    return 'Perfil do Cliente';
+  }
+
+  return null;
+};
+
+const resolveWorkspaceTabLabel = (pathname: string, entries: GlobalSearchEntry[]): string => {
+  const normalized = normalizePathname(pathname);
+  if (normalized === '/dashboard') {
+    return 'Dashboard';
+  }
+
+  const specialLabel = resolveSpecialWorkspaceTabLabel(normalized);
+  if (specialLabel) {
+    return specialLabel;
+  }
+
+  const normalizeEntryPath = (href: string): string => normalizePathname(href);
+
+  const exactMatch = entries.find((entry) => normalizeEntryPath(entry.href) === normalized);
+  if (exactMatch) {
+    return exactMatch.title;
+  }
+
+  const prefixMatch = [...entries]
+    .map((entry) => ({ entry, normalizedHref: normalizeEntryPath(entry.href) }))
+    .filter(
+      ({ normalizedHref }) =>
+        normalized.startsWith(`${normalizedHref}/`) || normalizedHref.startsWith(normalized),
+    )
+    .sort((a, b) => b.normalizedHref.length - a.normalizedHref.length)[0];
+
+  if (prefixMatch?.entry?.title) {
+    return prefixMatch.entry.title;
+  }
+
+  return fallbackLabelFromPath(normalized);
+};
+
 const Brand: React.FC = () => {
   return (
     <div className="inline-flex items-center">
@@ -132,6 +238,11 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
     isMobileAutoHideEnabledForViewport(),
   );
   const [isMobileTopbarHidden, setIsMobileTopbarHidden] = useState(false);
+  const [empresaAtivaStorageId, setEmpresaAtivaStorageId] = useState(() =>
+    typeof window === 'undefined' ? '' : localStorage.getItem('empresaAtiva') || '',
+  );
+  const [workspaceTabs, setWorkspaceTabs] = useState<WorkspaceTab[]>([]);
+  const workspaceTabsInitializedRef = useRef(false);
   const lastScrollYRef = useRef(0);
 
   useEffect(() => {
@@ -156,6 +267,41 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const syncEmpresaId = () => {
+      setEmpresaAtivaStorageId(localStorage.getItem('empresaAtiva') || '');
+    };
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === 'empresaAtiva') {
+        setEmpresaAtivaStorageId(event.newValue || '');
+      }
+    };
+
+    const onEmpresaChanged = (event: Event) => {
+      const empresaEvent = event as CustomEvent<{ empresaId?: string | null }>;
+      const empresaId = String(empresaEvent?.detail?.empresaId || '').trim();
+      if (empresaId) {
+        setEmpresaAtivaStorageId(empresaId);
+      } else {
+        syncEmpresaId();
+      }
+    };
+
+    syncEmpresaId();
+    window.addEventListener('storage', onStorage);
+    window.addEventListener(EMPRESA_EVENT_NAME, onEmpresaChanged as EventListener);
+
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener(EMPRESA_EVENT_NAME, onEmpresaChanged as EventListener);
+    };
   }, []);
 
   useEffect(() => {
@@ -278,6 +424,151 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
       a.title.localeCompare(b.title, 'pt-BR', { sensitivity: 'base' }),
     );
   }, [menuFiltrado]);
+  const currentWorkspaceTabId = useMemo(() => normalizePathname(location.pathname), [location.pathname]);
+  const workspaceTabsStorageKey = useMemo(() => {
+    const userId = String(user?.id || 'anon').trim() || 'anon';
+    const empresaId = String(user?.empresa?.id || empresaAtivaStorageId || 'none').trim() || 'none';
+    return `conect-worktabs:${WORKSPACE_TABS_STORAGE_VERSION}::empresa:${empresaId}::user:${userId}`;
+  }, [empresaAtivaStorageId, user?.empresa?.id, user?.id]);
+
+  useEffect(() => {
+    workspaceTabsInitializedRef.current = false;
+
+    if (typeof window === 'undefined') {
+      setWorkspaceTabs([]);
+      workspaceTabsInitializedRef.current = true;
+      return;
+    }
+
+    try {
+      const raw = localStorage.getItem(workspaceTabsStorageKey);
+      if (!raw) {
+        setWorkspaceTabs([]);
+        workspaceTabsInitializedRef.current = true;
+        return;
+      }
+
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        setWorkspaceTabs([]);
+        workspaceTabsInitializedRef.current = true;
+        return;
+      }
+
+      const tabs = parsed
+        .filter((item): item is WorkspaceTab => {
+          return (
+            Boolean(item) &&
+            typeof item.id === 'string' &&
+            typeof item.path === 'string' &&
+            typeof item.label === 'string'
+          );
+        })
+        .map((item) => ({
+          id: normalizePathname(item.id),
+          path: String(item.path || item.id),
+          label: String(item.label || fallbackLabelFromPath(item.id)),
+          pinned: WORKSPACE_TABS_PINNED_ROUTES.has(normalizePathname(item.id)),
+        }))
+        .filter((item) => shouldTrackWorkspacePath(item.id))
+        .slice(0, WORKSPACE_TABS_MAX_ITEMS);
+
+      setWorkspaceTabs(tabs);
+    } catch (error) {
+      console.warn('[AppShell] Falha ao carregar abas de trabalho:', error);
+      setWorkspaceTabs([]);
+    } finally {
+      workspaceTabsInitializedRef.current = true;
+    }
+  }, [workspaceTabsStorageKey]);
+
+  useEffect(() => {
+    if (!workspaceTabsInitializedRef.current || typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      localStorage.setItem(workspaceTabsStorageKey, JSON.stringify(workspaceTabs));
+    } catch (error) {
+      console.warn('[AppShell] Falha ao persistir abas de trabalho:', error);
+    }
+  }, [workspaceTabs, workspaceTabsStorageKey]);
+
+  useEffect(() => {
+    if (!globalSearchEntries.length) {
+      return;
+    }
+
+    setWorkspaceTabs((prev) => {
+      let changed = false;
+
+      const next = prev.map((tab) => {
+        const nextLabel = resolveWorkspaceTabLabel(tab.id, globalSearchEntries);
+        if (nextLabel !== tab.label) {
+          changed = true;
+          return { ...tab, label: nextLabel };
+        }
+        return tab;
+      });
+
+      return changed ? next : prev;
+    });
+  }, [globalSearchEntries]);
+
+  useEffect(() => {
+    if (!shouldTrackWorkspacePath(currentWorkspaceTabId)) {
+      return;
+    }
+
+    const label = resolveWorkspaceTabLabel(currentWorkspaceTabId, globalSearchEntries);
+    const path = `${currentWorkspaceTabId}${location.search || ''}`;
+    const pinned = WORKSPACE_TABS_PINNED_ROUTES.has(currentWorkspaceTabId);
+
+    setWorkspaceTabs((prev) => {
+      const existingIndex = prev.findIndex((tab) => tab.id === currentWorkspaceTabId);
+
+      if (existingIndex >= 0) {
+        const current = prev[existingIndex];
+        if (current.path === path && current.label === label && current.pinned === pinned) {
+          return prev;
+        }
+
+        const next = [...prev];
+        next[existingIndex] = {
+          ...current,
+          path,
+          label,
+          pinned,
+        };
+        return next;
+      }
+
+      const next = [
+        ...prev,
+        {
+          id: currentWorkspaceTabId,
+          path,
+          label,
+          pinned,
+        },
+      ];
+
+      if (next.length <= WORKSPACE_TABS_MAX_ITEMS) {
+        return next;
+      }
+
+      const dropIndex = next.findIndex(
+        (tab) => !tab.pinned && tab.id !== currentWorkspaceTabId,
+      );
+
+      if (dropIndex >= 0) {
+        next.splice(dropIndex, 1);
+        return next;
+      }
+
+      return next.slice(next.length - WORKSPACE_TABS_MAX_ITEMS);
+    });
+  }, [currentWorkspaceTabId, globalSearchEntries, location.search]);
 
   const roleKey = String(user?.role || '').toLowerCase();
   const isAdmin =
@@ -290,6 +581,7 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
   const initials = useMemo(() => resolveInitials(user?.nome), [user?.nome]);
   const avatarUrl = useMemo(() => resolveAvatarUrl(user?.avatar_url || null), [user?.avatar_url]);
+  const activeWorkspacePath = `${currentWorkspaceTabId}${location.search || ''}`;
 
   const getCurrentProfile = () =>
     availableProfiles.find((profile) => profile.id === perfilSelecionado) || availableProfiles[0];
@@ -301,6 +593,44 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
   const handleOpenCoreAdmin = () => {
     navigate('/core-admin');
+  };
+
+  const handleSelectWorkspaceTab = (tab: WorkspaceTab) => {
+    const targetPath = String(tab.path || tab.id).trim() || tab.id;
+    if (targetPath === activeWorkspacePath) {
+      return;
+    }
+    navigate(targetPath);
+  };
+
+  const handleCloseWorkspaceTab = (tabId: string) => {
+    let nextPath: string | null = null;
+
+    setWorkspaceTabs((prev) => {
+      const index = prev.findIndex((tab) => tab.id === tabId);
+      if (index < 0) {
+        return prev;
+      }
+
+      const target = prev[index];
+      const canClose = prev.length > 1 && !target.pinned;
+      if (!canClose) {
+        return prev;
+      }
+
+      const nextTabs = prev.filter((tab) => tab.id !== tabId);
+
+      if (currentWorkspaceTabId === tabId) {
+        const fallbackTab = prev[index - 1] || prev[index + 1] || nextTabs[0];
+        nextPath = fallbackTab?.path || '/dashboard';
+      }
+
+      return nextTabs;
+    });
+
+    if (nextPath) {
+      navigate(nextPath);
+    }
   };
 
   return (
@@ -554,6 +884,60 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
             <div className={`h-px rounded-full ${shellTokens.divider}`} aria-hidden />
             <SystemMaintenanceBanner />
           </div>
+
+          {workspaceTabs.length > 0 ? (
+            <div className={`${shellSpacing.pageOuterX} pb-2`}>
+              <nav
+                className="mt-2 flex items-center gap-1 overflow-x-auto"
+                aria-label="Abas de trabalho"
+              >
+                {workspaceTabs.map((tab) => {
+                  const isActive = tab.id === currentWorkspaceTabId;
+                  const canClose = workspaceTabs.length > 1 && !tab.pinned;
+
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => handleSelectWorkspaceTab(tab)}
+                      className={`group inline-flex h-9 shrink-0 items-center gap-2 rounded-t-lg border px-3 text-sm transition ${
+                        isActive
+                          ? 'border-[#0FB8B8] bg-[#15B8B8] text-white'
+                          : 'border-[#D4E2E7] bg-white text-[#3E5F70] hover:bg-[#F2FAFB]'
+                      }`}
+                    >
+                      <span className="max-w-[220px] truncate font-medium">{tab.label}</span>
+                      {canClose ? (
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`Fechar aba ${tab.label}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleCloseWorkspaceTab(tab.id);
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              handleCloseWorkspaceTab(tab.id);
+                            }
+                          }}
+                          className={`inline-flex h-4 w-4 items-center justify-center rounded-full ${
+                            isActive
+                              ? 'text-white/90 hover:bg-white/20'
+                              : 'text-[#6B8693] hover:bg-[#E8F1F4]'
+                          }`}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+          ) : null}
         </header>
 
         <main className={`${shellSpacing.pageOuterX} ${shellSpacing.pageOuterY}`}>

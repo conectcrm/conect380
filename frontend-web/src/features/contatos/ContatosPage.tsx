@@ -23,7 +23,6 @@ import { useGlobalConfirmation } from '../../contexts/GlobalConfirmationContext'
 import {
   EmptyState,
   FiltersBar,
-  InlineStats,
   LoadingSkeleton,
   PageHeader,
   DataTableCard,
@@ -138,90 +137,145 @@ const ContatosPage: React.FC = () => {
     carregarDados();
   };
 
-  // Estatísticas
+  // Indicadores operacionais
   const totalContatos = contatosFiltrados.length;
   const contatosPrincipais = contatosFiltrados.filter((c) => c.principal).length;
-  const contatosAtivos = contatosFiltrados.filter((c) => c.ativo).length;
-  const contatosComEmail = contatosFiltrados.filter((c) => c.email).length;
-  const pageDescription = 'Gerencie seus contatos cadastrados';
+  const contatosComEmailValido = contatosFiltrados.filter((c) => Boolean(c.email?.trim())).length;
+  const contatosVinculadosCliente = contatosFiltrados.filter((c) =>
+    Boolean(c.clienteId || c.cliente?.id),
+  ).length;
+  const contatosSemEmail = totalContatos - contatosComEmailValido;
+  const contatosSemCliente = totalContatos - contatosVinculadosCliente;
+  const contatosComPendencia = contatosFiltrados.filter(
+    (c) => !c.email?.trim() || !(c.clienteId || c.cliente?.id),
+  ).length;
+  const contatosProntosAbordagem = contatosFiltrados.filter(
+    (c) => c.ativo && Boolean(c.email?.trim()) && Boolean(c.clienteId || c.cliente?.id),
+  ).length;
+  const qualidadeCadastroPercentual =
+    totalContatos > 0 ? Math.round(((totalContatos - contatosComPendencia) / totalContatos) * 100) : 0;
+  const pageDescription =
+    'Foque em contatos prioritarios, base pronta para abordagem e pendencias que bloqueiam a acao comercial.';
 
   return (
     <div className="space-y-4 pt-1 sm:pt-2">
-      <SectionCard className="space-y-4 p-4 sm:p-5">
+      <SectionCard className="space-y-[18px] border-[#CBDAE2] bg-gradient-to-br from-white via-white to-[#F4FAFF] p-5 shadow-[0_24px_46px_-34px_rgba(16,57,74,0.38)]">
         <PageHeader
-          title="Contatos"
+          eyebrow={
+            <span className="inline-flex items-center rounded-full border border-[#BFD9E2] bg-[#EFF8FB] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#3F6A7C]">
+              Nucleo Comercial
+            </span>
+          }
+          title={
+            <span className="text-[27px] font-bold leading-[1.03] tracking-[-0.018em] text-[#002333] sm:text-[28px]">
+              Contatos
+            </span>
+          }
+          titleClassName="leading-none sm:inline-flex sm:items-center"
           description={pageDescription}
+          descriptionClassName="max-w-[74ch] text-[12px] leading-[1.4] text-[#5B7A89] sm:border-l sm:border-[#D7E5EC] sm:pl-3 sm:text-[13px]"
+          inlineDescriptionOnDesktop
           actions={
-            <button
-              onClick={handleNovo}
-              className="bg-[#159A9C] hover:bg-[#0d7a7c] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm text-sm font-medium"
-            >
-              <Plus className="w-4 h-4" />
-              Novo Contato
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={carregarDados}
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={loading}
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                Atualizar
+              </button>
+              <button
+                onClick={handleNovo}
+                className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition hover:bg-[#117C7E]"
+              >
+                <Plus className="h-4 w-4" />
+                Novo contato
+              </button>
+            </div>
           }
         />
 
-        {!loading && (
-          <InlineStats
-            stats={[
-              { label: 'Total', value: String(totalContatos), tone: 'neutral' },
-              { label: 'Principais', value: String(contatosPrincipais), tone: 'accent' },
-              { label: 'Ativos', value: String(contatosAtivos), tone: 'accent' },
-              { label: 'Com e-mail', value: String(contatosComEmail), tone: 'neutral' },
-            ]}
-          />
-        )}
-      </SectionCard>
-
-      <FiltersBar className="p-4">
-        <div className="flex w-full flex-col gap-4 sm:flex-row sm:items-end">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Filtrar por Cliente (opcional)
-            </label>
-            <select
-              value={clienteFiltro}
-              onChange={(e) => setClienteFiltro(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent bg-white"
-            >
-              <option value="">Todos os clientes</option>
-              {clientes.map((cliente) => (
-                <option key={cliente.id} value={cliente.id}>
-                  {cliente.nome} {cliente.documento ? `- ${cliente.documento}` : ''}
-                </option>
-              ))}
-            </select>
+        <section className="space-y-3 rounded-2xl border border-[#D4E1E8] bg-white/95 p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-[#5F7B89]">
+              Resumo essencial:
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[#D7E6EC] bg-[#F5FAFC] px-2.5 py-1 text-xs font-semibold text-[#345362]">
+              Base: {loading ? '--' : totalContatos}
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[#BFE8E9] bg-[#EEFBFB] px-2.5 py-1 text-xs font-semibold text-[#0F7B7D]">
+              Prioritarios: {loading ? '--' : contatosPrincipais}
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[#BEE6CF] bg-[#F1FBF5] px-2.5 py-1 text-xs font-semibold text-[#137A42]">
+              Prontos para abordagem: {loading ? '--' : contatosProntosAbordagem}
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[#F4C7CF] bg-[#FFF4F6] px-2.5 py-1 text-xs font-semibold text-[#B4233A]">
+              Pendencias cadastrais: {loading ? '--' : contatosComPendencia}
+            </span>
           </div>
 
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Buscar Contatos</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Buscar por nome, email, telefone, cargo, empresa..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+          <div className="rounded-xl border border-[#D7E6EC] bg-[#F9FCFE] px-3 py-3">
+            <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-[#5F7B89]">
+              <span>Qualidade de cadastro para acao comercial</span>
+              <span>{loading ? '--' : `${qualidadeCadastroPercentual}%`}</span>
+            </div>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#DDEBF0]">
+              <div
+                className="h-full rounded-full bg-[#1E66B4] transition-all"
+                style={{ width: `${qualidadeCadastroPercentual}%` }}
               />
             </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[#5B7A89]">
+              <span>Sem e-mail: {loading ? '--' : contatosSemEmail}</span>
+              <span>•</span>
+              <span>Sem cliente vinculado: {loading ? '--' : contatosSemCliente}</span>
+            </div>
           </div>
+        </section>
 
-          {contatosFiltrados.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Modo de Visualizacao
-              </label>
-              <div className="flex gap-2">
+        <FiltersBar className="space-y-4 rounded-2xl border border-[#D4E1E8] bg-gradient-to-br from-[#F7FBFD] to-[#F1F7FA] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
+          <div className="flex w-full flex-col gap-4">
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_280px_auto]">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#385A6A]">Buscar contatos</label>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7A95A3]" />
+                  <input
+                    type="text"
+                    placeholder="Nome, e-mail, telefone, cargo ou cliente..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#385A6A]">Cliente</label>
+                <select
+                  value={clienteFiltro}
+                  onChange={(e) => setClienteFiltro(e.target.value)}
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                >
+                  <option value="">Todos os clientes</option>
+                  {clientes.map((cliente) => (
+                    <option key={cliente.id} value={cliente.id}>
+                      {cliente.nome} {cliente.documento ? `- ${cliente.documento}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-wrap items-end gap-2">
                 <button
                   onClick={() => setViewMode('grid')}
                   className={`p-2.5 rounded-lg transition-colors border ${
                     viewMode === 'grid'
                       ? 'bg-[#159A9C] text-white border-[#159A9C]'
-                      : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-300'
+                      : 'bg-white text-[#486572] hover:bg-[#F4FAFC] border-[#D1E1E8]'
                   }`}
-                  title="Visualizacao em Grade"
+                  title="Visualizacao em grade"
                 >
                   <Grid3X3 className="w-5 h-5" />
                 </button>
@@ -230,17 +284,26 @@ const ContatosPage: React.FC = () => {
                   className={`p-2.5 rounded-lg transition-colors border ${
                     viewMode === 'list'
                       ? 'bg-[#159A9C] text-white border-[#159A9C]'
-                      : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-300'
+                      : 'bg-white text-[#486572] hover:bg-[#F4FAFC] border-[#D1E1E8]'
                   }`}
-                  title="Visualizacao em Lista"
+                  title="Visualizacao em lista"
                 >
                   <ListIcon className="w-5 h-5" />
                 </button>
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setClienteFiltro('');
+                  }}
+                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+                >
+                  Limpar
+                </button>
               </div>
             </div>
-          )}
-        </div>
-      </FiltersBar>
+          </div>
+        </FiltersBar>
+      </SectionCard>
 
       {loading && <LoadingSkeleton lines={6} />}
 
@@ -492,3 +555,4 @@ const ContatosPage: React.FC = () => {
 };
 
 export default ContatosPage;
+

@@ -10,6 +10,7 @@ import {
   DollarSign,
   Edit,
   Filter,
+  Plus,
   RefreshCw,
   Search,
   Trash2,
@@ -18,8 +19,6 @@ import {
 import {
   DataTableCard,
   EmptyState,
-  FiltersBar,
-  InlineStats,
   LoadingSkeleton,
   PageHeader,
   SectionCard,
@@ -298,7 +297,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
     } catch (err) {
       setFornecedoresCadastro([]);
       setErroFornecedoresCadastro(
-        'Não foi possível carregar fornecedores para cadastro de contas.',
+        'Nao foi possivel carregar fornecedores para cadastro de contas.',
       );
       console.error('Erro ao carregar fornecedores para contas a pagar:', err);
     } finally {
@@ -658,7 +657,53 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
   const totalAberto = contas.filter((c) => c.status === StatusContaPagar.EM_ABERTO).length;
   const totalPago = contas.filter((c) => c.status === StatusContaPagar.PAGO).length;
   const totalVencido = contas.filter((c) => c.status === StatusContaPagar.VENCIDO).length;
-  const valorLista = contasFiltradas.reduce((acc, conta) => acc + (conta.valorTotal || 0), 0);
+  const totalAgendado = contas.filter((c) => c.status === StatusContaPagar.AGENDADO).length;
+  const totalCancelado = contas.filter((c) => c.status === StatusContaPagar.CANCELADO).length;
+
+  const painelMetricas = useMemo(
+    () =>
+      resumoFinanceiro
+        ? [
+            {
+              label: 'Vencendo hoje',
+              value: moneyFmt.format(resumoFinanceiro.totalVencendoHoje),
+              highlightClass: 'text-[#A86400]',
+              hint: `${resumoFinanceiro.quantidadeVencendoHoje} conta(s)`,
+            },
+            {
+              label: 'Total do mes',
+              value: moneyFmt.format(resumoFinanceiro.totalMes),
+              highlightClass: 'text-[#173A4D]',
+              hint: `${resumoFinanceiro.quantidadeMes} conta(s) no periodo`,
+            },
+            {
+              label: 'Atrasado',
+              value: moneyFmt.format(resumoFinanceiro.totalAtrasado),
+              highlightClass: 'text-[#B4233A]',
+              hint: `${resumoFinanceiro.quantidadeAtrasado} conta(s) vencida(s)`,
+            },
+            {
+              label: 'Pago no mes',
+              value: moneyFmt.format(resumoFinanceiro.totalPagoMes),
+              highlightClass: 'text-[#137A42]',
+              hint: `${resumoFinanceiro.quantidadePagoMes} conta(s) baixada(s)`,
+            },
+          ]
+        : [],
+    [resumoFinanceiro],
+  );
+
+  const quickStatusFilters = useMemo(
+    () => [
+      { key: 'todos' as const, label: 'Todos', count: contas.length },
+      { key: StatusContaPagar.EM_ABERTO as const, label: 'Em aberto', count: totalAberto },
+      { key: StatusContaPagar.PAGO as const, label: 'Pagos', count: totalPago },
+      { key: StatusContaPagar.VENCIDO as const, label: 'Vencidos', count: totalVencido },
+      { key: StatusContaPagar.AGENDADO as const, label: 'Agendados', count: totalAgendado },
+      { key: StatusContaPagar.CANCELADO as const, label: 'Cancelados', count: totalCancelado },
+    ],
+    [contas.length, totalAberto, totalAgendado, totalCancelado, totalPago, totalVencido],
+  );
 
   const selecionadasVisiveis = contasFiltradas.filter((c) => contasSelecionadas.has(c.id)).length;
   const allVisibleSelected = totalLista > 0 && selecionadasVisiveis === totalLista;
@@ -775,14 +820,22 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
 
   return (
     <div className={`space-y-4 pt-1 sm:pt-2 ${className || ''}`}>
-      <SectionCard className="space-y-4 p-4 sm:p-5">
+      <SectionCard className="space-y-[18px] border-[#CBDAE2] bg-gradient-to-br from-white via-white to-[#F3FAF8] p-5 shadow-[0_24px_46px_-34px_rgba(16,57,74,0.38)]">
         <PageHeader
-          title={<span>Contas a Pagar</span>}
-          description={
-            loading
-              ? 'Carregando contas a pagar...'
-              : `Gerencie ${totalLista} obrigacoes financeiras na lista atual.`
+          eyebrow={
+            <span className="inline-flex items-center rounded-full border border-[#BFD9E2] bg-[#EFF8FB] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#3F6A7C]">
+              Nucleo Financeiro
+            </span>
           }
+          title={
+            <span className="text-[27px] font-bold leading-[1.03] tracking-[-0.018em] text-[#002333] sm:text-[28px]">
+              Contas a <span className="text-[#0F7B7D]">Pagar</span>
+            </span>
+          }
+          titleClassName="leading-none sm:inline-flex sm:items-center"
+          description="Monitore obrigacoes, atrasos e pagamentos com visao operacional diaria."
+          descriptionClassName="max-w-[64ch] text-[12px] leading-[1.4] text-[#5B7A89] sm:border-l sm:border-[#D7E5EC] sm:pl-3 sm:text-[13px]"
+          inlineDescriptionOnDesktop
           actions={
             <div className="flex flex-wrap items-center gap-2">
               <button
@@ -804,7 +857,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                 Exportar
               </button>
               <button type="button" onClick={handleNovaConta} className={btnPrimary}>
-                <CreditCard className="h-4 w-4" />
+                <Plus className="h-4 w-4" />
                 Nova Conta
               </button>
             </div>
@@ -812,98 +865,92 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
         />
 
         {!loading && !error && resumoFinanceiro ? (
-          <InlineStats
-            stats={[
-              {
-                label: 'Vencendo hoje',
-                value: moneyFmt.format(resumoFinanceiro.totalVencendoHoje),
-                tone: 'warning',
-              },
-              {
-                label: 'Total do mes',
-                value: moneyFmt.format(resumoFinanceiro.totalMes),
-                tone: 'neutral',
-              },
-              {
-                label: 'Atrasado',
-                value: moneyFmt.format(resumoFinanceiro.totalAtrasado),
-                tone: 'warning',
-              },
-              {
-                label: 'Pago no mes',
-                value: moneyFmt.format(resumoFinanceiro.totalPagoMes),
-                tone: 'accent',
-              },
-              { label: 'Em aberto', value: String(totalAberto), tone: 'warning' },
-              { label: 'Pagas', value: String(totalPago), tone: 'accent' },
-              { label: 'Vencidas', value: String(totalVencido), tone: 'warning' },
-              { label: 'Valor da lista', value: moneyFmt.format(valorLista), tone: 'neutral' },
-            ]}
-          />
+          <>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {painelMetricas.map((item) => (
+                <div key={item.label} className="rounded-xl border border-[#D2E1E8] bg-white px-4 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#5F7B89]">
+                    {item.label}
+                  </p>
+                  <p className={`mt-1 text-lg font-semibold ${item.highlightClass}`}>{item.value}</p>
+                  <p className="mt-1 text-xs text-[#688390]">{item.hint}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-4 rounded-2xl border border-[#D4E1E8] bg-gradient-to-br from-[#F7FBFD] to-[#F1F7FA] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
+              <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_220px_auto]">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Buscar contas</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
+                    <input
+                      type="text"
+                      value={termoBusca}
+                      onChange={(e) => setTermoBusca(e.target.value)}
+                      placeholder="Numero, fornecedor, descricao, documento..."
+                      className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Categoria</label>
+                  <select
+                    value={filtroCategoria}
+                    onChange={(e) => setFiltroCategoria(e.target.value as FiltroCategoriaUI)}
+                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                  >
+                    <option value="todas">Todas</option>
+                    {Object.values(CategoriaContaPagar).map((categoria) => (
+                      <option key={categoria} value={categoria}>
+                        {CATEGORIA_LABELS[categoria]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-end gap-2">
+                  <button
+                    type="button"
+                    onClick={limparFiltros}
+                    className={btnSecondary}
+                    disabled={!hasFilters}
+                  >
+                    <Filter className="h-4 w-4" />
+                    Limpar
+                  </button>
+                </div>
+              </div>
+
+              <div className="border-t border-[#DCE7EC] pt-3">
+                <div className="flex flex-wrap gap-2">
+                  {quickStatusFilters.map((item) => {
+                    const ativo = filtroStatus === item.key;
+                    return (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => setFiltroStatus(item.key)}
+                        className={`inline-flex h-8 items-center gap-2 rounded-full border px-3 text-xs font-semibold transition ${
+                          ativo
+                            ? 'border-[#159A9C] bg-[#EAF8F8] text-[#0F7B7D]'
+                            : 'border-[#D4E2E7] bg-white text-[#2F4D5C] hover:border-[#159A9C]/45 hover:bg-[#F4FAFB]'
+                        }`}
+                      >
+                        <span>{item.label}</span>
+                        <span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[11px] leading-none">
+                          {item.count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </>
         ) : null}
       </SectionCard>
-
-      <FiltersBar className="p-4">
-        <div className="flex w-full flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
-          <div className="w-full sm:min-w-[300px] sm:flex-1">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Buscar contas</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
-              <input
-                type="text"
-                value={termoBusca}
-                onChange={(e) => setTermoBusca(e.target.value)}
-                placeholder="Número, fornecedor, descrição, documento..."
-                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
-              />
-            </div>
-          </div>
-
-          <div className="w-full sm:w-auto">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Status</label>
-            <select
-              value={filtroStatus}
-              onChange={(e) => setFiltroStatus(e.target.value as FiltroStatusUI)}
-              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[180px]"
-            >
-              <option value="todos">Todos</option>
-              <option value={StatusContaPagar.EM_ABERTO}>Em aberto</option>
-              <option value={StatusContaPagar.PAGO}>Pago</option>
-              <option value={StatusContaPagar.VENCIDO}>Vencido</option>
-              <option value={StatusContaPagar.AGENDADO}>Agendado</option>
-              <option value={StatusContaPagar.CANCELADO}>Cancelado</option>
-            </select>
-          </div>
-
-          <div className="w-full sm:w-auto">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Categoria</label>
-            <select
-              value={filtroCategoria}
-              onChange={(e) => setFiltroCategoria(e.target.value as FiltroCategoriaUI)}
-              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[190px]"
-            >
-              <option value="todas">Todas</option>
-              {Object.values(CategoriaContaPagar).map((categoria) => (
-                <option key={categoria} value={categoria}>
-                  {CATEGORIA_LABELS[categoria]}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-            <button
-              type="button"
-              onClick={limparFiltros}
-              className={btnSecondary}
-              disabled={!hasFilters}
-            >
-              <Filter className="h-4 w-4" />
-              Limpar
-            </button>
-          </div>
-        </div>
-      </FiltersBar>
 
       {contasSelecionadas.size > 0 ? (
         <SectionCard className="p-4">
@@ -1134,7 +1181,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                       Fornecedor
                     </th>
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
-                      Descrição
+                      Descricao
                     </th>
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
                       Categoria
@@ -1152,7 +1199,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                       Status
                     </th>
                     <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
-                      Ações
+                      Acoes
                     </th>
                   </tr>
                 </thead>
@@ -1325,7 +1372,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
               </div>
               <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-[#6A8795]">
-                  Descrição
+                  Descricao
                 </p>
                 <p className="mt-1 text-sm text-[#1D3B4D]">{contaDetalhesSelecionada.descricao}</p>
                 {contaDetalhesSelecionada.numeroDocumento ? (
@@ -1367,7 +1414,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
               <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-[#6A8795]">Datas</p>
                 <p className="mt-2 text-sm text-[#1D3B4D]">
-                  Emissão: {formatDate(contaDetalhesSelecionada.dataEmissao)}
+                  Emissao: {formatDate(contaDetalhesSelecionada.dataEmissao)}
                 </p>
                 <p className="mt-1 text-sm text-[#1D3B4D]">
                   Vencimento: {formatDate(contaDetalhesSelecionada.dataVencimento)}
@@ -1460,7 +1507,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                 </p>
               </div>
               <p className="text-sm text-[#64808E]">
-                Esta ação registra o pagamento integral da conta com os dados padrão desta tela.
+                Esta acao registra o pagamento integral da conta com os dados padrao desta tela.
               </p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="rounded-xl border border-[#E8EFF2] bg-white p-4">

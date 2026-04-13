@@ -575,9 +575,13 @@ function CotacaoPage() {
       : null,
   ].filter(Boolean) as Array<{ key: string; label: string; onRemove: () => void }>;
 
-  const renderRowActions = (cotacao: Cotacao) => (
-    <div className="flex items-center gap-1.5">
-      {canSendCotacao && cotacao.status === StatusCotacao.RASCUNHO && (
+  const renderRowActions = (cotacao: Cotacao) => {
+    const semAprovadorEmRascunho =
+      canSendCotacao && cotacao.status === StatusCotacao.RASCUNHO && !cotacao.aprovadorId;
+
+    return (
+      <div className="flex items-center gap-1.5">
+        {canSendCotacao && cotacao.status === StatusCotacao.RASCUNHO && Boolean(cotacao.aprovadorId) && (
         <button
           type="button"
           onClick={(event) => {
@@ -589,8 +593,17 @@ function CotacaoPage() {
         >
           <Send className="h-4 w-4" />
         </button>
-      )}
-      {canUpdateCotacao && (
+        )}
+        {semAprovadorEmRascunho && (
+        <span
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#FFF7E6] text-[#B26A00]"
+          title="Defina um aprovador para habilitar o envio para aprovacao."
+          aria-label="Cotacao sem aprovador definido"
+        >
+          <AlertCircle className="h-4 w-4" />
+        </span>
+        )}
+        {canUpdateCotacao && (
         <button
           type="button"
           onClick={(event) => {
@@ -602,8 +615,8 @@ function CotacaoPage() {
         >
           <Edit3 className="h-4 w-4" />
         </button>
-      )}
-      {canDeleteCotacao && (
+        )}
+        {canDeleteCotacao && (
         <button
           type="button"
           onClick={(event) => {
@@ -615,9 +628,10 @@ function CotacaoPage() {
         >
           <Trash2 className="h-4 w-4" />
         </button>
-      )}
-    </div>
-  );
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-4 pt-1 sm:pt-2">

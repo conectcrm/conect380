@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   AlertCircle,
@@ -14,7 +14,6 @@ import {
   DataTableCard,
   EmptyState,
   FiltersBar,
-  InlineStats,
   LoadingSkeleton,
   PageHeader,
   SectionCard,
@@ -141,7 +140,7 @@ export default function FluxoCaixaPage() {
       setResumo(dadosResumo || resumoInicial);
       setProjecao(dadosProjecao || projecaoInicial);
     } catch (error) {
-      const mensagem = getApiErrorMessage(error, 'Nao foi possivel carregar o fluxo de caixa');
+      const mensagem = getApiErrorMessage(error, 'Não foi possível carregar o fluxo de caixa');
       setErro(mensagem);
       setResumo(resumoInicial);
       setProjecao(projecaoInicial);
@@ -155,30 +154,36 @@ export default function FluxoCaixaPage() {
     void carregarDados();
   }, []);
 
-  const stats = useMemo(
+  const painelMetricas = useMemo(
     () => [
       {
         label: 'Saldo realizado',
         value: moneyFmt.format(resumo.totais.saldoLiquidoRealizado),
-        tone: resumo.totais.saldoLiquidoRealizado >= 0 ? ('accent' as const) : ('warning' as const),
+        highlightClass:
+          resumo.totais.saldoLiquidoRealizado >= 0 ? 'text-[#137A42]' : 'text-[#B4233A]',
+        hint: `Entradas ${moneyFmt.format(resumo.totais.entradasRealizadas)}`,
       },
       {
         label: 'Saldo previsto',
         value: moneyFmt.format(resumo.totais.saldoLiquidoPrevisto),
-        tone: resumo.totais.saldoLiquidoPrevisto >= 0 ? ('accent' as const) : ('warning' as const),
+        highlightClass:
+          resumo.totais.saldoLiquidoPrevisto >= 0 ? 'text-[#137A42]' : 'text-[#B4233A]',
+        hint: `Saídas ${moneyFmt.format(resumo.totais.saidasPrevistas)}`,
       },
       {
         label: 'Entradas previstas',
         value: moneyFmt.format(projecao.totalEntradasPrevistas),
-        tone: 'neutral' as const,
+        highlightClass: 'text-[#1E66B4]',
+        hint: `Horizonte ${projecao.dias} dias`,
       },
       {
-        label: 'Saidas previstas',
+        label: 'Saídas previstas',
         value: moneyFmt.format(projecao.totalSaidasPrevistas),
-        tone: 'neutral' as const,
+        highlightClass: 'text-[#A86400]',
+        hint: `Saldo projetado ${moneyFmt.format(projecao.saldoProjetado)}`,
       },
     ],
-    [resumo, projecao],
+    [projecao, resumo],
   );
 
   const hasFilters =
@@ -207,87 +212,115 @@ export default function FluxoCaixaPage() {
 
   return (
     <div className="space-y-5">
-      <SectionCard className="space-y-4 p-5">
+      <SectionCard className="space-y-[18px] border-[#CBDAE2] bg-gradient-to-br from-white via-white to-[#F3FAF8] shadow-[0_24px_46px_-34px_rgba(16,57,74,0.38)] p-5">
         <PageHeader
-          title="Fluxo de Caixa"
-          description="Consolidado de entradas e saidas realizadas, previstas e projecao de curto prazo."
+          eyebrow={
+            <span className="inline-flex items-center rounded-full border border-[#BFD9E2] bg-[#EFF8FB] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#3F6A7C]">
+              Núcleo Financeiro
+            </span>
+          }
+          title={
+            <span className="text-[27px] font-bold leading-[1.03] tracking-[-0.018em] text-[#002333] sm:text-[28px]">
+              Fluxo de <span className="text-[#0F7B7D]">Caixa</span>
+            </span>
+          }
+          titleClassName="leading-none sm:inline-flex sm:items-center"
+          description="Visão consolidada de entradas, saídas e projeções de curto prazo."
+          descriptionClassName="max-w-[64ch] text-[12px] leading-[1.4] text-[#5B7A89] sm:border-l sm:border-[#D7E5EC] sm:pl-3 sm:text-[13px]"
+          inlineDescriptionOnDesktop
           actions={
             <button type="button" onClick={() => void carregarDados()} className={btnSecondary}>
-              <RefreshCw className="h-4 w-4" />
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               Atualizar
             </button>
           }
         />
 
-        {!loading && !erro ? <InlineStats stats={stats} /> : null}
-      </SectionCard>
-
-      <FiltersBar className="p-4">
-        <div className="flex w-full flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
-          <div className="w-full sm:w-auto">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Data inicio</label>
-            <input
-              type="date"
-              value={dataInicio}
-              onChange={(event) => setDataInicio(event.target.value)}
-              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[170px]"
-            />
-          </div>
-
-          <div className="w-full sm:w-auto">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Data fim</label>
-            <input
-              type="date"
-              value={dataFim}
-              onChange={(event) => setDataFim(event.target.value)}
-              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[170px]"
-            />
-          </div>
-
-          <div className="w-full sm:w-auto">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Agrupamento</label>
-            <select
-              value={agrupamento}
-              onChange={(event) => setAgrupamento(event.target.value as AgrupamentoFluxoCaixa)}
-              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[150px]"
-            >
-              <option value="dia">Dia</option>
-              <option value="semana">Semana</option>
-              <option value="mes">Mes</option>
-            </select>
-          </div>
-
-          <div className="w-full sm:w-auto">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Janela projecao</label>
-            <select
-              value={String(janelaDias)}
-              onChange={(event) => setJanelaDias(Number(event.target.value))}
-              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[150px]"
-            >
-              <option value="7">7 dias</option>
-              <option value="15">15 dias</option>
-              <option value="30">30 dias</option>
-              <option value="60">60 dias</option>
-            </select>
-          </div>
-
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-            <button type="button" onClick={() => void buscar()} className={btnPrimary}>
-              <Search className="h-4 w-4" />
-              Buscar
-            </button>
-            <button
-              type="button"
-              onClick={() => void limparFiltros()}
-              className={btnSecondary}
-              disabled={!hasFilters}
-            >
-              <Filter className="h-4 w-4" />
-              Limpar
-            </button>
-          </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {painelMetricas.map((item) => (
+            <div key={item.label} className="rounded-xl border border-[#D2E1E8] bg-white px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[#5F7B89]">
+                {item.label}
+              </p>
+              <p className={`mt-1 text-lg font-semibold ${item.highlightClass}`}>
+                {loading ? '--' : item.value}
+              </p>
+              <p className="mt-1 text-xs text-[#688390]">{item.hint}</p>
+            </div>
+          ))}
         </div>
-      </FiltersBar>
+
+        <div className="pt-1">
+          <FiltersBar className="space-y-4 rounded-2xl border border-[#D4E1E8] bg-gradient-to-br from-[#F7FBFD] to-[#F1F7FA] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
+            <div className="flex w-full flex-col gap-4">
+              <div className="grid grid-cols-1 gap-3 xl:grid-cols-[170px_170px_150px_150px_auto]">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Data início</label>
+                  <input
+                    type="date"
+                    value={dataInicio}
+                    onChange={(event) => setDataInicio(event.target.value)}
+                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Data fim</label>
+                  <input
+                    type="date"
+                    value={dataFim}
+                    onChange={(event) => setDataFim(event.target.value)}
+                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Agrupamento</label>
+                  <select
+                    value={agrupamento}
+                    onChange={(event) => setAgrupamento(event.target.value as AgrupamentoFluxoCaixa)}
+                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                  >
+                    <option value="dia">Dia</option>
+                    <option value="semana">Semana</option>
+                    <option value="mes">Mês</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Janela projeção</label>
+                  <select
+                    value={String(janelaDias)}
+                    onChange={(event) => setJanelaDias(Number(event.target.value))}
+                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                  >
+                    <option value="7">7 dias</option>
+                    <option value="15">15 dias</option>
+                    <option value="30">30 dias</option>
+                    <option value="60">60 dias</option>
+                  </select>
+                </div>
+
+                <div className="flex items-end gap-2">
+                  <button type="button" onClick={() => void buscar()} className={btnPrimary}>
+                    <Search className="h-4 w-4" />
+                    Buscar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void limparFiltros()}
+                    className={btnSecondary}
+                    disabled={!hasFilters}
+                  >
+                    <Filter className="h-4 w-4" />
+                    Limpar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </FiltersBar>
+        </div>
+      </SectionCard>
 
       {loading ? <LoadingSkeleton lines={8} /> : null}
 
@@ -308,8 +341,8 @@ export default function FluxoCaixaPage() {
       {!loading && !erro && resumo.serie.length === 0 ? (
         <EmptyState
           icon={<LineChart className="h-5 w-5" />}
-          title="Nenhum dado encontrado para o periodo"
-          description="Ajuste o intervalo para consultar movimentacoes de caixa."
+          title="Nenhum dado encontrado para o período"
+          description="Ajuste o intervalo para consultar movimentações de caixa."
           action={
             hasFilters ? (
               <button type="button" onClick={() => void limparFiltros()} className={btnSecondary}>
@@ -325,9 +358,9 @@ export default function FluxoCaixaPage() {
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
           <DataTableCard>
             <div className="border-b border-[#E1EAEE] bg-[#F8FBFC] px-5 py-3">
-              <h3 className="text-sm font-semibold text-[#173A4D]">Resumo por periodo</h3>
+              <h3 className="text-sm font-semibold text-[#173A4D]">Resumo por período</h3>
               <p className="mt-0.5 text-xs text-[#5F7B89]">
-                {resumo.periodoInicio} ate {resumo.periodoFim} ({resumo.agrupamento})
+                {resumo.periodoInicio} até {resumo.periodoFim} ({resumo.agrupamento})
               </p>
             </div>
             <div className="max-h-[60vh] overflow-auto">
@@ -335,19 +368,19 @@ export default function FluxoCaixaPage() {
                 <thead className="sticky top-0 z-10 bg-white shadow-[0_1px_0_0_#E1EAEE]">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
-                      Periodo
+                      Período
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
                       Entr. realizadas
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
-                      Saidas realizadas
+                      Saídas realizadas
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
                       Entr. previstas
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
-                      Saidas previstas
+                      Saídas previstas
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
                       Saldo
@@ -393,9 +426,9 @@ export default function FluxoCaixaPage() {
 
           <DataTableCard>
             <div className="border-b border-[#E1EAEE] bg-[#F8FBFC] px-5 py-3">
-              <h3 className="text-sm font-semibold text-[#173A4D]">Projecao diaria</h3>
+              <h3 className="text-sm font-semibold text-[#173A4D]">Projeção diária</h3>
               <p className="mt-0.5 text-xs text-[#5F7B89]">
-                De {projecao.baseEm} ate {projecao.ate} ({projecao.dias} dias)
+                De {projecao.baseEm} até {projecao.ate} ({projecao.dias} dias)
               </p>
             </div>
 
@@ -407,7 +440,7 @@ export default function FluxoCaixaPage() {
                 </p>
               </div>
               <div className="rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3">
-                <p className="text-xs text-[#6A8794]">Saidas previstas</p>
+                <p className="text-xs text-[#6A8794]">Saídas previstas</p>
                 <p className="mt-1 text-sm font-semibold text-[#B4233A]">
                   {moneyFmt.format(projecao.totalSaidasPrevistas)}
                 </p>
@@ -435,7 +468,7 @@ export default function FluxoCaixaPage() {
                       Entradas
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
-                      Saidas
+                      Saídas
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
                       Saldo acumulado

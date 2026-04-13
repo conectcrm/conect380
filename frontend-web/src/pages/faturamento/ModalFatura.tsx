@@ -286,6 +286,7 @@ export default function ModalFatura({
 }: ModalFaturaProps) {
   const { user } = useAuth();
   const usuarioResponsavelId = String(user?.id || '').trim();
+  const isEditMode = Boolean(fatura?.id);
   const financeiroFeatureFlags = getFinanceiroFeatureFlags();
   const opcoesFormaPagamento = useMemo(() => {
     const opcoes: Array<{ value: FormaPagamento; label: string }> = [
@@ -356,10 +357,32 @@ export default function ModalFatura({
     descricao?: string;
   } | null>(null);
 
+  const isLancamentoAvulso = useMemo(() => {
+    if (!fatura) {
+      return false;
+    }
+
+    const metadados = (fatura.metadados || null) as Record<string, unknown> | null;
+    const origemTitulo = String(metadados?.origemTitulo || '')
+      .trim()
+      .toLowerCase();
+    const origemOperacional = String(metadados?.origemOperacional || '')
+      .trim()
+      .toLowerCase();
+
+    if (origemTitulo === 'avulso' || origemOperacional === 'avulso') {
+      return true;
+    }
+
+    return fatura.tipo === TipoFatura.ADICIONAL && !fatura.contratoId;
+  }, [fatura]);
+
   const tipoExigeContrato =
     formData.tipo === TipoFatura.RECORRENTE ||
     formData.tipo === TipoFatura.PARCELA ||
     formData.tipo === TipoFatura.ADICIONAL;
+  const tipoExigeContratoNoContextoAtual =
+    tipoExigeContrato && !(formData.tipo === TipoFatura.ADICIONAL && isLancamentoAvulso);
 
   useEffect(() => {
     if (!isOpen) {
@@ -497,6 +520,10 @@ export default function ModalFatura({
 
   // Handlers para mudança dos selects
   const handleClienteChange = (cliente: typeof clienteSelecionado) => {
+    if (isEditMode) {
+      return;
+    }
+
     setClienteSelecionado(cliente);
     setFormData((prev) => ({
       ...prev,
@@ -515,6 +542,10 @@ export default function ModalFatura({
   };
 
   const handleContratoChange = (contrato: typeof contratoSelecionado) => {
+    if (isEditMode) {
+      return;
+    }
+
     setContratoSelecionado(contrato);
     setFormData((prev) => ({
       ...prev,
@@ -524,6 +555,10 @@ export default function ModalFatura({
   };
 
   const handleTipoFaturaChange = (tipo: TipoFatura) => {
+    if (isEditMode) {
+      return;
+    }
+
     setFormData((prev) => ({ ...prev, tipo }));
     setErros((prev) => ({ ...prev, contratoId: undefined, configuracaoTipo: undefined }));
   };
@@ -652,8 +687,12 @@ export default function ModalFatura({
     }
 
     // Regras condicionais por tipo de fatura
-    if (tipoExigeContrato && (!formData.contratoId || formData.contratoId.trim() === '')) {
-      novosErros.contratoId = 'Contrato é obrigatório para este tipo de fatura.';
+    if (
+      tipoExigeContratoNoContextoAtual &&
+      (!formData.contratoId || formData.contratoId.trim() === '')
+    ) {
+      novosErros.contratoId =
+        'Contrato e obrigatorio para este tipo de fatura. Se for lancamento sem contrato, use Contas a Receber (avulso).';
     }
 
     // Validar data de vencimento
@@ -664,7 +703,7 @@ export default function ModalFatura({
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
 
-      if (dataVencimento < hoje) {
+      if (!isEditMode && dataVencimento < hoje) {
         novosErros.dataVencimento = 'Data de vencimento não pode ser anterior a hoje.';
       }
     }
@@ -843,10 +882,17 @@ export default function ModalFatura({
           <div className="space-y-6">
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <div>
+                {isEditMode && (
+                  <p className="mb-2 text-xs text-[#5E7784]">
+                    Cliente, contrato e tipo nao podem ser alterados na edicao para preservar a
+                    rastreabilidade financeira.
+                  </p>
+                )}
                 <ClienteSelect
                   value={clienteSelecionado}
                   onChange={handleClienteChange}
                   required={true}
+                  disabled={salvando || isEditMode}
                   className="w-full"
                   error={erros.clienteId}
                 />
@@ -858,6 +904,7 @@ export default function ModalFatura({
                   onChange={handleContratoChange}
                   clienteId={clienteSelecionado?.id}
                   required={false}
+                  disabled={salvando || isEditMode}
                   className="w-full"
                 />
                 {erros.contratoId && <p className="mt-1 text-sm text-red-600">{erros.contratoId}</p>}
@@ -894,7 +941,8 @@ export default function ModalFatura({
               <select
                 value={formData.tipo}
                 onChange={(e) => handleTipoFaturaChange(e.target.value as TipoFatura)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1A9E87]/15"
+                disabled={salvando || isEditMode}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1A9E87]/15 disabled:cursor-not-allowed disabled:bg-gray-100"
               >
                 <option value={TipoFatura.UNICA}>Única</option>
                 <option value={TipoFatura.RECORRENTE}>Recorrente</option>
@@ -1014,9 +1062,16 @@ export default function ModalFatura({
                 Configuração por tipo de fatura
               </h3>
 
-              {tipoExigeContrato && (
+              {tipoExigeContratoNoContextoAtual && (
                 <p className="text-xs text-[#5E7784]">
-                  Este tipo de fatura deve estar vinculado a um contrato.
+                  Este tipo de fatura deve estar vinculado a um contrato. Para lancamento sem
+                  contrato, use Contas a Receber (avulso).
+                </p>
+              )}
+              {!tipoExigeContratoNoContextoAtual && formData.tipo === TipoFatura.ADICIONAL && (
+                <p className="text-xs text-[#5E7784]">
+                  Lancamento avulso detectado: manter sem contrato e gerenciar pelo fluxo de Contas
+                  a Receber.
                 </p>
               )}
 

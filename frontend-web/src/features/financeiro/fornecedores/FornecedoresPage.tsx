@@ -23,7 +23,6 @@ import {
   DataTableCard,
   EmptyState,
   FiltersBar,
-  InlineStats,
   LoadingSkeleton,
   PageHeader,
   SectionCard,
@@ -47,12 +46,6 @@ const btnPrimary =
   'inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition hover:bg-[#117C7E] disabled:opacity-60 disabled:cursor-not-allowed';
 const btnSecondary =
   'inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB] disabled:opacity-60 disabled:cursor-not-allowed';
-const btnDanger =
-  'inline-flex h-9 items-center gap-2 rounded-lg bg-[#C03449] px-3 text-sm font-medium text-white transition hover:bg-[#A32A3D] disabled:opacity-60 disabled:cursor-not-allowed';
-const btnSuccess =
-  'inline-flex h-9 items-center gap-2 rounded-lg bg-[#14804A] px-3 text-sm font-medium text-white transition hover:bg-[#0E6B3E] disabled:opacity-60 disabled:cursor-not-allowed';
-const btnWarning =
-  'inline-flex h-9 items-center gap-2 rounded-lg bg-[#B56E16] px-3 text-sm font-medium text-white transition hover:bg-[#955A10] disabled:opacity-60 disabled:cursor-not-allowed';
 
 const exportColumns: ExportColumn[] = [
   { key: 'nome', label: 'Nome' },
@@ -335,6 +328,32 @@ export default function FornecedoresPage() {
   const hasFilters = busca.trim().length > 0 || filtroStatus !== 'todos';
   const allSelected = fornecedores.length > 0 && selecionados.size === fornecedores.length;
   const partialSelected = selecionados.size > 0 && selecionados.size < fornecedores.length;
+  const painelMetricas = [
+    {
+      label: 'Total fornecedores',
+      value: String(total),
+      hint: `${selecionados.size} selecionado${selecionados.size === 1 ? '' : 's'}`,
+      highlightClass: 'text-[#123E52]',
+    },
+    {
+      label: 'Ativos',
+      value: String(ativos),
+      hint: 'Com operacao habilitada',
+      highlightClass: 'text-[#0F7B7D]',
+    },
+    {
+      label: 'Inativos',
+      value: String(inativos),
+      hint: 'Sem operacao no momento',
+      highlightClass: 'text-[#B56E16]',
+    },
+    {
+      label: 'Novos hoje',
+      value: String(novosHoje),
+      hint: 'Cadastros do dia',
+      highlightClass: 'text-[#173A4D]',
+    },
+  ];
 
   useEffect(() => {
     if (selectAllRef.current) {
@@ -383,52 +402,82 @@ export default function FornecedoresPage() {
 
   return (
     <div className="space-y-4 pt-1 sm:pt-2">
-      <SectionCard className="space-y-4 p-4 sm:p-5">
+      <SectionCard className="space-y-[18px] border-[#CBDAE2] bg-gradient-to-br from-white via-white to-[#F3FAF8] p-5 shadow-[0_24px_46px_-34px_rgba(16,57,74,0.38)]">
         <PageHeader
-          title="Fornecedores"
+          eyebrow={
+            <span className="inline-flex items-center rounded-full border border-[#BFD9E2] bg-[#EFF8FB] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#3F6A7C]">
+              Nucleo Financeiro
+            </span>
+          }
+          title={
+            <span className="text-[27px] font-bold leading-[1.03] tracking-[-0.018em] text-[#002333] sm:text-[28px]">
+              <span className="text-[#0F7B7D]">Fornecedores</span>
+            </span>
+          }
+          titleClassName="leading-none sm:inline-flex sm:items-center"
           description={
             carregando
               ? 'Carregando fornecedores...'
               : `Gerencie ${total} fornecedores e parceiros comerciais.`
           }
+          descriptionClassName="max-w-[64ch] text-[12px] leading-[1.4] text-[#5B7A89] sm:border-l sm:border-[#D7E5EC] sm:pl-3 sm:text-[13px]"
+          inlineDescriptionOnDesktop
           actions={
             <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onClick={() => void carregarFornecedores()} className={btnSecondary} disabled={carregando}>
+              <button
+                type="button"
+                onClick={() => void carregarFornecedores()}
+                className={btnSecondary}
+                disabled={carregando}
+              >
                 <RefreshCw className={`h-4 w-4 ${carregando ? 'animate-spin' : ''}`} />
                 Atualizar
               </button>
-              <button type="button" onClick={exportarParaCSV} className={btnSecondary} disabled={!fornecedores.length}>
+              <button
+                type="button"
+                onClick={exportarParaCSV}
+                className={btnSecondary}
+                disabled={!fornecedores.length}
+              >
                 <Download className="h-4 w-4" />
                 CSV
               </button>
-              <button type="button" onClick={exportarParaExcel} className={btnSecondary} disabled={!fornecedores.length}>
+              <button
+                type="button"
+                onClick={exportarParaExcel}
+                className={btnSecondary}
+                disabled={!fornecedores.length}
+              >
                 <FileSpreadsheet className="h-4 w-4" />
                 Excel
               </button>
               <button type="button" onClick={abrirModalCriacao} className={btnPrimary}>
                 <Plus className="h-4 w-4" />
-                Novo Fornecedor
+                Novo fornecedor
               </button>
             </div>
           }
         />
 
-        {!carregando && !erro ? (
-          <InlineStats
-            stats={[
-              { label: 'Total', value: String(total), tone: 'neutral' },
-              { label: 'Ativos', value: String(ativos), tone: 'accent' },
-              { label: 'Inativos', value: String(inativos), tone: 'warning' },
-              { label: 'Novos hoje', value: String(novosHoje), tone: 'neutral' },
-              { label: 'Selecionados', value: String(selecionados.size), tone: 'accent' },
-            ]}
-          />
-        ) : null}
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {painelMetricas.map((item) => (
+            <div key={item.label} className="rounded-xl border border-[#D2E1E8] bg-white px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[#5F7B89]">
+                {item.label}
+              </p>
+              <p className={`mt-1 text-lg font-semibold ${item.highlightClass}`}>
+                {carregando ? '--' : item.value}
+              </p>
+              <p className="mt-1 text-xs text-[#688390]">{item.hint}</p>
+            </div>
+          ))}
+        </div>
       </SectionCard>
 
-      <FiltersBar className="p-4">
-        <div className="flex w-full flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
-          <div className="w-full sm:min-w-[280px] sm:flex-1">
+      <FiltersBar className="space-y-4 rounded-2xl border border-[#D4E1E8] bg-gradient-to-br from-[#F7FBFD] to-[#F1F7FA] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
+        <div className="flex w-full flex-col gap-4">
+          <div className="flex w-full flex-col gap-3 xl:flex-row xl:items-end">
+            <div className="w-full xl:flex-1">
             <label className="mb-2 block text-sm font-medium text-[#385A6A]">Buscar fornecedores</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
@@ -443,65 +492,94 @@ export default function FornecedoresPage() {
             </div>
           </div>
 
-          <div className="w-full sm:w-auto">
+            <div className="w-full xl:w-[220px]">
             <label className="mb-2 block text-sm font-medium text-[#385A6A]">Status</label>
             <select
               value={filtroStatus}
               onChange={(e) => setFiltroStatus(e.target.value as FiltroStatus)}
-              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[180px]"
+              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
             >
-              <option value="todos">Todos</option>
+              <option value="todos">Todos os status</option>
               <option value="ativo">Ativos</option>
               <option value="inativo">Inativos</option>
             </select>
-          </div>
+            </div>
 
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-            <button type="button" onClick={() => void buscarFornecedores()} className={btnPrimary}>
-              <Search className="h-4 w-4" />
-              Buscar
-            </button>
-            <button type="button" onClick={() => void limparFiltros()} className={btnSecondary} disabled={!hasFilters}>
-              <Filter className="h-4 w-4" />
-              Limpar
-            </button>
+            <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:justify-end">
+              <button type="button" onClick={() => void buscarFornecedores()} className={btnPrimary}>
+                <Search className="h-4 w-4" />
+                Buscar
+              </button>
+              <button
+                type="button"
+                onClick={() => void limparFiltros()}
+                className={btnSecondary}
+                disabled={!hasFilters}
+              >
+                <Filter className="h-4 w-4" />
+                Limpar
+              </button>
+            </div>
           </div>
         </div>
       </FiltersBar>
 
       {selecionados.size > 0 ? (
-        <SectionCard className="p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="inline-flex items-center gap-2 rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-3 py-1 font-semibold text-[#0F7B7D]">
-                <CheckCircle className="h-4 w-4" />
-                {selecionados.size} selecionado{selecionados.size === 1 ? '' : 's'}
-              </span>
-              <button type="button" onClick={deselecionarTodos} className={btnSecondary}>
-                <X className="h-4 w-4" />
-                Limpar selecao
-              </button>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onClick={() => void ativarSelecionados()} className={btnSuccess}>
-                <Check className="h-4 w-4" />
-                Ativar
-              </button>
-              <button type="button" onClick={() => void desativarSelecionados()} className={btnWarning}>
-                <X className="h-4 w-4" />
-                Desativar
-              </button>
-              <button type="button" onClick={exportarSelecionados} className={btnSecondary}>
-                <Download className="h-4 w-4" />
-                Exportar
-              </button>
-              <button type="button" onClick={() => void excluirSelecionados()} className={btnDanger}>
-                <Trash2 className="h-4 w-4" />
-                Excluir
-              </button>
+        <div className="rounded-xl border border-[#D4E2E7] bg-white p-3 sm:p-4">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="inline-flex items-center gap-2 rounded-full border border-[#D4E2E7] bg-[#F6FAFB] px-3 py-1 text-sm font-medium text-[#244455]">
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#159A9C] text-white">
+                    <CheckCircle className="h-3.5 w-3.5" />
+                  </span>
+                  {selecionados.size} fornecedor(es) selecionado(s)
+                </span>
+                <button
+                  type="button"
+                  onClick={deselecionarTodos}
+                  className="text-sm font-medium text-[#1A9E87] underline underline-offset-2 transition-colors hover:text-[#127A6B]"
+                >
+                  Desmarcar todos
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void ativarSelecionados()}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition-colors hover:bg-[#0F7B7D]"
+                >
+                  <Check className="h-4 w-4" />
+                  Ativar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void desativarSelecionados()}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition-colors hover:bg-[#F6FAFB]"
+                >
+                  <X className="h-4 w-4" />
+                  Desativar
+                </button>
+                <button
+                  type="button"
+                  onClick={exportarSelecionados}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition-colors hover:bg-[#F6FAFB]"
+                >
+                  <Download className="h-4 w-4" />
+                  Exportar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void excluirSelecionados()}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#D92D20] px-3 text-sm font-medium text-white transition-colors hover:bg-[#B42318]"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Excluir
+                </button>
+              </div>
             </div>
           </div>
-        </SectionCard>
+        </div>
       ) : null}
 
       {carregando ? <LoadingSkeleton lines={8} /> : null}
@@ -563,7 +641,7 @@ export default function FornecedoresPage() {
                 className={btnSecondary}
               >
                 <CheckCircle className="h-4 w-4" />
-                {allSelected ? 'Desmarcar todos' : 'Selecionar todos'}
+                {allSelected ? 'Desmarcar visiveis' : 'Selecionar visiveis'}
               </button>
             </div>
           </div>

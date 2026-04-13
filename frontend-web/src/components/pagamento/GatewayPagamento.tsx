@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Building, Check, CreditCard, Smartphone, X } from 'lucide-react';
 import { getFinanceiroFeatureFlags } from '../../config/financeiroFeatureFlags';
 import { Fatura } from '../../services/faturamentoService';
@@ -180,7 +180,7 @@ export default function GatewayPagamento({
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#E1EAEE] bg-white p-6">
           <div>
             <h2 className="text-xl font-semibold text-[#173A4D]">Pagamento da fatura</h2>
-            <p className="text-gray-600">
+            <p className="text-sm text-[#5D7A88]">
               #{fatura.numero} - {formatarValorCompletoBRL(fatura.valorTotal)}
             </p>
           </div>
@@ -196,7 +196,7 @@ export default function GatewayPagamento({
         <div className="space-y-6 p-6">
           {!transacaoAtual ? (
             <>
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+              <div className="rounded-xl border border-[#F6D7B2] bg-[#FFF8EE] p-4 text-sm text-[#7A4B00]">
                 <div className="mb-2 flex items-start gap-2">
                   <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                   <strong>Protecao de regra de negocio ativa</strong>
@@ -206,11 +206,11 @@ export default function GatewayPagamento({
               </div>
 
               <div>
-                <h3 className="mb-4 text-lg font-medium text-gray-900">
+                <h3 className="mb-4 text-lg font-medium text-[#173A4D]">
                   Escolha o metodo de pagamento
                 </h3>
                 {metodosDisponiveis.length === 0 ? (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                  <div className="rounded-xl border border-[#F6D7B2] bg-[#FFF8EE] p-4 text-sm text-[#9B5A00]">
                     Nenhum metodo de pagamento online esta disponivel no ambiente atual.
                   </div>
                 ) : (
@@ -230,14 +230,14 @@ export default function GatewayPagamento({
                             className={
                               metodoSelecionado?.id === metodo.id
                                 ? 'text-[#159A9C]'
-                                : 'text-gray-400'
+                                : 'text-[#7C96A3]'
                             }
                           >
                             {metodo.icone}
                           </div>
-                          <span className="font-medium text-gray-900">{metodo.nome}</span>
+                          <span className="font-medium text-[#173A4D]">{metodo.nome}</span>
                         </div>
-                        <div className="text-sm text-gray-600">
+                        <div className="text-sm text-[#5D7A88]">
                           <div>Taxa: {metodo.taxa}%</div>
                           <div>
                             Compensacao:{' '}
@@ -260,21 +260,21 @@ export default function GatewayPagamento({
 
               {metodoSelecionado ? (
                 <div className="rounded-xl border border-[#D4E2E7] bg-[#F8FCFC] p-6">
-                  <h4 className="mb-2 font-medium text-gray-900">{metodoSelecionado.nome}</h4>
-                  <p className="text-sm text-gray-700">{getResumoMetodo(metodoSelecionado.tipo)}</p>
+                  <h4 className="mb-2 font-medium text-[#173A4D]">{metodoSelecionado.nome}</h4>
+                  <p className="text-sm text-[#5D7A88]">{getResumoMetodo(metodoSelecionado.tipo)}</p>
                 </div>
               ) : null}
 
               {metodoSelecionado ? (
                 <div className="rounded-xl border border-[#D4E2E7] bg-white p-6">
-                  <h4 className="mb-4 font-medium text-gray-900">Resumo da solicitacao</h4>
+                  <h4 className="mb-4 font-medium text-[#173A4D]">Resumo da solicitacao</h4>
                   <div className="space-y-2">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Valor da fatura:</span>
+                      <span className="text-[#5D7A88]">Valor da fatura:</span>
                       <span className="font-medium">{formatarValorCompletoBRL(valorTotal)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">
+                      <span className="text-[#5D7A88]">
                         Taxa do metodo ({metodoSelecionado.taxa}%):
                       </span>
                       <span className="font-medium">
@@ -317,15 +317,15 @@ export default function GatewayPagamento({
             </>
           ) : (
             <div className="space-y-4 text-center">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-                <Check className="h-8 w-8 text-green-600" />
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#ECF7F3]">
+                <Check className="h-8 w-8 text-[#067647]" />
               </div>
-              <h3 className="text-xl font-semibold text-green-900">Solicitacao registrada</h3>
-              <p className="text-gray-600">
+              <h3 className="text-xl font-semibold text-[#0E4B35]">Solicitacao registrada</h3>
+              <p className="text-[#5D7A88]">
                 O backend recebeu a solicitacao. A baixa financeira depende da confirmacao oficial
                 do processamento.
               </p>
-              <p className="text-xs text-gray-500">Referencia: {transacaoAtual.id}</p>
+              <p className="text-xs text-[#6D8794]">Referencia: {transacaoAtual.id}</p>
               <div className="flex justify-center gap-3 pt-2">
                 <button
                   onClick={onFechar}

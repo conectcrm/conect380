@@ -15,6 +15,7 @@ import {
 import { Fatura, StatusFatura } from '../../services/faturamentoService';
 import { formatarValorCompletoBRL } from '../../utils/formatacao';
 import { daysUntilDate, parseDateToLocalDay, startOfLocalDay } from '../../utils/dateOnly';
+import { SectionCard } from '../layout-v2';
 
 interface TemplateEmail {
   id: string;
@@ -356,79 +357,47 @@ export default function EmailAutomacao({ faturas, onEnviarEmail }: EmailAutomaca
   };
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-2xl border border-[#D4E2E7] bg-white p-6 shadow-sm">
-        <div className="flex justify-between items-start">
-          <div>
-            <h2 className="mb-2 text-xl font-semibold text-[#002333]">Automação de E-mails</h2>
-            <p className="text-[#4F6B79]">Disparo em lote para vencimento, atraso e cobrança.</p>
-            <p className="mt-1 text-xs text-[#6E8794]">
-              Templates e historico desta aba sao locais por navegador/usuario e nao substituem a
-              auditoria oficial do backend.
-            </p>
-          </div>
-          <button
-            onClick={() => setModalTemplate(true)}
-            className="px-4 py-2 bg-[#159A9C] text-white rounded-md hover:bg-[#117C7E] flex items-center gap-2"
-          >
-            <Settings className="w-4 h-4" />
-            Gerenciar templates
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="rounded-2xl border border-[#D4E2E7] bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <Clock className="w-6 h-6 text-yellow-600" />
-            </div>
+    <div className="space-y-4">
+      <SectionCard className="border-[#CBDCE4] bg-white p-4 sm:p-5 shadow-[0_22px_40px_-32px_rgba(16,57,74,0.34)]">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <div className="text-2xl font-bold text-gray-900">{faturasVencendo.length}</div>
-              <div className="text-sm text-gray-500">Vencem em até 3 dias</div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#476776]">Automacao da aba</p>
+              <p className="mt-1 text-sm text-[#5D7A88]">Disparo em lote para vencimento, atraso e cobranca.</p>
             </div>
+            <button
+              onClick={() => setModalTemplate(true)}
+              className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition hover:bg-[#117C7E]"
+            >
+              <Settings className="h-4 w-4" />
+              Gerenciar templates
+            </button>
           </div>
-        </div>
 
-        <div className="rounded-2xl border border-[#D4E2E7] bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-              <AlertCircle className="w-6 h-6 text-red-600" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-900">{faturasVencidas.length}</div>
-              <div className="text-sm text-gray-500">Faturas vencidas</div>
-            </div>
+          <div className="flex flex-wrap items-center gap-2 border-t border-[#DFE9ED] pt-3">
+            <span className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-[#F8FBFC] px-3 py-1 text-xs font-medium text-[#355563]">
+              Vencem em ate 3 dias {faturasVencendo.length}
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-[#F8FBFC] px-3 py-1 text-xs font-medium text-[#355563]">
+              Faturas vencidas {faturasVencidas.length}
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-[#F8FBFC] px-3 py-1 text-xs font-medium text-[#355563]">
+              Envios processados {emailsEnviados.length}
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-[#F8FBFC] px-3 py-1 text-xs font-medium text-[#355563]">
+              Templates ativos {templatesAtivos.length}
+            </span>
           </div>
-        </div>
 
-        <div className="rounded-2xl border border-[#D4E2E7] bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <Mail className="w-6 h-6 text-green-600" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-900">{emailsEnviados.length}</div>
-              <div className="text-sm text-gray-500">Envios processados</div>
-            </div>
-          </div>
+          <p className="text-xs text-[#6E8794]">
+            Templates e historico desta aba sao locais por navegador/usuario e nao substituem a
+            auditoria oficial do backend.
+          </p>
         </div>
+      </SectionCard>
 
-        <div className="rounded-2xl border border-[#D4E2E7] bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Users className="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-900">{templatesAtivos.length}</div>
-              <div className="text-sm text-gray-500">Templates ativos</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="rounded-2xl border border-[#D4E2E7] bg-white p-6 shadow-sm">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div className="rounded-xl border border-[#CBDCE4] bg-white p-5 shadow-[0_22px_40px_-32px_rgba(16,57,74,0.34)]">
           <h3 className="mb-4 text-lg font-medium text-[#002333]">Notificações pendentes</h3>
 
           <div className="space-y-4">
@@ -475,12 +444,12 @@ export default function EmailAutomacao({ faturas, onEnviarEmail }: EmailAutomaca
           </div>
         </div>
 
-        <div className="rounded-2xl border border-[#D4E2E7] bg-white p-6 shadow-sm">
-          <h3 className="mb-4 text-lg font-medium text-[#002333]">Últimos envios</h3>
+        <div className="rounded-xl border border-[#CBDCE4] bg-white p-5 shadow-[0_22px_40px_-32px_rgba(16,57,74,0.34)]">
+          <h3 className="mb-4 text-lg font-medium text-[#002333]">Ultimos envios</h3>
 
           <div className="space-y-3">
             {emailsEnviados.slice(0, 8).map((email) => (
-              <div key={email.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div key={email.id} className="flex items-center justify-between rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
                 <div className="flex items-center gap-3">
                   <div className={`w-2.5 h-2.5 rounded-full ${getStatusClasse(email.status)}`} />
                   <div>
@@ -806,5 +775,6 @@ export default function EmailAutomacao({ faturas, onEnviarEmail }: EmailAutomaca
     </div>
   );
 }
+
 
 

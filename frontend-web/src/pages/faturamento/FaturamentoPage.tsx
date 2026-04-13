@@ -7,6 +7,7 @@ import {
   Edit3,
   Trash2,
   FileText,
+  RefreshCw,
   DollarSign,
   Download,
   MoreVertical,
@@ -39,6 +40,7 @@ import {
   FormaPagamento,
   StatusFatura,
   TipoFatura,
+  OrigemFaturaOperacional,
   FiltrosFatura,
   ProntidaoCobranca,
 } from '../../services/faturamentoService';
@@ -68,7 +70,6 @@ import { getPagamentosGatewayUiConfig } from '../../config/pagamentosGatewayFlag
 import {
   DataTableCard,
   FiltersBar,
-  InlineStats,
   PageHeader,
   SectionCard,
 } from '../../components/layout-v2';
@@ -122,6 +123,11 @@ const STATUS_LABELS_FILA: Record<StatusFilaFaturamento, string> = {
   faturamento_liberado: 'Faturamento liberado',
 };
 
+const ORIGEM_FATURA_LABELS: Record<OrigemFaturaOperacional, string> = {
+  faturamento: 'Faturamento (venda/renovacao)',
+  avulso: 'Avulso (contas a receber)',
+};
+
 export default function FaturamentoPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -139,7 +145,10 @@ export default function FaturamentoPage() {
   const [faturaDetalhes, setFaturaDetalhes] = useState<Fatura | null>(null);
   const [faturaPagamentos, setFaturaPagamentos] = useState<Fatura | null>(null);
   const [busca, setBusca] = useState('');
-  const [filtros, setFiltros] = useState<FiltrosFatura>({ periodoCampo: 'vencimento' });
+  const [filtros, setFiltros] = useState<FiltrosFatura>({
+    periodoCampo: 'vencimento',
+    origem: 'faturamento',
+  });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
@@ -163,19 +172,14 @@ export default function FaturamentoPage() {
       return;
     }
 
-    const clienteIdNumerico = Number(clienteIdParam);
-    if (!Number.isInteger(clienteIdNumerico) || clienteIdNumerico <= 0) {
-      return;
-    }
-
     setFiltros((prev) => {
-      if (prev.clienteId === clienteIdNumerico) {
+      if (prev.clienteId === clienteIdParam) {
         return prev;
       }
 
       return {
         ...prev,
-        clienteId: clienteIdNumerico,
+        clienteId: clienteIdParam,
       };
     });
   }, [clienteIdParam]);
@@ -1938,29 +1942,7 @@ export default function FaturamentoPage() {
     }
   };
 
-  const termoBusca = busca.trim().toLowerCase();
-  const faturasFiltradas = faturas.filter((fatura) => {
-    if (clienteIdParam) {
-      const clienteIdFatura = String((fatura as any).cliente?.id || fatura.clienteId || '').trim();
-      if (clienteIdFatura && clienteIdFatura !== clienteIdParam) {
-        return false;
-      }
-    }
-
-    if (!termoBusca) {
-      return true;
-    }
-
-    const numero = fatura.numero.toLowerCase();
-    const nomeCliente = obterNomeCliente(fatura.cliente, fatura.clienteId).toLowerCase();
-    const observacoes = fatura.observacoes?.toLowerCase() ?? '';
-
-    return (
-      numero.includes(termoBusca) ||
-      nomeCliente.includes(termoBusca) ||
-      observacoes.includes(termoBusca)
-    );
-  });
+  const faturasFiltradas = useMemo(() => faturas, [faturas]);
 
   useEffect(() => {
     setMostrarAcoesMassa(faturasSelecionadas.length > 0);
@@ -1975,11 +1957,34 @@ export default function FaturamentoPage() {
   const btnPrimary =
     'inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition hover:bg-[#117C7E] disabled:cursor-not-allowed disabled:opacity-60';
 
-  const statsResumo = [
-    { label: 'Faturas', value: String(dashboardCards.totalFaturas) },
-    { label: 'Vencidas', value: String(dashboardCards.faturasVencidas), tone: 'warning' as const },
-    { label: 'Pendente', value: formatCurrency(dashboardCards.valorTotalPendente), tone: 'warning' as const },
-    { label: 'Recebido', value: formatCurrency(dashboardCards.valorTotalPago), tone: 'accent' as const },
+  const btnSecondary =
+    'inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-60';
+
+  const painelMetricas = [
+    {
+      label: 'Total de faturas',
+      value: String(dashboardCards.totalFaturas),
+      highlightClass: 'text-[#173A4D]',
+      hint: `${dashboardCards.faturasDoMes} no periodo atual`,
+    },
+    {
+      label: 'Vencidas',
+      value: String(dashboardCards.faturasVencidas),
+      highlightClass: 'text-[#B4233A]',
+      hint: 'Acompanhe cobrancas em atraso',
+    },
+    {
+      label: 'Pendente',
+      value: formatCurrency(dashboardCards.valorTotalPendente),
+      highlightClass: 'text-[#9B5A00]',
+      hint: 'Saldo em aberto para recebimento',
+    },
+    {
+      label: 'Recebido',
+      value: formatCurrency(dashboardCards.valorTotalPago),
+      highlightClass: 'text-[#0F6C38]',
+      hint: `${dashboardCards.faturasPagas} faturas baixadas`,
+    },
   ];
 
   const resumoFilaFaturamento = useMemo(() => {
@@ -2229,6 +2234,7 @@ export default function FaturamentoPage() {
     Boolean(busca) ||
     Boolean(filtros.status) ||
     Boolean(filtros.tipo) ||
+    filtros.origem === 'avulso' ||
     Boolean(filtros.dataInicial) ||
     Boolean(filtros.dataFinal) ||
     periodoCampoAtual !== 'vencimento' ||
@@ -2237,6 +2243,7 @@ export default function FaturamentoPage() {
 
   const filtrosAvancadosAtivosCount = [
     Boolean(filtros.tipo),
+    filtros.origem === 'avulso',
     Boolean(filtros.dataInicial),
     Boolean(filtros.dataFinal),
     periodoCampoAtual !== 'vencimento',
@@ -2245,14 +2252,390 @@ export default function FaturamentoPage() {
   ].filter(Boolean).length;
 
   const limparFiltros = () => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('clienteId');
+    nextParams.delete('cliente');
+    setSearchParams(nextParams, { replace: true });
     setBusca('');
-    setFiltros({ periodoCampo: 'vencimento' });
+    setFiltros({ periodoCampo: 'vencimento', origem: 'faturamento' });
     setSortBy('dataVencimento');
     setSortOrder('DESC');
     setPage(1);
     refetch();
   };
 
+
+  const renderFiltrosDashboard = () => (
+    <div className="space-y-4 rounded-2xl border border-[#D4E1E8] bg-gradient-to-br from-[#F7FBFD] to-[#F1F7FA] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
+      <div className="flex w-full flex-col gap-4">
+        <div className="flex w-full flex-col gap-3 xl:flex-row xl:items-end">
+          <div className="w-full xl:flex-1">
+            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Buscar faturas</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
+              <input
+                type="text"
+                placeholder="Buscar por numero, cliente ou observacoes..."
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                onKeyDown={handleSearch}
+                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+              />
+            </div>
+          </div>
+
+          <div className="w-full xl:w-[220px]">
+            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Status</label>
+            <select
+              value={filtros.status || ''}
+              onChange={(e) =>
+                setFiltros((prev) => ({
+                  ...prev,
+                  status: (e.target.value as StatusFatura) || undefined,
+                }))
+              }
+              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+            >
+              <option value="">Todos os status</option>
+              <option value={StatusFatura.PENDENTE}>Pendente</option>
+              <option value={StatusFatura.ENVIADA}>Enviada</option>
+              <option value={StatusFatura.PARCIALMENTE_PAGA}>Parcialmente paga</option>
+              <option value={StatusFatura.PAGA}>Paga</option>
+              <option value={StatusFatura.VENCIDA}>Vencida</option>
+              <option value={StatusFatura.CANCELADA}>Cancelada</option>
+            </select>
+          </div>
+
+          <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:justify-end">
+            <button
+              type="button"
+              onClick={() => setMostrarFiltrosAvancados((atual) => !atual)}
+              className={`inline-flex h-10 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors ${
+                mostrarFiltrosAvancados || filtrosAvancadosAtivosCount > 0
+                  ? 'border-[#159A9C] bg-[#E8F6F6] text-[#0F7B7D]'
+                  : 'border-[#B4BEC9] bg-white text-[#19384C] hover:bg-[#F6FAF9]'
+              }`}
+            >
+              <Settings className="h-4 w-4" />
+              Filtros avancados
+              {filtrosAvancadosAtivosCount > 0 && (
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#0F7B7D] px-1.5 text-xs font-semibold text-white">
+                  {filtrosAvancadosAtivosCount}
+                </span>
+              )}
+              <ChevronDown
+                className={`h-4 w-4 transition-transform ${mostrarFiltrosAvancados ? 'rotate-180' : ''}`}
+              />
+            </button>
+
+            <button
+              onClick={buscarFaturas}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#159A9C] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#0F7B7D]"
+              aria-label="Buscar"
+            >
+              <Search className="h-4 w-4" />
+              Buscar
+            </button>
+
+            {filtrosAtivos && (
+              <button
+                className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-[#B4BEC9] bg-white px-3 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
+                onClick={limparFiltros}
+              >
+                <X className="h-4 w-4" />
+                Limpar
+              </button>
+            )}
+          </div>
+        </div>
+
+        {mostrarFiltrosAvancados && (
+          <div className="rounded-xl border border-[#DCE8EC] bg-[#F8FBFC] p-3 sm:p-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="w-full">
+                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                  Tipo
+                </label>
+                <select
+                  value={filtros.tipo || ''}
+                  onChange={(e) =>
+                    setFiltros((prev) => ({
+                      ...prev,
+                      tipo: (e.target.value as TipoFatura) || undefined,
+                    }))
+                  }
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                >
+                  <option value="">Todos os tipos</option>
+                  <option value={TipoFatura.UNICA}>Unica</option>
+                  <option value={TipoFatura.RECORRENTE}>Recorrente</option>
+                  <option value={TipoFatura.PARCELA}>Parcela</option>
+                  <option value={TipoFatura.ADICIONAL}>Adicional</option>
+                </select>
+              </div>
+
+              <div className="w-full">
+                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                  Origem operacional
+                </label>
+                <select
+                  value={filtros.origem || 'faturamento'}
+                  onChange={(e) =>
+                    setFiltros((prev) => ({
+                      ...prev,
+                      origem: (e.target.value as OrigemFaturaOperacional) || 'faturamento',
+                    }))
+                  }
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                >
+                  <option value="faturamento">{ORIGEM_FATURA_LABELS.faturamento}</option>
+                  <option value="avulso">{ORIGEM_FATURA_LABELS.avulso}</option>
+                </select>
+              </div>
+
+              <div className="w-full">
+                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                  Base periodo
+                </label>
+                <select
+                  value={periodoCampoAtual}
+                  onChange={(e) =>
+                    setFiltros((prev) => ({
+                      ...prev,
+                      periodoCampo: e.target.value === 'emissao' ? 'emissao' : 'vencimento',
+                    }))
+                  }
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                >
+                  <option value="vencimento">Vencimento</option>
+                  <option value="emissao">Emissao</option>
+                </select>
+              </div>
+
+              <div className="w-full">
+                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                  Data inicial
+                </label>
+                <input
+                  type="date"
+                  value={filtros.dataInicial || ''}
+                  onChange={(e) =>
+                    setFiltros((prev) => ({
+                      ...prev,
+                      dataInicial: e.target.value || undefined,
+                    }))
+                  }
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                />
+              </div>
+
+              <div className="w-full">
+                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                  Data final
+                </label>
+                <input
+                  type="date"
+                  value={filtros.dataFinal || ''}
+                  onChange={(e) =>
+                    setFiltros((prev) => ({
+                      ...prev,
+                      dataFinal: e.target.value || undefined,
+                    }))
+                  }
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                />
+              </div>
+
+              <div className="w-full">
+                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                  Ordenar por
+                </label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                >
+                  <option value="dataVencimento">Vencimento</option>
+                  <option value="dataEmissao">Emissao</option>
+                  <option value="valorTotal">Valor</option>
+                  <option value="status">Status</option>
+                </select>
+              </div>
+
+              <div className="w-full">
+                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                  Ordem
+                </label>
+                <select
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value as 'ASC' | 'DESC')}
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                >
+                  <option value="DESC">Desc</option>
+                  <option value="ASC">Asc</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#DFEAEE] pt-3">
+              <span className="text-xs font-medium text-[#607B89]">Atalhos de periodo:</span>
+              <button
+                type="button"
+                onClick={() => aplicarPeriodoRapido('hoje')}
+                className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+              >
+                Hoje
+              </button>
+              <button
+                type="button"
+                onClick={() => aplicarPeriodoRapido('7d')}
+                className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+              >
+                Ultimos 7 dias
+              </button>
+              <button
+                type="button"
+                onClick={() => aplicarPeriodoRapido('30d')}
+                className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+              >
+                Ultimos 30 dias
+              </button>
+              <button
+                type="button"
+                onClick={() => aplicarPeriodoRapido('mesAtual')}
+                className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+              >
+                Este mes
+              </button>
+              <button
+                type="button"
+                onClick={() => aplicarPeriodoRapido('mesAnterior')}
+                className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+              >
+                Mes anterior
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Chips de filtros aplicados */}
+        {filtrosAtivos && (
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            {busca && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+                Busca: "{busca}"
+                <button
+                  className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                  onClick={() => setBusca('')}
+                  aria-label="Limpar busca"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {filtros.status && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+                Status: {faturamentoService.formatarStatusFatura(filtros.status)}
+                <button
+                  className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                  onClick={() => setFiltros((prev) => ({ ...prev, status: undefined }))}
+                  aria-label="Limpar filtro de status"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {filtros.tipo && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+                Tipo: {faturamentoService.formatarTipoFatura(filtros.tipo)}
+                <button
+                  className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                  onClick={() => setFiltros((prev) => ({ ...prev, tipo: undefined }))}
+                  aria-label="Limpar filtro de tipo"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {filtros.origem === 'avulso' && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+                Origem: {ORIGEM_FATURA_LABELS.avulso}
+                <button
+                  className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                  onClick={() =>
+                    setFiltros((prev) => ({
+                      ...prev,
+                      origem: 'faturamento',
+                    }))
+                  }
+                  aria-label="Voltar origem para faturamento"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {(filtros.dataInicial || filtros.dataFinal) && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+                {periodoCampoAtual === 'vencimento' ? 'Vencimento' : 'Emissao'}:{' '}
+                {filtros.dataInicial
+                  ? new Date(`${filtros.dataInicial}T00:00:00`).toLocaleDateString('pt-BR')
+                  : '...'}{' '}
+                a{' '}
+                {filtros.dataFinal
+                  ? new Date(`${filtros.dataFinal}T00:00:00`).toLocaleDateString('pt-BR')
+                  : '...'}
+                <button
+                  className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                  onClick={() =>
+                    setFiltros((prev) => ({
+                      ...prev,
+                      dataInicial: undefined,
+                      dataFinal: undefined,
+                    }))
+                  }
+                  aria-label="Limpar filtro de periodo"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {!filtros.dataInicial && !filtros.dataFinal && periodoCampoAtual === 'emissao' && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+                Base periodo: Emissao
+                <button
+                  className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                  onClick={() =>
+                    setFiltros((prev) => ({
+                      ...prev,
+                      periodoCampo: 'vencimento',
+                    }))
+                  }
+                  aria-label="Voltar base para vencimento"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {(sortBy !== 'dataVencimento' || sortOrder !== 'DESC') && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+                Ordenacao: {sortBy} ({sortOrder})
+                <button
+                  className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                  onClick={() => {
+                    setSortBy('dataVencimento');
+                    setSortOrder('DESC');
+                  }}
+                  aria-label="Resetar ordenacao"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
   const renderFilaFaturamento = () => (
     <SectionCard className="space-y-4 p-4 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -2415,35 +2798,54 @@ export default function FaturamentoPage() {
 
   return (
     <div className="space-y-4 pt-1 sm:pt-2">
-      <SectionCard className="space-y-4 p-4 sm:p-5">
+      <SectionCard className="space-y-[18px] border-[#CBDAE2] bg-gradient-to-br from-white via-white to-[#F3FAF8] p-5 shadow-[0_24px_46px_-34px_rgba(16,57,74,0.38)]">
         <PageHeader
-          title={
-            <span className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-[#159A9C]" />
-              Faturamento
+          eyebrow={
+            <span className="inline-flex items-center rounded-full border border-[#BFD9E2] bg-[#EFF8FB] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#3F6A7C]">
+              Nucleo Financeiro
             </span>
           }
+          title={
+            <span className="text-[27px] font-bold leading-[1.03] tracking-[-0.018em] text-[#002333] sm:text-[28px]">
+              <span className="text-[#0F7B7D]">Faturamento</span>
+            </span>
+          }
+          titleClassName="leading-none sm:inline-flex sm:items-center"
           description={
             carregando
               ? 'Carregando faturas...'
               : `Gerencie ${dashboardCards.totalFaturas} faturas, cobranças e recebimentos.`
           }
+          descriptionClassName="max-w-[64ch] text-[12px] leading-[1.4] text-[#5B7A89] sm:border-l sm:border-[#D7E5EC] sm:pl-3 sm:text-[13px]"
+          inlineDescriptionOnDesktop
           actions={
-            <>
+            <div className="flex flex-wrap items-center gap-2">
               <NotificacoesFaturamento
                 faturas={faturas}
                 onMarcarComoLida={marcarNotificacaoComoLida}
                 onAbrirFatura={abrirFaturaNotificacao}
               />
+              <button onClick={() => void carregarFaturas()} className={btnSecondary} disabled={carregando}>
+                <RefreshCw className={`h-4 w-4 ${carregando ? 'animate-spin' : ''}`} />
+                Atualizar
+              </button>
               <button onClick={abrirModalCriacao} className={btnPrimary}>
                 <Plus className="h-4 w-4" />
                 Nova fatura
               </button>
-            </>
+            </div>
           }
         />
-        <InlineStats stats={statsResumo} />
-      </SectionCard>
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {painelMetricas.map((item) => (
+            <div key={item.label} className="rounded-xl border border-[#D2E1E8] bg-white px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[#5F7B89]">{item.label}</p>
+              <p className={`mt-1 text-lg font-semibold ${item.highlightClass}`}>{item.value}</p>
+              <p className="mt-1 text-xs text-[#688390]">{item.hint}</p>
+            </div>
+          ))}
+        </div>
 
       <FiltersBar className="gap-2 p-2 sm:gap-3">
         {visoes.map((visao) => {
@@ -2465,6 +2867,15 @@ export default function FaturamentoPage() {
           );
         })}
       </FiltersBar>
+
+        {visaoAtiva === 'dashboard' && (
+          <div className="pt-1">
+            {renderFiltrosDashboard()}
+          </div>
+        )}
+      </SectionCard>
+
+
 
       {/* Conteudo baseado na visao ativa */}
       {visaoAtiva === 'fila' && renderFilaFaturamento()}
@@ -2603,343 +3014,7 @@ export default function FaturamentoPage() {
               </SectionCard>
             )}
 
-            {visaoAtiva === 'dashboard' && (
-              <>
-                {/* Filtros e Busca */}
-                <FiltersBar className="mb-3 p-4">
-                  <div className="flex w-full flex-col gap-4">
-                    <div className="flex w-full flex-col gap-3 xl:flex-row xl:items-end">
-                      <div className="w-full xl:flex-1">
-                        <label className="mb-2 block text-sm font-medium text-[#385A6A]">Buscar faturas</label>
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
-                          <input
-                            type="text"
-                            placeholder="Buscar por numero, cliente ou observacoes..."
-                            value={busca}
-                            onChange={(e) => setBusca(e.target.value)}
-                            onKeyDown={handleSearch}
-                            className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
-                          />
-                        </div>
-                      </div>
 
-                      <div className="w-full xl:w-[220px]">
-                        <label className="mb-2 block text-sm font-medium text-[#385A6A]">Status</label>
-                        <select
-                          value={filtros.status || ''}
-                          onChange={(e) =>
-                            setFiltros((prev) => ({
-                              ...prev,
-                              status: (e.target.value as StatusFatura) || undefined,
-                            }))
-                          }
-                          className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
-                        >
-                          <option value="">Todos os status</option>
-                          <option value={StatusFatura.PENDENTE}>Pendente</option>
-                          <option value={StatusFatura.ENVIADA}>Enviada</option>
-                          <option value={StatusFatura.PAGA}>Paga</option>
-                          <option value={StatusFatura.VENCIDA}>Vencida</option>
-                          <option value={StatusFatura.CANCELADA}>Cancelada</option>
-                        </select>
-                      </div>
-
-                      <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:justify-end">
-                        <button
-                          type="button"
-                          onClick={() => setMostrarFiltrosAvancados((atual) => !atual)}
-                          className={`inline-flex h-10 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors ${
-                            mostrarFiltrosAvancados || filtrosAvancadosAtivosCount > 0
-                              ? 'border-[#159A9C] bg-[#E8F6F6] text-[#0F7B7D]'
-                              : 'border-[#B4BEC9] bg-white text-[#19384C] hover:bg-[#F6FAF9]'
-                          }`}
-                        >
-                          <Settings className="h-4 w-4" />
-                          Filtros avancados
-                          {filtrosAvancadosAtivosCount > 0 && (
-                            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#0F7B7D] px-1.5 text-xs font-semibold text-white">
-                              {filtrosAvancadosAtivosCount}
-                            </span>
-                          )}
-                          <ChevronDown
-                            className={`h-4 w-4 transition-transform ${mostrarFiltrosAvancados ? 'rotate-180' : ''}`}
-                          />
-                        </button>
-
-                        <button
-                          onClick={buscarFaturas}
-                          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#159A9C] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#0F7B7D]"
-                          aria-label="Buscar"
-                        >
-                          <Search className="h-4 w-4" />
-                          Buscar
-                        </button>
-
-                        {filtrosAtivos && (
-                          <button
-                            className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-[#B4BEC9] bg-white px-3 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
-                            onClick={limparFiltros}
-                          >
-                            <X className="h-4 w-4" />
-                            Limpar
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {mostrarFiltrosAvancados && (
-                      <div className="rounded-xl border border-[#DCE8EC] bg-[#F8FBFC] p-3 sm:p-4">
-                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                          <div className="w-full">
-                            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
-                              Tipo
-                            </label>
-                            <select
-                              value={filtros.tipo || ''}
-                              onChange={(e) =>
-                                setFiltros((prev) => ({
-                                  ...prev,
-                                  tipo: (e.target.value as TipoFatura) || undefined,
-                                }))
-                              }
-                              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
-                            >
-                              <option value="">Todos os tipos</option>
-                              <option value={TipoFatura.UNICA}>Unica</option>
-                              <option value={TipoFatura.RECORRENTE}>Recorrente</option>
-                              <option value={TipoFatura.PARCELA}>Parcela</option>
-                              <option value={TipoFatura.ADICIONAL}>Adicional</option>
-                            </select>
-                          </div>
-
-                          <div className="w-full">
-                            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
-                              Base periodo
-                            </label>
-                            <select
-                              value={periodoCampoAtual}
-                              onChange={(e) =>
-                                setFiltros((prev) => ({
-                                  ...prev,
-                                  periodoCampo: e.target.value === 'emissao' ? 'emissao' : 'vencimento',
-                                }))
-                              }
-                              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
-                            >
-                              <option value="vencimento">Vencimento</option>
-                              <option value="emissao">Emissao</option>
-                            </select>
-                          </div>
-
-                          <div className="w-full">
-                            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
-                              Data inicial
-                            </label>
-                            <input
-                              type="date"
-                              value={filtros.dataInicial || ''}
-                              onChange={(e) =>
-                                setFiltros((prev) => ({
-                                  ...prev,
-                                  dataInicial: e.target.value || undefined,
-                                }))
-                              }
-                              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
-                            />
-                          </div>
-
-                          <div className="w-full">
-                            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
-                              Data final
-                            </label>
-                            <input
-                              type="date"
-                              value={filtros.dataFinal || ''}
-                              onChange={(e) =>
-                                setFiltros((prev) => ({
-                                  ...prev,
-                                  dataFinal: e.target.value || undefined,
-                                }))
-                              }
-                              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
-                            />
-                          </div>
-
-                          <div className="w-full">
-                            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
-                              Ordenar por
-                            </label>
-                            <select
-                              value={sortBy}
-                              onChange={(e) => setSortBy(e.target.value)}
-                              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
-                            >
-                              <option value="dataVencimento">Vencimento</option>
-                              <option value="dataEmissao">Emissao</option>
-                              <option value="valorTotal">Valor</option>
-                              <option value="status">Status</option>
-                            </select>
-                          </div>
-
-                          <div className="w-full">
-                            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
-                              Ordem
-                            </label>
-                            <select
-                              value={sortOrder}
-                              onChange={(e) => setSortOrder(e.target.value as 'ASC' | 'DESC')}
-                              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
-                            >
-                              <option value="DESC">Desc</option>
-                              <option value="ASC">Asc</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#DFEAEE] pt-3">
-                          <span className="text-xs font-medium text-[#607B89]">Atalhos de periodo:</span>
-                          <button
-                            type="button"
-                            onClick={() => aplicarPeriodoRapido('hoje')}
-                            className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
-                          >
-                            Hoje
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => aplicarPeriodoRapido('7d')}
-                            className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
-                          >
-                            Ultimos 7 dias
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => aplicarPeriodoRapido('30d')}
-                            className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
-                          >
-                            Ultimos 30 dias
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => aplicarPeriodoRapido('mesAtual')}
-                            className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
-                          >
-                            Este mes
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => aplicarPeriodoRapido('mesAnterior')}
-                            className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
-                          >
-                            Mes anterior
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Chips de filtros aplicados */}
-                    {filtrosAtivos && (
-                      <div className="mt-1 flex flex-wrap items-center gap-2">
-                        {busca && (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
-                            Busca: "{busca}"
-                            <button
-                              className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
-                              onClick={() => setBusca('')}
-                              aria-label="Limpar busca"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </span>
-                        )}
-                        {filtros.status && (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
-                            Status: {faturamentoService.formatarStatusFatura(filtros.status)}
-                            <button
-                              className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
-                              onClick={() => setFiltros((prev) => ({ ...prev, status: undefined }))}
-                              aria-label="Limpar filtro de status"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </span>
-                        )}
-                        {filtros.tipo && (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
-                            Tipo: {faturamentoService.formatarTipoFatura(filtros.tipo)}
-                            <button
-                              className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
-                              onClick={() => setFiltros((prev) => ({ ...prev, tipo: undefined }))}
-                              aria-label="Limpar filtro de tipo"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </span>
-                        )}
-                        {(filtros.dataInicial || filtros.dataFinal) && (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
-                            {periodoCampoAtual === 'vencimento' ? 'Vencimento' : 'Emissao'}:{' '}
-                            {filtros.dataInicial
-                              ? new Date(`${filtros.dataInicial}T00:00:00`).toLocaleDateString('pt-BR')
-                              : '...'}{' '}
-                            a{' '}
-                            {filtros.dataFinal
-                              ? new Date(`${filtros.dataFinal}T00:00:00`).toLocaleDateString('pt-BR')
-                              : '...'}
-                            <button
-                              className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
-                              onClick={() =>
-                                setFiltros((prev) => ({
-                                  ...prev,
-                                  dataInicial: undefined,
-                                  dataFinal: undefined,
-                                }))
-                              }
-                              aria-label="Limpar filtro de periodo"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </span>
-                        )}
-                        {!filtros.dataInicial && !filtros.dataFinal && periodoCampoAtual === 'emissao' && (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
-                            Base periodo: Emissao
-                            <button
-                              className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
-                              onClick={() =>
-                                setFiltros((prev) => ({
-                                  ...prev,
-                                  periodoCampo: 'vencimento',
-                                }))
-                              }
-                              aria-label="Voltar base para vencimento"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </span>
-                        )}
-                        {(sortBy !== 'dataVencimento' || sortOrder !== 'DESC') && (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
-                            Ordenacao: {sortBy} ({sortOrder})
-                            <button
-                              className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
-                              onClick={() => {
-                                setSortBy('dataVencimento');
-                                setSortOrder('DESC');
-                              }}
-                              aria-label="Resetar ordenacao"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </FiltersBar>
-              </>
-            )}
             {/* Barra de Ações em Massa */}
             {mostrarAcoesMassa && (
               <div className="mb-4 rounded-xl border border-[#D4E2E7] bg-white p-3 sm:p-4">

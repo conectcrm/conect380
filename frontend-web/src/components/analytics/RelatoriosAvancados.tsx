@@ -1,14 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import {
-  BarChart3,
-  Calendar,
   Download,
   PieChart,
   RefreshCw,
-  TrendingUp,
 } from 'lucide-react';
 import { Fatura, StatusFatura } from '../../services/faturamentoService';
 import { converterParaNumero, formatarValorCompletoBRL } from '../../utils/formatacao';
+import { SectionCard } from '../layout-v2';
 
 interface RelatorioMetrica {
   label: string;
@@ -460,77 +458,109 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [faturas, periodoSelecionado, tipoRelatorio]);
 
+  const totalPeriodo = formatarValorCompletoBRL(
+    dadosProcessados.reduce((acc, item) => acc + item.valor, 0),
+  );
+
+  const diasJanela =
+    periodoSelecionado === '7dias'
+      ? '7'
+      : periodoSelecionado === '30dias'
+        ? '30'
+        : periodoSelecionado === '90dias'
+          ? '90'
+          : '365';
+
   return (
-    <div className="space-y-6">
-      <div className="rounded-2xl border border-[#D4E2E7] bg-white p-6 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-wrap gap-4">
+    <div className="space-y-4">
+      <SectionCard className="border-[#CBDCE4] bg-white p-4 sm:p-5 shadow-[0_22px_40px_-32px_rgba(16,57,74,0.34)]">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <label className="mb-2 block text-sm font-medium text-[#244455]">Período</label>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#476776]">Relatorios da aba</p>
+              <p className="mt-1 text-sm text-[#5D7A88]">
+                Analise operacional por {LABEL_TIPO_RELATORIO[tipoRelatorio].toLowerCase()}.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={processarDados}
+                className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition hover:bg-[#117C7E]"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Atualizar
+              </button>
+              <button
+                onClick={() => onExportar('csv')}
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+              >
+                <Download className="h-4 w-4" />
+                CSV
+              </button>
+              <button
+                onClick={() => onExportar('excel')}
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+              >
+                <Download className="h-4 w-4" />
+                Excel
+              </button>
+              <button
+                onClick={() => onExportar('pdf')}
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+              >
+                <Download className="h-4 w-4" />
+                PDF
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-[#244455]">Periodo</label>
               <select
                 value={periodoSelecionado}
                 onChange={(e) => setPeriodoSelecionado(e.target.value as PeriodoRelatorio)}
-                className="rounded-lg border border-[#D4E2E7] px-3 py-2 text-sm text-[#244455] focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
+                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
               >
-                <option value="7dias">Últimos 7 dias</option>
-                <option value="30dias">Últimos 30 dias</option>
-                <option value="90dias">Últimos 90 dias</option>
-                <option value="1ano">Último ano</option>
+                <option value="7dias">Ultimos 7 dias</option>
+                <option value="30dias">Ultimos 30 dias</option>
+                <option value="90dias">Ultimos 90 dias</option>
+                <option value="1ano">Ultimo ano</option>
               </select>
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium text-[#244455]">Tipo de relatório</label>
+              <label className="mb-2 block text-sm font-medium text-[#244455]">Tipo de relatorio</label>
               <select
                 value={tipoRelatorio}
                 onChange={(e) => setTipoRelatorio(e.target.value as TipoRelatorio)}
-                className="rounded-lg border border-[#D4E2E7] px-3 py-2 text-sm text-[#244455] focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
+                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
               >
                 <option value="fluxo_caixa">Fechamento: fluxo de caixa</option>
-                <option value="competencia_mensal">Fechamento: competência mensal</option>
-                <option value="aging_recebiveis">Fechamento: aging de recebíveis</option>
+                <option value="competencia_mensal">Fechamento: competencia mensal</option>
+                <option value="aging_recebiveis">Fechamento: aging de recebiveis</option>
                 <option value="faturamento">Faturamento por status</option>
-                <option value="inadimplencia">Inadimplência</option>
+                <option value="inadimplencia">Inadimplencia</option>
                 <option value="clientes">Top clientes</option>
-                <option value="produtos">Produtos/serviços</option>
+                <option value="produtos">Produtos/servicos</option>
               </select>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={processarDados}
-              className="flex items-center gap-2 rounded-md bg-[#159A9C] px-4 py-2 text-sm text-white hover:bg-[#117C7E]"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Atualizar
-            </button>
-            <button
-              onClick={() => onExportar('csv')}
-              className="flex items-center gap-2 rounded-md border border-[#D4E2E7] bg-white px-4 py-2 text-sm text-[#244455] hover:bg-[#F6FAFB]"
-            >
-              <Download className="h-4 w-4" />
-              Exportar CSV
-            </button>
-            <button
-              onClick={() => onExportar('excel')}
-              className="flex items-center gap-2 rounded-md border border-[#D4E2E7] bg-white px-4 py-2 text-sm text-[#244455] hover:bg-[#F6FAFB]"
-            >
-              <Download className="h-4 w-4" />
-              Exportar Excel
-            </button>
-            <button
-              onClick={() => onExportar('pdf')}
-              className="flex items-center gap-2 rounded-md border border-[#D4E2E7] bg-white px-4 py-2 text-sm text-[#244455] hover:bg-[#F6FAFB]"
-            >
-              <Download className="h-4 w-4" />
-              Exportar PDF
-            </button>
+          <div className="flex flex-wrap items-center gap-2 border-t border-[#DFE9ED] pt-3">
+            <span className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-[#F8FBFC] px-3 py-1 text-xs font-medium text-[#355563]">
+              Total {totalPeriodo}
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-[#F8FBFC] px-3 py-1 text-xs font-medium text-[#355563]">
+              Categorias {dadosProcessados.length}
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-[#F8FBFC] px-3 py-1 text-xs font-medium text-[#355563]">
+              Dias analisados {diasJanela}
+            </span>
           </div>
         </div>
-      </div>
-
-      <div className="rounded-2xl border border-[#D4E2E7] bg-white p-6 shadow-sm">
+      </SectionCard>
+      <SectionCard className="border-[#CBDCE4] bg-white p-5 shadow-[0_22px_40px_-32px_rgba(16,57,74,0.34)]">
         <div className="mb-4 flex items-center gap-2">
           <PieChart className="h-5 w-5 text-[#159A9C]" />
           <h3 className="text-lg font-medium text-[#002333]">
@@ -574,7 +604,7 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
 
           <div className="space-y-3">
             {dadosProcessados.map((item) => (
-              <div key={item.label} className="flex items-center justify-between rounded-lg bg-gray-50 p-3">
+              <div key={item.label} className="flex items-center justify-between rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
                 <div className="flex items-center gap-3">
                   <div className="h-4 w-4 rounded" style={{ backgroundColor: item.cor }} />
                   <span className="text-sm font-medium text-gray-900">{item.label}</span>
@@ -587,55 +617,9 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
             ))}
           </div>
         </div>
-      </div>
+      </SectionCard>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="rounded-2xl border border-[#D4E2E7] bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#E8F6F6]">
-              <BarChart3 className="h-6 w-6 text-[#159A9C]" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-900">
-                {formatarValorCompletoBRL(dadosProcessados.reduce((acc, item) => acc + item.valor, 0))}
-              </div>
-              <div className="text-sm text-gray-500">Total do período</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-[#D4E2E7] bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-100">
-              <TrendingUp className="h-6 w-6 text-green-600" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-900">{dadosProcessados.length}</div>
-              <div className="text-sm text-gray-500">Categorias</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-[#D4E2E7] bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100">
-              <Calendar className="h-6 w-6 text-blue-600" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-900">
-                {periodoSelecionado === '7dias'
-                  ? '7'
-                  : periodoSelecionado === '30dias'
-                    ? '30'
-                    : periodoSelecionado === '90dias'
-                      ? '90'
-                      : '365'}
-              </div>
-              <div className="text-sm text-gray-500">Dias analisados</div>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
+

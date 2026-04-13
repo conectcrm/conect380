@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import ModalCadastroCliente from '../../components/modals/ModalCadastroCliente';
 import { ClienteCard } from '../../components/clientes';
 import { useGlobalConfirmation } from '../../contexts/GlobalConfirmationContext';
+import { useAuth } from '../../hooks/useAuth';
 import {
   clientesService,
   Cliente,
@@ -12,6 +13,7 @@ import {
   ClientesEstatisticas,
   PaginatedClientes,
 } from '../../services/clientesService';
+import usersService, { User as UsuarioResponsavel } from '../../services/usersService';
 import { UploadResult } from '../../services/uploadService';
 import {
   Users,
@@ -19,6 +21,7 @@ import {
   Search,
   Filter,
   Download,
+  RefreshCw,
   BookmarkPlus,
   BookmarkX,
   Eye,
@@ -36,12 +39,10 @@ import {
   DataTableCard,
   EmptyState,
   FiltersBar,
-  InlineStats,
   LoadingSkeleton,
   PageHeader,
   SectionCard,
 } from '../../components/layout-v2';
-import { matchesLocalSearchTerm, normalizeSearchValue } from '../../utils/localSearch';
 
 const CLIENTE_STATUS_OPTIONS: Array<{ value: Cliente['status']; label: string }> = [
   { value: 'lead', label: 'Lead' },
@@ -86,6 +87,7 @@ const formatDocumento = (documento?: string, tipo?: Cliente['tipo']): string => 
 
 const CLIENTES_PAGE_STATE_STORAGE_KEY = 'conectcrm_clientes_page_state_v1';
 const CLIENTES_SAVED_VIEWS_STORAGE_KEY = 'conectcrm_clientes_saved_views_v1';
+const CLIENTES_UNASSIGNED_RESPONSAVEL_FILTER = '__sem_responsavel__';
 type ClientesViewMode = 'cards' | 'table';
 
 type SavedClientesView = {
@@ -96,6 +98,7 @@ type SavedClientesView = {
   tipo: string;
   tag: string;
   origem: string;
+  responsavelId: string;
   followup: '' | 'pendente' | 'vencido';
   viewMode: ClientesViewMode;
   limit: number;
@@ -111,6 +114,7 @@ type PersistedClientesPageState = {
   tipo: string;
   tag: string;
   origem: string;
+  responsavelId: string;
   followup: '' | 'pendente' | 'vencido';
   viewMode: ClientesViewMode;
   page: number;
@@ -170,6 +174,7 @@ const loadSavedClientesViews = (): SavedClientesView[] => {
         ...view,
         tag: typeof view.tag === 'string' ? view.tag : '',
         origem: typeof view.origem === 'string' ? view.origem : '',
+        responsavelId: typeof view.responsavelId === 'string' ? view.responsavelId : '',
         followup:
           view.followup === 'pendente' || view.followup === 'vencido'
             ? (view.followup as 'pendente' | 'vencido')
@@ -213,6 +218,8 @@ const ClientesPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { confirm } = useGlobalConfirmation();
+  const { user } = useAuth();
+  const usuarioAtualId = String(user?.id || '').trim();
   const persistedStateRef = useRef<Partial<PersistedClientesPageState>>(
     loadPersistedClientesState(),
   );
@@ -227,7 +234,7 @@ const ClientesPage: React.FC = () => {
     tipo: persistedStateRef.current.tipo ?? '',
     tag: persistedStateRef.current.tag ?? '',
     origem: persistedStateRef.current.origem ?? '',
-    responsavelId: '',
+    responsavelId: persistedStateRef.current.responsavelId ?? '',
     followup:
       persistedStateRef.current.followup === 'pendente' ||
       persistedStateRef.current.followup === 'vencido'
@@ -241,6 +248,9 @@ const ClientesPage: React.FC = () => {
   const [selectedTipo, setSelectedTipo] = useState(persistedStateRef.current.tipo ?? '');
   const [selectedTag, setSelectedTag] = useState(persistedStateRef.current.tag ?? '');
   const [selectedOrigem, setSelectedOrigem] = useState(persistedStateRef.current.origem ?? '');
+  const [selectedResponsavelId, setSelectedResponsavelId] = useState(
+    persistedStateRef.current.responsavelId ?? '',
+  );
   const [selectedFollowup, setSelectedFollowup] = useState<'' | 'pendente' | 'vencido'>(
     persistedStateRef.current.followup === 'pendente' || persistedStateRef.current.followup === 'vencido'
       ? persistedStateRef.current.followup
@@ -250,6 +260,7 @@ const ClientesPage: React.FC = () => {
     Boolean(
       (persistedStateRef.current.tag ?? '').trim() ||
         (persistedStateRef.current.origem ?? '').trim() ||
+        (persistedStateRef.current.responsavelId ?? '').trim() ||
         (persistedStateRef.current.followup ?? '') ||
         (persistedStateRef.current.activeViewId ?? ''),
     ),
@@ -280,7 +291,13 @@ const ClientesPage: React.FC = () => {
   const [isSavingView, setIsSavingView] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [isBulkExporting, setIsBulkExporting] = useState(false);
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
   const [statusUpdateInProgress, setStatusUpdateInProgress] = useState<Record<string, boolean>>({});
+  const [responsaveis, setResponsaveis] = useState<UsuarioResponsavel[]>([]);
+  const [loadingResponsaveis, setLoadingResponsaveis] = useState(false);
+  const [bulkStatusTarget, setBulkStatusTarget] = useState<'' | Cliente['status']>('');
+  const [bulkResponsavelTarget, setBulkResponsavelTarget] = useState('');
+  const [bulkFollowupDate, setBulkFollowupDate] = useState('');
   const [estatisticas, setEstatisticas] = useState({
     total: 0,
     ativos: 0,
@@ -322,6 +339,39 @@ const ClientesPage: React.FC = () => {
       } else {
         mediaQuery.removeListener(listener);
       }
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadResponsaveis = async () => {
+      try {
+        setLoadingResponsaveis(true);
+        const usuarios = await usersService.listarAtivos();
+        if (cancelled) {
+          return;
+        }
+
+        setResponsaveis((usuarios || []).filter((usuario) => Boolean(usuario?.id)));
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Erro ao carregar responsaveis de clientes:', error);
+          setResponsaveis([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingResponsaveis(false);
+        }
+      }
+    };
+
+    loadResponsaveis().catch(() => {
+      // Tratado no bloco try/catch.
+    });
+
+    return () => {
+      cancelled = true;
     };
   }, []);
 
@@ -383,7 +433,7 @@ const ClientesPage: React.FC = () => {
         ...filters,
         page: filters.page ?? 1,
         limit: filters.limit ?? 10,
-        search: '',
+        search: (filters.search ?? '').trim(),
         status: filters.status ?? '',
         tipo: filters.tipo ?? '',
         sortBy: filters.sortBy ?? 'created_at',
@@ -475,14 +525,17 @@ const ClientesPage: React.FC = () => {
       const nextTipo = selectedTipo;
       const nextTag = selectedTag.trim();
       const nextOrigem = selectedOrigem.trim();
+      const nextResponsavelId = selectedResponsavelId.trim();
       const nextFollowup = selectedFollowup;
+      const nextSearch = (prev.search ?? '').trim();
 
       if (
-        (prev.search ?? '') === '' &&
+        (prev.search ?? '') === nextSearch &&
         (prev.status ?? '') === nextStatus &&
         (prev.tipo ?? '') === nextTipo &&
         (prev.tag ?? '') === nextTag &&
         (prev.origem ?? '') === nextOrigem &&
+        (prev.responsavelId ?? '') === nextResponsavelId &&
         (prev.followup ?? '') === nextFollowup &&
         currentPage === 1
       ) {
@@ -491,17 +544,17 @@ const ClientesPage: React.FC = () => {
 
       return {
         ...prev,
-        search: '',
+        search: nextSearch,
         status: nextStatus,
         tipo: nextTipo,
         tag: nextTag,
         origem: nextOrigem,
-        responsavelId: '',
+        responsavelId: nextResponsavelId,
         followup: nextFollowup,
         page: 1,
       };
     });
-  }, [selectedStatus, selectedTipo, selectedTag, selectedOrigem, selectedFollowup]);
+  }, [selectedStatus, selectedTipo, selectedTag, selectedOrigem, selectedResponsavelId, selectedFollowup]);
 
   useEffect(() => {
     if (hasHydratedQueryRef.current) {
@@ -515,6 +568,7 @@ const ClientesPage: React.FC = () => {
     const queryTipo = searchParams.get('tipo');
     const queryTag = searchParams.get('tag');
     const queryOrigem = searchParams.get('origem');
+    const queryResponsavelId = searchParams.get('responsavelId');
     const queryFollowup = searchParams.get('followup');
     const queryView = searchParams.get('view');
     const queryPage = Number(searchParams.get('page') || '');
@@ -529,6 +583,7 @@ const ClientesPage: React.FC = () => {
       queryTipo,
       queryTag,
       queryOrigem,
+      queryResponsavelId,
       queryFollowup,
       queryView,
       searchParams.get('page'),
@@ -562,6 +617,10 @@ const ClientesPage: React.FC = () => {
       setSelectedOrigem(queryOrigem);
     }
 
+    if (queryResponsavelId !== null) {
+      setSelectedResponsavelId(queryResponsavelId);
+    }
+
     if (queryFollowup === 'pendente' || queryFollowup === 'vencido') {
       setSelectedFollowup(queryFollowup);
     } else if (queryFollowup === '') {
@@ -580,11 +639,12 @@ const ClientesPage: React.FC = () => {
       const nextPage = Number.isFinite(queryPage) && queryPage > 0 ? queryPage : (prev.page ?? 1);
       const nextLimit =
         Number.isFinite(queryLimit) && queryLimit > 0 ? queryLimit : (prev.limit ?? 10);
-      const nextSearch = '';
+      const nextSearch = (querySearch ?? prev.search ?? '').trim();
       const nextStatus = queryStatus ?? prev.status ?? '';
       const nextTipo = queryTipo ?? prev.tipo ?? '';
       const nextTag = queryTag ?? prev.tag ?? '';
       const nextOrigem = queryOrigem ?? prev.origem ?? '';
+      const nextResponsavelId = queryResponsavelId ?? prev.responsavelId ?? '';
       const nextFollowup =
         queryFollowup === 'pendente' || queryFollowup === 'vencido'
           ? queryFollowup
@@ -603,6 +663,7 @@ const ClientesPage: React.FC = () => {
         (prev.tipo ?? '') === nextTipo &&
         (prev.tag ?? '') === nextTag &&
         (prev.origem ?? '') === nextOrigem &&
+        (prev.responsavelId ?? '') === nextResponsavelId &&
         (prev.followup ?? '') === nextFollowup &&
         (prev.sortBy ?? 'created_at') === nextSortBy &&
         (prev.sortOrder ?? 'DESC') === nextSortOrder
@@ -619,13 +680,32 @@ const ClientesPage: React.FC = () => {
         tipo: nextTipo,
         tag: nextTag,
         origem: nextOrigem,
-        responsavelId: '',
+        responsavelId: nextResponsavelId,
         followup: nextFollowup,
         sortBy: nextSortBy,
         sortOrder: nextSortOrder,
       };
     });
   }, [searchParams]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      const nextSearch = searchTerm.trim();
+      setFilters((prev) => {
+        if ((prev.search ?? '') === nextSearch && (prev.page ?? 1) === 1) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          search: nextSearch,
+          page: 1,
+        };
+      });
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [searchTerm]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -638,6 +718,7 @@ const ClientesPage: React.FC = () => {
       tipo: selectedTipo,
       tag: selectedTag,
       origem: selectedOrigem,
+      responsavelId: selectedResponsavelId,
       followup: selectedFollowup,
       viewMode,
       page: filters.page ?? 1,
@@ -659,6 +740,7 @@ const ClientesPage: React.FC = () => {
     selectedTipo,
     selectedTag,
     selectedOrigem,
+    selectedResponsavelId,
     selectedFollowup,
     viewMode,
   ]);
@@ -691,7 +773,7 @@ const ClientesPage: React.FC = () => {
     setOrDelete('tipo', selectedTipo);
     setOrDelete('tag', selectedTag.trim());
     setOrDelete('origem', selectedOrigem.trim());
-    nextParams.delete('responsavelId');
+    setOrDelete('responsavelId', selectedResponsavelId.trim());
     setOrDelete('followup', selectedFollowup);
     setOrDelete('view', viewMode === 'table' ? null : viewMode);
     setOrDelete('page', String(filters.page ?? 1), (filters.page ?? 1) > 1);
@@ -723,6 +805,7 @@ const ClientesPage: React.FC = () => {
     selectedTipo,
     selectedTag,
     selectedOrigem,
+    selectedResponsavelId,
     selectedFollowup,
     setSearchParams,
     viewMode,
@@ -738,6 +821,7 @@ const ClientesPage: React.FC = () => {
     filters.tipo,
     filters.tag,
     filters.origem,
+    filters.responsavelId,
     filters.followup,
     filters.sortBy,
     filters.sortOrder,
@@ -862,6 +946,18 @@ const ClientesPage: React.FC = () => {
     setSelectedOrigem(origem);
   };
 
+  const handleResponsavelChange = (responsavelId: string) => {
+    setSelectedResponsavelId(responsavelId);
+  };
+
+  const handleToggleMinhaCarteira = () => {
+    if (!usuarioAtualId) {
+      return;
+    }
+
+    setSelectedResponsavelId((current) => (current === usuarioAtualId ? '' : usuarioAtualId));
+  };
+
   const handleFollowupChange = (followup: '' | 'pendente' | 'vencido') => {
     setSelectedFollowup(followup);
   };
@@ -872,6 +968,7 @@ const ClientesPage: React.FC = () => {
     setSelectedTipo('');
     setSelectedTag('');
     setSelectedOrigem('');
+    setSelectedResponsavelId('');
     setSelectedFollowup('');
     setActiveViewId('');
     setShowAdvancedFilters(false);
@@ -894,31 +991,31 @@ const ClientesPage: React.FC = () => {
     }));
   };
 
-  const normalizedSearchTerm = normalizeSearchValue(searchTerm);
-  const clientesFiltrados = useMemo(() => {
-    if (!normalizedSearchTerm) {
-      return clientes;
-    }
+  const clientesFiltrados = clientes;
+  const responsavelLabelById = useMemo(() => {
+    const labels = new Map<string, string>([
+      [CLIENTES_UNASSIGNED_RESPONSAVEL_FILTER, 'Sem responsavel'],
+    ]);
 
-    return clientes.filter((cliente) => {
-      return matchesLocalSearchTerm(normalizedSearchTerm, [
-        cliente.nome,
-        cliente.documento,
-        cliente.email,
-        cliente.telefone,
-        cliente.empresa,
-      ]);
-    });
-  }, [clientes, normalizedSearchTerm]);
+    responsaveis
+      .filter((responsavel) => Boolean(responsavel?.id))
+      .forEach((responsavel) => {
+        const nome =
+          (responsavel.nome || responsavel.username || responsavel.email || '').trim() ||
+          String(responsavel.id);
+        labels.set(String(responsavel.id), nome);
+      });
+
+    return labels;
+  }, [responsaveis]);
+  const minhaCarteiraAtiva = Boolean(usuarioAtualId) && selectedResponsavelId === usuarioAtualId;
 
   const visibleClienteIds = useMemo(
     () => clientesFiltrados.map((cliente) => cliente.id).filter((id): id is string => Boolean(id)),
     [clientesFiltrados],
   );
 
-  const totalRegistros = normalizedSearchTerm
-    ? clientesFiltrados.length
-    : (clientesData?.total ?? clientes.length);
+  const totalRegistros = clientesData?.total ?? clientesFiltrados.length;
   const selectedCount = useMemo(() => {
     if (selectAllFiltered) {
       return Math.max(totalRegistros - excludedClientes.length, 0);
@@ -928,7 +1025,7 @@ const ClientesPage: React.FC = () => {
   }, [excludedClientes.length, selectAllFiltered, selectedClientes.length, totalRegistros]);
 
   const hasBulkSelection = selectedCount > 0;
-  const canSelectAcrossPages = !normalizedSearchTerm && totalRegistros > visibleClienteIds.length;
+  const canSelectAcrossPages = totalRegistros > visibleClienteIds.length;
   const areAllVisibleSelected =
     visibleClienteIds.length > 0 &&
     visibleClienteIds.every((id) =>
@@ -1138,18 +1235,19 @@ const ClientesPage: React.FC = () => {
     setSelectedTipo(selectedView.tipo);
     setSelectedTag(selectedView.tag ?? '');
     setSelectedOrigem(selectedView.origem ?? '');
+    setSelectedResponsavelId(selectedView.responsavelId ?? '');
     setSelectedFollowup(selectedView.followup ?? '');
     setViewMode(selectedView.viewMode);
     setFilters((prev) => ({
       ...prev,
       page: 1,
       limit: selectedView.limit,
-      search: '',
+      search: selectedView.searchTerm.trim(),
       status: selectedView.status,
       tipo: selectedView.tipo,
       tag: selectedView.tag ?? '',
       origem: selectedView.origem ?? '',
-      responsavelId: '',
+      responsavelId: selectedView.responsavelId ?? '',
       followup: selectedView.followup ?? '',
       sortBy: selectedView.sortBy,
       sortOrder: selectedView.sortOrder,
@@ -1225,6 +1323,7 @@ const ClientesPage: React.FC = () => {
         tipo: selectedTipo,
         tag: selectedTag.trim(),
         origem: selectedOrigem.trim(),
+        responsavelId: selectedResponsavelId.trim(),
         followup: selectedFollowup,
         viewMode,
         limit: filters.limit ?? 10,
@@ -1326,6 +1425,7 @@ const ClientesPage: React.FC = () => {
       searchParams.get('tipo'),
       searchParams.get('tag'),
       searchParams.get('origem'),
+      searchParams.get('responsavelId'),
       searchParams.get('followup'),
       searchParams.get('view'),
       searchParams.get('page'),
@@ -1352,18 +1452,19 @@ const ClientesPage: React.FC = () => {
     setSelectedTipo(defaultView.tipo);
     setSelectedTag(defaultView.tag ?? '');
     setSelectedOrigem(defaultView.origem ?? '');
+    setSelectedResponsavelId(defaultView.responsavelId ?? '');
     setSelectedFollowup(defaultView.followup ?? '');
     setViewMode(defaultView.viewMode);
     setFilters((prev) => ({
       ...prev,
       page: 1,
       limit: defaultView.limit,
-      search: '',
+      search: defaultView.searchTerm.trim(),
       status: defaultView.status,
       tipo: defaultView.tipo,
       tag: defaultView.tag ?? '',
       origem: defaultView.origem ?? '',
-      responsavelId: '',
+      responsavelId: defaultView.responsavelId ?? '',
       followup: defaultView.followup ?? '',
       sortBy: defaultView.sortBy,
       sortOrder: defaultView.sortOrder,
@@ -1388,6 +1489,7 @@ const ClientesPage: React.FC = () => {
       activeView.tipo === selectedTipo &&
       (activeView.tag ?? '') === selectedTag.trim() &&
       (activeView.origem ?? '') === selectedOrigem.trim() &&
+      (activeView.responsavelId ?? '') === selectedResponsavelId.trim() &&
       (activeView.followup ?? '') === selectedFollowup &&
       activeView.viewMode === viewMode &&
       activeView.limit === (filters.limit ?? 10) &&
@@ -1408,6 +1510,7 @@ const ClientesPage: React.FC = () => {
     selectedTipo,
     selectedTag,
     selectedOrigem,
+    selectedResponsavelId,
     selectedFollowup,
     viewMode,
   ]);
@@ -1534,6 +1637,233 @@ const ClientesPage: React.FC = () => {
       toast.error('Erro ao exportar clientes selecionados. Tente novamente.');
     } finally {
       setIsBulkExporting(false);
+    }
+  };
+
+  const handleBulkStatusUpdate = async () => {
+    if (!bulkStatusTarget || selectedCount === 0 || isBulkUpdating) {
+      return;
+    }
+
+    try {
+      setIsBulkUpdating(true);
+      const selectedIds = await getSelectedClienteIdsForBulkAction();
+      if (selectedIds.length === 0) {
+        toast.error('Nenhum cliente selecionado para atualizar status.');
+        clearBulkSelection();
+        return;
+      }
+
+      if (
+        !(await confirm(
+          `Atualizar status de ${selectedIds.length} cliente(s) para "${getStatusLabel(
+            bulkStatusTarget,
+          )}"?`,
+        ))
+      ) {
+        return;
+      }
+
+      const loadingToast = toast.loading(`Atualizando status de ${selectedIds.length} cliente(s)...`);
+      const updateResults = await Promise.allSettled(
+        selectedIds.map((id) => clientesService.updateClienteStatus(id, bulkStatusTarget)),
+      );
+      toast.dismiss(loadingToast);
+
+      const failedIds = selectedIds.filter(
+        (_, index) => updateResults[index]?.status === 'rejected',
+      );
+      const successCount = selectedIds.length - failedIds.length;
+
+      if (successCount > 0) {
+        await loadClientes(true);
+      }
+
+      setSelectAllFiltered(false);
+      setExcludedClientes([]);
+      setSelectedClientes(failedIds);
+
+      if (failedIds.length === 0) {
+        toast.success(`${successCount} cliente(s) atualizado(s) com sucesso!`);
+        return;
+      }
+
+      if (successCount > 0) {
+        toast(
+          `Atualizacao parcial: ${successCount} atualizado(s), ${failedIds.length} com falha.`,
+          {
+            duration: 5000,
+            position: 'top-right',
+            icon: '!',
+          },
+        );
+        return;
+      }
+
+      toast.error('Nao foi possivel atualizar o status dos clientes selecionados.');
+    } catch (error) {
+      console.error('Erro ao atualizar status em lote:', error);
+      toast.error('Erro ao atualizar status em lote. Tente novamente.');
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  };
+
+  const handleBulkResponsavelUpdate = async () => {
+    if (selectedCount === 0 || isBulkUpdating) {
+      return;
+    }
+
+    try {
+      setIsBulkUpdating(true);
+      const selectedIds = await getSelectedClienteIdsForBulkAction();
+      if (selectedIds.length === 0) {
+        toast.error('Nenhum cliente selecionado para atualizar responsavel.');
+        clearBulkSelection();
+        return;
+      }
+
+      const responsavelNome =
+        bulkResponsavelTarget.trim().length > 0
+          ? responsavelLabelById.get(bulkResponsavelTarget.trim()) || bulkResponsavelTarget.trim()
+          : 'Sem responsavel';
+
+      if (
+        !(await confirm(
+          `Atualizar responsavel de ${selectedIds.length} cliente(s) para "${responsavelNome}"?`,
+        ))
+      ) {
+        return;
+      }
+
+      const payload = {
+        responsavelId: bulkResponsavelTarget.trim(),
+      };
+
+      const loadingToast = toast.loading(
+        `Atualizando responsavel de ${selectedIds.length} cliente(s)...`,
+      );
+      const updateResults = await Promise.allSettled(
+        selectedIds.map((id) => clientesService.updateCliente(id, payload)),
+      );
+      toast.dismiss(loadingToast);
+
+      const failedIds = selectedIds.filter(
+        (_, index) => updateResults[index]?.status === 'rejected',
+      );
+      const successCount = selectedIds.length - failedIds.length;
+
+      if (successCount > 0) {
+        await loadClientes(true);
+      }
+
+      setSelectAllFiltered(false);
+      setExcludedClientes([]);
+      setSelectedClientes(failedIds);
+
+      if (failedIds.length === 0) {
+        toast.success(`${successCount} cliente(s) atualizado(s) com sucesso!`);
+        return;
+      }
+
+      if (successCount > 0) {
+        toast(
+          `Atualizacao parcial: ${successCount} atualizado(s), ${failedIds.length} com falha.`,
+          {
+            duration: 5000,
+            position: 'top-right',
+            icon: '!',
+          },
+        );
+        return;
+      }
+
+      toast.error('Nao foi possivel atualizar o responsavel dos clientes selecionados.');
+    } catch (error) {
+      console.error('Erro ao atualizar responsavel em lote:', error);
+      toast.error('Erro ao atualizar responsavel em lote. Tente novamente.');
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  };
+
+  const handleBulkFollowupUpdate = async () => {
+    if (selectedCount === 0 || isBulkUpdating) {
+      return;
+    }
+
+    if (!bulkFollowupDate) {
+      toast.error('Selecione uma data para o proximo follow-up.');
+      return;
+    }
+
+    try {
+      setIsBulkUpdating(true);
+      const selectedIds = await getSelectedClienteIdsForBulkAction();
+      if (selectedIds.length === 0) {
+        toast.error('Nenhum cliente selecionado para atualizar follow-up.');
+        clearBulkSelection();
+        return;
+      }
+
+      if (
+        !(await confirm(
+          `Definir proximo follow-up de ${selectedIds.length} cliente(s) para ${new Date(
+            `${bulkFollowupDate}T12:00:00`,
+          ).toLocaleDateString('pt-BR')}?`,
+        ))
+      ) {
+        return;
+      }
+
+      const payload = {
+        proximo_contato: `${bulkFollowupDate}T12:00:00`,
+      };
+
+      const loadingToast = toast.loading(
+        `Atualizando follow-up de ${selectedIds.length} cliente(s)...`,
+      );
+      const updateResults = await Promise.allSettled(
+        selectedIds.map((id) => clientesService.updateCliente(id, payload)),
+      );
+      toast.dismiss(loadingToast);
+
+      const failedIds = selectedIds.filter(
+        (_, index) => updateResults[index]?.status === 'rejected',
+      );
+      const successCount = selectedIds.length - failedIds.length;
+
+      if (successCount > 0) {
+        await loadClientes(true);
+      }
+
+      setSelectAllFiltered(false);
+      setExcludedClientes([]);
+      setSelectedClientes(failedIds);
+
+      if (failedIds.length === 0) {
+        toast.success(`${successCount} cliente(s) atualizado(s) com sucesso!`);
+        return;
+      }
+
+      if (successCount > 0) {
+        toast(
+          `Atualizacao parcial: ${successCount} atualizado(s), ${failedIds.length} com falha.`,
+          {
+            duration: 5000,
+            position: 'top-right',
+            icon: '!',
+          },
+        );
+        return;
+      }
+
+      toast.error('Nao foi possivel atualizar o follow-up dos clientes selecionados.');
+    } catch (error) {
+      console.error('Erro ao atualizar follow-up em lote:', error);
+      toast.error('Erro ao atualizar follow-up em lote. Tente novamente.');
+    } finally {
+      setIsBulkUpdating(false);
     }
   };
 
@@ -1705,18 +2035,21 @@ const ClientesPage: React.FC = () => {
       selectedTipo ||
       selectedTag.trim() ||
       selectedOrigem.trim() ||
+      selectedResponsavelId.trim() ||
       selectedFollowup,
   );
   const activeView = savedViews.find((view) => view.id === activeViewId) ?? null;
   const hasAdvancedFilters = Boolean(
     selectedTag.trim() ||
       selectedOrigem.trim() ||
+      selectedResponsavelId.trim() ||
       selectedFollowup ||
       activeViewId,
   );
   const advancedFiltersCount = [
     selectedTag.trim(),
     selectedOrigem.trim(),
+    selectedResponsavelId.trim(),
     selectedFollowup,
     activeViewId,
   ].filter(Boolean).length;
@@ -1746,21 +2079,30 @@ const ClientesPage: React.FC = () => {
 
   return (
     <div className="space-y-4 pt-1 sm:pt-2">
-      <SectionCard className="space-y-4 p-4 sm:p-5">
+      <SectionCard className="space-y-[18px] border-[#CBDAE2] bg-gradient-to-br from-white via-white to-[#F4FAFF] p-5 shadow-[0_24px_46px_-34px_rgba(16,57,74,0.38)]">
         <PageHeader
-          title={
-            <span className="inline-flex items-center gap-2">
-              <span>Clientes</span>
+          eyebrow={
+            <span className="inline-flex items-center rounded-full border border-[#BFD9E2] bg-[#EFF8FB] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#3F6A7C]">
+              Núcleo Comercial
             </span>
           }
+          title={
+            <span className="inline-flex items-center gap-2 text-[27px] font-bold leading-[1.03] tracking-[-0.018em] text-[#002333] sm:text-[28px]">
+              <Users className="h-6 w-6 text-[#159A9C]" />
+              Clientes
+            </span>
+          }
+          titleClassName="leading-none sm:inline-flex sm:items-center"
           description={pageDescription}
+          descriptionClassName="max-w-[74ch] text-[12px] leading-[1.4] text-[#5B7A89] sm:border-l sm:border-[#D7E5EC] sm:pl-3 sm:text-[13px]"
+          inlineDescriptionOnDesktop
           actions={
             <div className="flex flex-wrap items-center gap-2">
               <div className="inline-flex items-center rounded-lg border border-[#D4E2E7] bg-white p-1">
                 <button
                   type="button"
                   onClick={() => setViewMode('cards')}
-                  className={`inline-flex items-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  className={`inline-flex h-8 items-center rounded-md px-3 text-sm font-medium transition-colors ${
                     viewMode === 'cards'
                       ? 'bg-[#ECF7F3] text-[#0F7B7D]'
                       : 'text-[#607B89] hover:text-[#19384C]'
@@ -1772,7 +2114,7 @@ const ClientesPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setViewMode('table')}
-                  className={`inline-flex items-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  className={`inline-flex h-8 items-center rounded-md px-3 text-sm font-medium transition-colors ${
                     viewMode === 'table'
                       ? 'bg-[#ECF7F3] text-[#0F7B7D]'
                       : 'text-[#607B89] hover:text-[#19384C]'
@@ -1784,8 +2126,17 @@ const ClientesPage: React.FC = () => {
               </div>
               <button
                 type="button"
+                onClick={() => void loadClientes(true)}
+                disabled={isLoading}
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                Atualizar
+              </button>
+              <button
+                type="button"
                 onClick={handleExportClientes}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
               >
                 <Download className="h-4 w-4" />
                 Exportar
@@ -1796,7 +2147,7 @@ const ClientesPage: React.FC = () => {
                   setSelectedCliente(null);
                   setShowCreateModal(true);
                 }}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#0F7B7D]"
+                className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#0F7B7D]"
               >
                 <Plus className="h-4 w-4" />
                 Novo Cliente
@@ -1805,25 +2156,36 @@ const ClientesPage: React.FC = () => {
           }
         />
 
-        {!isLoading && (
-          <InlineStats
-            compact
-            stats={[
-              { label: 'Total de clientes', value: String(estatisticas.total), tone: 'neutral' },
-              { label: 'Clientes ativos', value: String(estatisticas.ativos), tone: 'accent' },
-              { label: 'Oportunidades abertas', value: String(oportunidadesAtivas), tone: 'warning' },
-            ]}
-          />
-        )}
-      </SectionCard>
+        <section className="space-y-3 rounded-2xl border border-[#D4E1E8] bg-white/95 p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-[#5F7B89]">
+              Resumo essencial:
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[#D7E6EC] bg-[#F5FAFC] px-2.5 py-1 text-xs font-semibold text-[#345362]">
+              Base cadastrada: {isLoading ? '--' : estatisticas.total}
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[#BEE6CF] bg-[#F1FBF5] px-2.5 py-1 text-xs font-semibold text-[#137A42]">
+              Clientes ativos: {isLoading ? '--' : estatisticas.ativos}
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[#BFE8E9] bg-[#EEFBFB] px-2.5 py-1 text-xs font-semibold text-[#0F7B7D]">
+              Prospects: {isLoading ? '--' : estatisticas.prospects}
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[#D6DAF8] bg-[#F2F4FF] px-2.5 py-1 text-xs font-semibold text-[#404F9A]">
+              Leads: {isLoading ? '--' : estatisticas.leads}
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[#F5D7A7] bg-[#FFF7EA] px-2.5 py-1 text-xs font-semibold text-[#A86400]">
+              Oportunidades abertas: {isLoading ? '--' : oportunidadesAtivas}
+            </span>
+          </div>
+        </section>
 
-      <FiltersBar className="p-4">
-        <div className="flex w-full flex-col gap-4">
+        <FiltersBar className="space-y-4 rounded-2xl border border-[#D4E1E8] bg-gradient-to-br from-[#F7FBFD] to-[#F1F7FA] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
+          <div className="flex w-full flex-col gap-4">
           <div className="flex w-full flex-col gap-3 xl:flex-row xl:items-end">
             <div className="w-full xl:min-w-[300px] xl:flex-1">
-              <label className="mb-2 block text-sm font-medium text-[#385A6A]">
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
                 Buscar clientes
-                <span className="ml-1 text-xs font-normal text-[#6F8B98]">atalho: /</span>
+                <span className="ml-1 text-[10px] font-medium normal-case text-[#6F8B98]">atalho: /</span>
               </label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
@@ -1839,7 +2201,9 @@ const ClientesPage: React.FC = () => {
             </div>
 
             <div className="w-full xl:w-auto">
-              <label className="mb-2 block text-sm font-medium text-[#385A6A]">Status</label>
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                Status
+              </label>
               <select
                 value={selectedStatus}
                 onChange={(e) => handleStatusChange(e.target.value)}
@@ -1855,7 +2219,9 @@ const ClientesPage: React.FC = () => {
             </div>
 
             <div className="w-full xl:w-auto">
-              <label className="mb-2 block text-sm font-medium text-[#385A6A]">Tipo</label>
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                Tipo
+              </label>
               <select
                 value={selectedTipo}
                 onChange={(e) => handleTipoChange(e.target.value)}
@@ -1871,6 +2237,19 @@ const ClientesPage: React.FC = () => {
             </div>
 
             <div className="flex w-full flex-wrap items-end gap-2 xl:w-auto xl:justify-end">
+              <button
+                type="button"
+                onClick={handleToggleMinhaCarteira}
+                disabled={!usuarioAtualId}
+                className={`inline-flex h-10 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors ${
+                  minhaCarteiraAtiva
+                    ? 'border-[#159A9C] bg-[#ECF7F3] text-[#0F7B7D]'
+                    : 'border-[#B4BEC9] bg-white text-[#19384C] hover:bg-[#F6FAF9]'
+                } disabled:cursor-not-allowed disabled:opacity-60`}
+              >
+                Minha carteira
+              </button>
+
               <button
                 type="button"
                 data-testid="clientes-advanced-filters-toggle"
@@ -1907,7 +2286,9 @@ const ClientesPage: React.FC = () => {
             <div className="rounded-xl border border-[#DCE8EC] bg-[#F8FBFC] p-3 sm:p-4">
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <div className="w-full">
-                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Tag</label>
+                  <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                    Tag
+                  </label>
                   <input
                     type="text"
                     value={selectedTag}
@@ -1919,7 +2300,9 @@ const ClientesPage: React.FC = () => {
                 </div>
 
                 <div className="w-full">
-                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Follow-up</label>
+                  <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                    Follow-up
+                  </label>
                   <select
                     value={selectedFollowup}
                     onChange={(e) => handleFollowupChange(e.target.value as '' | 'pendente' | 'vencido')}
@@ -1933,7 +2316,9 @@ const ClientesPage: React.FC = () => {
                 </div>
 
                 <div className="w-full">
-                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Origem</label>
+                  <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                    Origem
+                  </label>
                   <input
                     type="text"
                     value={selectedOrigem}
@@ -1943,10 +2328,35 @@ const ClientesPage: React.FC = () => {
                     className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
                   />
                 </div>
+
+                <div className="w-full">
+                  <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                    Responsavel
+                  </label>
+                  <select
+                    value={selectedResponsavelId}
+                    onChange={(e) => handleResponsavelChange(e.target.value)}
+                    data-testid="clientes-filter-responsavel"
+                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                  >
+                    <option value="">Todos</option>
+                    <option value={CLIENTES_UNASSIGNED_RESPONSAVEL_FILTER}>Sem responsavel</option>
+                    {responsaveis.map((responsavel) => (
+                      <option key={responsavel.id} value={responsavel.id}>
+                        {responsavel.nome || responsavel.username || responsavel.email || responsavel.id}
+                      </option>
+                    ))}
+                  </select>
+                  {loadingResponsaveis ? (
+                    <p className="mt-1 text-xs text-[#6F8B98]">Carregando responsaveis...</p>
+                  ) : null}
+                </div>
               </div>
 
               <div className="mt-3 border-t border-[#DFEAEE] pt-3">
-                <label className="mb-2 block text-sm font-medium text-[#385A6A]">Views salvas</label>
+                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                  Views salvas
+                </label>
                 <div className="flex flex-wrap items-center gap-2">
                   <select
                     value={activeViewId}
@@ -1996,8 +2406,9 @@ const ClientesPage: React.FC = () => {
               </div>
             </div>
           )}
-        </div>
-      </FiltersBar>
+          </div>
+        </FiltersBar>
+      </SectionCard>
 
       {hasFilterChips && (
         <div className="flex flex-wrap items-center gap-2">
@@ -2099,6 +2510,22 @@ const ClientesPage: React.FC = () => {
                 onClick={() => setSelectedOrigem('')}
                 className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
                 title="Remover filtro de origem"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          )}
+
+          {selectedResponsavelId.trim() && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+              Responsavel:{' '}
+              <strong className="font-semibold text-[#1C3B4C]">
+                {responsavelLabelById.get(selectedResponsavelId.trim()) || selectedResponsavelId.trim()}
+              </strong>
+              <button
+                onClick={() => setSelectedResponsavelId('')}
+                className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                title="Remover filtro de responsavel"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -2224,9 +2651,75 @@ const ClientesPage: React.FC = () => {
                 <div className="flex flex-wrap items-center gap-2">
                   {hasBulkSelection && (
                     <>
+                      <select
+                        value={bulkStatusTarget}
+                        onChange={(e) =>
+                          setBulkStatusTarget((e.target.value as Cliente['status']) || '')
+                        }
+                        disabled={isBulkDeleting || isBulkExporting || isBulkUpdating}
+                        className="h-8 rounded-lg border border-[#D4E2E7] bg-white px-2 text-xs text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 disabled:cursor-not-allowed disabled:opacity-60"
+                        title="Alterar status em lote"
+                      >
+                        <option value="">Status em lote</option>
+                        {CLIENTE_STATUS_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={handleBulkStatusUpdate}
+                        disabled={
+                          !bulkStatusTarget || isBulkDeleting || isBulkExporting || isBulkUpdating
+                        }
+                        className="inline-flex items-center gap-1 rounded-lg border border-[#D4E2E7] bg-white px-3 py-1.5 text-xs font-medium text-[#385A6A] transition-colors hover:bg-[#F6FAF9] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Aplicar status
+                      </button>
+
+                      <select
+                        value={bulkResponsavelTarget}
+                        onChange={(e) => setBulkResponsavelTarget(e.target.value)}
+                        disabled={isBulkDeleting || isBulkExporting || isBulkUpdating}
+                        className="h-8 rounded-lg border border-[#D4E2E7] bg-white px-2 text-xs text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 disabled:cursor-not-allowed disabled:opacity-60"
+                        title="Atribuir responsavel em lote"
+                      >
+                        <option value="">Responsavel em lote</option>
+                        {responsaveis.map((responsavel) => (
+                          <option key={responsavel.id} value={responsavel.id}>
+                            {responsavel.nome || responsavel.username || responsavel.email || responsavel.id}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={handleBulkResponsavelUpdate}
+                        disabled={isBulkDeleting || isBulkExporting || isBulkUpdating}
+                        className="inline-flex items-center gap-1 rounded-lg border border-[#D4E2E7] bg-white px-3 py-1.5 text-xs font-medium text-[#385A6A] transition-colors hover:bg-[#F6FAF9] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Aplicar responsavel
+                      </button>
+
+                      <input
+                        type="date"
+                        value={bulkFollowupDate}
+                        onChange={(e) => setBulkFollowupDate(e.target.value)}
+                        disabled={isBulkDeleting || isBulkExporting || isBulkUpdating}
+                        className="h-8 rounded-lg border border-[#D4E2E7] bg-white px-2 text-xs text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 disabled:cursor-not-allowed disabled:opacity-60"
+                        title="Definir proximo follow-up em lote"
+                      />
+                      <button
+                        onClick={handleBulkFollowupUpdate}
+                        disabled={
+                          !bulkFollowupDate || isBulkDeleting || isBulkExporting || isBulkUpdating
+                        }
+                        className="inline-flex items-center gap-1 rounded-lg border border-[#D4E2E7] bg-white px-3 py-1.5 text-xs font-medium text-[#385A6A] transition-colors hover:bg-[#F6FAF9] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Definir follow-up
+                      </button>
+
                       <button
                         onClick={handleBulkExport}
-                        disabled={isBulkExporting || isBulkDeleting}
+                        disabled={isBulkExporting || isBulkDeleting || isBulkUpdating}
                         className="inline-flex items-center gap-1 rounded-lg bg-[#159A9C] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {isBulkExporting ? (
@@ -2238,7 +2731,7 @@ const ClientesPage: React.FC = () => {
                       </button>
                       <button
                         onClick={handleBulkDelete}
-                        disabled={isBulkDeleting || isBulkExporting}
+                        disabled={isBulkDeleting || isBulkExporting || isBulkUpdating}
                         className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {isBulkDeleting ? (
@@ -2252,7 +2745,7 @@ const ClientesPage: React.FC = () => {
                   )}
                   <button
                     onClick={handleExportClientes}
-                    disabled={isBulkDeleting || isBulkExporting}
+                    disabled={isBulkDeleting || isBulkExporting || isBulkUpdating}
                     className="inline-flex items-center gap-1 rounded-lg border border-[#D4E2E7] bg-white px-3 py-1.5 text-xs font-medium text-[#385A6A] transition-colors hover:bg-[#F6FAF9] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Download className="h-3.5 w-3.5" />

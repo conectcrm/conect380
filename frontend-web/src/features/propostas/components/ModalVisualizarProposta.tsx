@@ -141,6 +141,21 @@ const formatCurrency = (value: number) => {
 
 const formatDate = (date: Date | string | undefined | null) => {
   if (!date) return '-';
+  if (date instanceof Date && !Number.isNaN(date.getTime())) {
+    const dia = String(date.getUTCDate()).padStart(2, '0');
+    const mes = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const ano = String(date.getUTCFullYear());
+    return `${dia}/${mes}/${ano}`;
+  }
+  if (typeof date === 'string') {
+    const isoDateMatch = String(date)
+      .trim()
+      .match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoDateMatch) {
+      const [, ano, mes, dia] = isoDateMatch;
+      return `${dia}/${mes}/${ano}`;
+    }
+  }
   const d = new Date(date);
   if (Number.isNaN(d.getTime())) return '-';
   return d.toLocaleDateString('pt-BR');
@@ -1548,7 +1563,9 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
           )}
 
           {!proposta.cliente?.email && !proposta.cliente?.telefone && !proposta.cliente?.endereco && (
-            <p className="text-[11px] text-[#8BA0AA]">Dados complementares do cliente ainda nao informados.</p>
+            <p className="text-[11px] text-[#8BA0AA]">
+              Cliente sem dados complementares cadastrados neste rascunho.
+            </p>
           )}
         </div>
       </section>
@@ -1715,7 +1732,12 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
               <Calendar className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
               <div>
                 <p className="text-sm font-medium text-[#19384C]">
-                  Valida ate: {formatDate(proposta.dataValidade)}
+                  Valida ate:{' '}
+                  {formatDate(
+                    proposta.dataValidade ||
+                      (proposta as any).data_vencimento ||
+                      (proposta as any).dataVencimento,
+                  )}
                 </p>
                 <p className="text-xs text-[#607B89]">
                   Registro no sistema: {proposta.criadaEm ? formatDateTime(proposta.criadaEm) : 'N/A'}

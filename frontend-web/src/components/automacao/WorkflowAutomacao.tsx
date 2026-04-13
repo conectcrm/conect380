@@ -14,6 +14,7 @@ import {
 import { Fatura, StatusFatura } from '../../services/faturamentoService';
 import { formatarValorCompletoBRL, converterParaNumero } from '../../utils/formatacao';
 import { daysUntilDate } from '../../utils/dateOnly';
+import { SectionCard } from '../layout-v2';
 
 export interface WorkflowExecutionResult {
   processados: number;
@@ -237,72 +238,42 @@ export default function WorkflowAutomacao({ faturas, onExecutarAcao }: WorkflowA
     historico.find((item) => item.workflowId === workflowId);
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-2xl border border-[#D4E2E7] bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-[#002333]">Automação de Workflows</h2>
-            <p className="text-gray-600 mt-1">
-              Execute fluxos operacionais do faturamento com controle de histórico.
-            </p>
+    <div className="space-y-4">
+      <SectionCard className="border-[#CBDCE4] bg-white p-4 sm:p-5 shadow-[0_22px_40px_-32px_rgba(16,57,74,0.34)]">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#476776]">Workflows da aba</p>
+              <p className="mt-1 text-sm text-[#5D7A88]">
+                Execucoes operacionais do faturamento com controle de historico.
+              </p>
+            </div>
+            <button
+              onClick={executarTodosAtivos}
+              disabled={executandoLote || workflowExecutando !== null}
+              className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition hover:bg-[#117C7E] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Zap className="h-4 w-4" />
+              {executandoLote ? 'Executando workflows ativos...' : 'Executar workflows ativos'}
+            </button>
           </div>
-          <button
-            onClick={executarTodosAtivos}
-            disabled={executandoLote || workflowExecutando !== null}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#117C7E] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Zap className="h-4 w-4" />
-            {executandoLote ? 'Executando workflows ativos...' : 'Executar workflows ativos'}
-          </button>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <div className="rounded-2xl border border-[#D4E2E7] bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-[#E8F6F6] p-2">
-              <Activity className="h-5 w-5 text-[#159A9C]" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-900">{metricas.ativos}</p>
-              <p className="text-sm text-gray-500">Workflows ativos</p>
-            </div>
+          <div className="flex flex-wrap items-center gap-2 border-t border-[#DFE9ED] pt-3">
+            <span className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-[#F8FBFC] px-3 py-1 text-xs font-medium text-[#355563]">
+              Workflows ativos {metricas.ativos}
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-[#F8FBFC] px-3 py-1 text-xs font-medium text-[#355563]">
+              Vencendo em ate 3 dias {metricas.faturasVencendo}
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-[#F8FBFC] px-3 py-1 text-xs font-medium text-[#355563]">
+              Faturas vencidas {metricas.faturasVencidas}
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-[#F8FBFC] px-3 py-1 text-xs font-medium text-[#355563]">
+              Valor em atraso {formatarValorCompletoBRL(metricas.valorVencido)}
+            </span>
           </div>
         </div>
-        <div className="rounded-2xl border border-[#D4E2E7] bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-yellow-100 p-2">
-              <CalendarClock className="h-5 w-5 text-yellow-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-900">{metricas.faturasVencendo}</p>
-              <p className="text-sm text-gray-500">Vencendo em até 3 dias</p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-2xl border border-[#D4E2E7] bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-red-100 p-2">
-              <MailWarning className="h-5 w-5 text-red-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-900">{metricas.faturasVencidas}</p>
-              <p className="text-sm text-gray-500">Faturas vencidas</p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-2xl border border-[#D4E2E7] bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-orange-100 p-2">
-              <Clock className="h-5 w-5 text-orange-600" />
-            </div>
-            <div>
-              <p className="text-lg font-bold text-gray-900">{formatarValorCompletoBRL(metricas.valorVencido)}</p>
-              <p className="text-sm text-gray-500">Valor total em atraso</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      </SectionCard>
 
       <div className="grid grid-cols-1 gap-4">
         {workflows.map((workflow) => {
@@ -310,7 +281,7 @@ export default function WorkflowAutomacao({ faturas, onExecutarAcao }: WorkflowA
           const ultimo = ultimoHistorico(workflow.id);
 
           return (
-            <div key={workflow.id} className="rounded-2xl border border-[#D4E2E7] bg-white p-6 shadow-sm">
+            <div key={workflow.id} className="rounded-xl border border-[#CBDCE4] bg-white p-5 shadow-[0_22px_40px_-32px_rgba(16,57,74,0.34)]">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="space-y-2">
                   <div className="flex items-center gap-3">
@@ -326,7 +297,7 @@ export default function WorkflowAutomacao({ faturas, onExecutarAcao }: WorkflowA
                   <p className="text-sm text-gray-600">{workflow.descricao}</p>
                   {ultimo && (
                     <div className="text-xs text-gray-500">
-                      Última execução: {new Date(ultimo.fimExecucao).toLocaleString('pt-BR')} - {ultimo.mensagem}
+                      Ultima execucao: {new Date(ultimo.fimExecucao).toLocaleString('pt-BR')} - {ultimo.mensagem}
                     </div>
                   )}
                 </div>
@@ -358,8 +329,8 @@ export default function WorkflowAutomacao({ faturas, onExecutarAcao }: WorkflowA
         })}
       </div>
 
-      <div className="rounded-2xl border border-[#D4E2E7] bg-white shadow-sm">
-        <div className="border-b p-6">
+      <div className="rounded-xl border border-[#CBDCE4] bg-white shadow-[0_22px_40px_-32px_rgba(16,57,74,0.34)]">
+        <div className="border-b p-5">
           <h3 className="text-lg font-semibold text-[#002333]">Histórico de execuções</h3>
         </div>
         {historico.length === 0 ? (
@@ -411,3 +382,4 @@ export default function WorkflowAutomacao({ faturas, onExecutarAcao }: WorkflowA
     </div>
   );
 }
+

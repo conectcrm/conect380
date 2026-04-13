@@ -528,7 +528,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                       }}
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Se selecionado, esta cotação precisará ser aprovada antes de prosseguir.
+                      Campo opcional: sem aprovador, a cotacao fica em rascunho.
                     </p>
                   </div>
 
@@ -900,7 +900,14 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
               )}
               <button
                 type={isLastTab ? 'submit' : 'button'}
-                onClick={isLastTab ? undefined : () => void avancarAba()}
+                onClick={
+                  isLastTab
+                    ? undefined
+                    : (event) => {
+                        event.preventDefault();
+                        void avancarAba();
+                      }
+                }
                 disabled={isSubmitting}
                 className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -916,4 +923,3 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
 };
 
 export default ModalCadastroCotacao;
-

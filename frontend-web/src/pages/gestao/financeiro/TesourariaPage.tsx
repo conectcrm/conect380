@@ -17,7 +17,6 @@ import {
   DataTableCard,
   EmptyState,
   FiltersBar,
-  InlineStats,
   LoadingSkeleton,
   PageHeader,
   SectionCard,
@@ -176,30 +175,35 @@ export default function TesourariaPage() {
     }
   }, [posicao.itens]);
 
-  const stats = useMemo(
+  const painelMetricas = useMemo(
     () => [
       {
         label: 'Saldo atual',
         value: moneyFmt.format(posicao.saldoAtualConsolidado),
-        tone: 'neutral' as const,
+        hint: `${posicao.totalContas} conta(s) monitoradas`,
+        highlightClass: 'text-[#173A4D]',
       },
       {
         label: 'Entradas previstas',
         value: moneyFmt.format(posicao.entradasPrevistasConsolidadas),
-        tone: 'accent' as const,
+        hint: `Janela de ${janelaDias} dia(s)`,
+        highlightClass: 'text-[#137A42]',
       },
       {
         label: 'Saidas programadas',
         value: moneyFmt.format(posicao.saidasProgramadasConsolidadas),
-        tone: 'warning' as const,
+        hint: 'Compromissos no periodo',
+        highlightClass: 'text-[#A86400]',
       },
       {
         label: 'Saldo projetado',
         value: moneyFmt.format(posicao.saldoProjetadoConsolidado),
-        tone: posicao.saldoProjetadoConsolidado >= 0 ? ('accent' as const) : ('warning' as const),
+        hint: `Referencia ${posicao.referenciaEm || '-'}`,
+        highlightClass:
+          posicao.saldoProjetadoConsolidado >= 0 ? 'text-[#137A42]' : 'text-[#B4233A]',
       },
     ],
-    [posicao],
+    [janelaDias, posicao],
   );
 
   const hasFilters = janelaDias !== 30 || incluirInativas || filtroStatusMovimentacoes !== 'todos';
@@ -295,87 +299,115 @@ export default function TesourariaPage() {
   };
 
   return (
-    <div className="space-y-5">
-      <SectionCard className="space-y-4 p-5">
+    <div className="space-y-4 pt-1 sm:pt-2">
+      <SectionCard className="space-y-[18px] border-[#CBDAE2] bg-gradient-to-br from-white via-white to-[#F3FAF8] p-5 shadow-[0_24px_46px_-34px_rgba(16,57,74,0.38)]">
         <PageHeader
-          title="Tesouraria"
+          eyebrow={
+            <span className="inline-flex items-center rounded-full border border-[#BFD9E2] bg-[#EFF8FB] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#3F6A7C]">
+              Nucleo Financeiro
+            </span>
+          }
+          title={
+            <span className="text-[27px] font-bold leading-[1.03] tracking-[-0.018em] text-[#002333] sm:text-[28px]">
+              Tesouraria
+            </span>
+          }
+          titleClassName="leading-none sm:inline-flex sm:items-center"
           description="Posicao consolidada de caixa por conta bancaria com visao de curto prazo."
+          descriptionClassName="max-w-[64ch] text-[12px] leading-[1.4] text-[#5B7A89] sm:border-l sm:border-[#D7E5EC] sm:pl-3 sm:text-[13px]"
+          inlineDescriptionOnDesktop
           actions={
             <button type="button" onClick={() => void carregarDados()} className={btnSecondary}>
-              <RefreshCw className="h-4 w-4" />
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               Atualizar
             </button>
           }
         />
 
-        {!loading && !erro ? <InlineStats stats={stats} /> : null}
-      </SectionCard>
-
-      <FiltersBar className="p-4">
-        <div className="flex w-full flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
-          <div className="w-full sm:w-auto">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Janela de analise</label>
-            <select
-              value={String(janelaDias)}
-              onChange={(event) => setJanelaDias(Number(event.target.value))}
-              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[150px]"
-            >
-              <option value="7">7 dias</option>
-              <option value="15">15 dias</option>
-              <option value="30">30 dias</option>
-              <option value="60">60 dias</option>
-              <option value="90">90 dias</option>
-            </select>
-          </div>
-
-          <div className="w-full sm:w-auto">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Contas exibidas</label>
-            <label className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455]">
-              <input
-                type="checkbox"
-                checked={incluirInativas}
-                onChange={(event) => setIncluirInativas(event.target.checked)}
-                className="h-4 w-4 rounded border-[#B8CBD4] text-[#159A9C] focus:ring-[#159A9C]/40"
-              />
-              Incluir inativas
-            </label>
-          </div>
-
-          <div className="w-full sm:w-auto">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Status transferencias</label>
-            <select
-              value={filtroStatusMovimentacoes}
-              onChange={(event) =>
-                setFiltroStatusMovimentacoes(
-                  event.target.value as 'todos' | StatusMovimentacaoTesouraria,
-                )
-              }
-              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[180px]"
-            >
-              <option value="todos">Todos</option>
-              <option value="pendente">Pendentes</option>
-              <option value="aprovada">Aprovadas</option>
-              <option value="cancelada">Canceladas</option>
-            </select>
-          </div>
-
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-            <button type="button" onClick={() => void buscar()} className={btnPrimary}>
-              <Search className="h-4 w-4" />
-              Buscar
-            </button>
-            <button
-              type="button"
-              onClick={() => void limparFiltros()}
-              className={btnSecondary}
-              disabled={!hasFilters}
-            >
-              <Filter className="h-4 w-4" />
-              Limpar
-            </button>
-          </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {painelMetricas.map((item) => (
+            <div key={item.label} className="rounded-xl border border-[#D2E1E8] bg-white px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[#5F7B89]">
+                {item.label}
+              </p>
+              <p className={`mt-1 text-lg font-semibold ${item.highlightClass}`}>
+                {loading ? '--' : item.value}
+              </p>
+              <p className="mt-1 text-xs text-[#688390]">{item.hint}</p>
+            </div>
+          ))}
         </div>
-      </FiltersBar>
+
+        <div className="pt-1">
+          <FiltersBar className="space-y-4 rounded-2xl border border-[#D4E1E8] bg-gradient-to-br from-[#F7FBFD] to-[#F1F7FA] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
+            <div className="flex w-full flex-col gap-4">
+              <div className="flex w-full flex-col gap-3 xl:flex-row xl:items-end">
+                <div className="w-full xl:w-[180px]">
+                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Janela de analise</label>
+                  <select
+                    value={String(janelaDias)}
+                    onChange={(event) => setJanelaDias(Number(event.target.value))}
+                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                  >
+                    <option value="7">7 dias</option>
+                    <option value="15">15 dias</option>
+                    <option value="30">30 dias</option>
+                    <option value="60">60 dias</option>
+                    <option value="90">90 dias</option>
+                  </select>
+                </div>
+
+                <div className="w-full xl:w-[220px]">
+                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Status transferencias</label>
+                  <select
+                    value={filtroStatusMovimentacoes}
+                    onChange={(event) =>
+                      setFiltroStatusMovimentacoes(
+                        event.target.value as 'todos' | StatusMovimentacaoTesouraria,
+                      )
+                    }
+                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                  >
+                    <option value="todos">Todos</option>
+                    <option value="pendente">Pendentes</option>
+                    <option value="aprovada">Aprovadas</option>
+                    <option value="cancelada">Canceladas</option>
+                  </select>
+                </div>
+
+                <div className="w-full xl:min-w-[240px] xl:flex-1">
+                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Contas exibidas</label>
+                  <label className="inline-flex h-10 w-full items-center gap-2 rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455]">
+                    <input
+                      type="checkbox"
+                      checked={incluirInativas}
+                      onChange={(event) => setIncluirInativas(event.target.checked)}
+                      className="h-4 w-4 rounded border-[#B8CBD4] text-[#159A9C] focus:ring-[#159A9C]/40"
+                    />
+                    Incluir inativas
+                  </label>
+                </div>
+
+                <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:justify-end">
+                  <button type="button" onClick={() => void buscar()} className={btnPrimary}>
+                    <Search className="h-4 w-4" />
+                    Buscar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void limparFiltros()}
+                    className={btnSecondary}
+                    disabled={!hasFilters}
+                  >
+                    <Filter className="h-4 w-4" />
+                    Limpar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </FiltersBar>
+        </div>
+      </SectionCard>
 
       {loading ? <LoadingSkeleton lines={8} /> : null}
 
@@ -481,10 +513,12 @@ export default function TesourariaPage() {
 
       {!loading && !erro && posicao.itens.length > 0 ? (
         <SectionCard className="space-y-4 p-5">
-          <PageHeader
-            title="Transferencias internas"
-            description="Crie e processe movimentacoes entre contas internas com rastreabilidade."
-          />
+          <div>
+            <h2 className="text-lg font-semibold text-[#002333]">Transferencias internas</h2>
+            <p className="mt-1 text-sm text-[#5B7A89]">
+              Crie e processe movimentacoes entre contas internas com rastreabilidade.
+            </p>
+          </div>
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-5">
             <div className="lg:col-span-2">

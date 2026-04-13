@@ -333,6 +333,8 @@ const CORES_GRAFICOS = [
   '#FBBF24',
   '#DC2626',
 ];
+const PIPELINE_UNASSIGNED_RESPONSAVEL_FILTER = '__sem_responsavel__';
+const PIPELINE_LEGACY_UNASSIGNED_RESPONSAVEL_FILTER = 'sem_responsavel';
 
 const TIPO_ATIVIDADE_LABEL: Record<TipoAtividade, string> = {
   [TipoAtividade.LIGACAO]: 'Ligacao',
@@ -1580,19 +1582,19 @@ const PipelinePage: React.FC = () => {
       } else if (formato === 'excel') {
         // Excel Export usando xlsx
         const dadosExcel = oportunidadesFiltradas.map((op) => ({
-          Título: op.titulo,
-          Estágio: op.estagio,
-          Valor: op.valor,
-          'Probabilidade (%)': op.probabilidade,
-          Prioridade: op.prioridade || '',
-          Origem: op.origem || '',
-          Contato: op.nomeContato || '',
-          Email: op.emailContato || '',
-          Telefone: op.telefoneContato || '',
-          Empresa: op.empresaContato || '',
-          Responsável: op.responsavel?.nome || '',
-          'Data Esperada': op.dataFechamentoEsperado || '',
-          Descrição: op.descricao || '',
+          titulo: op.titulo,
+          estagio: op.estagio,
+          valor: op.valor,
+          probabilidadePercentual: op.probabilidade,
+          prioridade: op.prioridade || '',
+          origem: op.origem || '',
+          contato: op.nomeContato || '',
+          email: op.emailContato || '',
+          telefone: op.telefoneContato || '',
+          empresa: op.empresaContato || '',
+          responsavel: op.responsavel?.nome || '',
+          dataEsperada: op.dataFechamentoEsperado || '',
+          descricao: op.descricao || '',
         }));
 
         // Criar workbook
@@ -1623,13 +1625,13 @@ const PipelinePage: React.FC = () => {
         // Adicionar aba de Estatísticas
         if (estatisticas) {
           const statsData = [
-            { Métrica: 'Total de Oportunidades', Valor: estatisticas.totalOportunidades },
+            { metrica: 'Total de Oportunidades', valor: estatisticas.totalOportunidades },
             {
-              Métrica: 'Valor Total do Pipeline',
-              Valor: formatarMoeda(estatisticas.valorTotalPipeline),
+              metrica: 'Valor Total do Pipeline',
+              valor: formatarMoeda(estatisticas.valorTotalPipeline),
             },
-            { Métrica: 'Ticket Médio', Valor: formatarMoeda(estatisticas.valorMedio) },
-            { Métrica: 'Taxa de Conversão', Valor: `${estatisticas.taxaConversao.toFixed(1)}%` },
+            { metrica: 'Ticket Medio', valor: formatarMoeda(estatisticas.valorMedio) },
+            { metrica: 'Taxa de Conversao', valor: `${estatisticas.taxaConversao.toFixed(1)}%` },
           ];
           const wsStats = XLSX.utils.json_to_sheet(statsData);
           wsStats['!cols'] = [{ wch: 30 }, { wch: 25 }];
@@ -1641,11 +1643,10 @@ const PipelinePage: React.FC = () => {
           const opsEstagio = oportunidadesFiltradas.filter((op) => op.estagio === estagio.id);
           const valorTotal = opsEstagio.reduce((sum, op) => sum + op.valor, 0);
           return {
-            Estágio: estagio.nome,
-            Quantidade: opsEstagio.length,
-            'Valor Total': formatarMoeda(valorTotal),
-            'Valor Médio':
-              opsEstagio.length > 0 ? formatarMoeda(valorTotal / opsEstagio.length) : 'R$ 0,00',
+            estagio: estagio.nome,
+            quantidade: opsEstagio.length,
+            valorTotal: formatarMoeda(valorTotal),
+            valorMedio: opsEstagio.length > 0 ? formatarMoeda(valorTotal / opsEstagio.length) : 'R$ 0,00',
           };
         });
         const wsStaging = XLSX.utils.json_to_sheet(stagingData);
@@ -2060,8 +2061,19 @@ const PipelinePage: React.FC = () => {
     }
 
     // Filtro por responsável
-    if (filtros.responsavel && op.responsavel?.id !== filtros.responsavel) {
-      return false;
+    if (filtros.responsavel) {
+      const responsavelOportunidadeId = String(op.responsavel?.id || '').trim();
+      const isUnassignedFilter =
+        filtros.responsavel === PIPELINE_UNASSIGNED_RESPONSAVEL_FILTER ||
+        filtros.responsavel === PIPELINE_LEGACY_UNASSIGNED_RESPONSAVEL_FILTER;
+
+      if (isUnassignedFilter) {
+        if (responsavelOportunidadeId) {
+          return false;
+        }
+      } else if (responsavelOportunidadeId !== filtros.responsavel) {
+        return false;
+      }
     }
 
     // Filtro por valor mínimo
@@ -2429,8 +2441,13 @@ const PipelinePage: React.FC = () => {
     }
 
     if (filtros.responsavel) {
+      const isUnassignedFilter =
+        filtros.responsavel === PIPELINE_UNASSIGNED_RESPONSAVEL_FILTER ||
+        filtros.responsavel === PIPELINE_LEGACY_UNASSIGNED_RESPONSAVEL_FILTER;
       const responsavelNome =
-        usuarios.find((u) => u.id === filtros.responsavel)?.nome || filtros.responsavel;
+        isUnassignedFilter
+          ? 'Sem responsavel'
+          : usuarios.find((u) => u.id === filtros.responsavel)?.nome || filtros.responsavel;
       chips.push({ label: 'Responsável', value: responsavelNome });
     }
 
@@ -3276,6 +3293,7 @@ const PipelinePage: React.FC = () => {
                     <option value="">
                       {loadingUsuarios ? 'Carregando...' : 'Todos os responsáveis'}
                     </option>
+                    <option value={PIPELINE_UNASSIGNED_RESPONSAVEL_FILTER}>Sem responsavel</option>
                     {usuarios.map((usuario) => (
                       <option key={usuario.id} value={usuario.id}>
                         {usuario.nome}
@@ -5054,3 +5072,4 @@ const PipelinePage: React.FC = () => {
 };
 
 export default PipelinePage;
+

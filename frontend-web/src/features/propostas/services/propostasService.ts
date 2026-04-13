@@ -774,6 +774,12 @@ class PropostasService {
     const validadeDiasRaw = Number(propostaAny.validadeDias ?? propostaAny.validade_dias ?? 30);
     const validadeDias =
       Number.isFinite(validadeDiasRaw) && validadeDiasRaw > 0 ? validadeDiasRaw : 30;
+    const dataValidadeFonte =
+      propostaAny.dataValidade ||
+      propostaAny.dataVencimento ||
+      propostaAny.data_vencimento ||
+      propostaAny.data_vencimento_proposta;
+    const dataValidadeDate = dataValidadeFonte ? new Date(dataValidadeFonte) : null;
 
     return {
       id: propostaAny.id,
@@ -809,9 +815,10 @@ class PropostasService {
         propostaAny.incluirImpostosPDF ?? propostaAny.incluir_impostos_pdf ?? true,
       subtotal,
       total,
-      dataValidade: propostaAny.dataVencimento
-        ? new Date(propostaAny.dataVencimento)
-        : new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000),
+      dataValidade:
+        dataValidadeDate && Number.isFinite(dataValidadeDate.getTime())
+          ? dataValidadeDate
+          : new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000),
       aprovacaoInterna: propostaAny.aprovacaoInterna || propostaAny.emailDetails?.aprovacaoInterna,
       lembretes: Array.isArray(propostaAny.lembretes)
         ? propostaAny.lembretes

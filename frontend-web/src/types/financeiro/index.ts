@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Tipos para o modulo financeiro do Conect CRM
  * Inspirado nos melhores ERPs do mercado (Omie, Conta Azul, Nibo)
  */
@@ -231,6 +231,13 @@ export interface ResumoFinanceiro {
 
 
 export type StatusContaReceber = 'pendente' | 'parcial' | 'recebida' | 'vencida' | 'cancelada';
+export type OrigemContaReceber = 'faturamento' | 'avulso';
+export type TipoLancamentoAvulsoContaReceber =
+  | 'instalacao'
+  | 'servico_avulso'
+  | 'reembolso'
+  | 'solicitacao_servico'
+  | 'outro';
 
 export interface ContaReceber {
   id: number;
@@ -240,6 +247,8 @@ export interface ContaReceber {
   clienteNome: string;
   clienteEmail?: string | null;
   status: StatusContaReceber;
+  origemTitulo: OrigemContaReceber;
+  tipoLancamentoAvulso?: TipoLancamentoAvulsoContaReceber | null;
   statusFatura: string;
   createdAt: string;
   dataEmissao: string;
@@ -253,6 +262,7 @@ export interface ContaReceber {
 export interface FiltrosContasReceber {
   busca?: string;
   status?: StatusContaReceber[];
+  origem?: OrigemContaReceber[];
   clienteId?: string;
   dataVencimentoInicio?: string;
   dataVencimentoFim?: string;
@@ -298,6 +308,19 @@ export const STATUS_CONTA_RECEBER_LABELS: Record<StatusContaReceber, string> = {
   cancelada: 'Cancelada',
 };
 
+export const ORIGEM_CONTA_RECEBER_LABELS: Record<OrigemContaReceber, string> = {
+  faturamento: 'Faturamento',
+  avulso: 'Avulso',
+};
+
+export const TIPO_LANCAMENTO_AVULSO_LABELS: Record<TipoLancamentoAvulsoContaReceber, string> = {
+  instalacao: 'Instalação',
+  servico_avulso: 'Serviço avulso',
+  reembolso: 'Reembolso',
+  solicitacao_servico: 'Solicitação de serviço',
+  outro: 'Outro',
+};
+
 export interface RegistrarRecebimentoContaReceberPayload {
   valor: number;
   metodoPagamento: string;
@@ -318,6 +341,25 @@ export interface ResultadoRegistrarRecebimentoContaReceber {
     metodoPagamento?: string | null;
     gatewayTransacaoId?: string | null;
   };
+  contaReceber: ContaReceber;
+}
+
+export interface CriarLancamentoAvulsoContaReceberPayload {
+  clienteId: string;
+  usuarioResponsavelId?: string;
+  dataVencimento: string;
+  descricao: string;
+  valor: number;
+  tipoLancamentoAvulso?: TipoLancamentoAvulsoContaReceber;
+  formaPagamentoPreferida?: string;
+  observacoes?: string;
+  correlationId?: string;
+  origemId?: string;
+}
+
+export interface ResultadoCriarLancamentoAvulsoContaReceber {
+  correlationId: string;
+  origemId: string;
   contaReceber: ContaReceber;
 }
 

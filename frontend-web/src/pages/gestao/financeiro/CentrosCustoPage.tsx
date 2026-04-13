@@ -17,7 +17,6 @@ import {
   DataTableCard,
   EmptyState,
   FiltersBar,
-  InlineStats,
   LoadingSkeleton,
   PageHeader,
   SectionCard,
@@ -346,17 +345,49 @@ export default function CentrosCustoPage() {
   const ativos = centros.filter((item) => item.ativo).length;
   const inativos = total - ativos;
   const hasFilters = busca.trim().length > 0 || filtroStatus !== 'todos';
+  const painelMetricas = [
+    {
+      label: 'Total centros',
+      value: String(total),
+      hint: 'Centros cadastrados',
+      highlightClass: 'text-[#123E52]',
+    },
+    {
+      label: 'Ativos',
+      value: String(ativos),
+      hint: 'Disponiveis para lancamento',
+      highlightClass: 'text-[#0F7B7D]',
+    },
+    {
+      label: 'Inativos',
+      value: String(inativos),
+      hint: 'Fora de operacao',
+      highlightClass: 'text-[#B56E16]',
+    },
+  ];
 
   return (
     <div className="space-y-4 pt-1 sm:pt-2">
-      <SectionCard className="space-y-4 p-4 sm:p-5">
+      <SectionCard className="space-y-[18px] border-[#CBDAE2] bg-gradient-to-br from-white via-white to-[#F3FAF8] p-5 shadow-[0_24px_46px_-34px_rgba(16,57,74,0.38)]">
         <PageHeader
-          title="Centros de Custo"
+          eyebrow={
+            <span className="inline-flex items-center rounded-full border border-[#BFD9E2] bg-[#EFF8FB] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#3F6A7C]">
+              Nucleo Financeiro
+            </span>
+          }
+          title={
+            <span className="text-[27px] font-bold leading-[1.03] tracking-[-0.018em] text-[#002333] sm:text-[28px]">
+              Centros de <span className="text-[#0F7B7D]">Custo</span>
+            </span>
+          }
+          titleClassName="leading-none sm:inline-flex sm:items-center"
           description={
             carregando
               ? 'Carregando centros de custo...'
               : `Gerencie ${total} centro(s) de custo da empresa.`
           }
+          descriptionClassName="max-w-[64ch] text-[12px] leading-[1.4] text-[#5B7A89] sm:border-l sm:border-[#D7E5EC] sm:pl-3 sm:text-[13px]"
+          inlineDescriptionOnDesktop
           actions={
             <div className="flex flex-wrap items-center gap-2">
               <button
@@ -370,74 +401,82 @@ export default function CentrosCustoPage() {
               </button>
               <button type="button" onClick={abrirModalCriacao} className={btnPrimary}>
                 <Plus className="h-4 w-4" />
-                Novo Centro
+                Novo centro
               </button>
             </div>
           }
         />
 
-        {!carregando && !erro ? (
-          <InlineStats
-            stats={[
-              { label: 'Total', value: String(total), tone: 'neutral' },
-              { label: 'Ativos', value: String(ativos), tone: 'accent' },
-              { label: 'Inativos', value: String(inativos), tone: 'warning' },
-            ]}
-          />
-        ) : null}
-      </SectionCard>
-
-      <FiltersBar className="p-4">
-        <div className="flex w-full flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
-          <div className="w-full sm:min-w-[280px] sm:flex-1">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Buscar centro</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
-              <input
-                type="text"
-                value={busca}
-                onChange={(event) => setBusca(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    void buscarCentros();
-                  }
-                }}
-                placeholder="Codigo, nome ou descricao..."
-                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
-              />
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {painelMetricas.map((item) => (
+            <div key={item.label} className="rounded-xl border border-[#D2E1E8] bg-white px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[#5F7B89]">
+                {item.label}
+              </p>
+              <p className={`mt-1 text-lg font-semibold ${item.highlightClass}`}>
+                {carregando ? '--' : item.value}
+              </p>
+              <p className="mt-1 text-xs text-[#688390]">{item.hint}</p>
             </div>
-          </div>
-
-          <div className="w-full sm:w-auto">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Status</label>
-            <select
-              value={filtroStatus}
-              onChange={(event) => setFiltroStatus(event.target.value as FiltroStatus)}
-              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[170px]"
-            >
-              <option value="todos">Todos</option>
-              <option value="ativo">Ativos</option>
-              <option value="inativo">Inativos</option>
-            </select>
-          </div>
-
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-            <button type="button" onClick={() => void buscarCentros()} className={btnPrimary}>
-              <Search className="h-4 w-4" />
-              Buscar
-            </button>
-            <button
-              type="button"
-              onClick={() => void limparFiltros()}
-              className={btnSecondary}
-              disabled={!hasFilters}
-            >
-              <Filter className="h-4 w-4" />
-              Limpar
-            </button>
-          </div>
+          ))}
         </div>
-      </FiltersBar>
+
+        <div className="pt-1">
+          <FiltersBar className="space-y-4 rounded-2xl border border-[#D4E1E8] bg-gradient-to-br from-[#F7FBFD] to-[#F1F7FA] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
+            <div className="flex w-full flex-col gap-4">
+              <div className="flex w-full flex-col gap-3 xl:flex-row xl:items-end">
+                <div className="w-full xl:flex-1">
+                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Buscar centro</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
+                    <input
+                      type="text"
+                      value={busca}
+                      onChange={(event) => setBusca(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          void buscarCentros();
+                        }
+                      }}
+                      placeholder="Codigo, nome ou descricao..."
+                      className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                    />
+                  </div>
+                </div>
+
+                <div className="w-full xl:w-[220px]">
+                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Status</label>
+                  <select
+                    value={filtroStatus}
+                    onChange={(event) => setFiltroStatus(event.target.value as FiltroStatus)}
+                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                  >
+                    <option value="todos">Todos os status</option>
+                    <option value="ativo">Ativos</option>
+                    <option value="inativo">Inativos</option>
+                  </select>
+                </div>
+
+                <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:justify-end">
+                  <button type="button" onClick={() => void buscarCentros()} className={btnPrimary}>
+                    <Search className="h-4 w-4" />
+                    Buscar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void limparFiltros()}
+                    className={btnSecondary}
+                    disabled={!hasFilters}
+                  >
+                    <Filter className="h-4 w-4" />
+                    Limpar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </FiltersBar>
+        </div>
+      </SectionCard>
 
       {carregando ? <LoadingSkeleton lines={8} /> : null}
 

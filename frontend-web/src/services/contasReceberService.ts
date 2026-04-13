@@ -1,9 +1,11 @@
-﻿import api from './api';
+import api from './api';
 import {
   ContaReceber,
+  CriarLancamentoAvulsoContaReceberPayload,
   FiltrosContasReceber,
   ListaContasReceber,
   ReenviarCobrancaContaReceberPayload,
+  ResultadoCriarLancamentoAvulsoContaReceber,
   RegistrarRecebimentoContaReceberPayload,
   ResultadoReenviarCobrancaContaReceber,
   ResultadoRegistrarRecebimentoContaReceber,
@@ -76,6 +78,7 @@ const buildQuery = (filtros?: FiltrosContasReceber): string => {
   if (filtros.sortOrder) params.append('sortOrder', filtros.sortOrder);
 
   filtros.status?.forEach((item) => params.append('status', item));
+  filtros.origem?.forEach((item) => params.append('origem', item));
 
   const query = params.toString();
   return query ? `?${query}` : '';
@@ -112,6 +115,13 @@ export const contasReceberService = {
   ): Promise<ResultadoReenviarCobrancaContaReceber> {
     const response = await api.post(`/contas-receber/${contaReceberId}/reenviar-cobranca`, payload || {});
     return unwrap<ResultadoReenviarCobrancaContaReceber>(response.data);
+  },
+
+  async criarLancamentoAvulso(
+    payload: CriarLancamentoAvulsoContaReceberPayload,
+  ): Promise<ResultadoCriarLancamentoAvulsoContaReceber> {
+    const response = await api.post('/contas-receber/avulsos', payload);
+    return unwrap<ResultadoCriarLancamentoAvulsoContaReceber>(response.data);
   },
 };
 

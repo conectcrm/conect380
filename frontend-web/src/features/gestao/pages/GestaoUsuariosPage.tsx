@@ -1695,7 +1695,7 @@ const GestaoUsuariosPage: React.FC = () => {
     <div className="space-y-4 pt-1 sm:pt-2">
       <SectionCard className="space-y-4 p-4 sm:p-5">
         <PageHeader
-          title="Gestao de Usuarios"
+          title="Usuarios"
           description="Gerencie usuarios, papeis e permissoes do sistema."
           filters={<ActiveEmpresaBadge variant="page" />}
           actions={

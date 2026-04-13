@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
@@ -34,7 +34,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { useGlobalConfirmation } from '../contexts/GlobalConfirmationContext';
-import { FiltersBar, InlineStats, PageHeader, SectionCard } from '../components/layout-v2';
+import { FiltersBar, PageHeader, SectionCard } from '../components/layout-v2';
 import leadsService, {
   Lead,
   StatusLead,
@@ -191,6 +191,7 @@ const convertSchema = yup.object().shape({
 
 const LEADS_SAVED_VIEWS_STORAGE_KEY = 'conectcrm_leads_saved_views_v1';
 const LEAD_UNASSIGNED_OPTION_VALUE = '__sem_responsavel__';
+const LEAD_UNASSIGNED_OPTION_LABEL = 'Sem responsável';
 const CLIENTE_OU_CONTATO_RULE_MESSAGE =
   'Informe um cliente (cliente_id) ou pelo menos o nome do contato (nomeContato).';
 
@@ -363,8 +364,14 @@ const LeadsPage: React.FC = () => {
   );
 
   const responsavelCriacaoOptions = useMemo<SearchSelectOptionValue[]>(
-    () =>
-      responsaveis
+    () => [
+      {
+        id: LEAD_UNASSIGNED_OPTION_VALUE,
+        label: LEAD_UNASSIGNED_OPTION_LABEL,
+        subtitle: 'Leads sem responsável atribuído',
+        extra: LEAD_UNASSIGNED_OPTION_VALUE,
+      },
+      ...responsaveis
         .filter((responsavel) => Boolean(responsavel?.id))
         .map((responsavel) => {
           const nome = (responsavel.nome || responsavel.username || responsavel.email || '').trim();
@@ -381,6 +388,7 @@ const LeadsPage: React.FC = () => {
             extra: responsavel.id,
           };
         }),
+    ],
     [responsaveis],
   );
 
@@ -1007,8 +1015,17 @@ const LeadsPage: React.FC = () => {
       // Validar tipo de arquivo
       if (!file.name.endsWith('.csv')) {
         setError('Por favor, selecione um arquivo CSV');
+        setImportFile(null);
         return;
       }
+
+      const tamanhoMaximoBytes = 10 * 1024 * 1024;
+      if (file.size > tamanhoMaximoBytes) {
+        setError('Arquivo CSV deve ter no máximo 10MB');
+        setImportFile(null);
+        return;
+      }
+
       setImportFile(file);
       setImportResult(null);
     }
@@ -1125,16 +1142,25 @@ const LeadsPage: React.FC = () => {
     return normalized.length > 88 ? `${normalized.slice(0, 88)}...` : normalized;
   };
 
+  const getUltimaInteracaoLabel = (lead: Lead) =>
+    lead.data_ultima_interacao
+      ? formatDateTime(lead.data_ultima_interacao)
+      : 'Sem interação registrada';
+
   const totalLeadsAbertos = Math.max(
     (estatisticas?.total || 0) - (estatisticas?.convertidos || 0),
     0,
   );
+  const leadsNovos = estatisticas?.novos || 0;
   const leadsProntosParaConversao = estatisticas?.qualificados || 0;
+  const leadsSemResponsavel = estatisticas?.semResponsavel || 0;
+  const leadsSemContato = estatisticas?.semContato || 0;
   const taxaConversao = estatisticas?.taxaConversao || 0;
+  const scoreMedio = estatisticas?.scoreMedio || 0;
 
   const pageDescription = loading
     ? 'Carregando...'
-    : `Gerencie seus ${totalRegistros} leads na pré-venda e converta em oportunidades`;
+    : 'Acompanhe o funil de pré-venda, trate gargalos e acelere a passagem para oportunidades';
   const hasFilters =
     Boolean(busca.trim()) ||
     filtroStatus !== 'operacionais' ||
@@ -1209,8 +1235,11 @@ const LeadsPage: React.FC = () => {
     actionId: string,
     actionLabel: string,
     callback: (leadId: string) => Promise<unknown>,
+    targetLeadIds?: string[],
   ) => {
-    if (selectedLeadIds.length === 0) {
+    const leadIds = targetLeadIds?.length ? targetLeadIds : selectedLeadIds;
+
+    if (leadIds.length === 0) {
       toastService.error('Selecione pelo menos um lead.');
       return;
     }
@@ -1219,7 +1248,7 @@ const LeadsPage: React.FC = () => {
     setError(null);
 
     try {
-      const results = await Promise.allSettled(selectedLeadIds.map((leadId) => callback(leadId)));
+      const results = await Promise.allSettled(leadIds.map((leadId) => callback(leadId)));
       const successCount = results.filter((result) => result.status === 'fulfilled').length;
       const errorCount = results.length - successCount;
 
@@ -1256,8 +1285,31 @@ const LeadsPage: React.FC = () => {
       return;
     }
 
-    await executeBulkAction('qualificar', 'Qualificação em lote', (leadId) =>
-      leadsService.qualificar(leadId, 'Lead qualificado em lote'),
+    const leadIdsElegiveis = leadsFiltrados
+      .filter(
+        (lead) =>
+          selectedLeadIds.includes(lead.id) &&
+          (lead.status === StatusLead.NOVO || lead.status === StatusLead.CONTATADO),
+      )
+      .map((lead) => lead.id);
+    const ignorados = selectedLeadIds.length - leadIdsElegiveis.length;
+
+    if (leadIdsElegiveis.length === 0) {
+      toastService.error('Selecione ao menos um lead novo ou contatado para qualificar.');
+      return;
+    }
+
+    if (ignorados > 0) {
+      toastService.warning(
+        `${ignorados} lead${ignorados > 1 ? 's foram ignorados' : ' foi ignorado'} por não estar em status elegível.`,
+      );
+    }
+
+    await executeBulkAction(
+      'qualificar',
+      'Qualificação em lote',
+      (leadId) => leadsService.qualificar(leadId, 'Lead qualificado em lote'),
+      leadIdsElegiveis,
     );
   };
 
@@ -1267,12 +1319,36 @@ const LeadsPage: React.FC = () => {
       return;
     }
 
+    const leadIdsElegiveis = leadsFiltrados
+      .filter(
+        (lead) =>
+          selectedLeadIds.includes(lead.id) &&
+          lead.status !== StatusLead.DESQUALIFICADO &&
+          lead.status !== StatusLead.CONVERTIDO,
+      )
+      .map((lead) => lead.id);
+    const ignorados = selectedLeadIds.length - leadIdsElegiveis.length;
+
+    if (leadIdsElegiveis.length === 0) {
+      toastService.error('Selecione ao menos um lead elegível para desqualificar.');
+      return;
+    }
+
+    if (ignorados > 0) {
+      toastService.warning(
+        `${ignorados} lead${ignorados > 1 ? 's foram ignorados' : ' foi ignorado'} por não estar em status elegível.`,
+      );
+    }
+
     if (!(await confirm('Deseja desqualificar os leads selecionados?'))) {
       return;
     }
 
-    await executeBulkAction('desqualificar', 'Desqualificação em lote', (leadId) =>
-      leadsService.desqualificar(leadId, 'Lead desqualificado em lote'),
+    await executeBulkAction(
+      'desqualificar',
+      'Desqualificação em lote',
+      (leadId) => leadsService.desqualificar(leadId, 'Lead desqualificado em lote'),
+      leadIdsElegiveis,
     );
   };
 
@@ -1364,22 +1440,29 @@ const LeadsPage: React.FC = () => {
 
   return (
     <div className="space-y-4 pt-1 sm:pt-2">
-      <SectionCard className="space-y-4 p-4 sm:p-5">
+      <SectionCard className="space-y-[18px] border-[#CBDAE2] bg-gradient-to-br from-white via-white to-[#F4FAFF] p-5 shadow-[0_24px_46px_-34px_rgba(16,57,74,0.38)]">
         <PageHeader
-          title={
-            <span className="inline-flex items-center gap-2">
-              <UserPlus className="h-5 w-5 text-[#159A9C]" />
-              <span>Leads</span>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin text-[#159A9C]" /> : null}
+          eyebrow={
+            <span className="inline-flex items-center rounded-full border border-[#BFD9E2] bg-[#EFF8FB] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#3F6A7C]">
+              Núcleo Comercial
             </span>
           }
+          title={
+            <span className="inline-flex items-center gap-2 text-[27px] font-bold leading-[1.03] tracking-[-0.018em] text-[#002333] sm:text-[28px]">
+              <UserPlus className="h-6 w-6 text-[#159A9C]" />
+              Leads
+            </span>
+          }
+          titleClassName="leading-none sm:inline-flex sm:items-center"
           description={pageDescription}
+          descriptionClassName="max-w-[74ch] text-[12px] leading-[1.4] text-[#5B7A89] sm:border-l sm:border-[#D7E5EC] sm:pl-3 sm:text-[13px]"
+          inlineDescriptionOnDesktop
           actions={
             <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={carregarDados}
                 disabled={loading}
-                className="inline-flex h-10 items-center justify-center rounded-lg border border-[#B4BEC9] bg-white px-3 text-[#19384C] transition-colors hover:bg-[#F6FAF9] disabled:opacity-50"
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-[#D4E2E7] bg-white px-3 text-[#19384C] transition-colors hover:bg-[#F6FAF9] disabled:opacity-50"
                 title="Atualizar leads"
               >
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
@@ -1387,7 +1470,7 @@ const LeadsPage: React.FC = () => {
               {canCreateLead && (
                 <button
                   onClick={handleOpenImportDialog}
-                  className="inline-flex items-center gap-2 rounded-lg border border-[#159A9C] bg-white px-4 py-2 text-sm font-medium text-[#159A9C] transition-colors hover:bg-[#F4FBF9]"
+                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#159A9C] bg-white px-3 text-sm font-medium text-[#159A9C] transition-colors hover:bg-[#F4FBF9]"
                 >
                   <Upload className="h-4 w-4" />
                   Importar CSV
@@ -1396,7 +1479,7 @@ const LeadsPage: React.FC = () => {
               {canCreateLead && (
                 <button
                   onClick={() => handleOpenDialog()}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#0F7B7D]"
+                  className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#0F7B7D]"
                 >
                   <Plus className="h-4 w-4" />
                   Novo Lead
@@ -1406,31 +1489,46 @@ const LeadsPage: React.FC = () => {
           }
         />
 
-        {!loading && (
-          <InlineStats
-            stats={[
-              {
-                label: 'Em aberto',
-                value: String(totalLeadsAbertos),
-                tone: 'accent',
-              },
-              {
-                label: 'Prontos para converter',
-                value: String(leadsProntosParaConversao),
-                tone: 'accent',
-              },
-              {
-                label: 'Taxa de conversão',
-                value: `${taxaConversao.toFixed(1)}%`,
-                tone: 'accent',
-              },
-            ]}
-          />
-        )}
-      </SectionCard>
+        <section className="space-y-3 rounded-2xl border border-[#D4E1E8] bg-white/95 p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-[#5F7B89]">
+              Resumo essencial:
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[#D7E6EC] bg-[#F5FAFC] px-2.5 py-1 text-xs font-semibold text-[#345362]">
+              Base ativa: {loading ? '--' : totalLeadsAbertos}
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[#BEE6CF] bg-[#F1FBF5] px-2.5 py-1 text-xs font-semibold text-[#137A42]">
+              Novos sem abordagem: {loading ? '--' : leadsNovos}
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[#BFE8E9] bg-[#EEFBFB] px-2.5 py-1 text-xs font-semibold text-[#0F7B7D]">
+              Maduros para virar oportunidade: {loading ? '--' : leadsProntosParaConversao}
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[#F4C7CF] bg-[#FFF4F6] px-2.5 py-1 text-xs font-semibold text-[#B4233A]">
+              Sem dono comercial: {loading ? '--' : leadsSemResponsavel}
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[#F5D7A7] bg-[#FFF7EA] px-2.5 py-1 text-xs font-semibold text-[#A86400]">
+              Sem canal de contato: {loading ? '--' : leadsSemContato}
+            </span>
+          </div>
 
-      <div className="w-full space-y-6">
-        <FiltersBar className="p-4">
+          <div className="rounded-xl border border-[#D7E6EC] bg-[#F9FCFE] px-3 py-3">
+            <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-[#5F7B89]">
+              <span>Taxa de conversão da carteira</span>
+              <span>{loading ? '--' : `${taxaConversao.toFixed(1)}%`}</span>
+            </div>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#DDEBF0]">
+              <div
+                className="h-full rounded-full bg-[#1E66B4] transition-all"
+                style={{ width: `${Math.max(0, Math.min(100, taxaConversao))}%` }}
+              />
+            </div>
+            <div className="mt-2 text-xs text-[#5B7A89]">
+              Qualificação média dos leads: {loading ? '--' : scoreMedio.toFixed(1)}
+            </div>
+          </div>
+        </section>
+
+        <FiltersBar className="space-y-4 rounded-2xl border border-[#D4E1E8] bg-gradient-to-br from-[#F7FBFD] to-[#F1F7FA] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
           <div className="flex w-full flex-col gap-4">
             <div className="flex w-full flex-col gap-3 xl:flex-row xl:items-end">
               <div className="w-full xl:min-w-[320px] xl:flex-1">
@@ -1464,7 +1562,7 @@ const LeadsPage: React.FC = () => {
                   }}
                   className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 xl:w-[220px]"
                 >
-                  <option value="operacionais">Pré-venda (abertos)</option>
+                  <option value="operacionais">Pré-venda (ativos)</option>
                   <option value="todos">Todos os status</option>
                   <option value={StatusLead.NOVO}>Novos</option>
                   <option value={StatusLead.CONTATADO}>Contatados</option>
@@ -1761,7 +1859,9 @@ const LeadsPage: React.FC = () => {
             )}
           </div>
         </FiltersBar>
+      </SectionCard>
 
+      <div className="w-full space-y-6">
         {/* Error Alert */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
@@ -1881,7 +1981,7 @@ const LeadsPage: React.FC = () => {
                         <Edit2 className="h-4 w-4 text-[#5D7887]" />
                       </button>
                     )}
-                    {canDeleteLead && (
+                    {canDeleteLead && lead.status !== StatusLead.CONVERTIDO && (
                       <button
                         onClick={(event) => {
                           event.stopPropagation();
@@ -1922,7 +2022,7 @@ const LeadsPage: React.FC = () => {
                       Última interação
                     </p>
                     <p className="mt-1 text-xs font-medium text-[#3F5E6E]">
-                      {formatDateTime(lead.data_ultima_interacao || lead.updated_at)}
+                      {getUltimaInteracaoLabel(lead)}
                     </p>
                   </div>
                 </div>
@@ -2065,7 +2165,9 @@ const LeadsPage: React.FC = () => {
 
                   {isDetailedCardView && (
                     <div className="mt-2 grid grid-cols-2 gap-2">
-                      {canManageLeadLifecycle && lead.status === StatusLead.NOVO && (
+                      {canManageLeadLifecycle &&
+                        (lead.status === StatusLead.NOVO ||
+                          lead.status === StatusLead.CONTATADO) && (
                         <button
                           type="button"
                           onClick={(event) => {
@@ -2078,7 +2180,7 @@ const LeadsPage: React.FC = () => {
                         >
                           Registrar interação
                         </button>
-                      )}
+                        )}
 
                       {canManageLeadLifecycle &&
                         lead.status !== StatusLead.DESQUALIFICADO &&
@@ -2212,9 +2314,7 @@ const LeadsPage: React.FC = () => {
                       Última interação
                     </p>
                     <p className="mt-1 text-xs font-medium text-[#244455]">
-                      {formatDateTime(
-                        leadDetalhesAberto.data_ultima_interacao || leadDetalhesAberto.updated_at,
-                      )}
+                      {getUltimaInteracaoLabel(leadDetalhesAberto)}
                     </p>
                   </div>
                   <div className="rounded-lg border border-[#E0EBEF] bg-[#F8FCFC] px-3 py-2">
@@ -2293,7 +2393,9 @@ const LeadsPage: React.FC = () => {
                       </button>
                     )}
 
-                    {canManageLeadLifecycle && leadDetalhesAberto.status === StatusLead.NOVO && (
+                    {canManageLeadLifecycle &&
+                      (leadDetalhesAberto.status === StatusLead.NOVO ||
+                        leadDetalhesAberto.status === StatusLead.CONTATADO) && (
                       <button
                         type="button"
                         onClick={() => handleOpenInteracaoDialog(leadDetalhesAberto)}
@@ -2303,7 +2405,7 @@ const LeadsPage: React.FC = () => {
                       >
                         Registrar interação
                       </button>
-                    )}
+                      )}
 
                     {canManageLeadLifecycle &&
                       leadDetalhesAberto.status !== StatusLead.DESQUALIFICADO &&
@@ -2328,7 +2430,7 @@ const LeadsPage: React.FC = () => {
                       </button>
                     )}
 
-                    {canDeleteLead && (
+                    {canDeleteLead && leadDetalhesAberto.status !== StatusLead.CONVERTIDO && (
                       <button
                         type="button"
                         onClick={() => handleDelete(leadDetalhesAberto.id)}

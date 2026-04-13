@@ -18,6 +18,8 @@ export enum TipoFatura {
   ADICIONAL = 'adicional',
 }
 
+export type OrigemFaturaOperacional = 'faturamento' | 'avulso';
+
 export enum FormaPagamento {
   PIX = 'pix',
   CARTAO_CREDITO = 'cartao_credito',
@@ -253,7 +255,8 @@ export interface FiltrosFatura {
   busca?: string;
   status?: StatusFatura;
   tipo?: TipoFatura;
-  clienteId?: number;
+  origem?: OrigemFaturaOperacional;
+  clienteId?: string;
   contratoId?: number;
   dataInicial?: string;
   dataFinal?: string;
@@ -573,12 +576,11 @@ export const faturamentoService = {
           sortOrder: 'sortOrder',
           status: 'status',
           tipo: 'tipo',
+          origem: 'origem',
           clienteId: 'clienteId',
           dataInicial: 'dataInicio',
           dataFinal: 'dataFim',
           periodoCampo: 'periodoCampo',
-          formaPagamento: 'formaPagamento',
-          vencidas: 'vencidas',
           q: 'q',
         };
 

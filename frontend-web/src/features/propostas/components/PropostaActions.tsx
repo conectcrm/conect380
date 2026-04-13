@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   BaseModal,
   FormField,
@@ -8,6 +8,7 @@ import {
 } from '../../../components/modals/BaseModal';
 import { toastService } from '../../../services/toastService';
 import {
+  Eye,
   Pencil,
   Mail,
   MessageSquare,
@@ -391,6 +392,7 @@ type PropostaUI = {
 
 interface PropostaActionsProps {
   proposta: PropostaCompleta | PropostaUI;
+  onViewProposta?: (proposta: PropostaCompleta | PropostaUI) => void;
   onEditProposta?: (proposta: PropostaCompleta | PropostaUI) => void;
   onPropostaUpdated?: () => void;
   className?: string;
@@ -431,6 +433,7 @@ const componentRoleLabelsPdf: Record<PlanoComponentePdf['componentRole'], string
 
 const PropostaActions: React.FC<PropostaActionsProps> = ({
   proposta,
+  onViewProposta,
   onEditProposta,
   onPropostaUpdated,
   className = '',
@@ -441,25 +444,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const { confirm } = useGlobalConfirmation();
   const mvpModeAtivo = isMvpModeEnabled();
   const faturamentoDisponivelNoContexto = !mvpModeAtivo;
-  const usuarioLogadoAtual = authService.getUser() as any;
-  const roleUsuarioAtual = String(usuarioLogadoAtual?.role || '')
-    .trim()
-    .toLowerCase();
-  const permissoesUsuarioAtual = [
-    ...(Array.isArray(usuarioLogadoAtual?.permissions) ? usuarioLogadoAtual.permissions : []),
-    ...(Array.isArray(usuarioLogadoAtual?.permissoes) ? usuarioLogadoAtual.permissoes : []),
-  ]
-    .map((permissao) => String(permissao || '').trim().toLowerCase())
-    .filter((permissao) => Boolean(permissao));
-  const perfilPodeOperarFaturamento = ['financeiro', 'admin', 'superadmin'].includes(
-    roleUsuarioAtual,
-  );
-  const permissaoPodeOperarFaturamento = permissoesUsuarioAtual.includes(
-    'financeiro.faturamento.manage',
-  );
-  const faturamentoOperacaoPermitidaNoContexto =
-    faturamentoDisponivelNoContexto &&
-    (perfilPodeOperarFaturamento || permissaoPodeOperarFaturamento);
+  const faturamentoOperacaoPermitidaNoContexto = faturamentoDisponivelNoContexto;
   const [sendingEmail, setSendingEmail] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [clienteData, setClienteData] = useState<{
@@ -1866,21 +1851,24 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     }
   };
 
-  const handleSolicitarDispensaContrato = async (): Promise<boolean> => {
+  const handleSolicitarDispensaContrato = async (reasonOverride?: string): Promise<boolean> => {
     try {
       const { propostaCompleta, propostaId } = await obterContextoAutomacao();
       const propostaData = getPropostaData(propostaCompleta);
-      const motivo = await askForInput({
-        title: 'Solicitar dispensa de contrato',
-        message:
-          'Informe o motivo da dispensa. Essa solicitacao precisara de aprovacao para liberar o faturamento.',
-        placeholder: 'Ex: venda transacional padrao com aceite em proposta e termos comerciais',
-        confirmText: 'Solicitar dispensa',
-        cancelText: 'Cancelar',
-        required: true,
-        multiline: true,
-        confirmVariant: 'warning',
-      });
+      const motivo =
+        typeof reasonOverride === 'string'
+          ? reasonOverride
+          : await askForInput({
+              title: 'Solicitar dispensa de contrato',
+              message:
+                'Informe o motivo da dispensa. Essa solicitacao precisara de aprovacao para liberar o faturamento.',
+              placeholder: 'Ex: venda transacional padrao com aceite em proposta e termos comerciais',
+              confirmText: 'Solicitar dispensa',
+              cancelText: 'Cancelar',
+              required: true,
+              multiline: true,
+              confirmVariant: 'warning',
+            });
 
       if (motivo === null) {
         return false;
@@ -1914,21 +1902,24 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     }
   };
 
-  const handleAprovarDispensaContrato = async (): Promise<boolean> => {
+  const handleAprovarDispensaContrato = async (reasonOverride?: string): Promise<boolean> => {
     try {
       const { propostaCompleta, propostaId } = await obterContextoAutomacao();
       const propostaData = getPropostaData(propostaCompleta);
-      const motivo = await askForInput({
-        title: 'Aprovar dispensa de contrato',
-        message:
-          'Informe o motivo da aprovacao. Essa acao libera o caminho sem contrato para faturamento.',
-        placeholder: 'Ex: operacao padrao sem risco juridico e dentro da politica comercial',
-        confirmText: 'Aprovar dispensa',
-        cancelText: 'Cancelar',
-        required: true,
-        multiline: true,
-        confirmVariant: 'success',
-      });
+      const motivo =
+        typeof reasonOverride === 'string'
+          ? reasonOverride
+          : await askForInput({
+              title: 'Aprovar dispensa de contrato',
+              message:
+                'Informe o motivo da aprovacao. Essa acao libera o caminho sem contrato para faturamento.',
+              placeholder: 'Ex: operacao padrao sem risco juridico e dentro da politica comercial',
+              confirmText: 'Aprovar dispensa',
+              cancelText: 'Cancelar',
+              required: true,
+              multiline: true,
+              confirmVariant: 'success',
+            });
 
       if (motivo === null) {
         return false;
@@ -2284,7 +2275,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
             const aprovarAgora = await confirm({
               title: 'Dispensa pendente de aprovacao',
               message:
-                'A dispensa ja foi solicitada para esta proposta. Deseja aprovar agora para liberar o faturamento?',
+                'A dispensa ja foi solicitada para esta proposta. Deseja aprovar agora para criar a fatura sem contrato?',
               confirmText: 'Aprovar dispensa',
               cancelText: 'Aguardar',
               icon: 'warning',
@@ -2293,20 +2284,20 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
             if (!aprovarAgora) {
               toastService.info(
-                'Dispensa de contrato pendente. Aguardando aprovacao para seguir com faturamento.',
+                'Dispensa de contrato pendente. Aguardando aprovacao para criar fatura sem contrato.',
               );
               break;
             }
 
             const aprovado = await handleAprovarDispensaContrato();
             if (aprovado) {
-              registrarHandoffFinanceiro('dispensa_contrato_aprovada');
+              await handleCriarFaturaSemContrato();
             }
             break;
           }
 
           if (statusDispensa === 'aprovada') {
-            registrarHandoffFinanceiro('dispensa_contrato_aprovada');
+            await handleCriarFaturaSemContrato();
             break;
           }
 
@@ -2326,10 +2317,10 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           }
 
           const confirmarSemContrato = await confirm({
-            title: 'Solicitar dispensa de contrato',
+            title: 'Criar fatura sem contrato',
             message:
-              'A proposta seguira para analise de dispensa. A fatura so sera permitida apos aprovacao da dispensa.',
-            confirmText: 'Sim, solicitar dispensa',
+              'A proposta seguira diretamente para faturamento sem contrato, com registro automatico da dispensa.',
+            confirmText: 'Sim, criar fatura',
             cancelText: 'Voltar',
             icon: 'warning',
             confirmButtonClass: 'bg-amber-600 hover:bg-amber-700 focus:ring-amber-500',
@@ -2339,7 +2330,15 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
             break;
           }
 
-          await handleSolicitarDispensaContrato();
+          const motivoDispensaAutomatica =
+            'Dispensa automatica aprovada via fluxo comercial para gerar faturamento sem contrato.';
+          const solicitada = await handleSolicitarDispensaContrato(motivoDispensaAutomatica);
+          if (solicitada) {
+            const aprovada = await handleAprovarDispensaContrato(motivoDispensaAutomatica);
+            if (aprovada) {
+              await handleCriarFaturaSemContrato();
+            }
+          }
           break;
         }
 
@@ -2384,7 +2383,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           }
 
           toastService.success('Assinatura externa confirmada.');
-          registrarHandoffFinanceiro('contrato_assinado');
+          await handleCriarFatura({ ignoreStatusGate: true });
           break;
         }
 
@@ -2393,7 +2392,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
             toastService.info(AUTOMACAO_FLUXO_MENSAGEM);
             break;
           }
-          registrarHandoffFinanceiro('contrato_assinado');
+          await handleCriarFatura();
           break;
 
         case 'dispensa_contrato_solicitada': {
@@ -2414,22 +2413,25 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
           const aprovado = await handleAprovarDispensaContrato();
           if (aprovado) {
-            registrarHandoffFinanceiro('dispensa_contrato_aprovada');
+            await handleCriarFaturaSemContrato();
           }
           break;
         }
 
         case 'dispensa_contrato_aprovada':
+          if (!faturamentoDisponivelNoContexto) {
+            toastService.info(AUTOMACAO_FLUXO_MENSAGEM);
+            break;
+          }
+          await handleCriarFaturaSemContrato();
+          break;
+
         case 'faturamento_liberado':
           if (!faturamentoDisponivelNoContexto) {
             toastService.info(AUTOMACAO_FLUXO_MENSAGEM);
             break;
           }
-          registrarHandoffFinanceiro(
-            status === 'faturamento_liberado'
-              ? 'faturamento_liberado'
-              : 'dispensa_contrato_aprovada',
-          );
+          await handleCriarFatura({ ignoreStatusGate: true });
           break;
 
         case 'fatura_criada':
@@ -2917,9 +2919,8 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     }
     const token = await portalClienteService.gerarTokenPublico(String(propostaId));
     const clienteData = await getClienteData();
-    const empresaData = await getEmpresaDataPdf();
     const shareUrl = `${window.location.origin}/portal/${propostaData.numero}/${token}`;
-    const nomeEmpresaShare = empresaData.nome || empresaNomeExibicao;
+    const nomeEmpresaShare = 'ConectCRM';
 
     if (navigator.share) {
       try {
@@ -2983,11 +2984,11 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       'fatura_criada',
       'aguardando_pagamento',
     ].includes(statusFluxoAtual);
-  const exibirEmailDireto = !statusEncerradoSemAcoesComerciais;
+  const exibirEmailDireto = !statusEncerradoSemAcoesComerciais && statusFluxoAtual !== 'rascunho';
   const exibirWhatsApp = !statusEncerradoSemAcoesComerciais;
   const exibirCompartilhar = !statusEncerradoSemAcoesComerciais;
   const exibirGerarContrato = podeGerarContrato();
-  const exibirCriarFatura = false;
+  const exibirCriarFatura = podeCriarFatura();
   const exibirAvancarFluxo = !statusEncerradoSemAcoesComerciais && !bloqueiaAvancoFinanceiroNoMvp;
   const exibirAcoesCompartilhamento = actionScope === 'all' || actionScope === 'share';
   const exibirAcoesFluxo = actionScope === 'all' || actionScope === 'flow';
@@ -3027,7 +3028,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         return {
           label: 'Formalizar venda',
           title: faturamentoDisponivelNoContexto
-            ? 'Gerar contrato ou solicitar dispensa para encaminhar ao financeiro'
+            ? 'Gerar contrato ou criar fatura a partir da proposta aprovada'
             : 'Gerar contrato para formalizar a venda no MVP',
         };
       case 'contrato_gerado':
@@ -3097,6 +3098,18 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         >
           <Pencil className="w-4 h-4" />
           {showLabels && <span>Editar</span>}
+        </button>
+      )}
+
+      {actionScope === 'all' && onViewProposta && (
+        <button
+          type="button"
+          onClick={() => onViewProposta(proposta)}
+          className={`${buttonClass} ${buttonThemeClass.neutral}`}
+          title="Visualizar proposta"
+        >
+          <Eye className="w-4 h-4" />
+          {showLabels && <span>Visualizar</span>}
         </button>
       )}
 
