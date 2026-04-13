@@ -29,6 +29,9 @@ import { OportunidadesService } from '../oportunidades/oportunidades.service';
 import { Empresa } from '../../empresas/entities/empresa.entity';
 import * as Papa from 'papaparse';
 
+const LEADS_UNASSIGNED_RESPONSAVEL_FILTER = '__sem_responsavel__';
+const LEADS_LEGACY_UNASSIGNED_RESPONSAVEL_FILTER = 'sem_responsavel';
+
 @Injectable()
 export class LeadsService {
   private readonly logger = new Logger(LeadsService.name);
@@ -578,7 +581,7 @@ export class LeadsService {
       const detail = (error as any)?.detail || (error as Error).message;
       this.logError('[LeadsService.create] erro ao criar lead', error);
 
-      // Se for erro de validação do BadRequestException, propagar
+      // Se for erro de validacao do BadRequestException, propagar
       if (error instanceof BadRequestException) {
         throw error;
       }
@@ -609,8 +612,11 @@ export class LeadsService {
       if (filtros?.status) {
         const statusFiltro = filtros.status.toString().trim().toLowerCase();
         if (statusFiltro === 'operacionais' || statusFiltro === 'abertos') {
-          query.andWhere('lead.status <> :statusConvertidoFiltro', {
-            statusConvertidoFiltro: await this.mapearStatusLeadParaBanco(StatusLead.CONVERTIDO),
+          query.andWhere('lead.status NOT IN (:...statusOperacionaisExcluidos)', {
+            statusOperacionaisExcluidos: [
+              await this.mapearStatusLeadParaBanco(StatusLead.CONVERTIDO),
+              await this.mapearStatusLeadParaBanco(StatusLead.DESQUALIFICADO),
+            ],
           });
         } else {
           query.andWhere('lead.status = :status', {
@@ -626,14 +632,31 @@ export class LeadsService {
       }
 
       if (filtros?.responsavel_id) {
-        query.andWhere('lead.responsavel_id = :responsavel_id', {
-          responsavel_id: filtros.responsavel_id,
-        });
+        const responsavelFiltroNormalizado = String(filtros.responsavel_id).trim();
+
+        if (
+          responsavelFiltroNormalizado === LEADS_UNASSIGNED_RESPONSAVEL_FILTER ||
+          responsavelFiltroNormalizado === LEADS_LEGACY_UNASSIGNED_RESPONSAVEL_FILTER
+        ) {
+          query.andWhere('lead.responsavel_id IS NULL');
+        } else {
+          query.andWhere('lead.responsavel_id = :responsavel_id', {
+            responsavel_id: responsavelFiltroNormalizado,
+          });
+        }
       }
 
       if (filtros?.dataInicio && filtros?.dataFim) {
         query.andWhere('lead.created_at BETWEEN :dataInicio AND :dataFim', {
           dataInicio: filtros.dataInicio,
+          dataFim: filtros.dataFim,
+        });
+      } else if (filtros?.dataInicio) {
+        query.andWhere('lead.created_at >= :dataInicio', {
+          dataInicio: filtros.dataInicio,
+        });
+      } else if (filtros?.dataFim) {
+        query.andWhere('lead.created_at <= :dataFim', {
           dataFim: filtros.dataFim,
         });
       }
@@ -646,7 +669,7 @@ export class LeadsService {
         );
       }
 
-      // Aplicar paginação
+      // Aplicar paginacao
       query.skip(skip).take(limit);
 
       const statusQualificado = await this.mapearStatusLeadParaBanco(StatusLead.QUALIFICADO);
@@ -714,7 +737,7 @@ export class LeadsService {
       });
 
       if (!lead) {
-        throw new NotFoundException(`Lead com ID ${id} não encontrado`);
+        throw new NotFoundException(`Lead com ID ${id} nao encontrado`);
       }
 
       return normalizeResponse ? this.normalizarLeadDoBanco(lead) : lead;
@@ -733,6 +756,7 @@ export class LeadsService {
   async update(id: string, dto: UpdateLeadDto, empresaId: string): Promise<Lead> {
     try {
       const lead = await this.findOne(id, empresaId, false);
+      const statusAtualNormalizado = this.normalizarStatusLead(lead.status as unknown as string);
       const previousResponsavelId =
         typeof lead.responsavel_id === 'string' && lead.responsavel_id.trim().length > 0
           ? lead.responsavel_id.trim()
@@ -752,8 +776,8 @@ export class LeadsService {
         })}`,
       );
 
-      // Tratar troca de responsável de forma explícita para evitar persistência do vínculo antigo
-      // quando a relação "responsavel" já veio carregada no entity.
+      // Tratar troca de responsavel de forma explicita para evitar persistencia do vinculo antigo
+      // quando a relacao "responsavel" ja veio carregada no entity.
       if (hasResponsavelPayload) {
         const responsavelPayload = (dto as any).responsavel_id;
         let normalizedResponsavelId =
@@ -776,6 +800,26 @@ export class LeadsService {
       }
 
       if (sanitizedDto.status !== undefined) {
+        const statusAlvoNormalizado = this.normalizarStatusLead(sanitizedDto.status as string);
+
+        if (
+          statusAtualNormalizado === StatusLead.CONVERTIDO &&
+          statusAlvoNormalizado !== StatusLead.CONVERTIDO
+        ) {
+          throw new BadRequestException(
+            'Lead convertido nao pode retornar para etapas anteriores.',
+          );
+        }
+
+        if (
+          statusAtualNormalizado !== StatusLead.CONVERTIDO &&
+          statusAlvoNormalizado === StatusLead.CONVERTIDO
+        ) {
+          throw new BadRequestException(
+            'Use a acao de conversao para converter um lead em oportunidade.',
+          );
+        }
+
         sanitizedDto.status = (await this.mapearStatusLeadParaBanco(
           sanitizedDto.status as string,
         )) as any;
@@ -825,7 +869,7 @@ export class LeadsService {
       const lead = await this.findOne(id, empresaId, false);
 
       if (lead.status === StatusLead.CONVERTIDO) {
-        throw new BadRequestException('Não é possível deletar um lead já convertido');
+        throw new BadRequestException('Nao e possivel deletar um lead ja convertido');
       }
 
       await this.leadsRepository.remove(lead);
@@ -851,7 +895,7 @@ export class LeadsService {
       const lead = await this.findOne(leadId, empresaId, false);
 
       if (lead.status === StatusLead.CONVERTIDO) {
-        throw new BadRequestException('Lead já foi convertido anteriormente');
+        throw new BadRequestException('Lead ja foi convertido anteriormente');
       }
 
       const tituloOportunidade =
@@ -926,13 +970,13 @@ export class LeadsService {
   }
 
   /**
-   * Obter estatísticas de leads
+   * Obter estatisticas de leads
    */
   async getEstatisticas(empresaId: string): Promise<LeadEstatisticas> {
     try {
       this.logger.debug(`[LeadsService.getEstatisticas] empresaId=${empresaId}`);
 
-      // Buscar todos os leads (sem paginação para estatísticas)
+      // Buscar todos os leads (sem paginacao para estatisticas)
       const result = await this.findAll(empresaId, { limit: 10000 }); // Limite alto para pegar todos
       const leads = result.data;
       this.logger.debug(`[LeadsService.getEstatisticas] leads encontrados=${leads.length}`);
@@ -943,6 +987,8 @@ export class LeadsService {
       const qualificados = leads.filter((l) => l.status === StatusLead.QUALIFICADO).length;
       const desqualificados = leads.filter((l) => l.status === StatusLead.DESQUALIFICADO).length;
       const convertidos = leads.filter((l) => l.status === StatusLead.CONVERTIDO).length;
+      const semResponsavel = leads.filter((l) => !l.responsavel_id).length;
+      const semContato = leads.filter((l) => !l.email && !l.telefone).length;
 
       const taxaConversao = total > 0 ? (convertidos / total) * 100 : 0;
 
@@ -960,7 +1006,7 @@ export class LeadsService {
         quantidade,
       }));
 
-      // Agrupamento por responsável
+      // Agrupamento por responsavel
       const responsavelMap = new Map<string, { nome: string; quantidade: number }>();
       leads.forEach((lead) => {
         if (lead.responsavel_id) {
@@ -989,6 +1035,8 @@ export class LeadsService {
         qualificados,
         desqualificados,
         convertidos,
+        semResponsavel,
+        semContato,
         taxaConversao,
         scoreMedio,
         porOrigem,
@@ -996,19 +1044,20 @@ export class LeadsService {
       };      this.logger.debug(`[LeadsService.getEstatisticas] estatisticas=${JSON.stringify(estatisticas)}`);
 
       return estatisticas;
-    } catch (error) {      this.logError('[LeadsService.getEstatisticas] erro ao obter estat?sticas', error);
-      throw new InternalServerErrorException('Erro ao obter estatísticas', error.message);
+    } catch (error) {
+      this.logError('[LeadsService.getEstatisticas] erro ao obter estatisticas', error);
+      throw new InternalServerErrorException('Erro ao obter estatisticas', error.message);
     }
   }
 
   /**
-   * Calcular score de qualificação do lead (0-100)
+   * Calcular score de qualificacao do lead (0-100)
    * Algoritmo simples baseado em completude de dados
    */
   private calcularScore(lead: Lead): number {
     let score = 0;
 
-    // Nome é obrigatório, mas não conta no score
+    // Nome e obrigatorio, mas nao conta no score
     if (lead.email) score += 25;
     if (lead.telefone) score += 25;
     if (lead.empresa_nome) score += 20;
@@ -1051,12 +1100,19 @@ export class LeadsService {
       // Processar cada linha
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
-        const linha = i + 2; // +2 porque linha 1 é header e index começa em 0
+        const linha = i + 2; // +2 porque linha 1 e header e index comeca em 0
 
         try {
-          // Validação básica
+          // Validacao basica
           if (!row.nome || row.nome.trim().length === 0) {
-            throw new Error('Nome é obrigatório');
+            throw new Error('Nome e obrigatorio');
+          }
+
+          const emailNormalizado = row.email?.trim() || undefined;
+          const telefoneNormalizado = row.telefone?.trim() || undefined;
+
+          if (!emailNormalizado && !telefoneNormalizado) {
+            throw new Error('Informe pelo menos um contato: email ou telefone');
           }
 
           // Validar origem se fornecida
@@ -1064,7 +1120,7 @@ export class LeadsService {
             ? await this.mapearOrigemLeadParaBanco(row.origem)
             : origemImportacaoBanco;
 
-          // Buscar responsável por email se fornecido
+          // Buscar responsavel por email se fornecido
           let responsavel_id: string | undefined;
           if (row.responsavel_email) {
             const responsavel = await this.leadsRepository.manager.findOne(User, {
@@ -1081,8 +1137,8 @@ export class LeadsService {
           // Criar lead
           const lead = this.leadsRepository.create({
             nome: row.nome.trim(),
-            email: row.email?.trim() || undefined,
-            telefone: row.telefone?.trim() || undefined,
+            email: emailNormalizado,
+            telefone: telefoneNormalizado,
             empresa_nome: row.empresa_nome?.trim() || undefined,
             origem: origem as any,
             observacoes: row.observacoes?.trim() || undefined,
@@ -1117,3 +1173,4 @@ export class LeadsService {
     }
   }
 }
+
