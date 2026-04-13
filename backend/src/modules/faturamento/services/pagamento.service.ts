@@ -11,6 +11,7 @@ import {
   RegistrarPagamentoManualDto,
 } from '../dto/pagamento.dto';
 import { FaturamentoService } from './faturamento.service';
+import { ComissoesService } from '../../comissoes/comissoes.service';
 
 @Injectable()
 export class PagamentoService {
@@ -22,6 +23,7 @@ export class PagamentoService {
     @InjectRepository(Fatura)
     private faturaRepository: Repository<Fatura>,
     private faturamentoService: FaturamentoService,
+    private readonly comissoesService: ComissoesService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -220,6 +222,28 @@ export class PagamentoService {
         });
       }
 
+      if (
+        processarPagamentoDto.novoStatus === StatusPagamento.APROVADO &&
+        statusAnteriorPagamento !== StatusPagamento.APROVADO
+      ) {
+        try {
+          await this.comissoesService.registrarLancamentoPorPagamentoAprovado({
+            pagamento: pagamentoAtualizado,
+            fatura: pagamento.fatura as Fatura,
+            empresaId,
+            origem: processarPagamentoDto.webhookData
+              ? 'pagamento.webhook.aprovado'
+              : 'pagamento.processar.aprovado',
+          });
+        } catch (error: any) {
+          this.logger.warn(
+            `Falha ao registrar comissao para pagamento aprovado (empresa=${empresaId} pagamento=${pagamentoAtualizado.id}): ${String(
+              error?.message || error,
+            )}`,
+          );
+        }
+      }
+
       this.logEvento('PAGAMENTO_STATUS_CHANGE', {
         empresaId,
         pagamentoId: pagamentoAtualizado.id,
@@ -396,6 +420,26 @@ export class PagamentoService {
       origemId: `pagamento:${pagamento.id}`,
       source: 'pagamento.estorno',
     });
+
+    try {
+      const fatura = await this.faturaRepository.findOne({
+        where: { id: pagamento.faturaId, empresaId },
+      });
+      if (fatura) {
+        await this.comissoesService.registrarLancamentoPorPagamentoAprovado({
+          pagamento: estornoSalvo,
+          fatura,
+          empresaId,
+          origem: 'pagamento.estorno.aprovado',
+        });
+      }
+    } catch (error: any) {
+      this.logger.warn(
+        `Falha ao registrar comissao para estorno (empresa=${empresaId} pagamento=${estornoSalvo.id}): ${String(
+          error?.message || error,
+        )}`,
+      );
+    }
 
     this.logger.log(
       `Estorno criado: ${estornoSalvo.transacaoId} para pagamento ${pagamento.transacaoId}`,

@@ -14,6 +14,7 @@ import { Cliente } from '../clientes/cliente.entity';
 import { MercadoPagoModule } from '../mercado-pago/mercado-pago.module';
 import { EmpresaConfig } from '../empresas/entities/empresa-config.entity';
 import { FinanceiroModule } from '../financeiro/financeiro.module';
+import { ComissoesModule } from '../comissoes/comissoes.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { FinanceiroModule } from '../financeiro/financeiro.module';
     PropostasModule, // Para acessar o EmailIntegradoService
     forwardRef(() => MercadoPagoModule),
     forwardRef(() => FinanceiroModule),
+    ComissoesModule,
   ],
   controllers: [FaturamentoController],
   providers: [FaturamentoService, PagamentoService, CobrancaService],

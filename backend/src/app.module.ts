@@ -48,6 +48,7 @@ import { SystemBrandingModule } from './modules/system-branding/system-branding.
 import { CoreAdminModule } from './modules/core-admin/core-admin.module';
 import { CatalogoModule } from './modules/catalogo/catalogo.module';
 import { VehicleInventoryModule } from './modules/vehicle-inventory/vehicle-inventory.module';
+import { ComissoesModule } from './modules/comissoes/comissoes.module';
 
 const nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
 const isProduction = nodeEnv === 'production';
@@ -125,6 +126,7 @@ const throttlerShortLimit = isProduction ? 10 : 200;
     CoreAdminModule,
     CatalogoModule,
     VehicleInventoryModule,
+    ComissoesModule,
   ],
   controllers: [HealthController, RateLimitController], // 📊 Health + Rate Limit monitoring
   providers: [

@@ -50,6 +50,7 @@ const PATH_PREFIX_TO_MODULE: Array<{ prefix: string; module: EntitlementModule }
   { prefix: '/financeiro', module: 'FINANCEIRO' },
   { prefix: '/faturamento', module: 'FINANCEIRO' },
   { prefix: '/pagamentos', module: 'FINANCEIRO' },
+  { prefix: '/comissoes', module: 'VENDAS' },
   { prefix: '/mercadopago', module: 'FINANCEIRO' },
   { prefix: '/fornecedores', module: 'FINANCEIRO' },
   { prefix: '/contas-pagar', module: 'FINANCEIRO' },
