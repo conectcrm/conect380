@@ -166,6 +166,11 @@ export class LeadsController {
       throw new BadRequestException('Arquivo CSV não fornecido');
     }
 
+    const tamanhoMaximoBytes = 10 * 1024 * 1024;
+    if (file.size > tamanhoMaximoBytes) {
+      throw new BadRequestException('Arquivo CSV deve ter no máximo 10MB');
+    }
+
     // Verificar se é CSV
     const isCSV =
       file.mimetype === 'text/csv' ||
@@ -182,3 +187,4 @@ export class LeadsController {
     return this.leadsService.importFromCsv(csvContent, empresaId);
   }
 }
+

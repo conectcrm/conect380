@@ -160,6 +160,10 @@ export class Fatura {
     transactionId?: string;
     paymentMethod?: string;
     installments?: number;
+    propostaId?: string;
+    comercial?: {
+      propostaId?: string;
+    };
     boleto?: {
       paymentId?: string | null;
       barcode?: string | null;

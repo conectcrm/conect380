@@ -149,6 +149,42 @@ describe('FaturamentoService - criar fatura (unitário sem TypeORM)', () => {
     expect(Number(item.valorTotal)).toBe(90); // 2 * 50 - 10
   });
 
+  it('deve bloquear tipo adicional sem contrato no contexto de faturamento', async () => {
+    const dto: CreateFaturaDto = {
+      clienteId: 'f6d5f870-0709-4af2-bdf1-92cbf1909683',
+      usuarioResponsavelId: '7c640d96-4bdc-47b0-a7a3-53d0e8f261f3',
+      tipo: 'adicional' as any,
+      descricao: 'Lancamento adicional sem contrato',
+      dataVencimento: new Date().toISOString().split('T')[0],
+      itens: [{ descricao: 'Item adicional', quantidade: 1, valorUnitario: 100 }],
+    };
+
+    await expect(service.criarFatura(dto, 'empresa-teste')).rejects.toThrow(
+      'Erro ao criar fatura',
+    );
+  });
+
+  it('deve permitir tipo adicional sem contrato quando origem operacional for avulso', async () => {
+    const dto: CreateFaturaDto = {
+      clienteId: '465640a2-6ee6-4125-8600-b4f08a53bc11',
+      usuarioResponsavelId: 'de27f466-8203-4ce9-a558-531f8765d4b0',
+      tipo: 'adicional' as any,
+      descricao: 'Lancamento avulso operacional',
+      dataVencimento: new Date().toISOString().split('T')[0],
+      itens: [{ descricao: 'Item avulso', quantidade: 1, valorUnitario: 140 }],
+    };
+
+    const fatura = await service.criarFatura(
+      dto,
+      'empresa-teste',
+      undefined,
+      { origemOperacional: 'avulso' },
+    );
+
+    expect(fatura.id).toBeDefined();
+    expect(String(fatura.tipo)).toBe('adicional');
+  });
+
   it('deve persistir impostos estruturados e compor o valor total da fatura', async () => {
     const dto: CreateFaturaDto = {
       clienteId: 'a96cb5f6-0688-4ec1-9f29-e43f5bb8e3f2',

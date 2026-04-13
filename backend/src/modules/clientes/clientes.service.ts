@@ -90,6 +90,8 @@ type ClienteFaturasResumo = {
   faturas: FaturaResumoItem[];
 };
 
+const CLIENTES_UNASSIGNED_RESPONSAVEL_FILTER = '__sem_responsavel__';
+
 @Injectable()
 export class ClientesService {
   private statusColumnSupported: boolean | null = null;
@@ -985,8 +987,13 @@ export class ClientesService {
     }
 
     const responsavelId = this.normalizeTextFilter(params.responsavelId);
-    if (responsavelId && (await this.hasResponsavelIdColumn())) {
-      queryBuilder.andWhere('cliente.responsavel_id = :responsavelId', { responsavelId });
+    const hasResponsavelIdColumn = await this.hasResponsavelIdColumn();
+    if (responsavelId && hasResponsavelIdColumn) {
+      if (responsavelId === CLIENTES_UNASSIGNED_RESPONSAVEL_FILTER) {
+        queryBuilder.andWhere('cliente.responsavel_id IS NULL');
+      } else {
+        queryBuilder.andWhere('cliente.responsavel_id = :responsavelId', { responsavelId });
+      }
     }
 
     const tag = this.normalizeTagFilter(params.tag);

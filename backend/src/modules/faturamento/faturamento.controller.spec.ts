@@ -39,6 +39,8 @@ describe('FaturamentoController', () => {
       undefined,
       undefined,
       undefined,
+      undefined,
+      undefined,
       '1',
       '10',
       'createdAt; DROP TABLE faturas;--' as any,
@@ -52,6 +54,80 @@ describe('FaturamentoController', () => {
       'createdAt',
       'DESC',
       expect.any(Object),
+    );
+  });
+
+  it('usa vencimento como periodo padrao e normaliza datas de filtro', async () => {
+    faturamentoServiceMock.buscarFaturasPaginadas.mockResolvedValue({
+      faturas: [],
+      total: 0,
+      resumo: { valorTotal: 0, valorRecebido: 0, valorEmAberto: 0 },
+    });
+
+    await controller.buscarFaturas(
+      'empresa-1',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      '2026-04-01T12:30:00.000Z',
+      '2026-04-30',
+      undefined,
+      undefined,
+      '1',
+      '10',
+      'dataVencimento',
+      'ASC',
+    );
+
+    expect(faturamentoServiceMock.buscarFaturasPaginadas).toHaveBeenCalledWith(
+      'empresa-1',
+      1,
+      10,
+      'dataVencimento',
+      'ASC',
+      expect.objectContaining({
+        dataInicio: '2026-04-01',
+        dataFim: '2026-04-30',
+        periodoCampo: 'vencimento',
+      }),
+    );
+  });
+
+  it('propaga filtro de origem ao buscar faturas', async () => {
+    faturamentoServiceMock.buscarFaturasPaginadas.mockResolvedValue({
+      faturas: [],
+      total: 0,
+      resumo: { valorTotal: 0, valorRecebido: 0, valorEmAberto: 0 },
+    });
+
+    await controller.buscarFaturas(
+      'empresa-1',
+      undefined,
+      undefined,
+      'faturamento' as any,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      '1',
+      '10',
+      'createdAt',
+      'DESC',
+    );
+
+    expect(faturamentoServiceMock.buscarFaturasPaginadas).toHaveBeenCalledWith(
+      'empresa-1',
+      1,
+      10,
+      'createdAt',
+      'DESC',
+      expect.objectContaining({
+        origem: 'faturamento',
+      }),
     );
   });
 

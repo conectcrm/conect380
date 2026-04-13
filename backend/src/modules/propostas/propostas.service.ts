@@ -2851,6 +2851,176 @@ export class PropostasService {
     return base ? `${base}\n\n[FLOW_META]${meta}` : `[FLOW_META]${meta}`;
   }
 
+  private getLegacyObservacoesColumn(columns: Set<string>): string | null {
+    if (columns.has('observacoes')) {
+      return 'observacoes';
+    }
+    if (columns.has('descricao')) {
+      return 'descricao';
+    }
+    return null;
+  }
+
+  private async loadLegacyPropostaGateRecord(
+    propostaId: string,
+    empresaId?: string,
+    propostaColumns?: Set<string>,
+  ): Promise<{
+    id: string;
+    empresaId?: string;
+    statusAtual: SalesFlowStatus;
+    emailDetails: Record<string, unknown>;
+    observacoes?: string;
+  } | null> {
+    const columns = propostaColumns || (await this.getTableColumns('propostas'));
+    const emailDetailsColumn = this.getLegacyEmailDetailsColumn(columns);
+    const observacoesColumn = this.getLegacyObservacoesColumn(columns);
+    const possuiEmpresaColumn = columns.has('empresa_id');
+    const empresaIdNormalizado = String(empresaId || '').trim();
+    const filtrarPorEmpresa = possuiEmpresaColumn && empresaIdNormalizado.length > 0;
+
+    const params: unknown[] = [propostaId];
+    let whereClause = 'id::text = $1';
+    if (filtrarPorEmpresa) {
+      params.push(empresaIdNormalizado);
+      whereClause += ' AND empresa_id::text = $2';
+    }
+
+    const rowsRaw = await this.propostaRepository.query(
+      `
+        SELECT
+          id::text AS id,
+          ${possuiEmpresaColumn ? 'empresa_id::text' : 'NULL::text'} AS empresa_id,
+          status::text AS status,
+          ${emailDetailsColumn ? `"${emailDetailsColumn}"` : 'NULL::jsonb'} AS email_details,
+          ${observacoesColumn ? `"${observacoesColumn}"::text` : 'NULL::text'} AS observacoes
+        FROM propostas
+        WHERE ${whereClause}
+        LIMIT 1
+      `,
+      params,
+    );
+
+    const row = this.extractQueryRows<{
+      id?: string;
+      empresa_id?: string;
+      status?: string;
+      email_details?: unknown;
+      observacoes?: string;
+    }>(rowsRaw)?.[0];
+
+    if (!row?.id) {
+      return null;
+    }
+
+    const observacoes = row.observacoes ?? undefined;
+    const legacyMeta = this.parseLegacyFlowMetadata(observacoes);
+    const emailDetails = this.toJsonRecordOrUndefined(row.email_details) || {};
+    if (!emailDetails.fluxoStatus && legacyMeta.fluxoStatus) {
+      emailDetails.fluxoStatus = legacyMeta.fluxoStatus;
+    }
+
+    const statusAtual =
+      this.extractFlowStatusFromEmailDetails(emailDetails) ||
+      legacyMeta.fluxoStatus ||
+      this.mapDatabaseStatusToFlowStatus(row.status);
+
+    return {
+      id: String(row.id),
+      empresaId: String(row.empresa_id || '').trim() || undefined,
+      statusAtual,
+      emailDetails,
+      observacoes,
+    };
+  }
+
+  private async persistLegacyPropostaGateRecord(
+    propostaId: string,
+    novoStatus: SalesFlowStatus,
+    emailDetails: Record<string, unknown>,
+    observacoesAtual: string | undefined,
+    empresaId?: string,
+    propostaColumns?: Set<string>,
+  ): Promise<void> {
+    const columns = propostaColumns || (await this.getTableColumns('propostas'));
+    const emailDetailsColumn = this.getLegacyEmailDetailsColumn(columns);
+    const observacoesColumn = this.getLegacyObservacoesColumn(columns);
+    const possuiEmpresaColumn = columns.has('empresa_id');
+    const empresaIdNormalizado = String(empresaId || '').trim();
+    const filtrarPorEmpresa = possuiEmpresaColumn && empresaIdNormalizado.length > 0;
+
+    const setClauses: string[] = ['status = $1'];
+    const params: unknown[] = [this.mapFlowStatusToDatabaseStatus(novoStatus, true)];
+    let nextParam = 2;
+
+    if (emailDetailsColumn) {
+      setClauses.push(`"${emailDetailsColumn}" = $${nextParam++}::jsonb`);
+      params.push(JSON.stringify(emailDetails));
+    }
+
+    const observacoesComFluxo = observacoesColumn
+      ? this.mergeLegacyFlowMetadata(observacoesAtual, { fluxoStatus: novoStatus })
+      : undefined;
+    if (observacoesColumn && observacoesComFluxo !== undefined) {
+      setClauses.push(`"${observacoesColumn}" = $${nextParam++}`);
+      params.push(observacoesComFluxo);
+    }
+
+    let whereClause = `id::text = $${nextParam++}`;
+    params.push(propostaId);
+    if (filtrarPorEmpresa) {
+      whereClause += ` AND empresa_id::text = $${nextParam++}`;
+      params.push(empresaIdNormalizado);
+    }
+
+    await this.propostaRepository.query(
+      `
+        UPDATE propostas
+        SET ${setClauses.join(', ')}
+        WHERE ${whereClause}
+      `,
+      params,
+    );
+  }
+
+  private async hasSignedActiveContractForProposta(
+    propostaId: string,
+    empresaId?: string,
+  ): Promise<boolean> {
+    const propostaIdNormalizado = String(propostaId || '').trim();
+    if (!propostaIdNormalizado) {
+      return false;
+    }
+
+    const empresaIdNormalizado = String(empresaId || '').trim();
+    const possuiEmpresa = empresaIdNormalizado.length > 0;
+
+    try {
+      const rowsRaw = await this.propostaRepository.query(
+        `
+          SELECT 1
+          FROM contratos c
+          WHERE c."propostaId"::text = $1
+            AND c.status = 'assinado'
+            AND c.ativo = true
+            ${possuiEmpresa ? 'AND c.empresa_id::text = $2' : ''}
+          LIMIT 1
+        `,
+        possuiEmpresa ? [propostaIdNormalizado, empresaIdNormalizado] : [propostaIdNormalizado],
+      );
+      const rows = this.extractQueryRows(rowsRaw);
+      return Array.isArray(rows) && rows.length > 0;
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao verificar contrato assinado para proposta ${propostaIdNormalizado}: ${this.resolveErrorMessage(
+          error,
+          'erro desconhecido',
+        )}`,
+      );
+      return false;
+    }
+  }
+
   private async resolveFallbackUserId(empresaId: string): Promise<string> {
     const usersRows: Array<{ id?: string }> = await this.propostaRepository.query(
       `
@@ -6212,6 +6382,76 @@ export class PropostasService {
     },
     empresaId?: string,
   ): Promise<Proposta> {
+    const propostaColumns = await this.getTableColumns('propostas');
+    if (this.isLegacyPropostasSchema(propostaColumns)) {
+      const propostaLegacy = await this.loadLegacyPropostaGateRecord(
+        propostaId,
+        empresaId,
+        propostaColumns,
+      );
+      if (!propostaLegacy) {
+        throw new NotFoundException(this.buildPropostaNotFoundMessage(propostaId));
+      }
+
+      const statusAtual = propostaLegacy.statusAtual;
+      const empresaIdProposta = empresaId || propostaLegacy.empresaId;
+      const gate = this.parseContratoGate(propostaLegacy.emailDetails);
+      const dispensaAprovada = gate.dispensa?.status === 'aprovada';
+      const contratoAssinadoPorStatus = statusAtual === 'contrato_assinado';
+      const contratoAssinadoPorVinculo = contratoAssinadoPorStatus
+        ? false
+        : await this.hasSignedActiveContractForProposta(propostaId, empresaIdProposta);
+      const contratoAssinado = contratoAssinadoPorStatus || contratoAssinadoPorVinculo;
+      const fluxoFinanceiroIniciado = ['faturamento_liberado', 'fatura_criada', 'aguardando_pagamento', 'pago'].includes(
+        statusAtual,
+      );
+      if (!contratoAssinado && !dispensaAprovada && !fluxoFinanceiroIniciado) {
+        throw new BadRequestException(
+          'Faturamento bloqueado: proposta sem contrato assinado ou dispensa de contrato aprovada.',
+        );
+      }
+
+      const agora = new Date().toISOString();
+      let emailDetails = this.upsertContratoGate(propostaLegacy.emailDetails, (currentGate) => ({
+        ...currentGate,
+        faturamento: {
+          liberado: true,
+          motivo: this.normalizeOverrideReason(payload?.motivo) || undefined,
+          liberadoEm: agora,
+          liberadoPorId: actor?.id,
+          liberadoPorNome: actor?.nome,
+        },
+      }));
+
+      emailDetails = this.appendHistoricoEvento(emailDetails, 'faturamento_liberado', {
+        origem: 'api',
+        status: statusAtual,
+        detalhes: 'Faturamento liberado para a proposta.',
+        metadata: {
+          motivo: this.normalizeOverrideReason(payload?.motivo) || undefined,
+          actorUserId: actor?.id,
+          actorNome: actor?.nome,
+        },
+      });
+
+      const novoStatus: SalesFlowStatus = 'faturamento_liberado';
+      emailDetails.fluxoStatus = novoStatus;
+      await this.persistLegacyPropostaGateRecord(
+        propostaId,
+        novoStatus,
+        emailDetails,
+        propostaLegacy.observacoes,
+        empresaIdProposta,
+        propostaColumns,
+      );
+
+      const atualizada = await this.obterProposta(propostaId, empresaIdProposta);
+      if (!atualizada) {
+        throw new NotFoundException(this.buildPropostaNotFoundMessage(propostaId));
+      }
+      return atualizada;
+    }
+
     const proposta = await this.propostaRepository.findOne({
       where: empresaId ? { id: propostaId, empresaId } : { id: propostaId },
     });
@@ -6220,9 +6460,14 @@ export class PropostasService {
     }
 
     const statusAtual = this.resolveStatusFluxoAtualProposta(proposta);
+    const empresaIdProposta = empresaId || String((proposta as any)?.empresaId || '').trim() || undefined;
     const gate = this.parseContratoGate(proposta.emailDetails);
     const dispensaAprovada = gate.dispensa?.status === 'aprovada';
-    const contratoAssinado = statusAtual === 'contrato_assinado';
+    const contratoAssinadoPorStatus = statusAtual === 'contrato_assinado';
+    const contratoAssinadoPorVinculo = contratoAssinadoPorStatus
+      ? false
+      : await this.hasSignedActiveContractForProposta(propostaId, empresaIdProposta);
+    const contratoAssinado = contratoAssinadoPorStatus || contratoAssinadoPorVinculo;
     const fluxoFinanceiroIniciado = ['faturamento_liberado', 'fatura_criada', 'aguardando_pagamento', 'pago'].includes(
       statusAtual,
     );
@@ -6264,6 +6509,52 @@ export class PropostasService {
   }
 
   async assertPropostaElegivelParaFaturamento(propostaId: string, empresaId?: string): Promise<void> {
+    const propostaColumns = await this.getTableColumns('propostas');
+    if (this.isLegacyPropostasSchema(propostaColumns)) {
+      const propostaLegacy = await this.loadLegacyPropostaGateRecord(
+        propostaId,
+        empresaId,
+        propostaColumns,
+      );
+      if (!propostaLegacy) {
+        throw new NotFoundException(this.buildPropostaNotFoundMessage(propostaId));
+      }
+
+      const statusAtual = propostaLegacy.statusAtual;
+      const empresaIdProposta = empresaId || propostaLegacy.empresaId;
+      const gate = this.parseContratoGate(propostaLegacy.emailDetails);
+      const dispensaAprovada = gate.dispensa?.status === 'aprovada';
+      const faturamentoLiberado = Boolean(gate.faturamento?.liberado);
+      if (
+        faturamentoLiberado ||
+        ['faturamento_liberado', 'fatura_criada', 'aguardando_pagamento', 'pago'].includes(
+          statusAtual,
+        )
+      ) {
+        return;
+      }
+
+      const contratoAssinadoPorStatus = statusAtual === 'contrato_assinado';
+      const contratoAssinadoPorVinculo = contratoAssinadoPorStatus
+        ? false
+        : await this.hasSignedActiveContractForProposta(propostaId, empresaIdProposta);
+      if (contratoAssinadoPorStatus || contratoAssinadoPorVinculo || dispensaAprovada) {
+        throw new BadRequestException(
+          'Faturamento bloqueado: proposta elegivel, mas sem liberacao formal de faturamento.',
+        );
+      }
+
+      if (gate.dispensa?.status === 'solicitada') {
+        throw new BadRequestException(
+          'Faturamento bloqueado: solicitacao de dispensa de contrato pendente de aprovacao.',
+        );
+      }
+
+      throw new BadRequestException(
+        'Faturamento bloqueado: proposta sem contrato assinado ou dispensa de contrato aprovada.',
+      );
+    }
+
     const proposta = await this.propostaRepository.findOne({
       where: empresaId ? { id: propostaId, empresaId } : { id: propostaId },
     });
@@ -6272,6 +6563,7 @@ export class PropostasService {
     }
 
     const statusAtual = this.resolveStatusFluxoAtualProposta(proposta);
+    const empresaIdProposta = empresaId || String((proposta as any)?.empresaId || '').trim() || undefined;
     const gate = this.parseContratoGate(proposta.emailDetails);
     const dispensaAprovada = gate.dispensa?.status === 'aprovada';
     const faturamentoLiberado = Boolean(gate.faturamento?.liberado);
@@ -6284,7 +6576,11 @@ export class PropostasService {
       return;
     }
 
-    if (statusAtual === 'contrato_assinado' || dispensaAprovada) {
+    const contratoAssinadoPorStatus = statusAtual === 'contrato_assinado';
+    const contratoAssinadoPorVinculo = contratoAssinadoPorStatus
+      ? false
+      : await this.hasSignedActiveContractForProposta(propostaId, empresaIdProposta);
+    if (contratoAssinadoPorStatus || contratoAssinadoPorVinculo || dispensaAprovada) {
       throw new BadRequestException(
         'Faturamento bloqueado: proposta elegivel, mas sem liberacao formal de faturamento.',
       );

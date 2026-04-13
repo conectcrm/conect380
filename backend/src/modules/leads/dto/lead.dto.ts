@@ -196,6 +196,8 @@ export interface LeadEstatisticas {
   qualificados: number;
   desqualificados: number;
   convertidos: number;
+  semResponsavel: number;
+  semContato: number;
   taxaConversao: number;
   scoreMedio: number;
   porOrigem: {

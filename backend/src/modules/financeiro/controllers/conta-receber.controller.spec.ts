@@ -17,6 +17,14 @@ describe('ContaReceberController (permissions)', () => {
     expect(permissions).toEqual([Permission.FINANCEIRO_FATURAMENTO_MANAGE]);
   });
 
+  it('deve exigir permissao de gestao para criar lancamento avulso', () => {
+    const permissions = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      ContaReceberController.prototype.criarLancamentoAvulso,
+    );
+    expect(permissions).toEqual([Permission.FINANCEIRO_FATURAMENTO_MANAGE]);
+  });
+
   it('deve exigir permissao de gestao para reenviar cobranca', () => {
     const permissions = Reflect.getMetadata(
       PERMISSIONS_KEY,
