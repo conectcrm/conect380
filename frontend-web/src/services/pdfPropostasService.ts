@@ -64,8 +64,10 @@ export interface DadosProposta {
     valorTotal: number;
   }>;
   subtotal?: number;
+  descontoItens?: number;
   descontoGeral?: number;
   percentualDesconto?: number;
+  percentualImpostos?: number;
   impostos?: number;
   valorTotal: number;
   formaPagamento?: string;

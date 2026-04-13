@@ -1888,14 +1888,31 @@ const PropostasPage: React.FC = () => {
       };
     });
 
-    const subtotalCalculado = itens.reduce((sum, item) => sum + Number(item.valorTotal || 0), 0);
-    const subtotal = Number((propostaCompleta as any).subtotal ?? subtotalCalculado);
-    const descontoGeral = Number((propostaCompleta as any).descontoGlobal ?? 0);
-    const impostos = Number((propostaCompleta as any).impostos ?? 0);
-    const valorTotal = Number(
-      (propostaCompleta as any).total ??
-        (propostaCompleta as any).valor ??
-        subtotal - descontoGeral + impostos,
+    const roundMoney = (value: unknown): number => {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return 0;
+      return Math.round((numeric + Number.EPSILON) * 100) / 100;
+    };
+
+    const clampPercent = (value: unknown): number => {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return 0;
+      return Math.min(100, Math.max(0, numeric));
+    };
+
+    const subtotalCalculado = roundMoney(itens.reduce((sum, item) => sum + Number(item.valorTotal || 0), 0));
+    const subtotal = roundMoney((propostaCompleta as any).subtotal ?? subtotalCalculado);
+
+    // No sistema, descontoGlobal e impostos sao percentuais.
+    const percentualDesconto = clampPercent((propostaCompleta as any).descontoGlobal ?? 0);
+    const descontoGeral = roundMoney(subtotal * (percentualDesconto / 100));
+    const basePosDesconto = roundMoney(Math.max(0, subtotal - descontoGeral));
+    const percentualImpostos = clampPercent((propostaCompleta as any).impostos ?? 0);
+    const impostos = roundMoney(basePosDesconto * (percentualImpostos / 100));
+    const totalCalculado = roundMoney(basePosDesconto + impostos);
+
+    const valorTotal = roundMoney(
+      (propostaCompleta as any).total ?? (propostaCompleta as any).valor ?? totalCalculado,
     );
     const prazoEntrega =
       safeRender((propostaCompleta as any).prazoEntrega) ||
@@ -1968,7 +1985,8 @@ const PropostasPage: React.FC = () => {
       itens,
       subtotal,
       descontoGeral,
-      percentualDesconto: subtotal > 0 ? (descontoGeral / subtotal) * 100 : 0,
+      percentualDesconto,
+      percentualImpostos,
       impostos,
       valorTotal,
       formaPagamento: descreverFormaPagamento(
