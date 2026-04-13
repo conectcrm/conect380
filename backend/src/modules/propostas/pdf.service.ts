@@ -407,7 +407,7 @@ export class PdfService {
       valorTotalCalculado,
     );
 
-    const formaPagamento = this.descreverFormaPagamento(dados?.formaPagamento);
+    const formaPagamento = this.descreverFormaPagamento(dados?.formaPagamento, dados?.parcelas);
     const prazoEntrega = this.toNonEmptyString(dados?.prazoEntrega);
     const garantia = this.toNonEmptyString(dados?.garantia);
     const validadeProposta =
@@ -461,6 +461,9 @@ export class PdfService {
       dataEmissao,
     );
 
+    const incluirImpostosPDF = dados?.incluirImpostosPDF !== false;
+    const temImpostos = incluirImpostosPDF && impostos > 0;
+
     return {
       ...dados,
       numeroProposta,
@@ -500,7 +503,7 @@ export class PdfService {
       temDescontoItens: descontoItens > 0,
       temDescontoGeral: descontoGeral > 0,
       temTotalDescontos: totalDescontos > 0,
-      temImpostos: impostos > 0,
+      temImpostos,
       temPrazoEntrega: Boolean(prazoEntrega),
       temGarantia: Boolean(garantia),
     };
@@ -741,10 +744,11 @@ export class PdfService {
     return true;
   }
 
-  private descreverFormaPagamento(value: unknown): string {
+  private descreverFormaPagamento(value: unknown, parcelas?: unknown): string {
     const normalized = String(value || '')
       .trim()
       .toLowerCase();
+    const numeroParcelas = Number(parcelas || 0);
 
     const map: Record<string, string> = {
       avista: 'A vista',
@@ -755,7 +759,7 @@ export class PdfService {
       cartao_credito: 'Cartao de credito',
       pix: 'PIX',
       recorrente: 'Recorrente',
-      parcelado: 'Parcelado',
+      parcelado: numeroParcelas > 1 ? `Parcelado em ate ${numeroParcelas}x` : 'Parcelado',
     };
 
     return map[normalized] || this.toNonEmptyString(value) || 'Conforme negociacao comercial';

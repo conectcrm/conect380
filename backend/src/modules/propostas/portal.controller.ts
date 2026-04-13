@@ -208,6 +208,8 @@ export class PortalController {
       numeroProposta: String(proposta?.numero || proposta?.id || `PROP-${Date.now()}`),
       titulo: String(proposta?.titulo || 'Proposta Comercial'),
       status: String(proposta?.status || 'enviada'),
+      parcelas: proposta?.parcelas,
+      incluirImpostosPDF: proposta?.incluirImpostosPDF,
       dataEmissao: this.toIsoDate(
         proposta?.emailDetails?.sentAt || proposta?.criadaEm || proposta?.createdAt,
         agora,
@@ -247,7 +249,8 @@ export class PortalController {
       formaPagamento: String(proposta?.formaPagamento || proposta?.condicoes?.formaPagamento || 'A combinar'),
       prazoEntrega: String(proposta?.prazoEntrega || proposta?.condicoes?.prazoEntrega || 'A combinar'),
       garantia: String(proposta?.garantia || proposta?.condicoes?.garantia || ''),
-      validadeProposta: String(proposta?.dataVencimento || proposta?.dataValidade || ''),
+      // Deixe vazio para o PdfService padronizar como "Ate {dataValidade}" em pt-BR.
+      validadeProposta: '',
       condicoesGerais: observacoes ? [observacoes] : [],
       observacoes,
     };
