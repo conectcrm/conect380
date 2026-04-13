@@ -245,8 +245,9 @@ export class ComissoesService {
       .createQueryBuilder('l')
       .leftJoinAndSelect('l.participantes', 'p')
       .where('l.empresa_id = :empresaId', { empresaId })
-      .orderBy('l.data_evento', 'DESC')
-      .addOrderBy('l.created_at', 'DESC')
+      // Use entity property paths in orderBy so TypeORM can resolve column metadata safely.
+      .orderBy('l.dataEvento', 'DESC')
+      .addOrderBy('l.createdAt', 'DESC')
       .skip(skip)
       .take(limit);
 
