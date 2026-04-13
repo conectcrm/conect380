@@ -75,6 +75,17 @@ export interface ConfiguracoesEmpresa {
   gatewayPagamentoProvider?: string | null;
   gatewayPagamentoAccessToken?: string | null;
   gatewayPagamentoWebhookSecret?: string | null;
+  inadimplenciaAutomacaoAtiva: boolean;
+  inadimplenciaDiasAviso: number;
+  inadimplenciaDiasAcao: number;
+  inadimplenciaAcao:
+    | 'nenhuma'
+    | 'marcar_em_risco'
+    | 'bloquear_operacao'
+    | 'suspender_acesso';
+  inadimplenciaModoExecucao: 'automatico' | 'manual_com_sugestao';
+  inadimplenciaEscopo: 'cliente' | 'servico' | 'contrato' | 'recorrencia';
+  inadimplenciaDesbloqueioAutomaticoNaBaixa: boolean;
   fiscalProvider?: string | null;
   fiscalOfficialHttpEnabled?: boolean | null;
   fiscalRequireOfficialProvider?: boolean | null;
@@ -142,6 +153,17 @@ export interface UpdateEmpresaConfigDto {
   gatewayPagamentoProvider?: string;
   gatewayPagamentoAccessToken?: string;
   gatewayPagamentoWebhookSecret?: string;
+  inadimplenciaAutomacaoAtiva?: boolean;
+  inadimplenciaDiasAviso?: number;
+  inadimplenciaDiasAcao?: number;
+  inadimplenciaAcao?:
+    | 'nenhuma'
+    | 'marcar_em_risco'
+    | 'bloquear_operacao'
+    | 'suspender_acesso';
+  inadimplenciaModoExecucao?: 'automatico' | 'manual_com_sugestao';
+  inadimplenciaEscopo?: 'cliente' | 'servico' | 'contrato' | 'recorrencia';
+  inadimplenciaDesbloqueioAutomaticoNaBaixa?: boolean;
   fiscalProvider?: string;
   fiscalOfficialHttpEnabled?: boolean;
   fiscalRequireOfficialProvider?: boolean;

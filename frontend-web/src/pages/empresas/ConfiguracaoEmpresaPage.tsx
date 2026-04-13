@@ -1476,6 +1476,166 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                     </div>
                   </div>
 
+                  <div className="rounded-lg border border-[#DCE6EA] bg-white p-5 space-y-4">
+                    <div>
+                      <p className="text-sm font-semibold text-[#244455]">
+                        Politica de inadimplencia operacional
+                      </p>
+                      <p className="text-xs text-[#607B89] mt-1">
+                        Recurso opcional para segmentos que precisam transformar atraso financeiro
+                        em status operacional do cliente, sem depender de gateway.
+                      </p>
+                    </div>
+
+                    <label className="flex items-start gap-3 rounded-lg border border-[#DCE6EA] bg-[#F8FBFC] p-4">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(formData.inadimplenciaAutomacaoAtiva)}
+                        onChange={(e) =>
+                          handleInputChange('inadimplenciaAutomacaoAtiva', e.target.checked)
+                        }
+                        className="mt-1 h-4 w-4 rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
+                      />
+                      <span>
+                        <span className="block text-sm font-medium text-[#244455]">
+                          Ativar automacao por inadimplencia
+                        </span>
+                        <span className="mt-1 block text-xs text-[#607B89]">
+                          Quando desativado, o Conect continua permitindo monitoramento, mas evita
+                          acao operacional automatica.
+                        </span>
+                      </span>
+                    </label>
+
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Dias para aviso
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={90}
+                          value={formData.inadimplenciaDiasAviso ?? 3}
+                          onChange={(e) =>
+                            handleInputChange('inadimplenciaDiasAviso', Number(e.target.value || 0))
+                          }
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                        />
+                        <p className="text-xs text-[#607B89] mt-1">
+                          A partir deste atraso o cliente passa a ficar em risco operacional.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Dias para acao
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={365}
+                          value={formData.inadimplenciaDiasAcao ?? 15}
+                          onChange={(e) =>
+                            handleInputChange('inadimplenciaDiasAcao', Number(e.target.value || 0))
+                          }
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                        />
+                        <p className="text-xs text-[#607B89] mt-1">
+                          Faixa em que a politica deixa de apenas sinalizar e passa a agir.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Tipo de acao
+                        </label>
+                        <select
+                          value={formData.inadimplenciaAcao || 'bloquear_operacao'}
+                          onChange={(e) => handleInputChange('inadimplenciaAcao', e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                        >
+                          <option value="nenhuma">Nenhuma</option>
+                          <option value="marcar_em_risco">Apenas marcar em risco</option>
+                          <option value="bloquear_operacao">Bloquear operacao</option>
+                          <option value="suspender_acesso">Suspender acesso</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Modo de execucao
+                        </label>
+                        <select
+                          value={formData.inadimplenciaModoExecucao || 'automatico'}
+                          onChange={(e) =>
+                            handleInputChange('inadimplenciaModoExecucao', e.target.value)
+                          }
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                        >
+                          <option value="automatico">Automatico</option>
+                          <option value="manual_com_sugestao">Manual com sugestao</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Escopo inicial
+                        </label>
+                        <select
+                          value={formData.inadimplenciaEscopo || 'cliente'}
+                          onChange={(e) => handleInputChange('inadimplenciaEscopo', e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                        >
+                          <option value="cliente">Cliente</option>
+                          <option value="servico">Servico</option>
+                          <option value="contrato">Contrato</option>
+                          <option value="recorrencia">Recorrencia</option>
+                        </select>
+                        <p className="text-xs text-[#607B89] mt-1">
+                          Nesta primeira fase o motor backend trabalha no escopo cliente.
+                        </p>
+                      </div>
+
+                      <label className="flex items-start gap-3 rounded-lg border border-[#DCE6EA] bg-[#F8FBFC] p-4">
+                        <input
+                          type="checkbox"
+                          checked={formData.inadimplenciaDesbloqueioAutomaticoNaBaixa ?? true}
+                          onChange={(e) =>
+                            handleInputChange(
+                              'inadimplenciaDesbloqueioAutomaticoNaBaixa',
+                              e.target.checked,
+                            )
+                          }
+                          className="mt-1 h-4 w-4 rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
+                        />
+                        <span>
+                          <span className="block text-sm font-medium text-[#244455]">
+                            Desbloquear automaticamente apos baixa
+                          </span>
+                          <span className="mt-1 block text-xs text-[#607B89]">
+                            Usa a baixa manual em contas a receber como gatilho oficial de
+                            regularizacao.
+                          </span>
+                        </span>
+                      </label>
+                    </div>
+
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-semibold">Escopo desta entrega</p>
+                          <p className="text-xs mt-1">
+                            O status operacional sera reavaliado por vencimento e por baixa manual.
+                            A integracao por OFX/CSV segue separada da baixa de contas a receber
+                            nesta fase.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="flex flex-col gap-3 rounded-lg border border-[#DCE6EA] bg-[#F8FBFC] p-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="text-sm font-medium text-[#244455]">Prontidao de cobranca</p>
@@ -1625,4 +1785,3 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
 };
 
 export default ConfiguracaoEmpresaPage;
-

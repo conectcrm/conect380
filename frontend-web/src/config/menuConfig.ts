@@ -1,4 +1,4 @@
-﻿import {
+import {
   type LucideIcon,
   Home,
   Users,
@@ -29,6 +29,7 @@
   Tag,
   Palette,
   Shield,
+  AlertTriangle,
 } from 'lucide-react';
 import { isMenuItemAllowedInMvp } from './mvpScope';
 import { isAtendimentoModuleVisible, isOmnichannelEnabled } from './featureFlags';
@@ -62,7 +63,9 @@ const filterMenuByModules = (items: MenuConfig[], modulosAtivos: string[]): Menu
       return acc;
     }
 
-    const filteredChildren = item.children ? filterMenuByModules(item.children, modulosAtivos) : undefined;
+    const filteredChildren = item.children
+      ? filterMenuByModules(item.children, modulosAtivos)
+      : undefined;
 
     if (item.children && (!filteredChildren || filteredChildren.length === 0)) {
       return acc;
@@ -272,11 +275,7 @@ const VENDEDOR_COMERCIAL_PERMISSIONS = [
   'comercial.propostas.send',
 ];
 
-const SUPORTE_CRM_PERMISSIONS = [
-  'crm.clientes.read',
-  'crm.clientes.update',
-  'crm.leads.read',
-];
+const SUPORTE_CRM_PERMISSIONS = ['crm.clientes.read', 'crm.clientes.update', 'crm.leads.read'];
 
 const SUPORTE_ATENDIMENTO_PERMISSIONS = [
   'atendimento.chats.read',
@@ -345,8 +344,17 @@ const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
     ...VENDEDOR_CRM_PERMISSIONS,
     ...VENDEDOR_COMERCIAL_PERMISSIONS,
   ],
-  suporte: [...BASIC_PROFILE_PERMISSIONS, ...INSIGHTS_PERMISSIONS, ...SUPORTE_CRM_PERMISSIONS, ...SUPORTE_ATENDIMENTO_PERMISSIONS],
-  financeiro: [...BASIC_PROFILE_PERMISSIONS, ...INSIGHTS_PERMISSIONS, ...FINANCEIRO_DEFAULT_PERMISSIONS],
+  suporte: [
+    ...BASIC_PROFILE_PERMISSIONS,
+    ...INSIGHTS_PERMISSIONS,
+    ...SUPORTE_CRM_PERMISSIONS,
+    ...SUPORTE_ATENDIMENTO_PERMISSIONS,
+  ],
+  financeiro: [
+    ...BASIC_PROFILE_PERMISSIONS,
+    ...INSIGHTS_PERMISSIONS,
+    ...FINANCEIRO_DEFAULT_PERMISSIONS,
+  ],
 };
 
 const GENERATED_LEGACY_PERMISSION_ALIASES: Record<string, string> = ALL_PERMISSION_VALUES.reduce(
@@ -487,7 +495,6 @@ const expandEquivalentPermissions = (target: Set<string>): void => {
   if (hasPagamentosManage) {
     FINANCEIRO_PAGAMENTOS_MANAGE_EQUIVALENCES.forEach((permission) => target.add(permission));
   }
-
 };
 
 function* iteratePermissionInputs(rawPermissions: unknown): Generator<unknown> {
@@ -571,7 +578,10 @@ export const userHasPermission = (
   return hasRequiredPermission(resolvedPermissions, permission);
 };
 
-const hasRequiredPermission = (resolvedPermissions: Set<string>, requiredPermission: string): boolean => {
+const hasRequiredPermission = (
+  resolvedPermissions: Set<string>,
+  requiredPermission: string,
+): boolean => {
   const requiredRaw = requiredPermission.trim();
   if (!requiredRaw) {
     return true;
@@ -1081,6 +1091,16 @@ export const menuConfig: MenuConfig[] = [
         group: 'Fluxo Financeiro',
       },
       {
+        id: 'financeiro-inadimplencia-operacional',
+        title: 'Inadimplencia Operacional',
+        shortTitle: 'Inadimplencia',
+        icon: AlertTriangle,
+        href: '/financeiro/inadimplencia-operacional',
+        color: 'orange',
+        permissions: ['financeiro.faturamento.read'],
+        group: 'Fluxo Financeiro',
+      },
+      {
         id: 'financeiro-conciliacao',
         title: 'Conciliacao Bancaria',
         shortTitle: 'Conciliacao',
@@ -1353,7 +1373,10 @@ const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
   { pattern: '/atendimento/dashboard-analytics', permissions: ['relatorios.read'] },
   { pattern: '/nuclei/atendimento/canais/email', permissions: ['config.integracoes.manage'] },
   { pattern: '/nuclei/atendimento/sla/configuracoes', permissions: ['atendimento.sla.manage'] },
-  { pattern: '/nuclei/atendimento/distribuicao/configuracao', permissions: ['atendimento.filas.manage'] },
+  {
+    pattern: '/nuclei/atendimento/distribuicao/configuracao',
+    permissions: ['atendimento.filas.manage'],
+  },
   { pattern: '/nuclei/atendimento/distribuicao/skills', permissions: ['atendimento.filas.manage'] },
   { pattern: '/nuclei/atendimento/sla/dashboard', permissions: ['relatorios.read'] },
   { pattern: '/nuclei/atendimento/distribuicao/dashboard', permissions: ['relatorios.read'] },
@@ -1396,7 +1419,10 @@ const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
   { pattern: '/financeiro/faturamento', permissions: ['financeiro.faturamento.read'] },
   { pattern: '/financeiro/contas-pagar', permissions: ['financeiro.contas-pagar.read'] },
   { pattern: '/financeiro/fornecedores', permissions: ['financeiro.fornecedores.read'] },
-  { pattern: '/financeiro/fornecedores/:fornecedorId', permissions: ['financeiro.fornecedores.read'] },
+  {
+    pattern: '/financeiro/fornecedores/:fornecedorId',
+    permissions: ['financeiro.fornecedores.read'],
+  },
   { pattern: '/financeiro/contas-bancarias', permissions: ['financeiro.contas-bancarias.read'] },
   {
     pattern: '/financeiro/relatorios',
@@ -1678,7 +1704,8 @@ const resolveRequiredModuleForPath = (pathname: string): LicensedModule | null =
 
   ROUTE_MODULE_REQUIREMENTS.forEach((rule) => {
     const hasMatch = candidates.some(
-      (candidate) => matchesPattern(candidate, rule.pattern) || isPathMatch(candidate, rule.pattern),
+      (candidate) =>
+        matchesPattern(candidate, rule.pattern) || isPathMatch(candidate, rule.pattern),
     );
 
     if (!hasMatch) {
@@ -1794,7 +1821,9 @@ export const canUserAccessPath = (
     return false;
   }
 
-  const matchedRule = ROUTE_PERMISSION_RULES.find((rule) => matchesPattern(normalizedPath, rule.pattern));
+  const matchedRule = ROUTE_PERMISSION_RULES.find((rule) =>
+    matchesPattern(normalizedPath, rule.pattern),
+  );
   if (matchedRule) {
     const resolvedPermissions = resolveUserPermissions(user);
     if (matchedRule.match === 'all') {
@@ -1819,9 +1848,7 @@ export const canUserAccessPath = (
   const allowedMenu = getMenuParaEmpresa(modulosAtivos, user);
   const allowedPathRules = expandRouteAliases(flattenMenuPathRules(allowedMenu));
 
-  return allowedPathRules.some((allowedRule) =>
-    isPathMatchRule(normalizedPath, allowedRule),
-  );
+  return allowedPathRules.some((allowedRule) => isPathMatchRule(normalizedPath, allowedRule));
 };
 
 const collectNavigableMenuPaths = (items: MenuConfig[]): string[] => {
@@ -1864,10 +1891,7 @@ export const getDefaultAuthorizedPath = (
     }
   }
 
-  if (
-    !excludedPaths.has(fallbackPath) &&
-    canUserAccessPath(fallbackPath, modulosAtivos, user)
-  ) {
+  if (!excludedPaths.has(fallbackPath) && canUserAccessPath(fallbackPath, modulosAtivos, user)) {
     return fallbackPath;
   }
 

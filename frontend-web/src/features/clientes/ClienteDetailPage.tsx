@@ -2,23 +2,24 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
+  AlertTriangle,
   ArrowLeft,
   Building,
   CalendarDays,
-  ClipboardList,
   Clock3,
   Edit,
-  FileText,
   Globe,
   Loader2,
+  Lock,
   Mail,
   MapPin,
-  MessageCircle,
   Phone,
   Plus,
+  RefreshCw,
   Star,
   Tag,
   Trash2,
+  Unlock,
   User,
 } from 'lucide-react';
 import ModalNovoContato from '../../components/contatos/ModalNovoContato';
@@ -34,14 +35,12 @@ import {
   SectionCard,
 } from '../../components/layout-v2';
 import { useGlobalConfirmation } from '../../contexts/GlobalConfirmationContext';
-import { isOmnichannelEnabled } from '../../config/featureFlags';
 import { useAuth } from '../../hooks/useAuth';
 import {
   Cliente,
   ClienteAttachment,
   ClienteContratosResumo,
   ClienteFaturasResumo,
-  ClienteOmnichannelContexto,
   ClientePropostasResumo,
   ClienteTicketsResumo,
   clientesService,
@@ -53,26 +52,22 @@ import {
   StatusPlanoCobranca,
   TipoRecorrencia,
 } from '../../services/faturamentoService';
+import {
+  inadimplenciaOperacionalService,
+  InadimplenciaOperacionalCliente,
+  InadimplenciaOperacionalEvento,
+} from '../../services/inadimplenciaOperacionalService';
 import { UploadResult } from '../../services/uploadService';
-
-type DemandasResumo = {
-  total: number;
-  abertas: number;
-  urgentes: number;
-};
 
 type ClientePerfilTab =
   | 'tipo'
   | 'contatos'
   | 'anexos'
-  | 'notas'
-  | 'demandas'
   | 'tickets'
   | 'propostas'
   | 'contratos'
   | 'recorrencias'
-  | 'faturas'
-  | 'omnichannel';
+  | 'faturas';
 
 type TicketsFiltroTab = 'abertos' | 'resolvidos';
 type PropostasFiltroTab = 'pendentes' | 'negociacao' | 'aprovadas' | 'encerradas';
@@ -256,6 +251,29 @@ const planoStatusClassMap: Record<string, string> = {
   [StatusPlanoCobranca.EXPIRADO]: 'border-slate-200 bg-slate-50 text-slate-700',
 };
 
+const inadimplenciaStatusLabelMap: Record<string, string> = {
+  ativo: 'Ativo',
+  em_risco: 'Em risco',
+  bloqueado_automatico: 'Bloqueado automatico',
+  bloqueado_manual: 'Bloqueado manual',
+};
+
+const inadimplenciaStatusClassMap: Record<string, string> = {
+  ativo: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  em_risco: 'border-amber-200 bg-amber-50 text-amber-800',
+  bloqueado_automatico: 'border-rose-200 bg-rose-50 text-rose-700',
+  bloqueado_manual: 'border-red-200 bg-red-50 text-red-700',
+};
+
+const inadimplenciaEventoLabelMap: Record<string, string> = {
+  avaliacao: 'Avaliacao',
+  marcacao_risco: 'Marcado em risco',
+  bloqueio_automatico: 'Bloqueio automatico',
+  bloqueio_manual: 'Bloqueio manual',
+  desbloqueio_automatico: 'Desbloqueio automatico',
+  desbloqueio_manual: 'Desbloqueio manual',
+};
+
 const tipoRecorrenciaLabelMap: Record<string, string> = {
   [TipoRecorrencia.MENSAL]: 'Mensal',
   [TipoRecorrencia.TRIMESTRAL]: 'Trimestral',
@@ -266,19 +284,21 @@ const tipoRecorrenciaLabelMap: Record<string, string> = {
 
 const isTicketResolvidoStatus = (status?: string): boolean => {
   const normalized = (status || '').toUpperCase();
-  return normalized === 'CONCLUIDO' || normalized === 'ENCERRADO' || normalized === 'CANCELADO';
+  return normalized === 'CONCLUIDO' || normalized === 'ENCERRADO';
 };
 
 const isTicketAbertoStatus = (status?: string): boolean => !isTicketResolvidoStatus(status);
 
 const isFaturaPagaStatus = (status?: string): boolean => {
   const normalized = (status || '').toLowerCase();
-  return normalized === 'paga' || normalized === 'parcialmente_paga';
+  return normalized === 'paga';
 };
 
 const isFaturaPendenteStatus = (status?: string): boolean => {
   const normalized = (status || '').toLowerCase();
-  return normalized === 'pendente' || normalized === 'enviada';
+  return (
+    normalized === 'pendente' || normalized === 'enviada' || normalized === 'parcialmente_paga'
+  );
 };
 
 const isFaturaVencidaStatus = (status?: string): boolean =>
@@ -290,6 +310,13 @@ const statusLabelMap: Record<Cliente['status'], string> = {
   prospect: 'Prospect',
   inativo: 'Inativo',
 };
+
+const clienteStatusOptions: Array<{ value: Cliente['status']; label: string }> = [
+  { value: 'lead', label: 'Lead' },
+  { value: 'prospect', label: 'Prospect' },
+  { value: 'cliente', label: 'Cliente' },
+  { value: 'inativo', label: 'Inativo' },
+];
 
 const statusClassMap: Record<Cliente['status'], string> = {
   cliente: 'border-emerald-200 bg-emerald-50 text-emerald-700',
@@ -346,6 +373,21 @@ const ensureSiteProtocol = (site?: string | null): string | null => {
   return `https://${site}`;
 };
 
+const toDateInputValue = (value?: string | null): string => {
+  if (!value) {
+    return '';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  const timezoneOffset = date.getTimezoneOffset() * 60000;
+  const localDate = new Date(date.getTime() - timezoneOffset);
+  return localDate.toISOString().slice(0, 10);
+};
+
 const ClienteDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -371,20 +413,14 @@ const ClienteDetailPage: React.FC = () => {
   const [contatos, setContatos] = useState<Contato[]>([]);
   const [contatosLoading, setContatosLoading] = useState(false);
   const [contatoActionId, setContatoActionId] = useState<string | null>(null);
-  const [notasTotal, setNotasTotal] = useState<number | null>(null);
-  const [demandasResumo, setDemandasResumo] = useState<DemandasResumo | null>(null);
   const [ticketsResumo, setTicketsResumo] = useState<ClienteTicketsResumo | null>(null);
   const [propostasResumo, setPropostasResumo] = useState<ClientePropostasResumo | null>(null);
   const [contratosResumo, setContratosResumo] = useState<ClienteContratosResumo | null>(null);
   const [faturasResumo, setFaturasResumo] = useState<ClienteFaturasResumo | null>(null);
-  const [contextoOmnichannel, setContextoOmnichannel] = useState<ClienteOmnichannelContexto | null>(
-    null,
-  );
   const [ticketsLoading, setTicketsLoading] = useState(false);
   const [propostasLoading, setPropostasLoading] = useState(false);
   const [contratosLoading, setContratosLoading] = useState(false);
   const [faturasLoading, setFaturasLoading] = useState(false);
-  const [contextoLoading, setContextoLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<ClientePerfilTab>('tipo');
   const [ticketsFiltroTab, setTicketsFiltroTab] = useState<TicketsFiltroTab>('abertos');
   const [contratosFiltroTab, setContratosFiltroTab] = useState<ContratosFiltroTab>('pendentes');
@@ -400,6 +436,19 @@ const ClienteDetailPage: React.FC = () => {
     id: number;
     action: 'gerar' | 'pausar' | 'reativar' | 'cancelar';
   } | null>(null);
+  const [quickStatus, setQuickStatus] = useState<Cliente['status']>('lead');
+  const [quickFollowupDate, setQuickFollowupDate] = useState('');
+  const [quickActionLoading, setQuickActionLoading] = useState<'status' | 'followup' | null>(null);
+  const [inadimplenciaResumo, setInadimplenciaResumo] =
+    useState<InadimplenciaOperacionalCliente | null>(null);
+  const [inadimplenciaEventos, setInadimplenciaEventos] = useState<
+    InadimplenciaOperacionalEvento[]
+  >([]);
+  const [inadimplenciaLoading, setInadimplenciaLoading] = useState(false);
+  const [inadimplenciaLoaded, setInadimplenciaLoaded] = useState(false);
+  const [inadimplenciaActionLoading, setInadimplenciaActionLoading] = useState<
+    'reavaliar' | 'bloquear' | 'desbloquear' | null
+  >(null);
 
   const loadCliente = useCallback(async (clienteId: string): Promise<Cliente> => {
     return clientesService.getClienteById(clienteId);
@@ -452,40 +501,22 @@ const ClienteDetailPage: React.FC = () => {
     setPropostasLoading(true);
     setContratosLoading(true);
     setFaturasLoading(true);
-    setContextoLoading(isOmnichannelEnabled);
 
-    const [
-      notasResult,
-      demandasResult,
-      ticketsResult,
-      propostasResult,
-      contratosResult,
-      faturasResult,
-      contextoResult,
-    ] = await Promise.all([
-      clientesService.contarNotasCliente(clienteId).catch(() => null),
-      clientesService.contarDemandasCliente(clienteId).catch(() => null),
+    const [ticketsResult, propostasResult, contratosResult, faturasResult] = await Promise.all([
       clientesService.getResumoTicketsCliente(clienteId).catch(() => null),
       clientesService.getResumoPropostasCliente(clienteId, 100).catch(() => null),
       clientesService.getResumoContratosCliente(clienteId).catch(() => null),
       clientesService.getResumoFaturasCliente(clienteId).catch(() => null),
-      isOmnichannelEnabled
-        ? clientesService.getContextoOmnichannelCliente(clienteId).catch(() => null)
-        : Promise.resolve(null),
     ]);
 
-    setNotasTotal(notasResult?.total ?? null);
-    setDemandasResumo(demandasResult ?? null);
     setTicketsResumo(ticketsResult ?? null);
     setPropostasResumo(propostasResult ?? null);
     setContratosResumo(contratosResult ?? null);
     setFaturasResumo(faturasResult ?? null);
-    setContextoOmnichannel(isOmnichannelEnabled ? (contextoResult ?? null) : null);
     setTicketsLoading(false);
     setPropostasLoading(false);
     setContratosLoading(false);
     setFaturasLoading(false);
-    setContextoLoading(false);
   }, []);
 
   const loadPlanosCobranca = useCallback(
@@ -507,6 +538,36 @@ const ClienteDetailPage: React.FC = () => {
         return [];
       } finally {
         setPlanosCobrancaLoading(false);
+      }
+    },
+    [],
+  );
+
+  const loadInadimplenciaOperacional = useCallback(
+    async (clienteId: string, silent = false): Promise<void> => {
+      try {
+        setInadimplenciaLoading(true);
+        const data = await inadimplenciaOperacionalService.obterCliente(clienteId);
+        setInadimplenciaResumo(data.status);
+        setInadimplenciaEventos(Array.isArray(data.eventos) ? data.eventos : []);
+      } catch (fetchError: unknown) {
+        const statusCode =
+          typeof fetchError === 'object' &&
+          fetchError !== null &&
+          'response' in fetchError &&
+          typeof (fetchError as { response?: { status?: unknown } }).response?.status !==
+            'undefined'
+            ? Number((fetchError as { response?: { status?: unknown } }).response?.status || 0)
+            : 0;
+        setInadimplenciaResumo(null);
+        setInadimplenciaEventos([]);
+        if (!silent && statusCode !== 403 && statusCode !== 404) {
+          console.error('Erro ao carregar inadimplencia operacional:', fetchError);
+          toast.error('Nao foi possivel carregar o status operacional financeiro.');
+        }
+      } finally {
+        setInadimplenciaLoading(false);
+        setInadimplenciaLoaded(true);
       }
     },
     [],
@@ -537,13 +598,10 @@ const ClienteDetailPage: React.FC = () => {
       setCliente(null);
       setAttachments([]);
       setContatos([]);
-      setNotasTotal(null);
-      setDemandasResumo(null);
       setTicketsResumo(null);
       setPropostasResumo(null);
       setContratosResumo(null);
       setFaturasResumo(null);
-      setContextoOmnichannel(null);
     } finally {
       setLoading(false);
     }
@@ -564,13 +622,33 @@ const ClienteDetailPage: React.FC = () => {
     setPlanosCobrancaTotal(null);
     setIsPlanoModalOpen(false);
     setPlanoAction(null);
+    setInadimplenciaResumo(null);
+    setInadimplenciaEventos([]);
+    setInadimplenciaLoaded(false);
+    setInadimplenciaActionLoading(null);
   }, [id]);
+
+  useEffect(() => {
+    if (!cliente) {
+      return;
+    }
+
+    setQuickStatus(cliente.status || 'lead');
+    setQuickFollowupDate(toDateInputValue(cliente.proximo_contato));
+  }, [cliente?.id, cliente?.status, cliente?.proximo_contato]);
 
   useEffect(() => {
     if (!id) return;
     if (activeTab !== 'recorrencias') return;
     void loadPlanosCobranca(id);
   }, [activeTab, id, loadPlanosCobranca]);
+
+  useEffect(() => {
+    if (!id) return;
+    if (activeTab !== 'recorrencias' && activeTab !== 'faturas') return;
+    if (inadimplenciaLoaded) return;
+    void loadInadimplenciaOperacional(id, true);
+  }, [activeTab, id, inadimplenciaLoaded, loadInadimplenciaOperacional]);
 
   const handleSaveCliente = async (
     clienteData: Omit<Cliente, 'id' | 'created_at' | 'updated_at'>,
@@ -605,6 +683,74 @@ const ClienteDetailPage: React.FC = () => {
     } catch (deleteError) {
       console.error('Erro ao excluir cliente:', deleteError);
       toast.error('Nao foi possivel excluir o cliente.');
+    }
+  };
+
+  const handleReavaliarInadimplencia = async () => {
+    if (!id) return;
+
+    try {
+      setInadimplenciaActionLoading('reavaliar');
+      const status = await inadimplenciaOperacionalService.reavaliarCliente(
+        id,
+        'Reavaliacao manual a partir do detalhe do cliente.',
+      );
+      setInadimplenciaResumo(status);
+      await loadInadimplenciaOperacional(id, true);
+      toast.success('Status operacional reavaliado.');
+    } catch (actionError) {
+      console.error('Erro ao reavaliar inadimplencia operacional:', actionError);
+      toast.error('Nao foi possivel reavaliar o cliente.');
+    } finally {
+      setInadimplenciaActionLoading(null);
+    }
+  };
+
+  const handleBloquearManualInadimplencia = async () => {
+    if (!id) return;
+
+    const shouldBlock = await confirm(
+      'Aplicar bloqueio manual deste cliente no contexto financeiro?',
+    );
+    if (!shouldBlock) return;
+
+    try {
+      setInadimplenciaActionLoading('bloquear');
+      const status = await inadimplenciaOperacionalService.bloquearManual(
+        id,
+        'Bloqueio manual realizado a partir do detalhe do cliente.',
+      );
+      setInadimplenciaResumo(status);
+      await loadInadimplenciaOperacional(id, true);
+      toast.success('Bloqueio manual aplicado.');
+    } catch (actionError) {
+      console.error('Erro ao bloquear manualmente cliente:', actionError);
+      toast.error('Nao foi possivel aplicar o bloqueio manual.');
+    } finally {
+      setInadimplenciaActionLoading(null);
+    }
+  };
+
+  const handleDesbloquearManualInadimplencia = async () => {
+    if (!id) return;
+
+    const shouldUnlock = await confirm('Liberar manualmente este cliente no contexto financeiro?');
+    if (!shouldUnlock) return;
+
+    try {
+      setInadimplenciaActionLoading('desbloquear');
+      const status = await inadimplenciaOperacionalService.desbloquearManual(
+        id,
+        'Desbloqueio manual realizado a partir do detalhe do cliente.',
+      );
+      setInadimplenciaResumo(status);
+      await loadInadimplenciaOperacional(id, true);
+      toast.success('Cliente liberado manualmente.');
+    } catch (actionError) {
+      console.error('Erro ao desbloquear manualmente cliente:', actionError);
+      toast.error('Nao foi possivel liberar o cliente.');
+    } finally {
+      setInadimplenciaActionLoading(null);
     }
   };
 
@@ -782,6 +928,56 @@ const ClienteDetailPage: React.FC = () => {
     }
   };
 
+  const handleQuickStatusSave = async () => {
+    if (!id || !cliente || quickStatus === cliente.status) {
+      return;
+    }
+
+    try {
+      setQuickActionLoading('status');
+      const atualizado = await clientesService.updateClienteStatus(id, quickStatus);
+      setCliente((current) =>
+        current ? { ...current, ...atualizado, status: quickStatus } : current,
+      );
+      toast.success('Status do cliente atualizado.');
+    } catch (error) {
+      console.error('Erro ao atualizar status rapido do cliente:', error);
+      toast.error('Nao foi possivel atualizar o status do cliente.');
+    } finally {
+      setQuickActionLoading(null);
+    }
+  };
+
+  const handleQuickFollowupSave = async (registrarInteracaoAgora = false) => {
+    if (!id || !cliente) {
+      return;
+    }
+
+    try {
+      setQuickActionLoading('followup');
+      const payload: Partial<Cliente> = {
+        proximo_contato: quickFollowupDate ? `${quickFollowupDate}T12:00:00` : null,
+      };
+
+      if (registrarInteracaoAgora) {
+        payload.ultimo_contato = new Date().toISOString();
+      }
+
+      const atualizado = await clientesService.updateCliente(id, payload);
+      setCliente((current) => (current ? { ...current, ...atualizado } : current));
+      toast.success(
+        registrarInteracaoAgora
+          ? 'Interacao registrada e follow-up atualizado.'
+          : 'Proximo follow-up atualizado.',
+      );
+    } catch (error) {
+      console.error('Erro ao atualizar follow-up rapido do cliente:', error);
+      toast.error('Nao foi possivel atualizar o follow-up do cliente.');
+    } finally {
+      setQuickActionLoading(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-4 pt-1 sm:pt-2">
@@ -820,7 +1016,6 @@ const ClienteDetailPage: React.FC = () => {
   const statusClass = statusClassMap[cliente.status] || statusClassMap.inativo;
   const clienteQuery = `clienteId=${encodeURIComponent(id)}&cliente=${encodeURIComponent(cliente.nome || '')}`;
   const siteUrl = ensureSiteProtocol(cliente.site);
-  const relacionamentoBadge = (notasTotal ?? 0) + (demandasResumo?.abertas ?? 0);
   const ticketsAbertos = sortByAtualizacaoDesc(
     ticketsResumo?.tickets.filter((ticket) => isTicketAbertoStatus(ticket.status)) ?? [],
   );
@@ -942,7 +1137,7 @@ const ClienteDetailPage: React.FC = () => {
     value: string;
     tone: 'neutral' | 'accent' | 'warning';
   }> = [
-    { key: 'tipo', label: 'Tipo', value: tipoLabel, tone: 'neutral' },
+    { key: 'tipo', label: 'Resumo', value: tipoLabel, tone: 'neutral' },
     {
       key: 'contatos',
       label: 'Contatos vinculados',
@@ -954,21 +1149,6 @@ const ClienteDetailPage: React.FC = () => {
       label: 'Anexos',
       value: String(attachments.length),
       tone: attachments.length > 0 ? 'accent' : 'neutral',
-    },
-    {
-      key: 'notas',
-      label: 'Notas internas',
-      value: notasTotal === null ? '--' : String(notasTotal),
-      tone: notasTotal && notasTotal > 0 ? 'accent' : 'neutral',
-    },
-    {
-      key: 'demandas',
-      label: 'Demandas abertas',
-      value: demandasResumo === null ? '--' : String(demandasResumo.abertas),
-      tone:
-        demandasResumo && (demandasResumo.urgentes > 0 || demandasResumo.abertas > 0)
-          ? 'warning'
-          : 'neutral',
     },
     {
       key: 'tickets',
@@ -1009,49 +1189,38 @@ const ClienteDetailPage: React.FC = () => {
     },
   ];
 
-  if (isOmnichannelEnabled) {
-    profileTabs.push({
-      key: 'omnichannel',
-      label: 'Segmento omnichannel',
-      value: contextoOmnichannel?.cliente?.segmento || '--',
-      tone:
-        (contextoOmnichannel?.cliente?.segmento || '').toUpperCase() === 'VIP' ||
-        relacionamentoBadge > 0
-          ? 'accent'
-          : 'neutral',
-    });
-  }
-
   const showContatoSection = activeTab === 'tipo';
   const showContatosSection = activeTab === 'contatos';
   const showEnderecoSection = activeTab === 'tipo';
-  const showDadosAdicionaisSection = activeTab === 'tipo';
+  const showDadosComerciaisSection = activeTab === 'tipo';
   const showObservacoesSection = activeTab === 'tipo';
   const showHistoricoSection = activeTab === 'tipo';
-  const showNotasSection = activeTab === 'notas';
-  const showDemandasSection = activeTab === 'demandas';
-  const showResumoOmnichannelSection = isOmnichannelEnabled && activeTab === 'omnichannel';
-  const showRelacionamentosSection =
-    showNotasSection || showDemandasSection || showResumoOmnichannelSection;
-  const showHistoricoOmnichannelSection = isOmnichannelEnabled && activeTab === 'omnichannel';
   const showTicketsSection = activeTab === 'tickets';
   const showPropostasSection = activeTab === 'propostas';
   const showContratosSection = activeTab === 'contratos';
   const showRecorrenciasSection = activeTab === 'recorrencias';
   const showFaturasSection = activeTab === 'faturas';
+  const showInadimplenciaOperacionalSection =
+    activeTab === 'recorrencias' || activeTab === 'faturas';
   const showTagsSection = activeTab === 'tipo';
   const showAnexosCard = activeTab === 'anexos';
+  const inadimplenciaStatusLabel =
+    inadimplenciaStatusLabelMap[inadimplenciaResumo?.statusOperacional || 'ativo'] || 'Ativo';
+  const inadimplenciaStatusClass =
+    inadimplenciaStatusClassMap[inadimplenciaResumo?.statusOperacional || 'ativo'] ||
+    'border-slate-200 bg-slate-50 text-slate-700';
+  const inadimplenciaTemBloqueio =
+    inadimplenciaResumo?.statusOperacional === 'bloqueado_automatico' ||
+    inadimplenciaResumo?.statusOperacional === 'bloqueado_manual';
 
   const showLeftCard =
     showContatoSection ||
     showContatosSection ||
     showEnderecoSection ||
-    showDadosAdicionaisSection ||
+    showDadosComerciaisSection ||
     showObservacoesSection;
   const showRightCard =
     showHistoricoSection ||
-    showRelacionamentosSection ||
-    showHistoricoOmnichannelSection ||
     showTicketsSection ||
     showPropostasSection ||
     showContratosSection ||
@@ -1384,43 +1553,7 @@ const ClienteDetailPage: React.FC = () => {
                 </section>
               ) : null}
 
-              {showDadosAdicionaisSection ? (
-                <section className="space-y-3">
-                  <h3 className="text-base font-semibold text-[#19384C]">Dados adicionais</h3>
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <div className="rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3">
-                      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[#6C8794]">
-                        Data de nascimento
-                      </p>
-                      <p className="text-sm text-[#355061]">
-                        {formatDate(cliente.data_nascimento)}
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3">
-                      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[#6C8794]">
-                        Genero
-                      </p>
-                      <p className="text-sm text-[#355061]">{cliente.genero || 'Nao informado'}</p>
-                    </div>
-                    <div className="rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3">
-                      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[#6C8794]">
-                        Profissao
-                      </p>
-                      <p className="text-sm text-[#355061]">
-                        {cliente.profissao || 'Nao informado'}
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3">
-                      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[#6C8794]">
-                        Renda
-                      </p>
-                      <p className="text-sm text-[#355061]">{formatCurrency(cliente.renda)}</p>
-                    </div>
-                  </div>
-                </section>
-              ) : null}
-
-              {showDadosAdicionaisSection ? (
+              {showDadosComerciaisSection ? (
                 <section className="space-y-3">
                   <h3 className="text-base font-semibold text-[#19384C]">Dados comerciais</h3>
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -1435,11 +1568,11 @@ const ClienteDetailPage: React.FC = () => {
                     </div>
                     <div className="rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3">
                       <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[#6C8794]">
-                        Responsavel ID
+                        Status de cadastro
                       </p>
-                      <p className="inline-flex items-center gap-2 break-all text-sm text-[#355061]">
-                        <User className="h-4 w-4 text-[#6C8794]" />
-                        {cliente.responsavel_id || cliente.responsavelId || 'Nao informado'}
+                      <p className="inline-flex items-center gap-2 text-sm text-[#355061]">
+                        <Tag className="h-4 w-4 text-[#6C8794]" />
+                        {statusLabel}
                       </p>
                     </div>
                   </div>
@@ -1463,6 +1596,93 @@ const ClienteDetailPage: React.FC = () => {
             <Card
               className={`space-y-6 p-4 ${showLeftCard ? 'xl:sticky xl:top-24 xl:self-start' : ''}`}
             >
+              {showHistoricoSection ? (
+                <section className="space-y-3">
+                  <h3 className="text-base font-semibold text-[#19384C]">Acoes rapidas</h3>
+                  <div className="space-y-3 rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3">
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium uppercase tracking-wide text-[#6C8794]">
+                        Status comercial
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select
+                          value={quickStatus}
+                          onChange={(event) =>
+                            setQuickStatus(event.target.value as Cliente['status'])
+                          }
+                          disabled={quickActionLoading !== null}
+                          className="h-9 min-w-[180px] rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm text-[#355061] outline-none transition focus:border-[#159A9C]/45 focus:ring-2 focus:ring-[#159A9C]/15 disabled:cursor-not-allowed disabled:bg-[#F2F6F8]"
+                        >
+                          {clienteStatusOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void handleQuickStatusSave();
+                          }}
+                          disabled={
+                            quickActionLoading !== null ||
+                            !cliente ||
+                            quickStatus === cliente.status
+                          }
+                          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#355061] transition-colors hover:bg-[#F3FAF8] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {quickActionLoading === 'status' ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : null}
+                          Atualizar status
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium uppercase tracking-wide text-[#6C8794]">
+                        Follow-up
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          type="date"
+                          value={quickFollowupDate}
+                          onChange={(event) => setQuickFollowupDate(event.target.value)}
+                          disabled={quickActionLoading !== null}
+                          className="h-9 min-w-[180px] rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm text-[#355061] outline-none transition focus:border-[#159A9C]/45 focus:ring-2 focus:ring-[#159A9C]/15 disabled:cursor-not-allowed disabled:bg-[#F2F6F8]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void handleQuickFollowupSave(false);
+                          }}
+                          disabled={quickActionLoading !== null}
+                          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#355061] transition-colors hover:bg-[#F3FAF8] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {quickActionLoading === 'followup' ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : null}
+                          Salvar follow-up
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void handleQuickFollowupSave(true);
+                          }}
+                          disabled={quickActionLoading !== null}
+                          className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {quickActionLoading === 'followup' ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : null}
+                          Registrar interacao
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              ) : null}
+
               {showHistoricoSection ? (
                 <section className="space-y-3">
                   <h3 className="text-base font-semibold text-[#19384C]">Historico</h3>
@@ -1500,124 +1720,6 @@ const ClienteDetailPage: React.FC = () => {
                       </p>
                     </div>
                   </div>
-                </section>
-              ) : null}
-
-              {showRelacionamentosSection ? (
-                <section className="space-y-3">
-                  <h3 className="text-base font-semibold text-[#19384C]">Relacionamentos</h3>
-                  <div className="space-y-3">
-                    {showNotasSection ? (
-                      <div className="rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3">
-                        <p className="mb-1 inline-flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-[#6C8794]">
-                          <FileText className="h-4 w-4" />
-                          Notas internas
-                        </p>
-                        <p className="text-sm text-[#355061]">
-                          {notasTotal === null ? 'Nao disponivel' : `${notasTotal} registro(s)`}
-                        </p>
-                      </div>
-                    ) : null}
-
-                    {showDemandasSection ? (
-                      <div className="rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3">
-                        <p className="mb-1 inline-flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-[#6C8794]">
-                          <ClipboardList className="h-4 w-4" />
-                          Demandas
-                        </p>
-                        <p className="text-sm text-[#355061]">
-                          {demandasResumo
-                            ? `${demandasResumo.total} total, ${demandasResumo.abertas} abertas e ${demandasResumo.urgentes} urgentes`
-                            : 'Nao disponivel'}
-                        </p>
-                      </div>
-                    ) : null}
-
-                    {showResumoOmnichannelSection ? (
-                      <div className="rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3">
-                        <p className="mb-1 inline-flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-[#6C8794]">
-                          <MessageCircle className="h-4 w-4" />
-                          Contexto omnichannel
-                        </p>
-                        {contextoLoading ? (
-                          <p className="text-sm text-[#607B89]">
-                            Carregando contexto omnichannel...
-                          </p>
-                        ) : contextoOmnichannel ? (
-                          <>
-                            <p className="text-sm text-[#355061]">
-                              Segmento {contextoOmnichannel.cliente.segmento}, avaliacao media{' '}
-                              {contextoOmnichannel.estatisticas.avaliacaoMedia.toFixed(1)} e tempo
-                              medio {contextoOmnichannel.estatisticas.tempoMedioResposta}.
-                            </p>
-                            <p className="mt-1 text-xs text-[#607B89]">
-                              {contextoOmnichannel.estatisticas.ticketsAbertos} ticket(s) aberto(s),{' '}
-                              {contextoOmnichannel.estatisticas.ticketsResolvidos} resolvido(s) e
-                              ultimo contato em{' '}
-                              {formatDateTime(contextoOmnichannel.cliente.ultimoContato)}.
-                            </p>
-                          </>
-                        ) : (
-                          <p className="text-sm text-[#607B89]">Nao disponivel</p>
-                        )}
-                      </div>
-                    ) : null}
-                  </div>
-                </section>
-              ) : null}
-
-              {showHistoricoOmnichannelSection ? (
-                <section className="space-y-3">
-                  <h3 className="text-base font-semibold text-[#19384C]">Historico omnichannel</h3>
-
-                  {contextoLoading ? (
-                    <div className="flex items-center gap-2 rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3 text-sm text-[#607B89]">
-                      <Loader2 className="h-4 w-4 animate-spin text-[#159A9C]" />
-                      Carregando historico omnichannel...
-                    </div>
-                  ) : !contextoOmnichannel || contextoOmnichannel.historico.tickets.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-[#D1E0E5] bg-[#FBFDFE] p-3 text-sm text-[#607B89]">
-                      Nenhum evento omnichannel recente encontrado para este cliente.
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {contextoOmnichannel.historico.tickets.slice(0, 3).map((ticket) => {
-                        const statusChave = (ticket.status || '').toUpperCase();
-                        const statusLabel = ticketStatusLabelMap[statusChave] || ticket.status;
-                        const statusClass =
-                          ticketStatusClassMap[statusChave] ||
-                          'border-slate-200 bg-slate-50 text-slate-700';
-
-                        return (
-                          <div
-                            key={ticket.id}
-                            className="rounded-xl border border-[#DCE8EC] bg-white p-3"
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <Link
-                                  to={`/atendimento/tickets/${ticket.id}`}
-                                  className="text-sm font-semibold text-[#159A9C] hover:text-[#0F7B7D]"
-                                >
-                                  {ticket.numero ? `#${ticket.numero}` : 'Ticket'} -{' '}
-                                  {ticket.assunto || 'Sem assunto'}
-                                </Link>
-                                <p className="mt-1 text-xs text-[#607B89]">
-                                  Criado em {formatDateTime(ticket.criadoEm)}
-                                  {ticket.canalId ? ` - Canal ${ticket.canalId}` : ''}
-                                </p>
-                              </div>
-                              <span
-                                className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${statusClass}`}
-                              >
-                                {statusLabel}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
                 </section>
               ) : null}
 
@@ -2177,6 +2279,179 @@ const ClienteDetailPage: React.FC = () => {
                       })}
                     </div>
                   )}
+                </section>
+              ) : null}
+
+              {showInadimplenciaOperacionalSection ? (
+                <section className="space-y-3">
+                  <div className="rounded-2xl border border-[#DCE8EC] bg-[#FBFDFE] p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 text-[#C17A00]" />
+                          <h3 className="text-base font-semibold text-[#19384C]">
+                            Operacao financeira
+                          </h3>
+                        </div>
+                        <p className="text-sm text-[#607B89]">
+                          Acompanha atraso, saldo vencido e bloqueio operacional deste cliente.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void handleReavaliarInadimplencia();
+                          }}
+                          className="inline-flex items-center gap-2 rounded-lg border border-[#D4E2E7] px-3 py-1.5 text-xs font-medium text-[#355061] transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                          disabled={inadimplenciaLoading || inadimplenciaActionLoading !== null}
+                        >
+                          <RefreshCw
+                            className={`h-3.5 w-3.5 ${
+                              inadimplenciaActionLoading === 'reavaliar' ? 'animate-spin' : ''
+                            }`}
+                          />
+                          Reavaliar
+                        </button>
+
+                        {inadimplenciaTemBloqueio ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void handleDesbloquearManualInadimplencia();
+                            }}
+                            className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            disabled={inadimplenciaLoading || inadimplenciaActionLoading !== null}
+                          >
+                            {inadimplenciaActionLoading === 'desbloquear' ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Unlock className="h-3.5 w-3.5" />
+                            )}
+                            Liberar manualmente
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void handleBloquearManualInadimplencia();
+                            }}
+                            className="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            disabled={inadimplenciaLoading || inadimplenciaActionLoading !== null}
+                          >
+                            {inadimplenciaActionLoading === 'bloquear' ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Lock className="h-3.5 w-3.5" />
+                            )}
+                            Bloquear manualmente
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {inadimplenciaLoading && !inadimplenciaResumo ? (
+                      <div className="mt-3 flex items-center gap-2 rounded-xl border border-[#DCE8EC] bg-white p-3 text-sm text-[#607B89]">
+                        <Loader2 className="h-4 w-4 animate-spin text-[#159A9C]" />
+                        Carregando status operacional financeiro...
+                      </div>
+                    ) : inadimplenciaResumo ? (
+                      <div className="mt-4 space-y-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${inadimplenciaStatusClass}`}
+                          >
+                            {inadimplenciaStatusLabel}
+                          </span>
+                          {inadimplenciaResumo.bloqueioManual ? (
+                            <span className="inline-flex rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#355061]">
+                              Bloqueio manual ativo
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                          <div className="rounded-xl border border-[#DCE8EC] bg-white p-3">
+                            <p className="text-[11px] font-medium uppercase tracking-wide text-[#6C8794]">
+                              Saldo vencido
+                            </p>
+                            <p className="mt-1 text-base font-semibold text-[#19384C]">
+                              {formatCurrency(inadimplenciaResumo.saldoVencido)}
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-[#DCE8EC] bg-white p-3">
+                            <p className="text-[11px] font-medium uppercase tracking-wide text-[#6C8794]">
+                              Maior atraso
+                            </p>
+                            <p className="mt-1 text-base font-semibold text-[#19384C]">
+                              {inadimplenciaResumo.diasMaiorAtraso} dia(s)
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-[#DCE8EC] bg-white p-3">
+                            <p className="text-[11px] font-medium uppercase tracking-wide text-[#6C8794]">
+                              Titulos vencidos
+                            </p>
+                            <p className="mt-1 text-base font-semibold text-[#19384C]">
+                              {inadimplenciaResumo.quantidadeTitulosVencidos}
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-[#DCE8EC] bg-white p-3">
+                            <p className="text-[11px] font-medium uppercase tracking-wide text-[#6C8794]">
+                              Ultima avaliacao
+                            </p>
+                            <p className="mt-1 text-sm font-medium text-[#19384C]">
+                              {formatDateTime(inadimplenciaResumo.ultimaAvaliacaoEm || undefined)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {inadimplenciaResumo.motivo ? (
+                          <div className="rounded-xl border border-[#F3E1B6] bg-[#FFF9EB] p-3 text-sm text-[#8A5A00]">
+                            {inadimplenciaResumo.motivo}
+                          </div>
+                        ) : null}
+
+                        {inadimplenciaEventos.length > 0 ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm font-medium text-[#355061]">
+                              <Clock3 className="h-4 w-4 text-[#607B89]" />
+                              Historico recente
+                            </div>
+                            <div className="space-y-2">
+                              {inadimplenciaEventos.slice(0, 3).map((evento) => (
+                                <div
+                                  key={evento.id}
+                                  className="rounded-xl border border-[#DCE8EC] bg-white p-3"
+                                >
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <p className="text-sm font-medium text-[#19384C]">
+                                      {inadimplenciaEventoLabelMap[evento.tipoEvento] ||
+                                        evento.tipoEvento}
+                                    </p>
+                                    <span className="text-xs text-[#607B89]">
+                                      {formatDateTime(evento.createdAt)}
+                                    </span>
+                                  </div>
+                                  <p className="mt-1 text-xs text-[#607B89]">
+                                    Estado: {evento.estadoAnterior || 'sem registro'} para{' '}
+                                    {evento.estadoNovo || 'sem alteracao'}
+                                  </p>
+                                  {evento.motivo ? (
+                                    <p className="mt-1 text-xs text-[#355061]">{evento.motivo}</p>
+                                  ) : null}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <div className="mt-3 rounded-xl border border-dashed border-[#D1E0E5] bg-white p-3 text-sm text-[#607B89]">
+                        Nenhum status operacional financeiro disponivel para este cliente.
+                      </div>
+                    )}
+                  </div>
                 </section>
               ) : null}
 

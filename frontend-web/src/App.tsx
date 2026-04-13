@@ -1,13 +1,7 @@
-﻿import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { Suspense } from 'react';
 import { Toaster } from 'react-hot-toast';
-import {
-  Navigate,
-  Route,
-  BrowserRouter as Router,
-  Routes,
-  useLocation,
-} from 'react-router-dom';
+import { Navigate, Route, BrowserRouter as Router, Routes, useLocation } from 'react-router-dom';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import PermissionPathGuard from './components/licensing/PermissionPathGuard';
 import { AuthProvider } from './contexts/AuthContext';
@@ -99,9 +93,7 @@ const ComercialDrilldownPage = React.lazy(
 );
 const ReportsHubPage = React.lazy(() => import('./features/reports/ReportsHubPage'));
 const AgendaReportPage = React.lazy(() => import('./features/reports/AgendaReportPage'));
-const FinanceiroReportsPage = React.lazy(
-  () => import('./features/reports/FinanceiroReportsPage'),
-);
+const FinanceiroReportsPage = React.lazy(() => import('./features/reports/FinanceiroReportsPage'));
 const ComercialPropostasContratosReportPage = React.lazy(
   () => import('./features/reports/ComercialPropostasContratosReportPage'),
 );
@@ -128,13 +120,9 @@ const ProdutosPage = React.lazy(() => import('./features/produtos/ProdutosPage')
 const CategoriasProdutosPage = React.lazy(
   () => import('./features/produtos/CategoriasProdutosPage'),
 );
-const VehicleInventoryPage = React.lazy(
-  () => import('./features/veiculos/VehicleInventoryPage'),
-);
+const VehicleInventoryPage = React.lazy(() => import('./features/veiculos/VehicleInventoryPage'));
 
-const ContasReceberPage = React.lazy(
-  () => import('./pages/gestao/financeiro/ContasReceberPage'),
-);
+const ContasReceberPage = React.lazy(() => import('./pages/gestao/financeiro/ContasReceberPage'));
 const ContasPagarPage = React.lazy(() => import('./pages/gestao/financeiro/ContasPagarPage'));
 const FornecedoresPage = React.lazy(
   () => import('./features/financeiro/fornecedores/FornecedoresPage'),
@@ -151,11 +139,12 @@ const AprovacoesFinanceirasPage = React.lazy(
 const ConciliacaoBancariaPage = React.lazy(
   () => import('./pages/gestao/financeiro/ConciliacaoBancariaPage'),
 );
+const InadimplenciaOperacionalPage = React.lazy(
+  () => import('./pages/gestao/financeiro/InadimplenciaOperacionalPage'),
+);
 const FluxoCaixaPage = React.lazy(() => import('./pages/gestao/financeiro/FluxoCaixaPage'));
 const TesourariaPage = React.lazy(() => import('./pages/gestao/financeiro/TesourariaPage'));
-const CentrosCustoPage = React.lazy(
-  () => import('./pages/gestao/financeiro/CentrosCustoPage'),
-);
+const CentrosCustoPage = React.lazy(() => import('./pages/gestao/financeiro/CentrosCustoPage'));
 
 const PerfilPage = React.lazy(() => import('./features/perfil'));
 const PortalClientePage = React.lazy(() => import('./pages/PortalClientePage'));
@@ -297,587 +286,615 @@ const AppRoutes: React.FC = () => {
               <PermissionPathGuard>
                 <DashboardLayout>
                   <Routes>
-                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                  <Route path="/dashboard" element={<DashboardRouter />} />
-                  {/* Página de Notificações */}
-                  <Route path="/notifications" element={<NotificationsPage />} />
-                  {/* Página de Contratos */}
-                  <Route
-                    path="/contratos"
-                    element={protegerRota(ModuloEnum.VENDAS, <ContratosPage />)}
-                  />
-                  <Route
-                    path="/contratos/:id"
-                    element={protegerRota(ModuloEnum.VENDAS, <ContratosPage />)}
-                  />
-                  {/* Rotas das páginas de núcleos - Protegidas por licença */}
-                  <Route
-                    path="/nuclei/crm"
-                    element={protegerRota(ModuloEnum.CRM, <CrmNucleusPage />)}
-                  />
-                  <Route
-                    path="/nuclei/vendas"
-                    element={protegerRota(ModuloEnum.VENDAS, <VendasNucleusPage />)}
-                  />
-                  <Route
-                    path="/nuclei/financeiro"
-                    element={protegerRota(ModuloEnum.FINANCEIRO, <FinanceiroNucleusPage />)}
-                  />
-                  <Route path="/nuclei/comercial" element={<Navigate to="/nuclei/crm" replace />} />
-                  <Route
-                    path="/nuclei/configuracoes"
-                    element={<Navigate to="/configuracoes/empresa" replace />}
-                  />{' '}
-                  {/* Configurações: base platform */}
-                  {/* ⭐ NOVA ROTA: Configurações de Atendimento com Abas (com redirects automáticos) */}
-                  <Route
-                    path="/atendimento/configuracoes"
-                    element={protegerRota(ModuloEnum.ATENDIMENTO, <ConfiguracoesWrapper />)}
-                  />
-                  {/* Redirects: rotas antigas redirecionam para abas especificas */}
-                  <Route
-                    path="/gestao/nucleos"
-                    element={<Navigate to="/atendimento/configuracoes?tab=nucleos" replace />}
-                  />
-                  <Route
-                    path="/gestao/equipes"
-                    element={<Navigate to="/atendimento/configuracoes?tab=equipes" replace />}
-                  />
-                  <Route
-                    path="/gestao/atendentes"
-                    element={<Navigate to="/atendimento/configuracoes?tab=atendentes" replace />}
-                  />
-                  <Route
-                    path="/gestao/tags"
-                    element={<Navigate to="/atendimento/configuracoes?tab=tags" replace />}
-                  />
-                  {/* Removido: apenas atribuicoes descontinuadas (absorvidas por distribuicao) */}
-                  <Route
-                    path="/gestao/atribuicoes"
-                    element={<Navigate to="/atendimento/distribuicao" replace />}
-                  />
-                  {/* Redirect antigo: departamentos permanecem ativos em /nuclei/configuracoes/departamentos */}
-                  <Route
-                    path="/gestao/departamentos"
-                    element={<Navigate to="/configuracoes/departamentos" replace />}
-                  />
-                  {/* Fluxos consolidados em Automacoes > Bot (mantem rotas builder separadas) */}
-                  <Route
-                    path="/gestao/fluxos"
-                    element={<Navigate to="/atendimento/automacoes?tab=bot" replace />}
-                  />
-                  <Route
-                    path="/gestao/fluxos/:id/builder"
-                    element={protegerRota(ModuloEnum.ATENDIMENTO, <FluxoBuilderPage />)}
-                  />
-                  <Route
-                    path="/gestao/fluxos/novo/builder"
-                    element={protegerRota(ModuloEnum.ATENDIMENTO, <FluxoBuilderPage />)}
-                  />
-                  {/* Gerenciamento de Empresas do Usuário */}
-                  <Route
-                    path="/empresas/minhas"
-                    element={protegerRota(ModuloEnum.ADMINISTRACAO, <MinhasEmpresasPage />)}
-                  />
-                  <Route
-                    path="/empresas/:empresaId/configuracoes"
-                    element={<Navigate to="/configuracoes/empresa" replace />}
-                  />
-                  <Route
-                    path="/empresas/:empresaId/relatorios"
-                    element={<Navigate to="/dashboard" replace />}
-                  />
-                  <Route
-                    path="/empresas/:empresaId/permissoes"
-                    element={<Navigate to="/configuracoes/usuarios" replace />}
-                  />
-                  <Route
-                    path="/empresas/:empresaId/usuarios"
-                    element={<Navigate to="/configuracoes/usuarios" replace />}
-                  />
-                  {/* Configurações globais da empresa ativa - Padrão consolidado */}
-                  <Route path="/configuracoes/usuarios" element={<GestaoUsuariosPage />} />
-                  <Route path="/configuracoes/empresa" element={<ConfiguracaoEmpresaPage />} />
-                  <Route
-                    path="/configuracoes/email"
-                    element={<Navigate to="/configuracoes/empresa" replace />}
-                  />
-                  <Route path="/configuracoes/metas" element={<MetasConfiguracao />} />
-                  <Route path="/configuracoes/integracoes" element={<IntegracoesPage />} />
-                  <Route path="/configuracoes/departamentos" element={<DepartamentosPage />} />
-                  <Route
-                    path="/configuracoes/sistema"
-                    element={protegerRota(ModuloEnum.ADMINISTRACAO, <SystemBrandingPage />)}
-                  />
-                  <Route
-                    path="/core-admin"
-                    element={isSuperAdmin ? <CoreAdminPage /> : <Navigate to="/dashboard" replace />}
-                  />
-                  <Route
-                    path="/configuracoes/seguranca"
-                    element={<Navigate to="/configuracoes/empresa" replace />}
-                  />
-                  {/* Rotas do nucleo atendimento */}
-                  <Route
-                    path="/nuclei/atendimento/canais/email"
-                    element={<ConfigurarCanalEmail />}
-                  />
-                  {/* SLA Tracking */}
-                  <Route
-                    path="/nuclei/atendimento/sla/configuracoes"
-                    element={<ConfiguracaoSLAPage />}
-                  />
-                  {/* Distribuição Automática */}
-                  <Route
-                    path="/nuclei/atendimento/distribuicao/configuracao"
-                    element={<ConfiguracaoDistribuicaoPage />}
-                  />
-                  <Route
-                    path="/nuclei/atendimento/distribuicao/skills"
-                    element={<GestaoSkillsPage />}
-                  />
-                  {/* Sprint 2 - Fase 6: Gestão Unificada de Tickets (substitui Demandas) */}
-                  <Route
-                    path="/atendimento/tickets"
-                    element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoTicketsPage />)}
-                  />
-                  <Route
-                    path="/atendimento/tickets/novo"
-                    element={protegerRota(ModuloEnum.ATENDIMENTO, <TicketCreatePage />)}
-                  />
-                  {/* Sprint 2 - Fase 7: Detalhes do Ticket */}
-                  <Route
-                    path="/atendimento/tickets/:id"
-                    element={protegerRota(ModuloEnum.ATENDIMENTO, <TicketDetailPage />)}
-                  />
-                  {/* Deprecated: demandas agora sao tickets (tipo='suporte') - redirects para compatibilidade */}
-                  <Route
-                    path="/nuclei/atendimento/demandas"
-                    element={<Navigate to="/atendimento/tickets?tipo=suporte" replace />}
-                  />
-                  <Route
-                    path="/nuclei/atendimento/tickets"
-                    element={<Navigate to="/atendimento/tickets" replace />}
-                  />
-                  <Route
-                    path="/nuclei/atendimento/tickets/novo"
-                    element={<Navigate to="/atendimento/tickets/novo" replace />}
-                  />
-                  <Route
-                    path="/nuclei/atendimento/demandas/:id"
-                    element={<Navigate to="/atendimento/tickets/:id" replace />}
-                  />
-                  <Route
-                    path="/demandas"
-                    element={<Navigate to="/atendimento/tickets?tipo=suporte" replace />}
-                  />
-                  <Route
-                    path="/demandas/:id"
-                    element={<Navigate to="/atendimento/tickets/:id" replace />}
-                  />
-                  {/* Sprint 2 - Fase 3e: Admin Console para Configurações de Tickets */}
-                  <Route
-                    path="/configuracoes/tickets/niveis"
-                    element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoNiveisAtendimentoPage />)}
-                  />
-                  <Route
-                    path="/configuracoes/tickets/status"
-                    element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoStatusCustomizadosPage />)}
-                  />
-                  <Route
-                    path="/configuracoes/tickets/tipos"
-                    element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoTiposServicoPage />)}
-                  />
-                  <Route
-                    path="/configuracoes/tickets"
-                    element={<Navigate to="/configuracoes/tickets/niveis" replace />}
-                  />
-                  <Route
-                    path="/configuracoes/tickets/*"
-                    element={<Navigate to="/configuracoes/tickets/niveis" replace />}
-                  />
-                  {/* Rotas legadas - Redirects para compatibilidade */}
-                  <Route
-                    path="/gestao/empresas"
-                    element={<Navigate to="/empresas/minhas" replace />}
-                  />
-                  {/* Redirect legado para rota operacional */}
-                  <Route
-                    path="/nuclei/configuracoes/empresas"
-                    element={<Navigate to="/configuracoes/empresa" replace />}
-                  />
-                  <Route
-                    path="/gestao/usuarios"
-                    element={<Navigate to="/configuracoes/usuarios" replace />}
-                  />
-                  <Route
-                    path="/nuclei/configuracoes/usuarios"
-                    element={<Navigate to="/configuracoes/usuarios" replace />}
-                  />
-                  <Route
-                    path="/nuclei/configuracoes/empresa"
-                    element={<Navigate to="/configuracoes/empresa" replace />}
-                  />
-                  <Route
-                    path="/nuclei/configuracoes/email"
-                    element={<Navigate to="/configuracoes/empresa" replace />}
-                  />
-                  <Route
-                    path="/nuclei/configuracoes/metas"
-                    element={<Navigate to="/configuracoes/metas" replace />}
-                  />
-                  <Route
-                    path="/nuclei/configuracoes/integracoes"
-                    element={<Navigate to="/configuracoes/integracoes" replace />}
-                  />
-                  <Route
-                    path="/nuclei/configuracoes/departamentos"
-                    element={<Navigate to="/configuracoes/departamentos" replace />}
-                  />
-                  <Route
-                    path="/nuclei/configuracoes/tickets/niveis"
-                    element={<Navigate to="/configuracoes/tickets/niveis" replace />}
-                  />
-                  <Route
-                    path="/nuclei/configuracoes/tickets/status"
-                    element={<Navigate to="/configuracoes/tickets/status" replace />}
-                  />
-                  <Route
-                    path="/nuclei/configuracoes/tickets/tipos"
-                    element={<Navigate to="/configuracoes/tickets/tipos" replace />}
-                  />
-                  <Route path="/relatorios" element={<ReportsHubPage />} />
-                  <Route
-                    path="/relatorios/agenda"
-                    element={protegerRota(ModuloEnum.CRM, <AgendaReportPage />)}
-                  />
-                  <Route
-                    path="/relatorios/financeiro"
-                    element={<Navigate to="/financeiro/relatorios" replace />}
-                  />
-                  <Route path="/relatorios/analytics" element={<Navigate to="/relatorios" replace />} />
-                  <Route
-                    path="/relatorios/comercial"
-                    element={protegerRota(ModuloEnum.CRM, <ComercialDrilldownPage />)}
-                  />
-                  <Route
-                    path="/relatorios/comercial/drilldown"
-                    element={protegerRota(ModuloEnum.CRM, <ComercialDrilldownPage />)}
-                  />
-                  <Route
-                    path="/relatorios/comercial/propostas-contratos"
-                    element={
-                      protegerRota(ModuloEnum.VENDAS, <ComercialPropostasContratosReportPage />)
-                    }
-                  />
-                  <Route
-                    path="/relatorios/comercial/clientes-leads"
-                    element={protegerRota(ModuloEnum.CRM, <ComercialClientesLeadsReportPage />)}
-                  />
-                  <Route
-                    path="/gestao/permissoes"
-                    element={<Navigate to="/configuracoes/usuarios" replace />}
-                  />
-                  {/* Atendimento Omnichannel - Protegido */}
-                  <Route
-                    path="/atendimento"
-                    element={
-                      isOmnichannelEnabled ? (
-                        protegerRota(ModuloEnum.ATENDIMENTO, <AtendimentoDashboard />)
-                      ) : (
-                        <Navigate to="/atendimento/tickets" replace />
-                      )
-                    }
-                  />
-                  {/* ETAPA 3: Páginas Consolidadas */}
-                  <Route
-                    path="/atendimento/automacoes"
-                    element={protegerRota(ModuloEnum.ATENDIMENTO, <AutomacoesPage />)}
-                  />
-                  <Route
-                    path="/atendimento/equipe"
-                    element={protegerRota(ModuloEnum.ATENDIMENTO, <EquipePage />)}
-                  />
-                  <Route
-                    path="/atendimento/distribuicao"
-                    element={protegerRota(ModuloEnum.ATENDIMENTO, <ConfiguracaoDistribuicaoPage />)}
-                  />
-                  <Route
-                    path="/atendimento/distribuicao/dashboard"
-                    element={protegerRota(ModuloEnum.ATENDIMENTO, <DashboardDistribuicaoPage />)}
-                  />
-                  <Route
-                    path="/atendimento/fechamento-automatico"
-                    element={protegerRota(ModuloEnum.ATENDIMENTO, <FechamentoAutomaticoPage />)}
-                  />
-                  {/* Dashboard Analytics (nova URL) */}
-                  <Route
-                    path="/atendimento/analytics"
-                    element={protegerRota(ModuloEnum.ATENDIMENTO, <DashboardAnalyticsPage />)}
-                  />
-                  {/* Redirects para URLs antigas (compatibilidade) */}
-                  <Route
-                    path="/atendimento/dashboard-analytics"
-                    element={<Navigate to="/atendimento/analytics" replace />}
-                  />
-                  <Route
-                    path="/nuclei/atendimento/sla/dashboard"
-                    element={<Navigate to="/atendimento/analytics?tab=sla" replace />}
-                  />
-                  <Route
-                    path="/nuclei/atendimento/distribuicao/dashboard"
-                    element={<Navigate to="/atendimento/analytics?tab=distribuicao" replace />}
-                  />
-                  {/* ETAPA 3: Redirects para páginas consolidadas */}
-                  <Route
-                    path="/nuclei/atendimento/templates"
-                    element={<Navigate to="/atendimento/automacoes?tab=templates" replace />}
-                  />
-                  <Route
-                    path="/atendimento/bot"
-                    element={<Navigate to="/atendimento/automacoes?tab=bot" replace />}
-                  />
-                  <Route
-                    path="/atendimento/regras"
-                    element={<Navigate to="/atendimento/automacoes?tab=regras" replace />}
-                  />
-                  <Route
-                    path="/nuclei/atendimento/filas"
-                    element={<Navigate to="/atendimento/equipe?tab=filas" replace />}
-                  />
-                  <Route
-                    path="/nuclei/atendimento/atendentes"
-                    element={<Navigate to="/atendimento/equipe?tab=atendentes" replace />}
-                  />
-                  <Route
-                    path="/nuclei/atendimento/skills"
-                    element={<Navigate to="/atendimento/equipe?tab=skills" replace />}
-                  />
-                  {/* Perfil do Usuário */}
-                  <Route path="/perfil" element={<PerfilPage />} />
-                  {/* Sistema de Billing e Assinaturas - controlado por permissao */}
-                  <Route path="/billing" element={<Navigate to="/billing/assinaturas" replace />} />
-                  <Route path="/billing/assinaturas" element={<BillingPage />} />
-                  <Route path="/billing/planos" element={<BillingPage />} />
-                  <Route
-                    path="/billing/faturas"
-                    element={<Navigate to="/billing/assinaturas" replace />}
-                  />
-                  <Route
-                    path="/billing/pagamentos"
-                    element={<Navigate to="/billing/assinaturas" replace />}
-                  />
-                  <Route
-                    path="/assinaturas"
-                    element={<Navigate to="/billing/assinaturas" replace />}
-                  />
-                  {/* Sistema de Faturamento - Protegido */}
-                  <Route
-                    path="/faturamento"
-                    element={protegerRota(ModuloEnum.FINANCEIRO, <FaturamentoPage />)}
-                  />
-                  {/* Exemplo Modal Produto */}
-                  <Route path="/exemplo-produto" element={<ExemploModalProduto />} />
-                  {/* Rotas dos módulos existentes - Protegidas */}
-                  <Route path="/leads" element={protegerRota(ModuloEnum.CRM, <LeadsPage />)} />
-                  <Route
-                    path="/clientes"
-                    element={protegerRota(ModuloEnum.CRM, <ClientesPage />)}
-                  />
-                  <Route
-                    path="/clientes/:id"
-                    element={protegerRota(ModuloEnum.CRM, <ClienteDetailPage />)}
-                  />
-                  <Route
-                    path="/contatos"
-                    element={protegerRota(ModuloEnum.CRM, <ContatosPage />)}
-                  />
-                  <Route
-                    path="/interacoes"
-                    element={<Navigate to="/atividades" replace />}
-                  />
-                  <Route
-                    path="/atividades"
-                    element={protegerRota(ModuloEnum.CRM, <AtividadesComerciaisPage />)}
-                  />
-                  <Route
-                    path="/pipeline"
-                    element={protegerRota(ModuloEnum.CRM, <PipelinePage />)}
-                  />
-                  <Route
-                    path="/pipeline/oportunidades/:id"
-                    element={protegerRota(ModuloEnum.CRM, <OportunidadeDetalhePage />)}
-                  />
-                  {/* Redirects - Consolidação de telas */}
-                  <Route path="/funil-vendas" element={<Navigate to="/pipeline" replace />} />
-                  <Route path="/oportunidades" element={<Navigate to="/pipeline" replace />} />
-                  <Route
-                    path="/propostas"
-                    element={protegerRota(ModuloEnum.VENDAS, <PropostasPage />)}
-                  />
-                  <Route
-                    path="/propostas/:id"
-                    element={protegerRota(ModuloEnum.VENDAS, <PropostaDetalhePage />)}
-                  />
-                  <Route
-                    path="/vendas/propostas"
-                    element={protegerRota(ModuloEnum.VENDAS, <PropostasPage />)}
-                  />
-                  <Route
-                    path="/vendas/propostas/:id"
-                    element={protegerRota(ModuloEnum.VENDAS, <PropostaDetalhePage />)}
-                  />
-                  <Route
-                    path="/compras/cotacoes"
-                    element={protegerRota(ModuloEnum.COMPRAS, <CotacaoPage />)}
-                  />
-                  <Route
-                    path="/compras/aprovacoes"
-                    element={protegerRota(ModuloEnum.COMPRAS, <MinhasAprovacoesPage />)}
-                  />
-                  <Route
-                    path="/financeiro/cotacoes"
-                    element={<Navigate to="/compras/cotacoes" replace />}
-                  />
-                  <Route
-                    path="/financeiro/compras/aprovacoes"
-                    element={<Navigate to="/compras/aprovacoes" replace />}
-                  />
-                  <Route
-                    path="/cotacoes"
-                    element={<Navigate to="/compras/cotacoes" replace />}
-                  />
-                  <Route
-                    path="/orcamentos"
-                    element={<Navigate to="/compras/cotacoes" replace />}
-                  />
-                  <Route
-                    path="/aprovacoes/pendentes"
-                    element={<Navigate to="/compras/aprovacoes" replace />}
-                  />
-                  <Route
-                    path="/produtos"
-                    element={protegerRota(ModuloEnum.VENDAS, <ProdutosPage />)}
-                  />
-                  <Route
-                    path="/vendas/produtos"
-                    element={protegerRota(ModuloEnum.VENDAS, <ProdutosPage />)}
-                  />
-                  <Route
-                    path="/veiculos"
-                    element={protegerRota(ModuloEnum.VENDAS, <VehicleInventoryPage />)}
-                  />
-                  <Route
-                    path="/vendas/veiculos"
-                    element={protegerRota(ModuloEnum.VENDAS, <VehicleInventoryPage />)}
-                  />
-                  <Route
-                    path="/produtos/categorias"
-                    element={protegerRota(ModuloEnum.VENDAS, <CategoriasProdutosPage />)}
-                  />
-                  <Route path="/agenda" element={protegerRota(ModuloEnum.CRM, <AgendaPage />)} />
-                  <Route
-                    path="/agenda/eventos/:id"
-                    element={protegerRota(ModuloEnum.CRM, <AgendaEventDetailsPage />)}
-                  />
-                  <Route
-                    path="/crm/agenda"
-                    element={protegerRota(ModuloEnum.CRM, <AgendaPage />)}
-                  />
-                  <Route
-                    path="/crm/agenda/eventos/:id"
-                    element={protegerRota(ModuloEnum.CRM, <AgendaEventDetailsPage />)}
-                  />
-                  <Route
-                    path="/crm/clientes"
-                    element={protegerRota(ModuloEnum.CRM, <ClientesPage />)}
-                  />
-                  <Route
-                    path="/crm/clientes/:id"
-                    element={protegerRota(ModuloEnum.CRM, <ClienteDetailPage />)}
-                  />
-                  <Route
-                    path="/crm/contatos"
-                    element={protegerRota(ModuloEnum.CRM, <ContatosPage />)}
-                  />
-                  <Route path="/crm/leads" element={protegerRota(ModuloEnum.CRM, <LeadsPage />)} />
-                  <Route
-                    path="/crm/interacoes"
-                    element={<Navigate to="/crm/atividades" replace />}
-                  />
-                  <Route
-                    path="/crm/atividades"
-                    element={protegerRota(ModuloEnum.CRM, <AtividadesComerciaisPage />)}
-                  />
-                  <Route
-                    path="/crm/pipeline"
-                    element={protegerRota(ModuloEnum.CRM, <PipelinePage />)}
-                  />
-                  <Route
-                    path="/crm/pipeline/oportunidades/:id"
-                    element={protegerRota(ModuloEnum.CRM, <OportunidadeDetalhePage />)}
-                  />
-                  {/* Portal do Cliente - Gestão */}
-                  <Route path="/portal" element={<PortalClientePage />} />
-                  {/* Rotas do Núcleo Financeiro - Protegidas */}
-                  <Route
-                    path="/financeiro"
-                    element={protegerRota(
-                      ModuloEnum.FINANCEIRO,
-                      <Navigate to="/nuclei/financeiro" replace />,
-                    )}
-                  />
-                  <Route
-                    path="/financeiro/contas-receber"
-                    element={protegerRota(ModuloEnum.FINANCEIRO, <ContasReceberPage />)}
-                  />
-                  <Route
-                    path="/financeiro/contas-pagar"
-                    element={protegerRota(ModuloEnum.FINANCEIRO, <ContasPagarPage />)}
-                  />
-                  <Route
-                    path="/financeiro/fluxo-caixa"
-                    element={protegerRota(ModuloEnum.FINANCEIRO, <FluxoCaixaPage />)}
-                  />
-                  <Route
-                    path="/financeiro/fornecedores"
-                    element={protegerRota(ModuloEnum.FINANCEIRO, <FornecedoresPage />)}
-                  />
-                  <Route
-                    path="/financeiro/fornecedores/:fornecedorId"
-                    element={protegerRota(ModuloEnum.FINANCEIRO, <FornecedorPerfilPage />)}
-                  />
-                  <Route
-                    path="/financeiro/contas-bancarias"
-                    element={protegerRota(ModuloEnum.FINANCEIRO, <ContasBancariasPage />)}
-                  />
-                  <Route
-                    path="/financeiro/aprovacoes"
-                    element={protegerRota(ModuloEnum.FINANCEIRO, <AprovacoesFinanceirasPage />)}
-                  />
-                  {/* Módulos financeiros - Protegidos */}
-                  <Route
-                    path="/financeiro/faturamento"
-                    element={protegerRota(ModuloEnum.FINANCEIRO, <FaturamentoPage />)}
-                  />
-                  <Route
-                    path="/financeiro/relatorios"
-                    element={protegerRota(ModuloEnum.FINANCEIRO, <FinanceiroReportsPage />)}
-                  />
-                  <Route
-                    path="/financeiro/conciliacao"
-                    element={protegerRota(ModuloEnum.FINANCEIRO, <ConciliacaoBancariaPage />)}
-                  />
-                  <Route
-                    path="/financeiro/centro-custos"
-                    element={protegerRota(ModuloEnum.FINANCEIRO, <CentrosCustoPage />)}
-                  />
-                  <Route
-                    path="/financeiro/tesouraria"
-                    element={protegerRota(ModuloEnum.FINANCEIRO, <TesourariaPage />)}
-                  />
-                  <Route path="/configuracoes" element={<Navigate to="/configuracoes/empresa" replace />} />
-                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                    <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                    <Route path="/dashboard" element={<DashboardRouter />} />
+                    {/* Página de Notificações */}
+                    <Route path="/notifications" element={<NotificationsPage />} />
+                    {/* Página de Contratos */}
+                    <Route
+                      path="/contratos"
+                      element={protegerRota(ModuloEnum.VENDAS, <ContratosPage />)}
+                    />
+                    <Route
+                      path="/contratos/:id"
+                      element={protegerRota(ModuloEnum.VENDAS, <ContratosPage />)}
+                    />
+                    {/* Rotas das páginas de núcleos - Protegidas por licença */}
+                    <Route
+                      path="/nuclei/crm"
+                      element={protegerRota(ModuloEnum.CRM, <CrmNucleusPage />)}
+                    />
+                    <Route
+                      path="/nuclei/vendas"
+                      element={protegerRota(ModuloEnum.VENDAS, <VendasNucleusPage />)}
+                    />
+                    <Route
+                      path="/nuclei/financeiro"
+                      element={protegerRota(ModuloEnum.FINANCEIRO, <FinanceiroNucleusPage />)}
+                    />
+                    <Route
+                      path="/nuclei/comercial"
+                      element={<Navigate to="/nuclei/crm" replace />}
+                    />
+                    <Route
+                      path="/nuclei/configuracoes"
+                      element={<Navigate to="/configuracoes/empresa" replace />}
+                    />{' '}
+                    {/* Configurações: base platform */}
+                    {/* ⭐ NOVA ROTA: Configurações de Atendimento com Abas (com redirects automáticos) */}
+                    <Route
+                      path="/atendimento/configuracoes"
+                      element={protegerRota(ModuloEnum.ATENDIMENTO, <ConfiguracoesWrapper />)}
+                    />
+                    {/* Redirects: rotas antigas redirecionam para abas especificas */}
+                    <Route
+                      path="/gestao/nucleos"
+                      element={<Navigate to="/atendimento/configuracoes?tab=nucleos" replace />}
+                    />
+                    <Route
+                      path="/gestao/equipes"
+                      element={<Navigate to="/atendimento/configuracoes?tab=equipes" replace />}
+                    />
+                    <Route
+                      path="/gestao/atendentes"
+                      element={<Navigate to="/atendimento/configuracoes?tab=atendentes" replace />}
+                    />
+                    <Route
+                      path="/gestao/tags"
+                      element={<Navigate to="/atendimento/configuracoes?tab=tags" replace />}
+                    />
+                    {/* Removido: apenas atribuicoes descontinuadas (absorvidas por distribuicao) */}
+                    <Route
+                      path="/gestao/atribuicoes"
+                      element={<Navigate to="/atendimento/distribuicao" replace />}
+                    />
+                    {/* Redirect antigo: departamentos permanecem ativos em /nuclei/configuracoes/departamentos */}
+                    <Route
+                      path="/gestao/departamentos"
+                      element={<Navigate to="/configuracoes/departamentos" replace />}
+                    />
+                    {/* Fluxos consolidados em Automacoes > Bot (mantem rotas builder separadas) */}
+                    <Route
+                      path="/gestao/fluxos"
+                      element={<Navigate to="/atendimento/automacoes?tab=bot" replace />}
+                    />
+                    <Route
+                      path="/gestao/fluxos/:id/builder"
+                      element={protegerRota(ModuloEnum.ATENDIMENTO, <FluxoBuilderPage />)}
+                    />
+                    <Route
+                      path="/gestao/fluxos/novo/builder"
+                      element={protegerRota(ModuloEnum.ATENDIMENTO, <FluxoBuilderPage />)}
+                    />
+                    {/* Gerenciamento de Empresas do Usuário */}
+                    <Route
+                      path="/empresas/minhas"
+                      element={protegerRota(ModuloEnum.ADMINISTRACAO, <MinhasEmpresasPage />)}
+                    />
+                    <Route
+                      path="/empresas/:empresaId/configuracoes"
+                      element={<Navigate to="/configuracoes/empresa" replace />}
+                    />
+                    <Route
+                      path="/empresas/:empresaId/relatorios"
+                      element={<Navigate to="/dashboard" replace />}
+                    />
+                    <Route
+                      path="/empresas/:empresaId/permissoes"
+                      element={<Navigate to="/configuracoes/usuarios" replace />}
+                    />
+                    <Route
+                      path="/empresas/:empresaId/usuarios"
+                      element={<Navigate to="/configuracoes/usuarios" replace />}
+                    />
+                    {/* Configurações globais da empresa ativa - Padrão consolidado */}
+                    <Route path="/configuracoes/usuarios" element={<GestaoUsuariosPage />} />
+                    <Route path="/configuracoes/empresa" element={<ConfiguracaoEmpresaPage />} />
+                    <Route
+                      path="/configuracoes/email"
+                      element={<Navigate to="/configuracoes/empresa" replace />}
+                    />
+                    <Route path="/configuracoes/metas" element={<MetasConfiguracao />} />
+                    <Route path="/configuracoes/integracoes" element={<IntegracoesPage />} />
+                    <Route path="/configuracoes/departamentos" element={<DepartamentosPage />} />
+                    <Route
+                      path="/configuracoes/sistema"
+                      element={protegerRota(ModuloEnum.ADMINISTRACAO, <SystemBrandingPage />)}
+                    />
+                    <Route
+                      path="/core-admin"
+                      element={
+                        isSuperAdmin ? <CoreAdminPage /> : <Navigate to="/dashboard" replace />
+                      }
+                    />
+                    <Route
+                      path="/configuracoes/seguranca"
+                      element={<Navigate to="/configuracoes/empresa" replace />}
+                    />
+                    {/* Rotas do nucleo atendimento */}
+                    <Route
+                      path="/nuclei/atendimento/canais/email"
+                      element={<ConfigurarCanalEmail />}
+                    />
+                    {/* SLA Tracking */}
+                    <Route
+                      path="/nuclei/atendimento/sla/configuracoes"
+                      element={<ConfiguracaoSLAPage />}
+                    />
+                    {/* Distribuição Automática */}
+                    <Route
+                      path="/nuclei/atendimento/distribuicao/configuracao"
+                      element={<ConfiguracaoDistribuicaoPage />}
+                    />
+                    <Route
+                      path="/nuclei/atendimento/distribuicao/skills"
+                      element={<GestaoSkillsPage />}
+                    />
+                    {/* Sprint 2 - Fase 6: Gestão Unificada de Tickets (substitui Demandas) */}
+                    <Route
+                      path="/atendimento/tickets"
+                      element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoTicketsPage />)}
+                    />
+                    <Route
+                      path="/atendimento/tickets/novo"
+                      element={protegerRota(ModuloEnum.ATENDIMENTO, <TicketCreatePage />)}
+                    />
+                    {/* Sprint 2 - Fase 7: Detalhes do Ticket */}
+                    <Route
+                      path="/atendimento/tickets/:id"
+                      element={protegerRota(ModuloEnum.ATENDIMENTO, <TicketDetailPage />)}
+                    />
+                    {/* Deprecated: demandas agora sao tickets (tipo='suporte') - redirects para compatibilidade */}
+                    <Route
+                      path="/nuclei/atendimento/demandas"
+                      element={<Navigate to="/atendimento/tickets?tipo=suporte" replace />}
+                    />
+                    <Route
+                      path="/nuclei/atendimento/tickets"
+                      element={<Navigate to="/atendimento/tickets" replace />}
+                    />
+                    <Route
+                      path="/nuclei/atendimento/tickets/novo"
+                      element={<Navigate to="/atendimento/tickets/novo" replace />}
+                    />
+                    <Route
+                      path="/nuclei/atendimento/demandas/:id"
+                      element={<Navigate to="/atendimento/tickets/:id" replace />}
+                    />
+                    <Route
+                      path="/demandas"
+                      element={<Navigate to="/atendimento/tickets?tipo=suporte" replace />}
+                    />
+                    <Route
+                      path="/demandas/:id"
+                      element={<Navigate to="/atendimento/tickets/:id" replace />}
+                    />
+                    {/* Sprint 2 - Fase 3e: Admin Console para Configurações de Tickets */}
+                    <Route
+                      path="/configuracoes/tickets/niveis"
+                      element={protegerRota(
+                        ModuloEnum.ATENDIMENTO,
+                        <GestaoNiveisAtendimentoPage />,
+                      )}
+                    />
+                    <Route
+                      path="/configuracoes/tickets/status"
+                      element={protegerRota(
+                        ModuloEnum.ATENDIMENTO,
+                        <GestaoStatusCustomizadosPage />,
+                      )}
+                    />
+                    <Route
+                      path="/configuracoes/tickets/tipos"
+                      element={protegerRota(ModuloEnum.ATENDIMENTO, <GestaoTiposServicoPage />)}
+                    />
+                    <Route
+                      path="/configuracoes/tickets"
+                      element={<Navigate to="/configuracoes/tickets/niveis" replace />}
+                    />
+                    <Route
+                      path="/configuracoes/tickets/*"
+                      element={<Navigate to="/configuracoes/tickets/niveis" replace />}
+                    />
+                    {/* Rotas legadas - Redirects para compatibilidade */}
+                    <Route
+                      path="/gestao/empresas"
+                      element={<Navigate to="/empresas/minhas" replace />}
+                    />
+                    {/* Redirect legado para rota operacional */}
+                    <Route
+                      path="/nuclei/configuracoes/empresas"
+                      element={<Navigate to="/configuracoes/empresa" replace />}
+                    />
+                    <Route
+                      path="/gestao/usuarios"
+                      element={<Navigate to="/configuracoes/usuarios" replace />}
+                    />
+                    <Route
+                      path="/nuclei/configuracoes/usuarios"
+                      element={<Navigate to="/configuracoes/usuarios" replace />}
+                    />
+                    <Route
+                      path="/nuclei/configuracoes/empresa"
+                      element={<Navigate to="/configuracoes/empresa" replace />}
+                    />
+                    <Route
+                      path="/nuclei/configuracoes/email"
+                      element={<Navigate to="/configuracoes/empresa" replace />}
+                    />
+                    <Route
+                      path="/nuclei/configuracoes/metas"
+                      element={<Navigate to="/configuracoes/metas" replace />}
+                    />
+                    <Route
+                      path="/nuclei/configuracoes/integracoes"
+                      element={<Navigate to="/configuracoes/integracoes" replace />}
+                    />
+                    <Route
+                      path="/nuclei/configuracoes/departamentos"
+                      element={<Navigate to="/configuracoes/departamentos" replace />}
+                    />
+                    <Route
+                      path="/nuclei/configuracoes/tickets/niveis"
+                      element={<Navigate to="/configuracoes/tickets/niveis" replace />}
+                    />
+                    <Route
+                      path="/nuclei/configuracoes/tickets/status"
+                      element={<Navigate to="/configuracoes/tickets/status" replace />}
+                    />
+                    <Route
+                      path="/nuclei/configuracoes/tickets/tipos"
+                      element={<Navigate to="/configuracoes/tickets/tipos" replace />}
+                    />
+                    <Route path="/relatorios" element={<ReportsHubPage />} />
+                    <Route
+                      path="/relatorios/agenda"
+                      element={protegerRota(ModuloEnum.CRM, <AgendaReportPage />)}
+                    />
+                    <Route
+                      path="/relatorios/financeiro"
+                      element={<Navigate to="/financeiro/relatorios" replace />}
+                    />
+                    <Route
+                      path="/relatorios/analytics"
+                      element={<Navigate to="/relatorios" replace />}
+                    />
+                    <Route
+                      path="/relatorios/comercial"
+                      element={protegerRota(ModuloEnum.CRM, <ComercialDrilldownPage />)}
+                    />
+                    <Route
+                      path="/relatorios/comercial/drilldown"
+                      element={protegerRota(ModuloEnum.CRM, <ComercialDrilldownPage />)}
+                    />
+                    <Route
+                      path="/relatorios/comercial/propostas-contratos"
+                      element={protegerRota(
+                        ModuloEnum.VENDAS,
+                        <ComercialPropostasContratosReportPage />,
+                      )}
+                    />
+                    <Route
+                      path="/relatorios/comercial/clientes-leads"
+                      element={protegerRota(ModuloEnum.CRM, <ComercialClientesLeadsReportPage />)}
+                    />
+                    <Route
+                      path="/gestao/permissoes"
+                      element={<Navigate to="/configuracoes/usuarios" replace />}
+                    />
+                    {/* Atendimento Omnichannel - Protegido */}
+                    <Route
+                      path="/atendimento"
+                      element={
+                        isOmnichannelEnabled ? (
+                          protegerRota(ModuloEnum.ATENDIMENTO, <AtendimentoDashboard />)
+                        ) : (
+                          <Navigate to="/atendimento/tickets" replace />
+                        )
+                      }
+                    />
+                    {/* ETAPA 3: Páginas Consolidadas */}
+                    <Route
+                      path="/atendimento/automacoes"
+                      element={protegerRota(ModuloEnum.ATENDIMENTO, <AutomacoesPage />)}
+                    />
+                    <Route
+                      path="/atendimento/equipe"
+                      element={protegerRota(ModuloEnum.ATENDIMENTO, <EquipePage />)}
+                    />
+                    <Route
+                      path="/atendimento/distribuicao"
+                      element={protegerRota(
+                        ModuloEnum.ATENDIMENTO,
+                        <ConfiguracaoDistribuicaoPage />,
+                      )}
+                    />
+                    <Route
+                      path="/atendimento/distribuicao/dashboard"
+                      element={protegerRota(ModuloEnum.ATENDIMENTO, <DashboardDistribuicaoPage />)}
+                    />
+                    <Route
+                      path="/atendimento/fechamento-automatico"
+                      element={protegerRota(ModuloEnum.ATENDIMENTO, <FechamentoAutomaticoPage />)}
+                    />
+                    {/* Dashboard Analytics (nova URL) */}
+                    <Route
+                      path="/atendimento/analytics"
+                      element={protegerRota(ModuloEnum.ATENDIMENTO, <DashboardAnalyticsPage />)}
+                    />
+                    {/* Redirects para URLs antigas (compatibilidade) */}
+                    <Route
+                      path="/atendimento/dashboard-analytics"
+                      element={<Navigate to="/atendimento/analytics" replace />}
+                    />
+                    <Route
+                      path="/nuclei/atendimento/sla/dashboard"
+                      element={<Navigate to="/atendimento/analytics?tab=sla" replace />}
+                    />
+                    <Route
+                      path="/nuclei/atendimento/distribuicao/dashboard"
+                      element={<Navigate to="/atendimento/analytics?tab=distribuicao" replace />}
+                    />
+                    {/* ETAPA 3: Redirects para páginas consolidadas */}
+                    <Route
+                      path="/nuclei/atendimento/templates"
+                      element={<Navigate to="/atendimento/automacoes?tab=templates" replace />}
+                    />
+                    <Route
+                      path="/atendimento/bot"
+                      element={<Navigate to="/atendimento/automacoes?tab=bot" replace />}
+                    />
+                    <Route
+                      path="/atendimento/regras"
+                      element={<Navigate to="/atendimento/automacoes?tab=regras" replace />}
+                    />
+                    <Route
+                      path="/nuclei/atendimento/filas"
+                      element={<Navigate to="/atendimento/equipe?tab=filas" replace />}
+                    />
+                    <Route
+                      path="/nuclei/atendimento/atendentes"
+                      element={<Navigate to="/atendimento/equipe?tab=atendentes" replace />}
+                    />
+                    <Route
+                      path="/nuclei/atendimento/skills"
+                      element={<Navigate to="/atendimento/equipe?tab=skills" replace />}
+                    />
+                    {/* Perfil do Usuário */}
+                    <Route path="/perfil" element={<PerfilPage />} />
+                    {/* Sistema de Billing e Assinaturas - controlado por permissao */}
+                    <Route
+                      path="/billing"
+                      element={<Navigate to="/billing/assinaturas" replace />}
+                    />
+                    <Route path="/billing/assinaturas" element={<BillingPage />} />
+                    <Route path="/billing/planos" element={<BillingPage />} />
+                    <Route
+                      path="/billing/faturas"
+                      element={<Navigate to="/billing/assinaturas" replace />}
+                    />
+                    <Route
+                      path="/billing/pagamentos"
+                      element={<Navigate to="/billing/assinaturas" replace />}
+                    />
+                    <Route
+                      path="/assinaturas"
+                      element={<Navigate to="/billing/assinaturas" replace />}
+                    />
+                    {/* Sistema de Faturamento - Protegido */}
+                    <Route
+                      path="/faturamento"
+                      element={protegerRota(ModuloEnum.FINANCEIRO, <FaturamentoPage />)}
+                    />
+                    {/* Exemplo Modal Produto */}
+                    <Route path="/exemplo-produto" element={<ExemploModalProduto />} />
+                    {/* Rotas dos módulos existentes - Protegidas */}
+                    <Route path="/leads" element={protegerRota(ModuloEnum.CRM, <LeadsPage />)} />
+                    <Route
+                      path="/clientes"
+                      element={protegerRota(ModuloEnum.CRM, <ClientesPage />)}
+                    />
+                    <Route
+                      path="/clientes/:id"
+                      element={protegerRota(ModuloEnum.CRM, <ClienteDetailPage />)}
+                    />
+                    <Route
+                      path="/contatos"
+                      element={protegerRota(ModuloEnum.CRM, <ContatosPage />)}
+                    />
+                    <Route path="/interacoes" element={<Navigate to="/atividades" replace />} />
+                    <Route
+                      path="/atividades"
+                      element={protegerRota(ModuloEnum.CRM, <AtividadesComerciaisPage />)}
+                    />
+                    <Route
+                      path="/pipeline"
+                      element={protegerRota(ModuloEnum.CRM, <PipelinePage />)}
+                    />
+                    <Route
+                      path="/pipeline/oportunidades/:id"
+                      element={protegerRota(ModuloEnum.CRM, <OportunidadeDetalhePage />)}
+                    />
+                    {/* Redirects - Consolidação de telas */}
+                    <Route path="/funil-vendas" element={<Navigate to="/pipeline" replace />} />
+                    <Route path="/oportunidades" element={<Navigate to="/pipeline" replace />} />
+                    <Route
+                      path="/propostas"
+                      element={protegerRota(ModuloEnum.VENDAS, <PropostasPage />)}
+                    />
+                    <Route
+                      path="/propostas/:id"
+                      element={protegerRota(ModuloEnum.VENDAS, <PropostaDetalhePage />)}
+                    />
+                    <Route
+                      path="/vendas/propostas"
+                      element={protegerRota(ModuloEnum.VENDAS, <PropostasPage />)}
+                    />
+                    <Route
+                      path="/vendas/propostas/:id"
+                      element={protegerRota(ModuloEnum.VENDAS, <PropostaDetalhePage />)}
+                    />
+                    <Route
+                      path="/compras/cotacoes"
+                      element={protegerRota(ModuloEnum.COMPRAS, <CotacaoPage />)}
+                    />
+                    <Route
+                      path="/compras/aprovacoes"
+                      element={protegerRota(ModuloEnum.COMPRAS, <MinhasAprovacoesPage />)}
+                    />
+                    <Route
+                      path="/financeiro/cotacoes"
+                      element={<Navigate to="/compras/cotacoes" replace />}
+                    />
+                    <Route
+                      path="/financeiro/compras/aprovacoes"
+                      element={<Navigate to="/compras/aprovacoes" replace />}
+                    />
+                    <Route path="/cotacoes" element={<Navigate to="/compras/cotacoes" replace />} />
+                    <Route
+                      path="/orcamentos"
+                      element={<Navigate to="/compras/cotacoes" replace />}
+                    />
+                    <Route
+                      path="/aprovacoes/pendentes"
+                      element={<Navigate to="/compras/aprovacoes" replace />}
+                    />
+                    <Route
+                      path="/produtos"
+                      element={protegerRota(ModuloEnum.VENDAS, <ProdutosPage />)}
+                    />
+                    <Route
+                      path="/vendas/produtos"
+                      element={protegerRota(ModuloEnum.VENDAS, <ProdutosPage />)}
+                    />
+                    <Route
+                      path="/veiculos"
+                      element={protegerRota(ModuloEnum.VENDAS, <VehicleInventoryPage />)}
+                    />
+                    <Route
+                      path="/vendas/veiculos"
+                      element={protegerRota(ModuloEnum.VENDAS, <VehicleInventoryPage />)}
+                    />
+                    <Route
+                      path="/produtos/categorias"
+                      element={protegerRota(ModuloEnum.VENDAS, <CategoriasProdutosPage />)}
+                    />
+                    <Route path="/agenda" element={protegerRota(ModuloEnum.CRM, <AgendaPage />)} />
+                    <Route
+                      path="/agenda/eventos/:id"
+                      element={protegerRota(ModuloEnum.CRM, <AgendaEventDetailsPage />)}
+                    />
+                    <Route
+                      path="/crm/agenda"
+                      element={protegerRota(ModuloEnum.CRM, <AgendaPage />)}
+                    />
+                    <Route
+                      path="/crm/agenda/eventos/:id"
+                      element={protegerRota(ModuloEnum.CRM, <AgendaEventDetailsPage />)}
+                    />
+                    <Route
+                      path="/crm/clientes"
+                      element={protegerRota(ModuloEnum.CRM, <ClientesPage />)}
+                    />
+                    <Route
+                      path="/crm/clientes/:id"
+                      element={protegerRota(ModuloEnum.CRM, <ClienteDetailPage />)}
+                    />
+                    <Route
+                      path="/crm/contatos"
+                      element={protegerRota(ModuloEnum.CRM, <ContatosPage />)}
+                    />
+                    <Route
+                      path="/crm/leads"
+                      element={protegerRota(ModuloEnum.CRM, <LeadsPage />)}
+                    />
+                    <Route
+                      path="/crm/interacoes"
+                      element={<Navigate to="/crm/atividades" replace />}
+                    />
+                    <Route
+                      path="/crm/atividades"
+                      element={protegerRota(ModuloEnum.CRM, <AtividadesComerciaisPage />)}
+                    />
+                    <Route
+                      path="/crm/pipeline"
+                      element={protegerRota(ModuloEnum.CRM, <PipelinePage />)}
+                    />
+                    <Route
+                      path="/crm/pipeline/oportunidades/:id"
+                      element={protegerRota(ModuloEnum.CRM, <OportunidadeDetalhePage />)}
+                    />
+                    {/* Portal do Cliente - Gestão */}
+                    <Route path="/portal" element={<PortalClientePage />} />
+                    {/* Rotas do Núcleo Financeiro - Protegidas */}
+                    <Route
+                      path="/financeiro"
+                      element={protegerRota(
+                        ModuloEnum.FINANCEIRO,
+                        <Navigate to="/nuclei/financeiro" replace />,
+                      )}
+                    />
+                    <Route
+                      path="/financeiro/contas-receber"
+                      element={protegerRota(ModuloEnum.FINANCEIRO, <ContasReceberPage />)}
+                    />
+                    <Route
+                      path="/financeiro/contas-pagar"
+                      element={protegerRota(ModuloEnum.FINANCEIRO, <ContasPagarPage />)}
+                    />
+                    <Route
+                      path="/financeiro/fluxo-caixa"
+                      element={protegerRota(ModuloEnum.FINANCEIRO, <FluxoCaixaPage />)}
+                    />
+                    <Route
+                      path="/financeiro/fornecedores"
+                      element={protegerRota(ModuloEnum.FINANCEIRO, <FornecedoresPage />)}
+                    />
+                    <Route
+                      path="/financeiro/fornecedores/:fornecedorId"
+                      element={protegerRota(ModuloEnum.FINANCEIRO, <FornecedorPerfilPage />)}
+                    />
+                    <Route
+                      path="/financeiro/contas-bancarias"
+                      element={protegerRota(ModuloEnum.FINANCEIRO, <ContasBancariasPage />)}
+                    />
+                    <Route
+                      path="/financeiro/aprovacoes"
+                      element={protegerRota(ModuloEnum.FINANCEIRO, <AprovacoesFinanceirasPage />)}
+                    />
+                    {/* Módulos financeiros - Protegidos */}
+                    <Route
+                      path="/financeiro/faturamento"
+                      element={protegerRota(ModuloEnum.FINANCEIRO, <FaturamentoPage />)}
+                    />
+                    <Route
+                      path="/financeiro/relatorios"
+                      element={protegerRota(ModuloEnum.FINANCEIRO, <FinanceiroReportsPage />)}
+                    />
+                    <Route
+                      path="/financeiro/conciliacao"
+                      element={protegerRota(ModuloEnum.FINANCEIRO, <ConciliacaoBancariaPage />)}
+                    />
+                    <Route
+                      path="/financeiro/inadimplencia-operacional"
+                      element={protegerRota(
+                        ModuloEnum.FINANCEIRO,
+                        <InadimplenciaOperacionalPage />,
+                      )}
+                    />
+                    <Route
+                      path="/financeiro/centro-custos"
+                      element={protegerRota(ModuloEnum.FINANCEIRO, <CentrosCustoPage />)}
+                    />
+                    <Route
+                      path="/financeiro/tesouraria"
+                      element={protegerRota(ModuloEnum.FINANCEIRO, <TesourariaPage />)}
+                    />
+                    <Route
+                      path="/configuracoes"
+                      element={<Navigate to="/configuracoes/empresa" replace />}
+                    />
+                    <Route path="*" element={<Navigate to="/dashboard" replace />} />
                   </Routes>
                 </DashboardLayout>
               </PermissionPathGuard>
@@ -929,64 +946,64 @@ const App: React.FC = () => {
                         <SidebarProvider>
                           <MenuProvider>
                             <GlobalConfirmationProvider>
-                            {/* SocketProvider temporariamente desabilitado - usando useWebSocket do chat */}
-                            {/* <SocketProvider> */}
-                            <Router
-                              future={{
-                                v7_startTransition: true,
-                                v7_relativeSplatPath: true,
-                              }}
-                            >
-                              <GlobalModalScrollLock />
-                              <ScrollToTop />
-                              <div className="App">
-                                <Suspense
-                                  fallback={
-                                    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-                                      <div className="bg-white p-6 rounded-xl shadow-lg text-center max-w-md w-full mx-4">
-                                        <p className="text-gray-600">Carregando...</p>
+                              {/* SocketProvider temporariamente desabilitado - usando useWebSocket do chat */}
+                              {/* <SocketProvider> */}
+                              <Router
+                                future={{
+                                  v7_startTransition: true,
+                                  v7_relativeSplatPath: true,
+                                }}
+                              >
+                                <GlobalModalScrollLock />
+                                <ScrollToTop />
+                                <div className="App">
+                                  <Suspense
+                                    fallback={
+                                      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+                                        <div className="bg-white p-6 rounded-xl shadow-lg text-center max-w-md w-full mx-4">
+                                          <p className="text-gray-600">Carregando...</p>
+                                        </div>
                                       </div>
-                                    </div>
-                                  }
-                                >
-                                  <AppRoutes />
-                                </Suspense>
+                                    }
+                                  >
+                                    <AppRoutes />
+                                  </Suspense>
 
-                                <SalesCelebrationHost />
+                                  <SalesCelebrationHost />
 
-                                {/* Toast Notifications */}
-                                <Toaster
-                                  position="top-right"
-                                  toastOptions={{
-                                    duration: 3000,
-                                    className:
-                                      'rounded-xl border border-[#D7E4E8] bg-white px-4 py-3 text-sm text-[#002333] shadow-lg',
-                                    success: {
+                                  {/* Toast Notifications */}
+                                  <Toaster
+                                    position="top-right"
+                                    toastOptions={{
                                       duration: 3000,
-                                      iconTheme: {
-                                        primary: '#159A9C',
-                                        secondary: '#FFFFFF',
+                                      className:
+                                        'rounded-xl border border-[#D7E4E8] bg-white px-4 py-3 text-sm text-[#002333] shadow-lg',
+                                      success: {
+                                        duration: 3000,
+                                        iconTheme: {
+                                          primary: '#159A9C',
+                                          secondary: '#FFFFFF',
+                                        },
                                       },
-                                    },
-                                    error: {
-                                      duration: 5000,
-                                      iconTheme: {
-                                        primary: '#DC2626',
-                                        secondary: '#FFFFFF',
+                                      error: {
+                                        duration: 5000,
+                                        iconTheme: {
+                                          primary: '#DC2626',
+                                          secondary: '#FFFFFF',
+                                        },
                                       },
-                                    },
-                                    loading: {
-                                      duration: Infinity,
-                                      iconTheme: {
-                                        primary: '#159A9C',
-                                        secondary: '#FFFFFF',
+                                      loading: {
+                                        duration: Infinity,
+                                        iconTheme: {
+                                          primary: '#159A9C',
+                                          secondary: '#FFFFFF',
+                                        },
                                       },
-                                    },
-                                  }}
-                                />
-                              </div>
-                            </Router>
-                            {/* </SocketProvider> */}
+                                    }}
+                                  />
+                                </div>
+                              </Router>
+                              {/* </SocketProvider> */}
                             </GlobalConfirmationProvider>
                           </MenuProvider>
                         </SidebarProvider>
