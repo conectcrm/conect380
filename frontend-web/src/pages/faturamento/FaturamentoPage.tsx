@@ -23,6 +23,8 @@ import {
   AlertCircle,
   XCircle,
   Building2,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   ChevronDown,
   X,
@@ -1944,6 +1946,26 @@ export default function FaturamentoPage() {
 
   const faturasFiltradas = useMemo(() => faturas, [faturas]);
 
+  const hasActiveListFilters = useMemo(() => {
+    if (busca.trim()) return true;
+
+    const normalized: Record<string, unknown> = { ...(filtros as Record<string, unknown>) };
+
+    // Defaults: nao contam como "filtros ativos" na UX.
+    if (normalized.periodoCampo === 'vencimento') delete normalized.periodoCampo;
+    if (normalized.origem === 'faturamento') delete normalized.origem;
+
+    return Object.values(normalized).some((value) => {
+      if (value === undefined || value === null) return false;
+      if (typeof value === 'boolean') return value;
+      if (typeof value === 'number') return Number.isFinite(value) && value !== 0;
+      if (Array.isArray(value)) return value.length > 0;
+      return String(value).trim().length > 0;
+    });
+  }, [busca, filtros]);
+
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(total / pageSize)), [pageSize, total]);
+
   useEffect(() => {
     setMostrarAcoesMassa(faturasSelecionadas.length > 0);
   }, [faturasSelecionadas]);
@@ -3103,9 +3125,24 @@ export default function FaturamentoPage() {
             )}
 
             {/* Lista de Faturas */}
-            <DataTableCard>
-              <div className="px-4 py-3 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Lista de Faturas</h2>
+            <DataTableCard className="border-[#CBDCE4] bg-white shadow-[0_22px_40px_-32px_rgba(16,57,74,0.34)]">
+              <div className="flex flex-col gap-3 border-b border-[#E1EAEE] bg-[#F8FBFC] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                <div>
+                  <h2 className="text-base font-semibold text-[#173A4D]">Lista de Faturas</h2>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[#5F7B89]">
+                    <span>
+                      Exibindo {faturasFiltradas.length} de {total} fatura(s)
+                    </span>
+                    {hasActiveListFilters ? (
+                      <span className="rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-2 py-0.5 text-[11px] font-medium text-[#0F7B7D]">
+                        filtros ativos
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="text-xs text-[#5F7B89]">
+                  Página {page} de {totalPages}
+                </div>
               </div>
 
               {carregando ? (
@@ -3144,10 +3181,10 @@ export default function FaturamentoPage() {
                 <div className="overflow-hidden">
                   {/* Versão desktop - Grid moderno */}
                   <div className="hidden lg:block">
-                    <div className="h-[calc(100vh-340px)] overflow-y-auto">
+                    <div className="max-h-[calc(100vh-340px)] overflow-y-auto">
                       {/* Header do Grid */}
-                      <div className="sticky top-0 z-10 bg-gradient-to-r from-slate-50 via-blue-50 to-indigo-50 border-b border-gray-200 shadow-sm">
-                        <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      <div className="sticky top-0 z-10 border-b border-[#E1EAEE] bg-[#FBFDFE]">
+                        <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-[#516F7D] uppercase tracking-wider">
                           <div className="col-span-1 flex items-center justify-center">
                             <input
                               type="checkbox"
@@ -3162,19 +3199,19 @@ export default function FaturamentoPage() {
                             />
                           </div>
                           <div className="col-span-2 flex items-center gap-1">
-                            <FileText className="w-3 h-3 text-blue-600" />
+                            <FileText className="w-3 h-3 text-[#159A9C]" />
                             <span>Fatura</span>
                           </div>
                           <div className="col-span-2 flex items-center gap-1">
-                            <Building2 className="w-3 h-3 text-blue-600" />
+                            <Building2 className="w-3 h-3 text-[#159A9C]" />
                             <span>Cliente</span>
                           </div>
                           <div className="col-span-2 flex items-center gap-1">
-                            <Activity className="w-3 h-3 text-blue-600" />
+                            <Activity className="w-3 h-3 text-[#159A9C]" />
                             <span>Status</span>
                           </div>
                           <div
-                            className="col-span-2 flex items-center gap-1 cursor-pointer hover:text-blue-600 transition-colors"
+                            className="col-span-2 flex items-center gap-1 cursor-pointer transition-colors hover:text-[#0F7B7D]"
                             onClick={() => {
                               if (sortBy === 'dataVencimento') {
                                 setSortOrder((prev) => (prev === 'DESC' ? 'ASC' : 'DESC'));
@@ -3187,7 +3224,7 @@ export default function FaturamentoPage() {
                             }}
                             title="Ordenar por vencimento"
                           >
-                            <Calendar className="w-3 h-3 text-blue-600" />
+                            <Calendar className="w-3 h-3 text-[#159A9C]" />
                             <span>Vencimento</span>
                             {sortBy === 'dataVencimento' &&
                               (sortOrder === 'DESC' ? (
@@ -3197,7 +3234,7 @@ export default function FaturamentoPage() {
                               ))}
                           </div>
                           <div
-                            className="col-span-2 flex items-center justify-end gap-1 cursor-pointer hover:text-blue-600 transition-colors pr-8"
+                            className="col-span-2 flex items-center justify-end gap-1 cursor-pointer pr-8 transition-colors hover:text-[#0F7B7D]"
                             onClick={() => {
                               if (sortBy === 'valorTotal') {
                                 setSortOrder((prev) => (prev === 'DESC' ? 'ASC' : 'DESC'));
@@ -3210,7 +3247,7 @@ export default function FaturamentoPage() {
                             }}
                             title="Ordenar por valor"
                           >
-                            <DollarSign className="w-3 h-3 text-blue-600" />
+                            <DollarSign className="w-3 h-3 text-[#159A9C]" />
                             <span>Valor</span>
                             {sortBy === 'valorTotal' &&
                               (sortOrder === 'DESC' ? (
@@ -3220,7 +3257,7 @@ export default function FaturamentoPage() {
                               ))}
                           </div>
                           <div className="col-span-1 flex items-center justify-center gap-1">
-                            <Settings className="w-3 h-3 text-blue-600" />
+                            <Settings className="w-3 h-3 text-[#159A9C]" />
                             <span>Ações</span>
                           </div>
                         </div>
@@ -3241,22 +3278,18 @@ export default function FaturamentoPage() {
                           );
 
                           // Definir classes de estilo baseado no status
-                          let rowClass = `grid grid-cols-12 gap-4 px-4 py-3 hover:bg-gradient-to-r hover:from-blue-25 hover:to-indigo-25 transition-all duration-200 group ${
-                            isSelected
-                              ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 shadow-sm'
-                              : ''
+                          let rowClass = `grid grid-cols-12 gap-4 px-4 py-3 transition-colors duration-150 group hover:bg-[#F6FAFB] ${
+                            isSelected ? 'bg-[#ECF7F3] border-l-4 border-[#1A9E87]' : ''
                           }`;
 
                           if (isVencida && fatura.status === StatusFatura.PENDENTE) {
-                            rowClass +=
-                              ' bg-gradient-to-r from-red-25 to-red-50 border-l-4 border-red-400';
+                            rowClass += ' bg-[#FEF3F2] border-l-4 border-[#F04438]';
                           } else if (
                             diasVencimento <= 7 &&
                             diasVencimento > 0 &&
                             fatura.status === StatusFatura.PENDENTE
                           ) {
-                            rowClass +=
-                              ' bg-gradient-to-r from-yellow-25 to-yellow-50 border-l-4 border-yellow-400';
+                            rowClass += ' bg-[#FFFAEB] border-l-4 border-[#F79009]';
                           }
 
                           return (
@@ -3312,7 +3345,7 @@ export default function FaturamentoPage() {
                                   />
                                 </div>
                                 <div>
-                                  <div className="text-sm font-semibold text-gray-900 group-hover:text-blue-700 transition-colors">
+                                  <div className="text-sm font-semibold text-gray-900 group-hover:text-[#0F7B7D] transition-colors">
                                     #{faturamentoService.formatarNumeroFatura(fatura.numero)}
                                   </div>
                                   <div className="text-xs text-gray-500 hidden sm:block">
@@ -3327,7 +3360,7 @@ export default function FaturamentoPage() {
                                   <Building2 className="w-3 h-3 text-indigo-600" />
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                  <div className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-700 transition-colors">
+                                  <div className="text-sm font-medium text-gray-900 truncate group-hover:text-[#0F7B7D] transition-colors">
                                     {obterNomeCliente(fatura.cliente, fatura.clienteId)}
                                   </div>
                                   {obterEmailCliente(fatura.cliente) && (
@@ -3384,7 +3417,7 @@ export default function FaturamentoPage() {
                                             fatura.status === StatusFatura.PENDENTE
                                           ? 'text-yellow-600'
                                           : 'text-gray-900'
-                                    } group-hover:text-blue-700 transition-colors`}
+                                    } group-hover:text-[#0F7B7D] transition-colors`}
                                   >
                                     {dataVencimento.toLocaleDateString('pt-BR', {
                                       day: '2-digit',
@@ -3405,7 +3438,7 @@ export default function FaturamentoPage() {
                               {/* Valor */}
                               <div className="col-span-2 flex items-center justify-end pr-8">
                                 <div className="text-right min-w-[140px]">
-                                  <div className="text-sm font-bold text-gray-900 group-hover:text-blue-700 transition-colors tabular-nums whitespace-nowrap">
+                                  <div className="text-sm font-bold text-gray-900 group-hover:text-[#0F7B7D] transition-colors tabular-nums whitespace-nowrap">
                                     <span className="text-gray-500 mr-1 font-normal">R$</span>
                                     {Number(fatura.valorTotal).toLocaleString('pt-BR', {
                                       minimumFractionDigits: 2,
@@ -4032,127 +4065,81 @@ export default function FaturamentoPage() {
                     })}
                   </div>
 
-                  {/* Barra de estatísticas otimizada */}
-                  <div className="px-4 py-3 border-t bg-gradient-to-r from-slate-50 via-blue-50 to-indigo-50">
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 text-xs">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                        <span className="text-gray-600">Página atual:</span>
-                        <span className="font-bold text-blue-700 tabular-nums whitespace-nowrap">
-                          <span className="text-gray-500 mr-1 font-normal">R$</span>
-                          {faturasFiltradas
-                            .reduce((acc, f) => acc + Number(f.valorTotal || 0), 0)
-                            .toLocaleString('pt-BR', {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
+                  <div className="flex flex-col items-stretch justify-between gap-3 border-t border-[#E1EAEE] bg-[#FBFDFE] px-4 py-3 sm:flex-row sm:items-center sm:px-5">
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-[#5F7B89]">
+                      <span>
+                        Mostrando{' '}
+                        <span className="font-semibold tabular-nums text-[#173A4D]">
+                          {(page - 1) * pageSize + 1}
+                        </span>{' '}
+                        -{' '}
+                        <span className="font-semibold tabular-nums text-[#173A4D]">
+                          {Math.min(page * pageSize, total)}
+                        </span>{' '}
+                        de{' '}
+                        <span className="font-semibold tabular-nums text-[#173A4D]">{total}</span>{' '}
+                        fatura(s)
+                      </span>
+
+                      <span className="hidden h-4 w-px bg-[#D4E2E7] sm:inline-block" />
+
+                      <span className="font-medium text-[#173A4D]">
+                        Total da página:{' '}
+                        <span className="tabular-nums">
+                          {formatCurrency(
+                            faturasFiltradas.reduce((acc, f) => acc + Number(f.valorTotal || 0), 0),
+                          )}
                         </span>
-                        <span className="text-gray-500">({faturasFiltradas.length} itens)</span>
-                      </div>
+                      </span>
 
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span className="text-gray-600">Recebido:</span>
-                        <span className="font-bold text-green-700 tabular-nums whitespace-nowrap">
-                          <span className="text-gray-500 mr-1 font-normal">R$</span>
-                          {Number(aggregates?.valorRecebido ?? 0).toLocaleString('pt-BR', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
+                      <span className="font-medium text-[#0F6C38]">
+                        Recebido:{' '}
+                        <span className="tabular-nums">
+                          {formatCurrency(Number(aggregates?.valorRecebido ?? 0))}
                         </span>
-                      </div>
+                      </span>
 
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                        <span className="text-gray-600">Em aberto:</span>
-                        <span className="font-bold text-orange-700 tabular-nums whitespace-nowrap">
-                          <span className="text-gray-500 mr-1 font-normal">R$</span>
-                          {Number(aggregates?.valorEmAberto ?? 0).toLocaleString('pt-BR', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
+                      <span className="font-medium text-[#9B5A00]">
+                        Em aberto:{' '}
+                        <span className="tabular-nums">
+                          {formatCurrency(Number(aggregates?.valorEmAberto ?? 0))}
                         </span>
-                      </div>
-
-                      <div className="flex items-center gap-2 justify-end">
-                        <div className="flex items-center gap-0.5">
-                          <div className="w-1 h-1 bg-purple-500 rounded-full"></div>
-                          <div className="w-1 h-1 bg-blue-500 rounded-full"></div>
-                          <div className="w-1 h-1 bg-green-500 rounded-full"></div>
-                        </div>
-                        <span className="text-gray-600">Grid:</span>
-                        <span className="font-bold text-purple-700">Otimizado</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Paginação aprimorada */}
-                  <div className="flex flex-col lg:flex-row items-center justify-between gap-4 px-6 py-4 border-t bg-white">
-                    <div className="text-sm text-gray-600 flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-gray-400" />
-                      Mostrando{' '}
-                      <span className="font-semibold tabular-nums">
-                        {(page - 1) * pageSize + 1}
-                      </span>{' '}
-                      -{' '}
-                      <span className="font-semibold tabular-nums">
-                        {Math.min(page * pageSize, total)}
-                      </span>{' '}
-                      de <span className="font-semibold tabular-nums">{total}</span> faturas
+                      </span>
                     </div>
 
-                    <div className="flex items-center gap-4">
-                      {/* Controles de navegação */}
+                    <div className="flex flex-wrap items-center justify-end gap-3">
                       <div className="flex items-center gap-2">
                         <button
-                          className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                          onClick={() => setPage((p) => Math.max(1, p - 1))}
-                          disabled={page === 1}
+                          type="button"
+                          onClick={() => setPage((current) => Math.max(current - 1, 1))}
+                          disabled={page <= 1}
+                          className={btnSecondary}
                         >
-                          <ChevronUp className="w-4 h-4 rotate-[-90deg]" />
+                          <ChevronLeft className="h-4 w-4" />
                           Anterior
                         </button>
-
-                        <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg">
-                          <span className="text-sm text-gray-600">Página</span>
-                          <input
-                            type="number"
-                            min={1}
-                            max={Math.max(1, Math.ceil(total / pageSize))}
-                            value={page}
-                            onChange={(e) => {
-                              const alvo = Number(e.target.value || '1');
-                              const max = Math.max(1, Math.ceil(total / pageSize));
-                              const pagina = Math.min(Math.max(1, alvo), max);
-                              setPage(pagina);
-                            }}
-                            className="w-16 px-2 py-1 border border-gray-300 rounded text-center focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                            aria-label="Número da página"
-                          />
-                          <span className="text-sm text-gray-600">
-                            de {Math.max(1, Math.ceil(total / pageSize))}
-                          </span>
-                        </div>
-
+                        <span className="rounded-lg border border-[#D4E2E7] bg-white px-3 py-2 text-sm text-[#244455]">
+                          {page}/{totalPages}
+                        </span>
                         <button
-                          className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                          onClick={() => setPage((p) => (p * pageSize < total ? p + 1 : p))}
-                          disabled={page * pageSize >= total}
+                          type="button"
+                          onClick={() => setPage((current) => Math.min(current + 1, totalPages))}
+                          disabled={page >= totalPages}
+                          className={btnSecondary}
                         >
                           Próxima
-                          <ChevronUp className="w-4 h-4 rotate-90" />
+                          <ChevronRight className="h-4 w-4" />
                         </button>
                       </div>
 
-                      {/* Seletor de itens por página */}
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-600">Itens por página:</span>
+                        <span className="text-xs text-[#5F7B89]">Itens por página:</span>
                         <select
-                          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                          className="h-9 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
                           value={pageSize}
-                          onChange={(e) => {
+                          onChange={(event) => {
                             setPage(1);
-                            setPageSize(parseInt(e.target.value, 10));
+                            setPageSize(parseInt(event.target.value, 10));
                           }}
                         >
                           <option value={10}>10</option>
