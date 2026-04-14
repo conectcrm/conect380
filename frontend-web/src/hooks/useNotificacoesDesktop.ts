@@ -1,4 +1,31 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { resolveRuntimeAssetUrl } from '../utils/runtimeAssetUrl';
+
+const BRANDING_CACHE_KEYS = [
+  'conect_system_branding_cache_v2::global',
+  'conect_system_branding_cache_v1',
+];
+const DEFAULT_NOTIFICATION_ICON = '/favicon.svg';
+
+const getCachedBrandingIcon = (): string => {
+  try {
+    for (const cacheKey of BRANDING_CACHE_KEYS) {
+      const raw = localStorage.getItem(cacheKey);
+      if (!raw) {
+        continue;
+      }
+
+      const parsed = JSON.parse(raw) as { logoIconUrl?: string; faviconUrl?: string };
+      const cachedIcon = parsed.logoIconUrl || parsed.faviconUrl || '';
+      if (cachedIcon) {
+        return resolveRuntimeAssetUrl(cachedIcon);
+      }
+    }
+    return DEFAULT_NOTIFICATION_ICON;
+  } catch {
+    return DEFAULT_NOTIFICATION_ICON;
+  }
+};
 
 // ===== INTERFACES =====
 
@@ -134,10 +161,11 @@ export function useNotificacoesDesktop(): UseNotificacoesDesktopReturn {
 
       try {
         // Criar notificação
+        const runtimeBrandIcon = getCachedBrandingIcon();
         const notificacao = new Notification(options.titulo, {
           body: options.corpo,
-          icon: options.icone || '/logo192.png',
-          badge: '/logo192.png',
+          icon: options.icone || runtimeBrandIcon,
+          badge: runtimeBrandIcon,
           tag: options.tag,
           requireInteraction: options.requireInteraction ?? false,
           silent: options.silent ?? false,

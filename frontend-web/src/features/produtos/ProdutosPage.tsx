@@ -14,33 +14,117 @@ import {
   X,
   DollarSign,
   Settings,
+  Lightbulb,
 } from 'lucide-react';
-import { BackToNucleus } from '../../components/navigation/BackToNucleus';
+import {
+  DataTableCard,
+  EmptyState,
+  FiltersBar,
+  InlineStats,
+  LoadingSkeleton,
+  PageHeader,
+  SectionCard,
+} from '../../components/layout-v2';
+import { ConfirmationModal } from '../../components/common/ConfirmationModal';
+import { useConfirmation } from '../../hooks/useConfirmation';
 import { ModalCadastroProduto } from '../../components/modals/ModalCadastroProdutoLandscape';
-import { produtosService, Produto, ProdutoEstatisticas } from '../../services/produtosService';
+import {
+  produtosService,
+  Produto,
+  ProdutoComponente,
+  ProdutoEstatisticas,
+} from '../../services/produtosService';
+import { categoriasProdutosService } from '../../services/categoriasProdutosService';
+import { CategoriaProduto } from '../../types/produtos';
+import { useAuth } from '../../hooks/useAuth';
+import { userHasPermission } from '../../config/menuConfig';
+import { isCatalogApiEnabledForTenant } from '../../config/catalogoFeaturesFlags';
+import { matchesLocalSearchTerm, normalizeSearchValue } from '../../utils/localSearch';
 import toast from 'react-hot-toast';
 
 // Interface para o novo modal
 interface ProdutoFormData {
   nome: string;
-  tipoItem: 'produto' | 'servico' | 'licenca' | 'modulo' | 'aplicativo';
+  tipoItem:
+    | 'produto'
+    | 'servico'
+    | 'licenca'
+    | 'modulo'
+    | 'plano'
+    | 'aplicativo'
+    | 'peca'
+    | 'acessorio'
+    | 'pacote'
+    | 'garantia';
   categoria: string;
+  categoriaId?: string;
+  subcategoriaId?: string;
+  configuracaoId?: string;
   precoUnitario: number;
-  frequencia: 'unico' | 'mensal' | 'anual';
-  unidadeMedida: 'unidade' | 'saca' | 'hectare' | 'pacote' | 'licenca';
-  status: boolean;
+  custoUnitario?: number;
+  frequencia: 'unico' | 'mensal' | 'anual' | 'trimestral' | 'sob_consulta';
+  unidadeMedida:
+    | 'unidade'
+    | 'saca'
+    | 'hectare'
+    | 'pacote'
+    | 'licenca'
+    | 'hora'
+    | 'dia'
+    | 'mensal'
+    | 'assinatura';
+  status: 'ativo' | 'inativo' | 'descontinuado';
   descricao?: string;
+  sku?: string;
+  fornecedor?: string;
+  estoqueAtual?: number;
+  estoqueMinimo?: number;
+  estoqueMaximo?: number;
   tags?: string[];
   variacoes?: string[];
+  tipoLicenciamento?: string;
+  periodicidadeLicenca?: string;
+  renovacaoAutomatica?: boolean;
+  quantidadeLicencas?: number;
+  templateCode?: string;
+  atributosTemplate?: Record<string, unknown>;
+  componentes?: ProdutoComponente[];
 }
 
 // Interface para compatibilidade com o componente atual
 interface ProdutoLegacy {
   id: string;
   nome: string;
+  tipoItem:
+    | 'produto'
+    | 'servico'
+    | 'licenca'
+    | 'modulo'
+    | 'plano'
+    | 'aplicativo'
+    | 'peca'
+    | 'acessorio'
+    | 'pacote'
+    | 'garantia';
   categoria: string;
+  categoriaId?: string;
+  subcategoriaId?: string;
+  configuracaoId?: string;
+  subcategoriaNome?: string;
+  configuracaoNome?: string;
   preco: number;
-  custoUnitario: number;
+  custoUnitario?: number | null;
+  frequencia: 'unico' | 'mensal' | 'anual' | 'trimestral' | 'sob_consulta';
+  unidadeMedida:
+    | 'unidade'
+    | 'saca'
+    | 'hectare'
+    | 'pacote'
+    | 'licenca'
+    | 'hora'
+    | 'dia'
+    | 'mensal'
+    | 'assinatura';
   estoque: {
     atual: number;
     minimo: number;
@@ -54,6 +138,15 @@ interface ProdutoLegacy {
   fornecedor: string;
   sku: string;
   descricao: string;
+  tags?: string[];
+  variacoes?: string[];
+  tipoLicenciamento?: string;
+  periodicidadeLicenca?: string;
+  renovacaoAutomatica?: boolean;
+  quantidadeLicencas?: number;
+  templateCode?: string;
+  atributosTemplate?: Record<string, unknown>;
+  componentes?: ProdutoComponente[];
   criadoEm: string;
   atualizadoEm: string;
 }
@@ -76,8 +169,82 @@ const statusConfig = {
   },
 };
 
+const tipoItemConfig = {
+  produto: 'Produto',
+  servico: 'Serviço',
+  licenca: 'Licença',
+  modulo: 'Módulo',
+  plano: 'Plano',
+  aplicativo: 'Aplicativo',
+  peca: 'Peça',
+  acessorio: 'Acessório',
+  pacote: 'Pacote',
+  garantia: 'Garantia',
+};
+
+type TipoItemCatalogo = keyof typeof tipoItemConfig;
+type NichoCatalogo = 'geral' | 'software' | 'servicos' | 'automotivo' | 'imobiliario';
+
+const nichoCatalogoConfig: Record<
+  NichoCatalogo,
+  {
+    label: string;
+    description: string;
+    defaultTipo: 'todos' | TipoItemCatalogo;
+    tiposRecomendados: TipoItemCatalogo[];
+  }
+> = {
+  geral: {
+    label: 'Visão Geral',
+    description: 'Catálogo completo sem recorte de nicho.',
+    defaultTipo: 'todos',
+    tiposRecomendados: [],
+  },
+  software: {
+    label: 'Software e SaaS',
+    description: 'Planos, módulos, licenças e ofertas de software.',
+    defaultTipo: 'plano',
+    tiposRecomendados: ['plano', 'modulo', 'licenca', 'aplicativo', 'pacote', 'servico'],
+  },
+  servicos: {
+    label: 'Serviços',
+    description: 'Serviços avulsos e pacotes recorrentes.',
+    defaultTipo: 'servico',
+    tiposRecomendados: ['servico', 'pacote', 'garantia'],
+  },
+  automotivo: {
+    label: 'Automotivo',
+    description: 'Peças, acessórios, serviços e garantia automotiva.',
+    defaultTipo: 'peca',
+    tiposRecomendados: ['peca', 'acessorio', 'servico', 'garantia', 'pacote'],
+  },
+  imobiliario: {
+    label: 'Imobiliário',
+    description: 'Serviços, pacotes e garantias para operação imobiliária.',
+    defaultTipo: 'servico',
+    tiposRecomendados: ['servico', 'pacote', 'garantia'],
+  },
+};
+
+const normalizeCatalogName = (value?: string | null) =>
+  (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+
 const ProdutosPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { confirmationState, showConfirmation } = useConfirmation();
+  const canCreateProduto = userHasPermission(user, 'crm.produtos.create');
+  const canUpdateProduto = userHasPermission(user, 'crm.produtos.update');
+  const canDeleteProduto = userHasPermission(user, 'crm.produtos.delete');
+  const empresaId = user?.empresa?.id || null;
+  const catalogApiEnabled = useMemo(
+    () => isCatalogApiEnabledForTenant(empresaId),
+    [empresaId],
+  );
 
   // Estados principais
   const [produtos, setProdutos] = useState<ProdutoLegacy[]>([]);
@@ -89,9 +256,20 @@ const ProdutosPage: React.FC = () => {
     estoquesBaixos: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [nichoFilter, setNichoFilter] = useState<NichoCatalogo>('geral');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
+  const [tipoFilter, setTipoFilter] = useState<string>('todos');
   const [categoriaFilter, setCategoriaFilter] = useState<string>('todas');
+  const [subcategoriaFilter, setSubcategoriaFilter] = useState<string>('todas');
+  const [configuracaoFilter, setConfiguracaoFilter] = useState<string>('todas');
+  const [sortOption, setSortOption] = useState<string>('nome-asc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [categoriasCatalogo, setCategoriasCatalogo] = useState<CategoriaProduto[]>([]);
   const [selectedProduto, setSelectedProduto] = useState<ProdutoLegacy | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -103,121 +281,313 @@ const ProdutosPage: React.FC = () => {
   const [isLoadingSave, setIsLoadingSave] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
-  // Estados para confirmação de exclusão
-  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
-  const [produtoParaExcluir, setProdutoParaExcluir] = useState<ProdutoLegacy | null>(null);
+  const resolveSortParams = useCallback(() => {
+    switch (sortOption) {
+      case 'nome-desc':
+        return { sortBy: 'nome' as const, sortOrder: 'DESC' as const };
+      case 'preco-desc':
+        return { sortBy: 'preco' as const, sortOrder: 'DESC' as const };
+      case 'preco-asc':
+        return { sortBy: 'preco' as const, sortOrder: 'ASC' as const };
+      case 'recentes':
+        return { sortBy: 'atualizadoEm' as const, sortOrder: 'DESC' as const };
+      default:
+        return { sortBy: 'nome' as const, sortOrder: 'ASC' as const };
+    }
+  }, [sortOption]);
+
+  const carregarCategorias = useCallback(async () => {
+    try {
+      const categorias = await categoriasProdutosService.listarCategorias({
+        ativo: true,
+        ordenacao: 'nome',
+        direcao: 'asc',
+      });
+      setCategoriasCatalogo(categorias);
+    } catch (error) {
+      console.error('Erro ao carregar categorias do catálogo:', error);
+    }
+  }, []);
 
   // Função para carregar produtos do backend
-  const carregarProdutos = async () => {
+  const carregarProdutos = useCallback(async () => {
     try {
       setIsLoading(true);
-      const produtosAPI = await produtosService.findAll();
-      const produtosFormatados = produtosAPI.map(produtosService.transformApiToLegacy);
+      setError(null);
+
+      const { sortBy, sortOrder } = resolveSortParams();
+      const categoriaSelecionadaId =
+        categoriaFilter !== 'todas'
+          ? categoriasCatalogo.find(
+              (categoria) =>
+                normalizeCatalogName(categoria.nome) === normalizeCatalogName(categoriaFilter),
+            )?.id
+          : undefined;
+      const resposta = await produtosService.listPaginated({
+        categoria: categoriaFilter !== 'todas' ? categoriaFilter : undefined,
+        categoriaId: categoriaSelecionadaId,
+        subcategoriaId: subcategoriaFilter !== 'todas' ? subcategoriaFilter : undefined,
+        configuracaoId: configuracaoFilter !== 'todas' ? configuracaoFilter : undefined,
+        status: statusFilter !== 'todos' ? statusFilter : undefined,
+        tipoItem: tipoFilter !== 'todos' ? tipoFilter : undefined,
+        page: currentPage,
+        limit: itemsPerPage,
+        sortBy,
+        sortOrder,
+      });
+
+      const produtosFormatados = resposta.data.map(produtosService.transformApiToLegacy);
       setProdutos(produtosFormatados);
+      setTotalItems(resposta.meta.total);
+      setTotalPages(resposta.meta.totalPages);
 
       // Carregar estatísticas
       const estatisticasAPI = await produtosService.getEstatisticas();
       setEstatisticas(estatisticasAPI);
     } catch (error) {
-      console.error('Erro ao carregar produtos:', error);
-      toast.error('Erro ao carregar produtos. Verifique se o backend está funcionando.');
+      console.error('Erro ao carregar itens do catálogo:', error);
+      setError('Erro ao carregar itens do catálogo. Tente novamente.');
+      toast.error('Erro ao carregar itens do catálogo. Verifique se o backend está funcionando.');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [categoriaFilter, categoriasCatalogo, configuracaoFilter, currentPage, itemsPerPage, resolveSortParams, statusFilter, subcategoriaFilter, tipoFilter]);
 
-  // Carregar dados ao montar o componente
   useEffect(() => {
-    carregarProdutos();
-  }, []);
+    void carregarCategorias();
+  }, [carregarCategorias]);
 
-  // Filtrar produtos
-  const produtosFiltrados = useMemo(() => {
-    return produtos.filter((produto) => {
-      const matchesSearch =
-        produto.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        produto.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        produto.fornecedor.toLowerCase().includes(searchTerm.toLowerCase());
+  useEffect(() => {
+    void carregarProdutos();
+  }, [carregarProdutos]);
 
-      const matchesStatus = statusFilter === 'todos' || produto.status === statusFilter;
-      const matchesCategoria = categoriaFilter === 'todas' || produto.categoria === categoriaFilter;
+  const categorias = useMemo(() => {
+    if (categoriasCatalogo.length > 0) {
+      return Array.from(
+        new Set(
+          categoriasCatalogo
+            .map((categoria) => categoria.nome?.trim())
+            .filter((categoria): categoria is string => Boolean(categoria)),
+        ),
+      );
+    }
 
-      return matchesSearch && matchesStatus && matchesCategoria;
-    });
-  }, [produtos, searchTerm, statusFilter, categoriaFilter]);
+    return Array.from(new Set(produtos.map((produto) => produto.categoria)));
+  }, [categoriasCatalogo, produtos]);
 
-  const categorias = useMemo(
-    () => Array.from(new Set(produtos.map((produto) => produto.categoria))),
-    [produtos],
+  const categoriaSelecionada = useMemo(() => {
+    if (categoriaFilter === 'todas') {
+      return null;
+    }
+
+    const categoriaNormalizada = normalizeCatalogName(categoriaFilter);
+    return (
+      categoriasCatalogo.find(
+        (categoria) => normalizeCatalogName(categoria.nome) === categoriaNormalizada,
+      ) || null
+    );
+  }, [categoriaFilter, categoriasCatalogo]);
+
+  const subcategoriasDisponiveis = useMemo(
+    () => categoriaSelecionada?.subcategorias?.filter((subcategoria) => subcategoria.ativo !== false) || [],
+    [categoriaSelecionada],
   );
 
+  const categoriaTemSubcategorias = subcategoriasDisponiveis.length > 0;
+
+  const subcategoriaSelecionada = useMemo(() => {
+    if (subcategoriaFilter === 'todas') {
+      return null;
+    }
+
+    return (
+      subcategoriasDisponiveis.find((subcategoria) => subcategoria.id === subcategoriaFilter) || null
+    );
+  }, [subcategoriaFilter, subcategoriasDisponiveis]);
+
+  const configuracoesDisponiveis = useMemo(
+    () => subcategoriaSelecionada?.configuracoes?.filter((configuracao) => configuracao.ativo !== false) || [],
+    [subcategoriaSelecionada],
+  );
+
+  const subcategoriaTemConfiguracoes = configuracoesDisponiveis.length > 0;
+
+  const categoriaDoProdutoSelecionado = useMemo(() => {
+    if (!selectedProduto) {
+      return null;
+    }
+
+    if (selectedProduto.categoriaId) {
+      return categoriasCatalogo.find((categoria) => categoria.id === selectedProduto.categoriaId) || null;
+    }
+
+    const categoriaNormalizada = normalizeCatalogName(selectedProduto.categoria);
+    return (
+      categoriasCatalogo.find(
+        (categoria) => normalizeCatalogName(categoria.nome) === categoriaNormalizada,
+      ) || null
+    );
+  }, [categoriasCatalogo, selectedProduto]);
+
+  const resumoCategoriaSelecionada = useMemo(() => {
+    if (!categoriaSelecionada) {
+      return null;
+    }
+
+    const totalConfiguracoes = categoriaSelecionada.subcategorias.reduce(
+      (total, subcategoria) => total + (subcategoria.configuracoes?.length || 0),
+      0,
+    );
+
+    return {
+      totalSubcategorias: categoriaSelecionada.subcategorias.length,
+      totalConfiguracoes,
+    };
+  }, [categoriaSelecionada]);
+
+  const tipos = useMemo(() => Object.keys(tipoItemConfig) as TipoItemCatalogo[], []);
+  const nichoSelecionadoConfig = nichoCatalogoConfig[nichoFilter];
+  const defaultTipoItemModal = useMemo<ProdutoFormData['tipoItem']>(() => {
+    if (tipoFilter !== 'todos' && tipos.includes(tipoFilter as TipoItemCatalogo)) {
+      return tipoFilter as ProdutoFormData['tipoItem'];
+    }
+
+    return nichoSelecionadoConfig.defaultTipo === 'todos'
+      ? 'produto'
+      : nichoSelecionadoConfig.defaultTipo;
+  }, [nichoSelecionadoConfig.defaultTipo, tipoFilter, tipos]);
+
+  useEffect(() => {
+    if (categoriaFilter === 'todas') {
+      if (subcategoriaFilter !== 'todas') {
+        setSubcategoriaFilter('todas');
+      }
+      if (configuracaoFilter !== 'todas') {
+        setConfiguracaoFilter('todas');
+      }
+      return;
+    }
+
+    if (
+      subcategoriaFilter !== 'todas' &&
+      !subcategoriasDisponiveis.some((subcategoria) => subcategoria.id === subcategoriaFilter)
+    ) {
+      setSubcategoriaFilter('todas');
+      setConfiguracaoFilter('todas');
+    }
+  }, [categoriaFilter, configuracaoFilter, subcategoriaFilter, subcategoriasDisponiveis]);
+
+  useEffect(() => {
+    if (subcategoriaFilter === 'todas') {
+      if (configuracaoFilter !== 'todas') {
+        setConfiguracaoFilter('todas');
+      }
+      return;
+    }
+
+    if (
+      configuracaoFilter !== 'todas' &&
+      !configuracoesDisponiveis.some((configuracao) => configuracao.id === configuracaoFilter)
+    ) {
+      setConfiguracaoFilter('todas');
+    }
+  }, [configuracaoFilter, configuracoesDisponiveis, subcategoriaFilter]);
+
+  const hasFilters =
+    searchTerm.trim().length > 0 ||
+    nichoFilter !== 'geral' ||
+    statusFilter !== 'todos' ||
+    tipoFilter !== 'todos' ||
+    categoriaFilter !== 'todas' ||
+    subcategoriaFilter !== 'todas' ||
+    configuracaoFilter !== 'todas';
+
+  const normalizedSearchTerm = normalizeSearchValue(searchTerm);
+
+  const produtosFiltrados = useMemo(() => {
+    if (!normalizedSearchTerm) {
+      return produtos;
+    }
+
+    return produtos.filter((produto) => {
+      return matchesLocalSearchTerm(normalizedSearchTerm, [
+        produto.nome,
+        produto.sku,
+        produto.fornecedor,
+        produto.categoria,
+        produto.subcategoriaNome,
+        produto.configuracaoNome,
+        produto.descricao,
+      ]);
+    });
+  }, [normalizedSearchTerm, produtos]);
+
+  const totalItensLista = normalizedSearchTerm ? produtosFiltrados.length : totalItems;
+
+  const handleNichoChange = useCallback((nextNicho: NichoCatalogo) => {
+    setNichoFilter(nextNicho);
+    const config = nichoCatalogoConfig[nextNicho];
+    setTipoFilter(config.defaultTipo);
+    setCategoriaFilter('todas');
+    setSubcategoriaFilter('todas');
+    setConfiguracaoFilter('todas');
+    setCurrentPage(1);
+  }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    nichoFilter,
+    statusFilter,
+    tipoFilter,
+    categoriaFilter,
+    subcategoriaFilter,
+    configuracaoFilter,
+    itemsPerPage,
+    sortOption,
+  ]);
+
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setNichoFilter('geral');
+    setStatusFilter('todos');
+    setTipoFilter('todos');
+    setCategoriaFilter('todas');
+    setSubcategoriaFilter('todas');
+    setConfiguracaoFilter('todas');
+    setCurrentPage(1);
+  };
+
   const handleExport = useCallback(async () => {
-    if (produtosFiltrados.length === 0) {
-      toast.error('Nenhum produto disponível para exportação.');
+    if (totalItems === 0) {
+      toast.error('Nenhum item disponível para exportação.');
       return;
     }
 
     try {
       setIsExporting(true);
 
-      const headers = [
-        'Nome',
-        'SKU',
-        'Categoria',
-        'Status',
-        'Preço',
-        'Custo',
-        'Estoque Atual',
-        'Estoque Mínimo',
-        'Estoque Máximo',
-        'Fornecedor',
-        'Vendas (Mês)',
-        'Vendas (Total)',
-        'Criado em',
-        'Atualizado em',
-      ];
+      const { sortBy, sortOrder } = resolveSortParams();
+      const categoriaSelecionadaId =
+        categoriaFilter !== 'todas'
+          ? categoriasCatalogo.find(
+              (categoria) =>
+                normalizeCatalogName(categoria.nome) === normalizeCatalogName(categoriaFilter),
+            )?.id
+          : undefined;
+      const csvBlob = await produtosService.exportCsv({
+        categoria: categoriaFilter !== 'todas' ? categoriaFilter : undefined,
+        categoriaId: categoriaSelecionadaId,
+        subcategoriaId: subcategoriaFilter !== 'todas' ? subcategoriaFilter : undefined,
+        configuracaoId: configuracaoFilter !== 'todas' ? configuracaoFilter : undefined,
+        status: statusFilter !== 'todos' ? statusFilter : undefined,
+        tipoItem: tipoFilter !== 'todos' ? tipoFilter : undefined,
+        search: searchTerm.trim() || undefined,
+        sortBy,
+        sortOrder,
+      });
 
-      const sanitize = (value: unknown) => {
-        if (value === null || value === undefined) {
-          return '';
-        }
-
-        if (value instanceof Date) {
-          return value.toISOString();
-        }
-
-        const text = String(value);
-        return text.includes('"') ? text.split('"').join('""') : text;
-      };
-
-      const formatNumber = (value: number | null | undefined) =>
-        typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : '';
-
-      const rows = produtosFiltrados.map((produto) =>
-        [
-          produto.nome,
-          produto.sku,
-          produto.categoria,
-          statusConfig[produto.status]?.label ?? produto.status,
-          formatNumber(produto.preco),
-          formatNumber(produto.custoUnitario),
-          produto.estoque.atual,
-          produto.estoque.minimo,
-          produto.estoque.maximo,
-          produto.fornecedor,
-          produto.vendas.mes,
-          produto.vendas.total,
-          produto.criadoEm,
-          produto.atualizadoEm,
-        ].map(sanitize),
-      );
-
-      const csvContent = [headers, ...rows]
-        .map((row) => row.map((cell) => `"${cell}"`).join(';'))
-        .join('\n');
-
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
+      const url = URL.createObjectURL(csvBlob);
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `produtos_${new Date().toISOString().slice(0, 10)}.csv`);
@@ -228,12 +598,12 @@ const ProdutosPage: React.FC = () => {
 
       toast.success('Exportação concluída com sucesso!');
     } catch (error) {
-      console.error('Erro ao exportar produtos:', error);
-      toast.error('Não foi possível exportar os produtos.');
+      console.error('Erro ao exportar itens do catálogo:', error);
+      toast.error('Não foi possível exportar os itens do catálogo.');
     } finally {
       setIsExporting(false);
     }
-  }, [produtosFiltrados]);
+  }, [categoriaFilter, categoriasCatalogo, configuracaoFilter, resolveSortParams, searchTerm, statusFilter, subcategoriaFilter, tipoFilter, totalItems]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -242,12 +612,58 @@ const ProdutosPage: React.FC = () => {
     }).format(value);
   };
 
+  const formatOptionalCurrency = (value?: number | null) => {
+    return typeof value === 'number' && Number.isFinite(value)
+      ? formatCurrency(value)
+      : 'Não informado';
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('pt-BR');
   };
 
+  const getPlanoComponentes = (produto: ProdutoLegacy): ProdutoComponente[] => {
+    if (produto.tipoItem !== 'plano' || !Array.isArray(produto.componentes)) {
+      return [];
+    }
+
+    return produto.componentes.filter((componente) => Boolean(componente.childItemId));
+  };
+
+  const getResumoComposicaoPlano = (produto: ProdutoLegacy): string | null => {
+    const componentes = getPlanoComponentes(produto);
+    if (componentes.length === 0) {
+      return null;
+    }
+
+    const nomes = componentes
+      .map((componente) => componente.nome?.trim())
+      .filter((nome): nome is string => Boolean(nome && nome.length > 0));
+
+    if (nomes.length === 0) {
+      return `${componentes.length} item(ns)`;
+    }
+
+    if (nomes.length <= 3) {
+      return nomes.join(', ');
+    }
+
+    return `${nomes.slice(0, 3).join(', ')} +${nomes.length - 3}`;
+  };
+
+  const roleLabel: Record<NonNullable<ProdutoComponente['componentRole']>, string> = {
+    included: 'Incluido',
+    required: 'Obrigatorio',
+    optional: 'Opcional',
+    recommended: 'Recomendado',
+    addon: 'Add-on',
+  };
+
+  const isTipoComEstoque = (tipoItem: ProdutoLegacy['tipoItem']) =>
+    tipoItem === 'produto' || tipoItem === 'peca' || tipoItem === 'acessorio';
+
   const getEstoqueStatus = (produto: ProdutoLegacy) => {
-    if (produto.categoria === 'Serviços') return null;
+    if (!isTipoComEstoque(produto.tipoItem)) return null;
 
     if (produto.estoque.atual <= produto.estoque.minimo) {
       return { label: 'Baixo', color: 'text-[#002333]', icon: AlertTriangle };
@@ -268,53 +684,95 @@ const ProdutosPage: React.FC = () => {
     setIsModalOpen(false);
   };
 
+  const mapProdutoParaFormulario = useCallback(
+    (produto: ProdutoLegacy): ProdutoFormData & { produtoId?: string } => ({
+      produtoId: produto.id,
+      nome: produto.nome,
+      tipoItem: produto.tipoItem,
+      categoria: produto.categoria,
+      categoriaId: produto.categoriaId,
+      subcategoriaId: produto.subcategoriaId,
+      configuracaoId: produto.configuracaoId,
+      precoUnitario: produto.preco,
+      custoUnitario: produto.custoUnitario ?? undefined,
+      frequencia: produto.frequencia,
+      unidadeMedida: produto.unidadeMedida,
+      status: produto.status,
+      descricao: produto.descricao,
+      sku: produto.sku,
+      fornecedor: produto.fornecedor,
+      estoqueAtual: produto.estoque.atual,
+      estoqueMinimo: produto.estoque.minimo,
+      estoqueMaximo: produto.estoque.maximo,
+      tags: produto.tags || [],
+      variacoes: produto.variacoes || [],
+      tipoLicenciamento: produto.tipoLicenciamento,
+      periodicidadeLicenca: produto.periodicidadeLicenca,
+      renovacaoAutomatica: produto.renovacaoAutomatica,
+      quantidadeLicencas: produto.quantidadeLicencas,
+      templateCode: produto.templateCode,
+      atributosTemplate: produto.atributosTemplate,
+      componentes: produto.componentes || [],
+    }),
+    [],
+  );
+
   // Funções para o modal de cadastro
   const handleNovoProduto = () => {
+    if (!canCreateProduto) {
+      toast.error('Você não tem permissão para criar itens.');
+      return;
+    }
+
     setProdutoParaEditar(null);
     setShowModalAvancado(true);
   };
 
-  const handleEditarProduto = (produto: ProdutoLegacy) => {
-    // Converter produto existente para formato do novo modal
-    setProdutoParaEditar({
-      produtoId: produto.id,
-      nome: produto.nome,
-      tipoItem: 'produto', // Mapear para as opções do novo modal
-      categoria: produto.categoria,
-      precoUnitario: produto.preco,
-      frequencia: 'unico',
-      unidadeMedida: 'unidade',
-      status: produto.status === 'ativo',
-      descricao: produto.descricao,
-      tags: [],
-      variacoes: [],
-    });
-    setShowModalAvancado(true);
-  };
+  const handleEditarProduto = async (produto: ProdutoLegacy) => {
+    if (!canUpdateProduto) {
+      toast.error('Você não tem permissão para editar itens.');
+      return;
+    }
 
-  const handleExcluirProduto = (produto: ProdutoLegacy) => {
-    setProdutoParaExcluir(produto);
-    setShowConfirmDelete(true);
-  };
+    try {
+      const produtoCompleto = catalogApiEnabled
+        ? (produtosService.transformApiToLegacy(
+            await produtosService.findById(produto.id),
+          ) as ProdutoLegacy)
+        : produto;
 
-  const confirmarExclusao = async () => {
-    if (produtoParaExcluir) {
-      try {
-        await produtosService.delete(produtoParaExcluir.id);
-        await carregarProdutos(); // Recarregar lista
-        toast.success(`Produto "${produtoParaExcluir.nome}" excluído com sucesso!`);
-        setShowConfirmDelete(false);
-        setProdutoParaExcluir(null);
-      } catch (error) {
-        console.error('Erro ao excluir produto:', error);
-        toast.error('Erro ao excluir produto');
-      }
+      setProdutoParaEditar(mapProdutoParaFormulario(produtoCompleto));
+      setShowModalAvancado(true);
+    } catch (error) {
+      console.error('Erro ao preparar edicao do item:', error);
+      toast.error('Nao foi possivel carregar os detalhes completos do item.');
     }
   };
 
-  const cancelarExclusao = () => {
-    setShowConfirmDelete(false);
-    setProdutoParaExcluir(null);
+  const handleExcluirProduto = (produto: ProdutoLegacy) => {
+    if (!canDeleteProduto) {
+      toast.error('Você não tem permissão para descontinuar itens.');
+      return;
+    }
+
+    showConfirmation({
+      title: 'Confirmar descontinuação',
+      message: `Tem certeza que deseja descontinuar o item "${produto.nome}"?\n\nO item permanecerá no histórico e deixará de ser ofertado em novos usos comerciais.`,
+      confirmText: 'Descontinuar',
+      cancelText: 'Cancelar',
+      icon: 'danger',
+      confirmButtonClass: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
+      onConfirm: async () => {
+        try {
+          await produtosService.delete(produto.id);
+          await carregarProdutos();
+          toast.success(`Item "${produto.nome}" descontinuado com sucesso!`);
+        } catch (error) {
+          console.error('Erro ao descontinuar item:', error);
+          toast.error('Erro ao descontinuar item');
+        }
+      },
+    });
   };
 
   const handleSaveProduto = async (data: ProdutoFormData) => {
@@ -327,11 +785,11 @@ const ProdutosPage: React.FC = () => {
       if (produtoParaEditar && produtoParaEditar.produtoId) {
         // Atualizar produto existente
         await produtosService.update(produtoParaEditar.produtoId, produtoData);
-        toast.success('Produto atualizado com sucesso!');
+        toast.success('Item atualizado com sucesso!');
       } else {
         // Criar novo produto
         await produtosService.create(produtoData);
-        toast.success('Produto criado com sucesso!');
+        toast.success('Item criado com sucesso!');
       }
 
       // Recarregar lista
@@ -340,8 +798,8 @@ const ProdutosPage: React.FC = () => {
       setShowModalAvancado(false);
       setProdutoParaEditar(null);
     } catch (error) {
-      console.error('Erro ao salvar produto:', error);
-      toast.error('Erro ao salvar produto');
+      console.error('Erro ao salvar item:', error);
+      toast.error('Erro ao salvar item');
       throw error; // Modal tratará o erro
     } finally {
       setIsLoadingSave(false);
@@ -352,7 +810,7 @@ const ProdutosPage: React.FC = () => {
     () => [
       {
         key: 'total-produtos',
-        label: 'Total de Produtos',
+        label: 'Total de Itens',
         value: estatisticas.totalProdutos,
         description: 'Itens cadastrados no catálogo',
         iconWrapper: 'bg-[#159A9C]',
@@ -361,7 +819,7 @@ const ProdutosPage: React.FC = () => {
       },
       {
         key: 'produtos-ativos',
-        label: 'Produtos Ativos',
+        label: 'Itens Ativos',
         value: estatisticas.produtosAtivos,
         description: 'Disponíveis para venda',
         iconWrapper: 'bg-[#0F7B7D]',
@@ -369,10 +827,10 @@ const ProdutosPage: React.FC = () => {
         Icon: Check,
       },
       {
-        key: 'faturamento',
-        label: 'Faturamento Total',
+        key: 'valor-catalogo',
+        label: 'Valor do Catálogo',
         value: formatCurrency(estatisticas.valorTotal),
-        description: 'Receita acumulada',
+        description: 'Soma dos preços de venda cadastrados',
         iconWrapper: 'bg-[#002333]',
         iconColor: 'text-white',
         Icon: DollarSign,
@@ -392,149 +850,484 @@ const ProdutosPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#159A9C] mx-auto"></div>
-          <p className="mt-4 text-[#002333]/70">Carregando produtos...</p>
-        </div>
+      <div className="space-y-4 pt-1 sm:pt-2">
+        <LoadingSkeleton lines={7} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header Padronizado */}
-      <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus nucleusName="Produtos" nucleusPath="/nuclei/produtos" />
-      </div>
-
-      <div className="p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
-          {/* Header da Página */}
-          <div className="bg-white rounded-lg shadow-sm border border-[#DEEFE7] p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-[#002333] flex items-center">
-                  <Package className="h-8 w-8 mr-3 text-[#159A9C]" />
-                  Produtos
-                </h1>
-                <p className="mt-2 text-[#002333]/70">
-                  Gestão completa do catálogo de produtos e serviços
-                </p>
-              </div>
-              <div className="mt-4 sm:mt-0 flex flex-col sm:flex-row gap-3">
+    <div className="space-y-4 pt-1 sm:pt-2">
+      <SectionCard className="space-y-4 p-4 sm:p-5">
+        <PageHeader
+          title={
+            <span className="inline-flex items-center gap-2">
+              <Package className="h-6 w-6 text-[#159A9C]" />
+              Catálogo de Itens
+            </span>
+          }
+          description="Gestão completa de produtos, serviços, planos, módulos, licenças, peças, acessórios, pacotes e garantias"
+          actions={
+            <>
+              <button
+                onClick={() => navigate('/produtos/categorias')}
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+              >
+                <Settings className="h-4 w-4" />
+                Estrutura do catálogo
+              </button>
+              <button
+                type="button"
+                onClick={handleExport}
+                disabled={isExporting || totalItems === 0}
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Download className="h-4 w-4" />
+                {isExporting ? 'Exportando...' : 'Exportar'}
+              </button>
+              {canCreateProduto && (
                 <button
-                  onClick={() => navigate('/produtos/categorias')}
-                  className="inline-flex items-center px-4 py-2 border border-[#B4BEC9] text-sm font-medium rounded-lg text-[#002333] bg-white hover:bg-[#DEEFE7] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#159A9C]/40 transition-colors"
-                >
-                  <Settings className="w-4 h-4 mr-2" />
-                  Categorias
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleExport}
-                  disabled={isExporting || produtosFiltrados.length === 0}
-                  className="inline-flex items-center px-4 py-2 border border-[#B4BEC9] text-sm font-medium rounded-lg text-[#002333] bg-white hover:bg-[#DEEFE7] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#159A9C]/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  {isExporting ? 'Exportando...' : 'Exportar'}
-                </button>
-
-                <button
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-semibold rounded-lg text-white bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] hover:from-[#0F7B7D] hover:to-[#0C6062] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#159A9C]/40 transition-all shadow-sm hover:shadow-md"
+                  className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition hover:bg-[#117C7E]"
                   onClick={handleNovoProduto}
                 >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Novo Produto
+                  <Plus className="h-4 w-4" />
+                  Novo Item
                 </button>
-              </div>
+              )}
+            </>
+          }
+        />
+
+        <InlineStats
+          stats={statCards.map((card, index) => ({
+            label: card.label,
+            value: String(card.value),
+            tone: index === 3 ? 'warning' : index === 1 ? 'accent' : 'neutral',
+          }))}
+        />
+      </SectionCard>
+
+      <SectionCard className="p-4 sm:p-5">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[#F2F8FB]">
+            <Lightbulb className="h-4 w-4 text-[#0F7B7D]" />
+          </span>
+          <div>
+            <h2 className="text-sm font-semibold text-[#244455]">Guia rápido do catálogo</h2>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-[#607B89]">
+              <li>Use categorias para organizar o catálogo por contexto comercial e operacional.</li>
+              <li>Use subcategorias e configurações apenas nas categorias que exigem esse detalhamento.</li>
+              <li>Mantenha SKU, fornecedor e estoque atualizados para facilitar proposta, venda e reposição.</li>
+            </ul>
+          </div>
+        </div>
+      </SectionCard>
+
+      <FiltersBar className="p-4">
+        <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-4">
+          <div className="lg:col-span-2 xl:col-span-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8FA6B2]" />
+              <input
+                type="text"
+                placeholder="Buscar por nome, SKU ou fornecedor..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+              />
             </div>
           </div>
 
-          {/* Cards de Estatísticas */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {statCards.map(({ key, label, value, description, iconWrapper, iconColor, Icon }) => (
-              <div
-                key={key}
-                className="rounded-xl p-6 shadow-sm border border-[#DEEFE7] bg-white hover:shadow-md transition-shadow"
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:col-span-2 xl:col-span-2">
+            <select
+              value={nichoFilter}
+              onChange={(e) => handleNichoChange(e.target.value as NichoCatalogo)}
+              className="h-10 rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+            >
+              {Object.entries(nichoCatalogoConfig).map(([key, config]) => (
+                <option key={key} value={key}>
+                  Nicho: {config.label}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="h-10 rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+            >
+              <option value="todos">Todos os Status</option>
+              <option value="ativo">Ativo</option>
+              <option value="inativo">Inativo</option>
+              <option value="descontinuado">Descontinuado</option>
+            </select>
+
+            <select
+              value={tipoFilter}
+              onChange={(e) => setTipoFilter(e.target.value)}
+              className="h-10 rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+            >
+              <option value="todos">Todos os Tipos</option>
+              {tipos.map((tipo) => (
+                <option key={tipo} value={tipo}>
+                  {tipoItemConfig[tipo] || tipo}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={categoriaFilter}
+              onChange={(e) => setCategoriaFilter(e.target.value)}
+              className="h-10 rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+            >
+              <option value="todas">Todas as Categorias</option>
+              {categorias.map((categoria) => (
+                <option key={categoria} value={categoria}>
+                  {categoria}
+                </option>
+              ))}
+            </select>
+
+            {categoriaSelecionada && categoriaTemSubcategorias ? (
+              <select
+                value={subcategoriaFilter}
+                onChange={(e) => setSubcategoriaFilter(e.target.value)}
+                className="h-10 rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
               >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-[#002333]/70 uppercase tracking-wide">
-                      {label}
-                    </p>
-                    <p className="mt-2 text-3xl font-bold text-[#002333]">{value}</p>
-                    <p className="mt-3 text-xs text-[#002333]/70">{description}</p>
-                  </div>
-                  <div
-                    className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-inner ${iconWrapper}`}
+                <option value="todas">Todas as Subcategorias</option>
+                {subcategoriasDisponiveis.map((subcategoria) => (
+                  <option key={subcategoria.id} value={subcategoria.id}>
+                    {subcategoria.nome}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+
+            {subcategoriaSelecionada && subcategoriaTemConfiguracoes ? (
+              <select
+                value={configuracaoFilter}
+                onChange={(e) => setConfiguracaoFilter(e.target.value)}
+                className="h-10 rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+              >
+                <option value="todas">Todas as Configurações</option>
+                {configuracoesDisponiveis.map((configuracao) => (
+                  <option key={configuracao.id} value={configuracao.id}>
+                    {configuracao.nome}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+
+            <select
+              value={sortOption}
+              onChange={(e) => setSortOption(e.target.value)}
+              className="h-10 rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+            >
+              <option value="nome-asc">Ordenar: Nome A-Z</option>
+              <option value="nome-desc">Ordenar: Nome Z-A</option>
+              <option value="preco-desc">Ordenar: Maior preço</option>
+              <option value="preco-asc">Ordenar: Menor preço</option>
+              <option value="recentes">Ordenar: Mais recentes</option>
+            </select>
+
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={handleClearFilters}
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+              >
+                Limpar filtros
+              </button>
+            )}
+          </div>
+        </div>
+
+        {nichoFilter !== 'geral' && (
+          <div className="mt-3 space-y-2 rounded-xl border border-[#DCE6F8] bg-[#F4F8FF] p-3">
+            <p className="text-xs font-medium text-[#35538A]">{nichoSelecionadoConfig.description}</p>
+            {nichoSelecionadoConfig.tiposRecomendados.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {nichoSelecionadoConfig.tiposRecomendados.map((tipo) => (
+                  <button
+                    key={tipo}
+                    type="button"
+                    onClick={() => {
+                      setTipoFilter(tipo);
+                      setCurrentPage(1);
+                    }}
+                    className={`inline-flex h-8 items-center rounded-full border px-3 text-xs font-medium transition ${
+                      tipoFilter === tipo
+                        ? 'border-[#35538A] bg-[#35538A] text-white'
+                        : 'border-[#C7D9F7] bg-white text-[#35538A] hover:bg-[#EEF4FF]'
+                    }`}
                   >
-                    <Icon className={`w-6 h-6 ${iconColor}`} />
+                    {tipoItemConfig[tipo]}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {categoriaSelecionada && !categoriaTemSubcategorias ? (
+          <p className="mt-3 text-xs text-[#607B89]">
+            A categoria selecionada usa apenas classificação principal. Não há subcategorias ou configurações para refinar nesta etapa.
+          </p>
+        ) : null}
+
+        {subcategoriaSelecionada && !subcategoriaTemConfiguracoes ? (
+          <p className="mt-2 text-xs text-[#607B89]">
+            A subcategoria selecionada não possui configurações adicionais. O filtro atual já está no nível mais detalhado.
+          </p>
+        ) : null}
+      </FiltersBar>
+
+      {categoriaSelecionada && resumoCategoriaSelecionada && (
+        <SectionCard className="space-y-4 p-4 sm:p-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#CFE7E8] bg-[#EFF8F8] px-3 py-1 text-xs font-medium text-[#0F7B7D]">
+                <Settings className="h-3.5 w-3.5" />
+                Estrutura oficial da categoria
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-[#19384C]">{categoriaSelecionada.nome}</h3>
+                <p className="mt-1 text-sm text-[#607B89]">
+                  {categoriaSelecionada.descricao || 'Categoria sem descrição cadastrada.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2 text-xs">
+              <span className="rounded-full border border-[#D4E2E7] bg-white px-3 py-1 font-medium text-[#244455]">
+                {resumoCategoriaSelecionada.totalSubcategorias} subcategorias
+              </span>
+              <span className="rounded-full border border-[#D4E2E7] bg-white px-3 py-1 font-medium text-[#244455]">
+                {resumoCategoriaSelecionada.totalConfiguracoes} configurações
+              </span>
+            </div>
+          </div>
+
+          {resumoCategoriaSelecionada.totalSubcategorias === 0 ? (
+            <div className="rounded-2xl border border-[#DEEFE7] bg-[#FCFEFE] p-4 text-sm text-[#607B89]">
+              Essa categoria não possui subcategorias cadastradas. Para esse tipo de item, a categoria principal já é suficiente.
+            </div>
+          ) : (
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+            {categoriaSelecionada.subcategorias.map((subcategoria) => (
+              <div
+                key={subcategoria.id}
+                className="rounded-2xl border border-[#DEEFE7] bg-[#FCFEFE] p-4"
+              >
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h4 className="text-sm font-semibold text-[#19384C]">{subcategoria.nome}</h4>
+                    <p className="mt-1 text-xs text-[#607B89]">
+                      {subcategoria.descricao || 'Subcategoria sem descrição cadastrada.'}
+                    </p>
                   </div>
+                  <div className="flex flex-wrap gap-2 text-[11px]">
+                    <span className="rounded-full bg-[#DEEFE7] px-2.5 py-1 font-medium text-[#0F7B7D]">
+                      {subcategoria.configuracoes?.length || 0} configurações
+                    </span>
+                    <span className="rounded-full bg-[#F3F8FA] px-2.5 py-1 font-medium text-[#516F7D]">
+                      Unidade: {subcategoria.unidade}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {subcategoria.configuracoes && subcategoria.configuracoes.length > 0 ? (
+                    subcategoria.configuracoes.map((configuracao) => (
+                      <span
+                        key={configuracao.id}
+                        className="rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-[11px] font-medium text-[#244455]"
+                      >
+                        {configuracao.nome}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-xs text-[#7A95A3]">
+                      Nenhuma configuração cadastrada para esta subcategoria.
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
           </div>
+          )}
+        </SectionCard>
+      )}
 
-          {/* Filtros */}
-          <div className="bg-white rounded-lg shadow-sm border border-[#DEEFE7] p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="lg:col-span-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#B4BEC9] w-5 h-5" />
-                  <input
-                    type="text"
-                    placeholder="Buscar por nome, SKU ou fornecedor..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C]/40 focus:border-[#159A9C] text-[#002333] placeholder-[#B4BEC9]"
-                  />
-                </div>
-              </div>
+      <DataTableCard>
+        <div className="border-b border-[#E1EAEE] bg-[#F8FBFC] px-4 py-3 sm:px-5">
+          <div className="flex flex-wrap items-center gap-3 text-sm text-[#516F7D]">
+            <h3 className="text-sm font-semibold text-[#1B3B4E]">
+              Lista de Itens ({totalItensLista})
+            </h3>
+            {hasFilters && (
+              <span className="rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-2 py-0.5 text-xs font-medium text-[#0F7B7D]">
+                filtros ativos
+              </span>
+            )}
+          </div>
+          {hasFilters && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {nichoFilter !== 'geral' && (
+                <span className="rounded-full border border-[#DCE6F8] bg-[#F4F8FF] px-3 py-1 text-xs font-medium text-[#35538A]">
+                  Nicho: {nichoSelecionadoConfig.label}
+                </span>
+              )}
+              {categoriaFilter !== 'todas' && (
+                <span className="rounded-full border border-[#D4E2E7] bg-white px-3 py-1 text-xs font-medium text-[#244455]">
+                  Categoria: {categoriaFilter}
+                </span>
+              )}
+              {subcategoriaSelecionada && (
+                <span className="rounded-full border border-[#CFE7E8] bg-[#EFF8F8] px-3 py-1 text-xs font-medium text-[#0F7B7D]">
+                  Subcategoria: {subcategoriaSelecionada.nome}
+                </span>
+              )}
+              {configuracaoFilter !== 'todas' && (
+                <span className="rounded-full border border-[#DCE6F8] bg-[#F4F8FF] px-3 py-1 text-xs font-medium text-[#35538A]">
+                  Configuração:{' '}
+                  {configuracoesDisponiveis.find((configuracao) => configuracao.id === configuracaoFilter)?.nome ||
+                    'Selecionada'}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
 
-              <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row gap-3">
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C]/40 focus:border-[#159A9C] text-[#002333]"
-                >
-                  <option value="todos">Todos os Status</option>
-                  <option value="ativo">Ativo</option>
-                  <option value="inativo">Inativo</option>
-                  <option value="descontinuado">Descontinuado</option>
-                </select>
-
-                <select
-                  value={categoriaFilter}
-                  onChange={(e) => setCategoriaFilter(e.target.value)}
-                  className="px-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C]/40 focus:border-[#159A9C] text-[#002333]"
-                >
-                  <option value="todas">Todas as Categorias</option>
-                  {categorias.map((categoria) => (
-                    <option key={categoria} value={categoria}>
-                      {categoria}
-                    </option>
-                  ))}
-                </select>
-              </div>
+        {error && (
+          <div className="border-b border-[#E1EAEE] bg-[#FFF7F7] px-4 py-3 sm:px-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-[#B4233A]">{error}</p>
+              <button
+                onClick={() => void carregarProdutos()}
+                className="inline-flex h-8 items-center gap-2 rounded-lg border border-[#E7C4CB] bg-white px-3 text-xs font-medium text-[#B4233A] transition hover:bg-[#FFF2F4]"
+              >
+                Tentar novamente
+              </button>
             </div>
           </div>
+        )}
 
-          {/* Lista de Produtos */}
-          <div className="bg-white rounded-lg shadow-sm border border-[#DEEFE7]">
-            <div className="px-6 py-4 border-b border-[#DEEFE7]">
-              <h3 className="text-lg font-semibold text-[#002333]">
-                Lista de Produtos ({produtosFiltrados.length})
-              </h3>
+        {produtosFiltrados.length === 0 ? (
+          <div className="p-4 sm:p-5">
+            <EmptyState
+              icon={<Package className="h-5 w-5" />}
+              title="Nenhum item encontrado"
+              description={
+                totalItems === 0 && !hasFilters
+                  ? 'Comece criando seu primeiro item.'
+                  : 'Tente ajustar os filtros ou termos de busca.'
+              }
+            />
+          </div>
+        ) : (
+          <>
+            <div className="divide-y divide-[#EAF0F2] lg:hidden">
+              {produtosFiltrados.map((produto) => {
+                const statusInfo = statusConfig[produto.status];
+                const StatusIcon = statusInfo.icon;
+
+                return (
+                  <div key={produto.id} className="space-y-3 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-[#19384C]">{produto.nome}</p>
+                        <p className="mt-0.5 text-xs text-[#6B8693]">SKU: {produto.sku}</p>
+                      </div>
+                      <span
+                        className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${statusInfo.color}`}
+                      >
+                        <StatusIcon className="mr-1 h-3 w-3" />
+                        {statusInfo.label}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-xs text-[#486978]">
+                      <div>
+                        <p className="text-[#6B8693]">Tipo</p>
+                        <p className="font-medium text-[#1E3A4B]">
+                          {tipoItemConfig[produto.tipoItem] || produto.tipoItem}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[#6B8693]">Categoria</p>
+                        <p className="font-medium text-[#1E3A4B]">{produto.categoria}</p>
+                        {produto.subcategoriaNome && (
+                          <p className="mt-0.5 text-[11px] text-[#6B8693]">{produto.subcategoriaNome}</p>
+                        )}
+                        {produto.configuracaoNome && (
+                          <p className="mt-1 inline-flex rounded-full border border-[#DCE6F8] bg-[#F4F8FF] px-2 py-0.5 text-[11px] font-medium text-[#35538A]">
+                            {produto.configuracaoNome}
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-[#6B8693]">Preço</p>
+                        {produto.tipoItem === 'plano' && getPlanoComponentes(produto).length > 0 && (
+                          <span className="mt-0.5 block text-[11px] text-[#6B8693]">
+                            Composicao: {getPlanoComponentes(produto).length} item(ns)
+                          </span>
+                        )}
+                        <p className="font-medium text-[#1E3A4B]">{formatCurrency(produto.preco)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[#6B8693]">Estoque</p>
+                        <p className="font-medium text-[#1E3A4B]">
+                          {isTipoComEstoque(produto.tipoItem) ? `${produto.estoque.atual} un.` : 'N/A'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[#6B8693]">Vendas (Mês)</p>
+                        <p className="font-medium text-[#1E3A4B]">{produto.vendas.mes}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => openModal(produto)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#159A9C] hover:bg-[#ECF7F3]"
+                        title="Visualizar"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                      {canUpdateProduto && (
+                        <button
+                          onClick={() => handleEditarProduto(produto)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#0F7B7D] hover:bg-[#ECF7F3]"
+                          title="Editar"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                      )}
+                      {canDeleteProduto && (
+                        <button
+                          onClick={() => handleExcluirProduto(produto)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#B4233A] hover:bg-[#FFF2F4]"
+                          title="Descontinuar"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-[#DEEFE7]">
-                <thead className="bg-[#DEEFE7]">
+            <div className="hidden overflow-x-auto lg:block">
+              <table className="w-full min-w-full divide-y divide-[#DEEFE7]">
+                <thead className="sticky top-0 z-10 bg-[#DEEFE7]">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-[#002333] uppercase tracking-wider">
-                      Produto
+                      Item
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-[#002333] uppercase tracking-wider">
+                      Tipo
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-[#002333] uppercase tracking-wider">
                       Categoria
@@ -570,23 +1363,41 @@ const ProdutosPage: React.FC = () => {
                               {produto.nome}
                             </div>
                             <div className="text-xs text-[#002333]/70">SKU: {produto.sku}</div>
+                            {produto.tipoItem === 'plano' && getPlanoComponentes(produto).length > 0 && (
+                              <div className="mt-1 text-xs text-[#35538A]">
+                                Composicao: {getPlanoComponentes(produto).length} item(ns)
+                              </div>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="text-sm text-[#002333] font-medium">
-                            {produto.categoria}
+                            {tipoItemConfig[produto.tipoItem] || produto.tipoItem}
                           </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div>
+                            <span className="text-sm text-[#002333] font-medium">{produto.categoria}</span>
+                            {produto.subcategoriaNome && (
+                              <div className="mt-1 text-xs text-[#002333]/70">{produto.subcategoriaNome}</div>
+                            )}
+                            {produto.configuracaoNome && (
+                              <div className="mt-1 inline-flex rounded-full border border-[#DCE6F8] bg-[#F4F8FF] px-2 py-0.5 text-[11px] font-medium text-[#35538A]">
+                                {produto.configuracaoNome}
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-[#002333] font-semibold">
                             {formatCurrency(produto.preco)}
                           </div>
                           <div className="text-xs text-[#002333]/70">
-                            Custo: {formatCurrency(produto.custoUnitario)}
+                            Custo interno: {formatOptionalCurrency(produto.custoUnitario)}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {produto.categoria === 'Serviços' ? (
+                          {!isTipoComEstoque(produto.tipoItem) ? (
                             <span className="text-sm text-[#002333]/70">N/A</span>
                           ) : (
                             <div className="text-sm">
@@ -622,20 +1433,24 @@ const ProdutosPage: React.FC = () => {
                             >
                               <Eye className="w-4 h-4" />
                             </button>
-                            <button
-                              onClick={() => handleEditarProduto(produto)}
-                              className="text-[#0F7B7D] hover:text-[#159A9C] p-1 rounded hover:bg-[#DEEFE7] transition-colors"
-                              title="Editar"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleExcluirProduto(produto)}
-                              className="text-[#002333] hover:text-[#0F7B7D] p-1 rounded hover:bg-[#B4BEC9]/30 transition-colors"
-                              title="Excluir"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            {canUpdateProduto && (
+                              <button
+                                onClick={() => handleEditarProduto(produto)}
+                                className="text-[#0F7B7D] hover:text-[#159A9C] p-1 rounded hover:bg-[#DEEFE7] transition-colors"
+                                title="Editar"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                            )}
+                            {canDeleteProduto && (
+                              <button
+                                onClick={() => handleExcluirProduto(produto)}
+                                className="text-[#002333] hover:text-[#0F7B7D] p-1 rounded hover:bg-[#B4BEC9]/30 transition-colors"
+                                title="Descontinuar"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -643,47 +1458,80 @@ const ProdutosPage: React.FC = () => {
                   })}
                 </tbody>
               </table>
+            </div>
+          </>
+        )}
 
-              {produtosFiltrados.length === 0 && (
-                <div className="text-center py-12">
-                  <Package className="mx-auto h-12 w-12 text-[#B4BEC9]" />
-                  <h3 className="mt-2 text-sm font-semibold text-[#002333]">
-                    Nenhum produto encontrado
-                  </h3>
-                  <p className="mt-1 text-sm text-[#002333]/70">
-                    {produtos.length === 0
-                      ? 'Comece criando seu primeiro produto.'
-                      : 'Tente ajustar os filtros ou termos de busca.'}
-                  </p>
-                </div>
-              )}
+        {totalItems > 0 && (
+          <div className="flex flex-col gap-3 border-t border-[#E1EAEE] bg-[#F8FBFC] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <div className="flex flex-wrap items-center gap-3 text-xs text-[#5F7B89] sm:text-sm">
+              <span>
+                {produtosFiltrados.length} de {normalizedSearchTerm ? produtos.length : totalItems} registros
+              </span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                className="h-8 rounded-lg border border-[#D4E2E7] bg-white px-2 text-xs text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+              >
+                <option value={10}>Exibir: 10</option>
+                <option value={25}>Exibir: 25</option>
+                <option value={50}>Exibir: 50</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="inline-flex h-8 items-center rounded-lg border border-[#D4E2E7] bg-white px-3 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Anterior
+              </button>
+              <span className="text-xs text-[#5F7B89] sm:text-sm">
+                Página {currentPage} de {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="inline-flex h-8 items-center rounded-lg border border-[#D4E2E7] bg-white px-3 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Próxima
+              </button>
             </div>
           </div>
-        </div>
-      </div>
+        )}
+      </DataTableCard>
 
       {/* Modal de Visualização */}
       {isModalOpen && selectedProduto && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-96 overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-lg font-semibold text-[#002333]">Detalhes do Produto</h3>
-                <button
-                  onClick={closeModal}
-                  className="text-[#B4BEC9] hover:text-[#002333] transition-colors"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-[1px]">
+          <div className="max-h-[90vh] w-full max-w-[980px] overflow-y-auto rounded-2xl border border-[#DCE7EB] bg-white shadow-[0_30px_60px_-30px_rgba(7,36,51,0.55)]">
+            <div className="flex items-center justify-between border-b border-[#E1EAEE] px-6 py-4">
+              <h3 className="text-lg font-semibold text-[#19384C]">Detalhes do item</h3>
+              <button
+                onClick={closeModal}
+                className="rounded-lg p-1 text-[#7A95A3] transition-colors hover:bg-[#F3F8FA] hover:text-[#19384C]"
+                title="Fechar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
 
-              <div className="space-y-4">
+            <div className="space-y-4 px-6 py-5">
                 <div>
                   <h4 className="text-sm font-semibold text-[#002333]">Nome</h4>
                   <p className="text-sm text-[#002333]/70">{selectedProduto.nome}</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <h4 className="text-sm font-semibold text-[#002333]">Tipo</h4>
+                    <p className="text-sm text-[#002333]/70">
+                      {tipoItemConfig[selectedProduto.tipoItem] || selectedProduto.tipoItem}
+                    </p>
+                  </div>
                   <div>
                     <h4 className="text-sm font-semibold text-[#002333]">SKU</h4>
                     <p className="text-sm text-[#002333]/70">{selectedProduto.sku}</p>
@@ -692,9 +1540,53 @@ const ProdutosPage: React.FC = () => {
                     <h4 className="text-sm font-semibold text-[#002333]">Categoria</h4>
                     <p className="text-sm text-[#002333]/70">{selectedProduto.categoria}</p>
                   </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-[#002333]">Subcategoria</h4>
+                    <p className="text-sm text-[#002333]/70">
+                      {selectedProduto.subcategoriaNome || 'Não informada'}
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-[#002333]">Configuração</h4>
+                    <p className="text-sm text-[#002333]/70">
+                      {selectedProduto.configuracaoNome || 'Não informada'}
+                    </p>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                {categoriaDoProdutoSelecionado && (
+                  <div className="rounded-2xl border border-[#DEEFE7] bg-[#FCFEFE] p-4">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <h4 className="text-sm font-semibold text-[#002333]">
+                          Estrutura relacionada da categoria
+                        </h4>
+                        <p className="mt-1 text-sm text-[#002333]/70">
+                          {categoriaDoProdutoSelecionado.descricao || 'Categoria sem descrição cadastrada.'}
+                        </p>
+                      </div>
+                      <span className="rounded-full border border-[#D4E2E7] bg-white px-3 py-1 text-xs font-medium text-[#244455]">
+                        {categoriaDoProdutoSelecionado.subcategorias.length} subcategorias oficiais
+                      </span>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {categoriaDoProdutoSelecionado.subcategorias.map((subcategoria) => (
+                        <span
+                          key={subcategoria.id}
+                          className="rounded-full border border-[#CFE7E8] bg-[#EFF8F8] px-3 py-1 text-xs text-[#0F7B7D]"
+                        >
+                          {subcategoria.nome}
+                          {subcategoria.configuracoes?.length
+                            ? ` • ${subcategoria.configuracoes.length} config.`
+                            : ''}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
                     <h4 className="text-sm font-semibold text-[#002333]">Preço</h4>
                     <p className="text-sm text-[#002333]/70">
@@ -702,14 +1594,14 @@ const ProdutosPage: React.FC = () => {
                     </p>
                   </div>
                   <div>
-                    <h4 className="text-sm font-semibold text-[#002333]">Custo</h4>
+                    <h4 className="text-sm font-semibold text-[#002333]">Custo Interno</h4>
                     <p className="text-sm text-[#002333]/70">
-                      {formatCurrency(selectedProduto.custoUnitario)}
+                      {formatOptionalCurrency(selectedProduto.custoUnitario)}
                     </p>
                   </div>
                 </div>
 
-                {selectedProduto.categoria !== 'Serviços' && (
+                {isTipoComEstoque(selectedProduto.tipoItem) && (
                   <div>
                     <h4 className="text-sm font-semibold text-[#002333]">Estoque</h4>
                     <p className="text-sm text-[#002333]/70">
@@ -726,7 +1618,91 @@ const ProdutosPage: React.FC = () => {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <h4 className="text-sm font-semibold text-[#002333]">Fornecedor</h4>
+                    <p className="text-sm text-[#002333]/70">
+                      {selectedProduto.fornecedor || 'Não informado'}
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-[#002333]">Status</h4>
+                    <p className="text-sm text-[#002333]/70">
+                      {statusConfig[selectedProduto.status]?.label || selectedProduto.status}
+                    </p>
+                  </div>
+                </div>
+
+                {selectedProduto.tags && selectedProduto.tags.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-[#002333]">Tags</h4>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {selectedProduto.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="inline-flex items-center rounded-full border border-[#CFE7E8] bg-[#EFF8F8] px-3 py-1 text-xs text-[#0F7B7D]"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(selectedProduto.tipoLicenciamento ||
+                  selectedProduto.periodicidadeLicenca ||
+                  selectedProduto.quantidadeLicencas) && (
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div>
+                      <h4 className="text-sm font-semibold text-[#002333]">Licenciamento</h4>
+                      <p className="text-sm text-[#002333]/70">
+                        {selectedProduto.tipoLicenciamento || 'Não informado'}
+                      </p>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-semibold text-[#002333]">Periodicidade</h4>
+                      <p className="text-sm text-[#002333]/70">
+                        {selectedProduto.periodicidadeLicenca || 'Não informada'}
+                      </p>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-semibold text-[#002333]">Licenças</h4>
+                      <p className="text-sm text-[#002333]/70">
+                        {selectedProduto.quantidadeLicencas ?? 'Não informada'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {selectedProduto.tipoItem === 'plano' && getPlanoComponentes(selectedProduto).length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-[#002333]">Composicao do plano</h4>
+                    <div className="mt-2 space-y-2">
+                      {getPlanoComponentes(selectedProduto).map((componente, index) => (
+                        <div
+                          key={`${componente.childItemId}-${index}`}
+                          className="rounded-lg border border-[#D4E2E7] bg-[#F8FBFC] px-3 py-2"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm font-medium text-[#19384C]">
+                              {componente.nome || 'Item do catalogo'}
+                            </p>
+                            <span className="rounded-full bg-white px-2 py-0.5 text-xs text-[#35538A]">
+                              {roleLabel[componente.componentRole || 'included']}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-[#607B89]">
+                            Qtd padrao: {componente.quantity ?? 1}
+                            {componente.affectsPrice ? ' · afeta preco' : ''}
+                            {componente.isDefault === false ? ' · nao padrao' : ''}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
                     <h4 className="text-sm font-semibold text-[#002333]">Criado em</h4>
                     <p className="text-sm text-[#002333]/70">
@@ -741,9 +1717,17 @@ const ProdutosPage: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              <div className="flex justify-end border-t border-[#E1EAEE] px-6 py-4">
+                <button
+                  onClick={closeModal}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+                >
+                  Fechar
+                </button>
+              </div>
             </div>
           </div>
-        </div>
       )}
 
       {/* Modal de Cadastro/Edição - Landscape */}
@@ -757,50 +1741,12 @@ const ProdutosPage: React.FC = () => {
           void handleSaveProduto(data as any);
         }}
         produtoEditando={produtoParaEditar}
+        defaultTipoItem={defaultTipoItemModal}
         loading={isLoadingSave}
       />
-
-      {/* Modal de Confirmação de Exclusão */}
-      {showConfirmDelete && produtoParaExcluir && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full">
-            <div className="p-6">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-[#DEEFE7] rounded-full flex items-center justify-center mr-4">
-                  <AlertTriangle className="w-6 h-6 text-[#002333]" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-[#002333]">Confirmar Exclusão</h3>
-                  <p className="text-sm text-[#002333]/70">Esta ação não pode ser desfeita.</p>
-                </div>
-              </div>
-
-              <p className="text-sm text-[#002333] mb-6">
-                Tem certeza que deseja excluir o produto{' '}
-                <strong>"{produtoParaExcluir.nome}"</strong>?
-              </p>
-
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={cancelarExclusao}
-                  className="px-4 py-2 border border-[#B4BEC9] text-sm font-medium rounded-lg text-[#002333] bg-white hover:bg-[#DEEFE7] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#159A9C]/40"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={confirmarExclusao}
-                  className="px-4 py-2 border border-transparent text-sm font-semibold rounded-lg text-white bg-[#002333] hover:bg-[#0F7B7D] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#159A9C]/40"
-                >
-                  Excluir
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmationModal confirmationState={confirmationState} />
     </div>
   );
 };
 
 export default ProdutosPage;
-

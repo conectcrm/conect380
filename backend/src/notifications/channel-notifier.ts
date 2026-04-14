@@ -6,6 +6,7 @@ export type ChannelTargets = {
   phone?: string;
   pushToken?: string;
   userId?: string;
+  empresaId?: string;
 };
 
 export interface NotifyByPolicyParams {
@@ -34,10 +35,20 @@ export async function notifyByPolicy(params: NotifyByPolicyParams) {
           );
           return;
         }
+        const empresaId =
+          params.targets.empresaId ||
+          (typeof params.context?.empresaId === 'string' ? params.context.empresaId : undefined);
+        if (!empresaId) {
+          params.logger?.debug?.(
+            `Canal whatsapp ignorado: empresaId ausente para policy=${params.policyKey}`,
+          );
+          return;
+        }
         senders.push(
           params.channels.sendWhatsapp({
             to: phone,
             message: params.message,
+            empresaId,
             context: params.context,
             retryMeta: entry.retryMeta,
           }),

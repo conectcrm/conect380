@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { toastService } from '../services/toastService';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -35,42 +35,58 @@ import {
   Calendar,
   Search,
   X,
-  Edit2,
+  Maximize2,
+  Minimize2,
   Trash2,
   Grid3X3,
   List,
   BarChart3,
   Download,
   FileSpreadsheet,
-  FileText,
   AlertCircle,
   RefreshCw,
-  Copy,
   Save,
   Bookmark,
+  ArrowLeft,
+  ArrowUp,
+  Archive,
+  RotateCcw,
+  CheckCircle,
+  Settings2,
+  MoreHorizontal,
+  FileText,
 } from 'lucide-react';
-import { BackToNucleus } from '../components/navigation/BackToNucleus';
 import { oportunidadesService } from '../services/oportunidadesService';
 import usuariosService from '../services/usuariosService';
-import { Usuario } from '../types/usuarios';
+import { Usuario, UserRole } from '../types/usuarios';
 import {
+  Atividade,
   Oportunidade,
   NovaOportunidade,
   FiltrosOportunidade,
   EstatisticasOportunidades,
+  StaleDealsResult,
+  StalePolicyDecision,
+  EngagementPolicyDecision,
 } from '../types/oportunidades';
 import {
   EstagioOportunidade,
+  LifecycleStatusOportunidade,
+  LifecycleViewOportunidade,
   PrioridadeOportunidade,
   OrigemOportunidade,
   TipoAtividade,
 } from '../types/oportunidades/enums';
 import ModalOportunidadeRefatorado from '../components/oportunidades/ModalOportunidadeRefatorado';
 import ModalMudancaEstagio from '../components/oportunidades/ModalMudancaEstagio';
-import ModalDetalhesOportunidade from '../components/oportunidades/ModalDetalhesOportunidade';
+import { ModalDetalhesEventoContext } from '../components/oportunidades/ModalDetalhesOportunidade';
 import ModalExport from '../components/oportunidades/ModalExport';
 import ModalMotivoPerda from '../components/oportunidades/ModalMotivoPerda';
+import { triggerSalesCelebration } from '../components/feedback/SalesCelebrationHost';
 import { useAuth } from '../contexts/AuthContext';
+import { userHasPermission } from '../config/menuConfig';
+import { useGlobalConfirmation } from '../contexts/GlobalConfirmationContext';
+import { DataTableCard, SectionCard } from '../components/layout-v2';
 
 // Configuração do localizador do calendário (date-fns)
 const locales = {
@@ -87,6 +103,14 @@ const localizer = dateFnsLocalizer({
 
 // Tipos de visualização
 type VisualizacaoPipeline = 'kanban' | 'lista' | 'calendario' | 'grafico';
+type WorkspaceTab = 'pipeline' | 'parametros';
+
+type KanbanScrollSnapshot = {
+  boardScrollLeft: number;
+  columnScrollTop: Record<string, number>;
+  windowScrollY: number;
+  expanded: boolean;
+};
 
 type EstagioConfig = {
   id: EstagioOportunidade;
@@ -103,7 +127,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.LEADS,
     nome: 'Leads',
-    headerClass: 'bg-[#002333]',
+    headerClass:
+      'bg-gradient-to-r from-[#EAF3F8] via-white to-[#F6FBFD] border border-[#B4BEC9]/45 border-b-0 border-t-4 border-t-[#1F4C63]',
     legendClass: 'bg-[#002333]',
     badgeTextClass: 'text-[#002333]',
     badgeBgClass: 'bg-[#DEEFE7]',
@@ -112,7 +137,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.QUALIFICACAO,
     nome: 'Qualificação',
-    headerClass: 'bg-[#0F7B7D]',
+    headerClass:
+      'bg-gradient-to-r from-[#E9F7F5] via-white to-[#F4FCFA] border border-[#B4BEC9]/45 border-b-0 border-t-4 border-t-[#0F7B7D]',
     legendClass: 'bg-[#0F7B7D]',
     badgeTextClass: 'text-[#0F7B7D]',
     badgeBgClass: 'bg-[#DEEFE7]',
@@ -121,7 +147,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.PROPOSTA,
     nome: 'Proposta',
-    headerClass: 'bg-[#159A9C]',
+    headerClass:
+      'bg-gradient-to-r from-[#EAF8F6] via-white to-[#F5FCFA] border border-[#B4BEC9]/45 border-b-0 border-t-4 border-t-[#159A9C]',
     legendClass: 'bg-[#159A9C]',
     badgeTextClass: 'text-[#0F7B7D]',
     badgeBgClass: 'bg-[#DEEFE7]',
@@ -130,7 +157,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.NEGOCIACAO,
     nome: 'Negociação',
-    headerClass: 'bg-[#0F7B7D]',
+    headerClass:
+      'bg-gradient-to-r from-[#ECF7F3] via-white to-[#F4FCF9] border border-[#B4BEC9]/45 border-b-0 border-t-4 border-t-[#137F72]',
     legendClass: 'bg-[#0F7B7D]',
     badgeTextClass: 'text-[#0F7B7D]',
     badgeBgClass: 'bg-[#DEEFE7]',
@@ -139,7 +167,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.FECHAMENTO,
     nome: 'Fechamento',
-    headerClass: 'bg-[#159A9C]',
+    headerClass:
+      'bg-gradient-to-r from-[#EEF8F8] via-white to-[#F7FCFC] border border-[#B4BEC9]/45 border-b-0 border-t-4 border-t-[#1A9AA0]',
     legendClass: 'bg-[#159A9C]',
     badgeTextClass: 'text-[#0F7B7D]',
     badgeBgClass: 'bg-[#DEEFE7]',
@@ -148,7 +177,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.GANHO,
     nome: 'Ganho',
-    headerClass: 'bg-green-600',
+    headerClass:
+      'bg-gradient-to-r from-green-50 via-white to-green-50/60 border border-[#B4BEC9]/45 border-b-0 border-t-4 border-t-green-600',
     legendClass: 'bg-green-600',
     badgeTextClass: 'text-green-700',
     badgeBgClass: 'bg-green-50',
@@ -157,7 +187,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.PERDIDO,
     nome: 'Perdido',
-    headerClass: 'bg-red-600',
+    headerClass:
+      'bg-gradient-to-r from-red-50 via-white to-red-50/60 border border-[#B4BEC9]/45 border-b-0 border-t-4 border-t-red-600',
     legendClass: 'bg-red-600',
     badgeTextClass: 'text-red-700',
     badgeBgClass: 'bg-red-50',
@@ -166,6 +197,132 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
 ];
 
 // Paleta de apoio para gráficos (seguindo tema Crevasse + cores contextuais)
+const ALLOWED_STAGE_TRANSITIONS: Record<EstagioOportunidade, readonly EstagioOportunidade[]> = {
+  [EstagioOportunidade.LEADS]: [EstagioOportunidade.QUALIFICACAO, EstagioOportunidade.PERDIDO],
+  [EstagioOportunidade.QUALIFICACAO]: [
+    EstagioOportunidade.LEADS,
+    EstagioOportunidade.PROPOSTA,
+    EstagioOportunidade.PERDIDO,
+  ],
+  [EstagioOportunidade.PROPOSTA]: [
+    EstagioOportunidade.QUALIFICACAO,
+    EstagioOportunidade.NEGOCIACAO,
+    EstagioOportunidade.PERDIDO,
+  ],
+  [EstagioOportunidade.NEGOCIACAO]: [
+    EstagioOportunidade.PROPOSTA,
+    EstagioOportunidade.FECHAMENTO,
+    EstagioOportunidade.PERDIDO,
+  ],
+  [EstagioOportunidade.FECHAMENTO]: [
+    EstagioOportunidade.NEGOCIACAO,
+    EstagioOportunidade.GANHO,
+    EstagioOportunidade.PERDIDO,
+  ],
+  [EstagioOportunidade.GANHO]: [],
+  [EstagioOportunidade.PERDIDO]: [],
+};
+
+const FORWARD_STAGE_ORDER: readonly EstagioOportunidade[] = [
+  EstagioOportunidade.LEADS,
+  EstagioOportunidade.QUALIFICACAO,
+  EstagioOportunidade.PROPOSTA,
+  EstagioOportunidade.NEGOCIACAO,
+  EstagioOportunidade.FECHAMENTO,
+];
+
+const STAGE_MONOGRAM: Record<EstagioOportunidade, string> = {
+  [EstagioOportunidade.LEADS]: 'LD',
+  [EstagioOportunidade.QUALIFICACAO]: 'QL',
+  [EstagioOportunidade.PROPOSTA]: 'PR',
+  [EstagioOportunidade.NEGOCIACAO]: 'NG',
+  [EstagioOportunidade.FECHAMENTO]: 'FC',
+  [EstagioOportunidade.GANHO]: 'OK',
+  [EstagioOportunidade.PERDIDO]: 'NO',
+};
+
+const STAGE_COLUMN_SURFACE_CLASS: Record<EstagioOportunidade, string> = {
+  [EstagioOportunidade.LEADS]: 'bg-[#EEF4F8]/80',
+  [EstagioOportunidade.QUALIFICACAO]: 'bg-[#ECF7F4]/80',
+  [EstagioOportunidade.PROPOSTA]: 'bg-[#EBF8F6]/80',
+  [EstagioOportunidade.NEGOCIACAO]: 'bg-[#EDF7F3]/80',
+  [EstagioOportunidade.FECHAMENTO]: 'bg-[#EEF8F8]/80',
+  [EstagioOportunidade.GANHO]: 'bg-green-50/85',
+  [EstagioOportunidade.PERDIDO]: 'bg-red-50/85',
+};
+
+const STAGE_EMPTY_HINT: Record<EstagioOportunidade, string> = {
+  [EstagioOportunidade.LEADS]: 'Adicione novos leads para iniciar o funil.',
+  [EstagioOportunidade.QUALIFICACAO]: 'Traga oportunidades para validar fit e potencial.',
+  [EstagioOportunidade.PROPOSTA]: 'Mova negociacoes aprovadas para proposta comercial.',
+  [EstagioOportunidade.NEGOCIACAO]: 'Conduza propostas para a fase final de decisao.',
+  [EstagioOportunidade.FECHAMENTO]: 'Concentre aqui os negocios prontos para decidir.',
+  [EstagioOportunidade.GANHO]: 'Negocios ganhos aparecem aqui.',
+  [EstagioOportunidade.PERDIDO]: 'Negocios perdidos aparecem aqui.',
+};
+
+const LIFECYCLE_VIEW_OPTIONS: Array<{
+  id: LifecycleViewOportunidade;
+  label: string;
+}> = [
+  { id: LifecycleViewOportunidade.OPEN, label: 'Abertas' },
+  { id: LifecycleViewOportunidade.CLOSED, label: 'Fechadas' },
+  { id: LifecycleViewOportunidade.ARCHIVED, label: 'Arquivadas' },
+  { id: LifecycleViewOportunidade.DELETED, label: 'Lixeira' },
+];
+
+const LIFECYCLE_VIEW_DESCRIPTIONS: Record<LifecycleViewOportunidade, string> = {
+  [LifecycleViewOportunidade.OPEN]: 'Apenas oportunidades ativas no funil comercial.',
+  [LifecycleViewOportunidade.CLOSED]: 'Negocios encerrados como ganho ou perdido.',
+  [LifecycleViewOportunidade.ARCHIVED]: 'Registros arquivados para referencia.',
+  [LifecycleViewOportunidade.DELETED]: 'Itens enviados para a lixeira (exclusao logica).',
+  [LifecycleViewOportunidade.ALL_ACTIVE]: 'Todos os registros ativos.',
+  [LifecycleViewOportunidade.ALL]: 'Todos os registros, incluindo lixeira.',
+};
+
+const PIPELINE_LIFECYCLE_VIEW_STORAGE_KEY = 'conectcrm-pipeline-lifecycle-view';
+const PIPELINE_PERSISTED_LIFECYCLE_VIEWS = new Set<LifecycleViewOportunidade>([
+  LifecycleViewOportunidade.OPEN,
+  LifecycleViewOportunidade.CLOSED,
+  LifecycleViewOportunidade.ARCHIVED,
+  LifecycleViewOportunidade.DELETED,
+]);
+
+const getInitialLifecycleView = (): LifecycleViewOportunidade => {
+  if (typeof window === 'undefined') {
+    return LifecycleViewOportunidade.OPEN;
+  }
+
+  try {
+    const value = localStorage.getItem(PIPELINE_LIFECYCLE_VIEW_STORAGE_KEY);
+    if (!value) {
+      return LifecycleViewOportunidade.OPEN;
+    }
+
+    if (PIPELINE_PERSISTED_LIFECYCLE_VIEWS.has(value as LifecycleViewOportunidade)) {
+      return value as LifecycleViewOportunidade;
+    }
+  } catch (err) {
+    console.warn('Nao foi possivel carregar a visualizacao da pipeline do localStorage.', err);
+  }
+
+  return LifecycleViewOportunidade.OPEN;
+};
+
+const STALE_THRESHOLD_MIN = 7;
+const STALE_THRESHOLD_MAX = 120;
+const STALE_AUTO_ARCHIVE_MIN = 7;
+const STALE_AUTO_ARCHIVE_MAX = 365;
+const ENGAGEMENT_HOT_MIN_PROBABILITY_MIN = 0;
+const ENGAGEMENT_HOT_MIN_PROBABILITY_MAX = 100;
+const ENGAGEMENT_HOT_MIN_PROBABILITY_DEFAULT = 75;
+const ENGAGEMENT_HOT_CLOSE_WINDOW_MIN = 1;
+const ENGAGEMENT_HOT_CLOSE_WINDOW_MAX = 90;
+const ENGAGEMENT_HOT_CLOSE_WINDOW_DEFAULT = 14;
+const ENGAGEMENT_NEXT_ACTION_SOON_MIN = 0;
+const ENGAGEMENT_NEXT_ACTION_SOON_MAX = 30;
+const ENGAGEMENT_NEXT_ACTION_SOON_DEFAULT = 3;
+
 const CORES_GRAFICOS = [
   '#002333',
   '#0F7B7D',
@@ -176,18 +333,78 @@ const CORES_GRAFICOS = [
   '#FBBF24',
   '#DC2626',
 ];
+const PIPELINE_UNASSIGNED_RESPONSAVEL_FILTER = '__sem_responsavel__';
+const PIPELINE_LEGACY_UNASSIGNED_RESPONSAVEL_FILTER = 'sem_responsavel';
+
+const TIPO_ATIVIDADE_LABEL: Record<TipoAtividade, string> = {
+  [TipoAtividade.LIGACAO]: 'Ligacao',
+  [TipoAtividade.EMAIL]: 'E-mail',
+  [TipoAtividade.REUNIAO]: 'Reuniao',
+  [TipoAtividade.NOTA]: 'Nota',
+  [TipoAtividade.TAREFA]: 'Tarefa',
+};
+
+interface ProximaAcaoAgendada {
+  data: Date;
+  tipoEvento: TipoAtividade;
+  responsavelId: string;
+  responsavelNome: string;
+  descricao: string;
+}
+
+type AbaDetalhesOportunidade = 'detalhes' | 'atividades';
+
+interface EventoCalendarioPipeline {
+  id: string;
+  title: string;
+  start: Date;
+  end: Date;
+  resource: Oportunidade;
+  color: string;
+  eventKind: 'oportunidade' | 'atividade';
+  atividadeId?: string | number;
+  atividadeTipo?: TipoAtividade;
+  atividadeDescricao?: string;
+  atividadeResponsavelNome?: string;
+  prioridade?: PrioridadeOportunidade;
+}
 
 const PipelinePage: React.FC = () => {
+  const { confirm } = useGlobalConfirmation();
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const { isAuthenticated, user } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [oportunidades, setOportunidades] = useState<Oportunidade[]>([]);
   const [estatisticas, setEstatisticas] = useState<EstatisticasOportunidades | null>(null);
+  const [lifecycleFeatureEnabled, setLifecycleFeatureEnabled] = useState(false);
+  const [lifecycleView, setLifecycleView] =
+    useState<LifecycleViewOportunidade>(getInitialLifecycleView);
+  const [stalePolicy, setStalePolicy] = useState<StalePolicyDecision | null>(null);
+  const [stalePolicyDraft, setStalePolicyDraft] = useState({
+    enabled: false,
+    thresholdDays: 30,
+    autoArchiveEnabled: false,
+    autoArchiveAfterDays: 60,
+  });
+  const [stalePolicyLoading, setStalePolicyLoading] = useState(false);
+  const [stalePolicySaving, setStalePolicySaving] = useState(false);
+  const [engagementPolicy, setEngagementPolicy] = useState<EngagementPolicyDecision | null>(null);
+  const [engagementPolicyDraft, setEngagementPolicyDraft] = useState({
+    hotMinProbability: ENGAGEMENT_HOT_MIN_PROBABILITY_DEFAULT,
+    hotCloseWindowDays: ENGAGEMENT_HOT_CLOSE_WINDOW_DEFAULT,
+    nextActionDueSoonDays: ENGAGEMENT_NEXT_ACTION_SOON_DEFAULT,
+  });
+  const [engagementPolicyLoading, setEngagementPolicyLoading] = useState(false);
+  const [engagementPolicySaving, setEngagementPolicySaving] = useState(false);
+  const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>('pipeline');
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loadingUsuarios, setLoadingUsuarios] = useState(false);
   const [visualizacao, setVisualizacao] = useState<VisualizacaoPipeline>('kanban');
+  const [kanbanExpanded, setKanbanExpanded] = useState(false);
   const [filtros, setFiltros] = useState({
     busca: '',
     estagio: '',
@@ -205,22 +422,213 @@ const PipelinePage: React.FC = () => {
   const [mudancaEstagioData, setMudancaEstagioData] = useState<{
     oportunidade: Oportunidade;
     novoEstagio: EstagioOportunidade;
+    isPuloEtapa: boolean;
   } | null>(null);
+  const [dragOverStage, setDragOverStage] = useState<EstagioOportunidade | null>(null);
   const [loadingMudancaEstagio, setLoadingMudancaEstagio] = useState(false);
+  const [erroMudancaEstagio, setErroMudancaEstagio] = useState<string | null>(null);
 
   // ✅ Estados para Modal de Motivo de Perda
   const [showModalMotivoPerda, setShowModalMotivoPerda] = useState(false);
   const [oportunidadeParaPerder, setOportunidadeParaPerder] = useState<Oportunidade | null>(null);
+  const [erroMotivoPerda, setErroMotivoPerda] = useState<string | null>(null);
   const [showModalDeletar, setShowModalDeletar] = useState(false);
   const [oportunidadeDeletar, setOportunidadeDeletar] = useState<Oportunidade | null>(null);
+  const [deleteMode, setDeleteMode] = useState<'soft' | 'permanente'>('soft');
   const [loadingDeletar, setLoadingDeletar] = useState(false);
-  const [oportunidadeDetalhes, setOportunidadeDetalhes] = useState<Oportunidade | null>(null);
   const [oportunidadeEditando, setOportunidadeEditando] = useState<Oportunidade | null>(null);
   const [estagioNovaOportunidade, setEstagioNovaOportunidade] = useState<EstagioOportunidade>(
     EstagioOportunidade.LEADS,
   );
   const [calendarView, setCalendarView] = useState<View>('month');
   const [calendarDate, setCalendarDate] = useState(new Date());
+  const [atividadesCalendarioPorOportunidade, setAtividadesCalendarioPorOportunidade] = useState<
+    Record<number, Atividade[]>
+  >({});
+  const [loadingAtividadesCalendario, setLoadingAtividadesCalendario] = useState(false);
+  const [openCardActionsMenuId, setOpenCardActionsMenuId] = useState<string | null>(null);
+  const [openListActionsMenuId, setOpenListActionsMenuId] = useState<string | null>(null);
+  const [showBackToTop, setShowBackToTop] = useState(false);
+  const kanbanBoardRef = useRef<HTMLDivElement | null>(null);
+  const kanbanColumnScrollRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const kanbanScrollSnapshotRef = useRef<KanbanScrollSnapshot | null>(null);
+  const canManageStalePolicy = userHasPermission(user as any, 'config.automacoes.manage');
+  const showPipelineWorkspace = !lifecycleFeatureEnabled || workspaceTab === 'pipeline';
+
+  const captureKanbanScrollSnapshot = useCallback(() => {
+    if (visualizacao !== 'kanban') return;
+
+    const columnScrollTop: Record<string, number> = {};
+    Object.entries(kanbanColumnScrollRefs.current).forEach(([stageId, element]) => {
+      if (!element) return;
+      columnScrollTop[stageId] = element.scrollTop;
+    });
+
+    kanbanScrollSnapshotRef.current = {
+      boardScrollLeft: kanbanBoardRef.current?.scrollLeft ?? 0,
+      columnScrollTop,
+      windowScrollY: window.scrollY,
+      expanded: kanbanExpanded,
+    };
+  }, [visualizacao, kanbanExpanded]);
+
+  const restoreKanbanScrollSnapshot = useCallback(
+    ({ defer = false }: { defer?: boolean } = {}) => {
+      const snapshot = kanbanScrollSnapshotRef.current;
+      if (!snapshot || visualizacao !== 'kanban') return;
+
+      const applySnapshot = () => {
+        const board = kanbanBoardRef.current;
+        if (board) {
+          board.scrollLeft = snapshot.boardScrollLeft;
+        }
+
+        if (!kanbanExpanded) {
+          window.scrollTo({ top: snapshot.windowScrollY, behavior: 'auto' });
+        }
+
+        if (snapshot.expanded && kanbanExpanded) {
+          Object.entries(snapshot.columnScrollTop).forEach(([stageId, value]) => {
+            const element = kanbanColumnScrollRefs.current[stageId];
+            if (element) {
+              element.scrollTop = value;
+            }
+          });
+        }
+      };
+
+      if (defer) {
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(applySnapshot);
+        });
+        return;
+      }
+
+      applySnapshot();
+    },
+    [visualizacao, kanbanExpanded],
+  );
+
+  const handleVoltarAoTopo = useCallback(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  const mapRoleToUserRole = (role?: string): UserRole => {
+    const normalizedRole = (role || '').trim().toLowerCase();
+
+    if (normalizedRole === 'superadmin') return UserRole.SUPERADMIN;
+    if (normalizedRole === 'admin') return UserRole.ADMIN;
+    if (normalizedRole === 'gerente' || normalizedRole === 'manager') return UserRole.GERENTE;
+    if (normalizedRole === 'suporte') return UserRole.SUPORTE;
+    if (normalizedRole === 'financeiro') return UserRole.FINANCEIRO;
+    return UserRole.VENDEDOR;
+  };
+
+  const getUsuarioLogadoFallback = useCallback((): Usuario | null => {
+    if (!user) return null;
+
+    const id = typeof user.id === 'string' ? user.id.trim() : '';
+    const nome = typeof user.nome === 'string' ? user.nome.trim() : '';
+
+    if (!id || !nome) return null;
+
+    const now = new Date();
+
+    return {
+      id,
+      nome,
+      email: typeof user.email === 'string' ? user.email : '',
+      telefone: typeof user.telefone === 'string' ? user.telefone : '',
+      role: mapRoleToUserRole(user.role),
+      permissoes: Array.isArray(user.permissoes)
+        ? user.permissoes
+        : Array.isArray(user.permissions)
+          ? user.permissions
+          : [],
+      empresa_id: user.empresa?.id || '',
+      avatar_url: user.avatar_url || null,
+      idioma_preferido: user.idioma_preferido || 'pt-BR',
+      configuracoes: user.configuracoes,
+      ativo: true,
+      deve_trocar_senha: false,
+      created_at: now,
+      updated_at: now,
+      empresa: user.empresa
+        ? {
+            id: user.empresa.id,
+            nome: user.empresa.nome,
+            slug: user.empresa.slug,
+          }
+        : undefined,
+    };
+  }, [user]);
+
+  const mergeUsuariosComFallback = useCallback(
+    (lista: Usuario[]): Usuario[] => {
+      const base = Array.isArray(lista) ? lista.filter((item) => !!item?.id) : [];
+      const usuarioFallback = getUsuarioLogadoFallback();
+
+      if (!usuarioFallback) return base;
+      if (base.some((item) => item.id === usuarioFallback.id)) return base;
+
+      return [usuarioFallback, ...base];
+    },
+    [getUsuarioLogadoFallback],
+  );
+
+  useEffect(() => {
+    if (visualizacao !== 'kanban' && kanbanExpanded) {
+      setKanbanExpanded(false);
+    }
+  }, [visualizacao, kanbanExpanded]);
+
+  useEffect(() => {
+    if (!kanbanExpanded) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [kanbanExpanded]);
+
+  useEffect(() => {
+    if (!openCardActionsMenuId && !openListActionsMenuId) return;
+
+    const closeMenu = () => {
+      setOpenCardActionsMenuId(null);
+      setOpenListActionsMenuId(null);
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeMenu();
+    };
+
+    window.addEventListener('click', closeMenu);
+    window.addEventListener('keydown', handleEscape);
+
+    return () => {
+      window.removeEventListener('click', closeMenu);
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [openCardActionsMenuId, openListActionsMenuId]);
+
+  useEffect(() => {
+    if (!kanbanExpanded) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setKanbanExpanded(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [kanbanExpanded]);
+
+  useEffect(() => {
+    const onScroll = () => {
+      setShowBackToTop(window.scrollY > 520);
+    };
+
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   // Estados para ordenação e paginação
   const [ordenacao, setOrdenacao] = useState<{
@@ -254,6 +662,99 @@ const PipelinePage: React.FC = () => {
     }
   }, []);
 
+  useEffect(() => {
+    if (!lifecycleFeatureEnabled) {
+      return;
+    }
+
+    try {
+      localStorage.setItem(PIPELINE_LIFECYCLE_VIEW_STORAGE_KEY, lifecycleView);
+    } catch (err) {
+      console.warn('Nao foi possivel salvar a visualizacao da pipeline no localStorage.', err);
+    }
+  }, [lifecycleFeatureEnabled, lifecycleView]);
+
+  const normalizeIntegerWithinRange = (value: number, min: number, max: number) => {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+      return min;
+    }
+    return Math.min(max, Math.max(min, Math.round(numericValue)));
+  };
+
+  const stalePolicyHasChanges = useMemo(() => {
+    if (!stalePolicy) return false;
+    return (
+      stalePolicy.enabled !== stalePolicyDraft.enabled ||
+      stalePolicy.thresholdDays !==
+        normalizeIntegerWithinRange(
+          stalePolicyDraft.thresholdDays,
+          STALE_THRESHOLD_MIN,
+          STALE_THRESHOLD_MAX,
+        ) ||
+      stalePolicy.autoArchiveEnabled !== stalePolicyDraft.autoArchiveEnabled ||
+      stalePolicy.autoArchiveAfterDays !==
+        normalizeIntegerWithinRange(
+          stalePolicyDraft.autoArchiveAfterDays,
+          STALE_AUTO_ARCHIVE_MIN,
+          STALE_AUTO_ARCHIVE_MAX,
+        )
+    );
+  }, [stalePolicy, stalePolicyDraft]);
+
+  const engagementPolicyHasChanges = useMemo(() => {
+    if (!engagementPolicy) return false;
+    return (
+      engagementPolicy.hotMinProbability !==
+        normalizeIntegerWithinRange(
+          engagementPolicyDraft.hotMinProbability,
+          ENGAGEMENT_HOT_MIN_PROBABILITY_MIN,
+          ENGAGEMENT_HOT_MIN_PROBABILITY_MAX,
+        ) ||
+      engagementPolicy.hotCloseWindowDays !==
+        normalizeIntegerWithinRange(
+          engagementPolicyDraft.hotCloseWindowDays,
+          ENGAGEMENT_HOT_CLOSE_WINDOW_MIN,
+          ENGAGEMENT_HOT_CLOSE_WINDOW_MAX,
+        ) ||
+      engagementPolicy.nextActionDueSoonDays !==
+        normalizeIntegerWithinRange(
+          engagementPolicyDraft.nextActionDueSoonDays,
+          ENGAGEMENT_NEXT_ACTION_SOON_MIN,
+          ENGAGEMENT_NEXT_ACTION_SOON_MAX,
+        )
+    );
+  }, [engagementPolicy, engagementPolicyDraft]);
+
+  const syncStalePolicyDraft = useCallback((policy: StalePolicyDecision) => {
+    setStalePolicyDraft({
+      enabled: Boolean(policy.enabled),
+      thresholdDays: policy.thresholdDays,
+      autoArchiveEnabled: Boolean(policy.autoArchiveEnabled),
+      autoArchiveAfterDays: policy.autoArchiveAfterDays,
+    });
+  }, []);
+
+  const syncEngagementPolicyDraft = useCallback((policy: EngagementPolicyDecision) => {
+    setEngagementPolicyDraft({
+      hotMinProbability: policy.hotMinProbability,
+      hotCloseWindowDays: policy.hotCloseWindowDays,
+      nextActionDueSoonDays: policy.nextActionDueSoonDays,
+    });
+  }, []);
+
+  const effectiveEngagementPolicy = useMemo(
+    () => ({
+      hotMinProbability:
+        engagementPolicy?.hotMinProbability ?? ENGAGEMENT_HOT_MIN_PROBABILITY_DEFAULT,
+      hotCloseWindowDays:
+        engagementPolicy?.hotCloseWindowDays ?? ENGAGEMENT_HOT_CLOSE_WINDOW_DEFAULT,
+      nextActionDueSoonDays:
+        engagementPolicy?.nextActionDueSoonDays ?? ENGAGEMENT_NEXT_ACTION_SOON_DEFAULT,
+    }),
+    [engagementPolicy],
+  );
+
   // Verificar autenticação ao carregar
   useEffect(() => {
     if (!isAuthenticated) {
@@ -264,24 +765,153 @@ const PipelinePage: React.FC = () => {
       setLoading(false);
       return;
     }
-    carregarDados();
-  }, [isAuthenticated, navigate]);
+    void carregarDados();
+  }, [isAuthenticated, navigate, lifecycleView]);
+
+  const pipelineBasePath = useMemo(
+    () => (location.pathname.startsWith('/crm/') ? '/crm/pipeline' : '/pipeline'),
+    [location.pathname],
+  );
+
+  const abrirDetalhesOportunidade = useCallback(
+    (
+      oportunidade: Oportunidade,
+      aba: AbaDetalhesOportunidade = 'detalhes',
+      contextoEvento: ModalDetalhesEventoContext | null = null,
+      replace = false,
+    ) => {
+      captureKanbanScrollSnapshot();
+      const params = new URLSearchParams();
+      const fromParams = new URLSearchParams(location.search);
+      fromParams.delete('oportunidadeId');
+      const fromSearch = fromParams.toString();
+      const fromPath = `${location.pathname}${fromSearch ? `?${fromSearch}` : ''}`;
+      if (aba === 'atividades') {
+        params.set('tab', 'atividades');
+      }
+
+      const targetPath = `${pipelineBasePath}/oportunidades/${oportunidade.id}`;
+      const targetUrl = params.toString() ? `${targetPath}?${params.toString()}` : targetPath;
+
+      navigate(targetUrl, {
+        replace,
+        state: {
+          from: fromPath,
+          initialTab: aba,
+          eventContext: contextoEvento,
+        },
+      });
+    },
+    [captureKanbanScrollSnapshot, location.pathname, location.search, navigate, pipelineBasePath],
+  );
+
+  useEffect(() => {
+    const oportunidadeIdParam = String(searchParams.get('oportunidadeId') || '').trim();
+    if (!oportunidadeIdParam) {
+      return;
+    }
+
+    const fromParams = new URLSearchParams(location.search);
+    fromParams.delete('oportunidadeId');
+    const fromSearch = fromParams.toString();
+    const fromPath = `${location.pathname}${fromSearch ? `?${fromSearch}` : ''}`;
+    const encodedId = encodeURIComponent(oportunidadeIdParam);
+
+    navigate(`${pipelineBasePath}/oportunidades/${encodedId}`, {
+      replace: true,
+      state: {
+        from: fromPath,
+        initialTab: 'detalhes',
+      },
+    });
+  }, [location.pathname, location.search, navigate, pipelineBasePath, searchParams]);
 
   const carregarDados = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Carregar oportunidades e usuários em paralelo
-      const [dados, stats, usuariosData] = await Promise.all([
-        oportunidadesService.listarOportunidades(),
-        oportunidadesService.obterEstatisticas(),
-        carregarUsuarios(),
-      ]);
+      const lifecycleDecision = await oportunidadesService
+        .obterLifecycleFeatureFlag()
+        .catch(() => ({ enabled: false, source: 'disabled', rolloutPercentage: 0 }));
+      const lifecycleEnabled = Boolean(lifecycleDecision.enabled);
+      setLifecycleFeatureEnabled(lifecycleEnabled);
 
-      setOportunidades(dados);
+      if (!lifecycleEnabled && lifecycleView !== LifecycleViewOportunidade.OPEN) {
+        setLifecycleView(LifecycleViewOportunidade.OPEN);
+      }
+
+      const lifecycleFilters: Partial<FiltrosOportunidade> = lifecycleEnabled
+        ? {
+            lifecycle_view: lifecycleView,
+            include_deleted: lifecycleView === LifecycleViewOportunidade.DELETED,
+          }
+        : {};
+
+      const staleDealsPromise: Promise<StaleDealsResult | null> =
+        lifecycleEnabled && lifecycleView === LifecycleViewOportunidade.OPEN
+          ? oportunidadesService.listarOportunidadesParadas({ limit: 2000 }).catch(() => null)
+          : Promise.resolve(null);
+
+      let stalePolicyPromise: Promise<StalePolicyDecision | null> = Promise.resolve(null);
+      let engagementPolicyPromise: Promise<EngagementPolicyDecision | null> = Promise.resolve(null);
+      if (lifecycleEnabled) {
+        setStalePolicyLoading(true);
+        setEngagementPolicyLoading(true);
+        stalePolicyPromise = oportunidadesService.obterStalePolicy().catch(() => null);
+        engagementPolicyPromise = oportunidadesService.obterEngagementPolicy().catch(() => null);
+      } else {
+        setStalePolicy(null);
+        setEngagementPolicy(null);
+      }
+
+      // Carregar oportunidades e usuários em paralelo
+      const [dados, stats, usuariosData, staleDealsResult, stalePolicyData, engagementPolicyData] =
+        await Promise.all([
+          oportunidadesService.listarOportunidades(lifecycleFilters),
+          oportunidadesService.obterEstatisticas(lifecycleFilters),
+          carregarUsuarios(),
+          staleDealsPromise,
+          stalePolicyPromise,
+          engagementPolicyPromise,
+        ]);
+
+      const staleById = new Map(
+        (staleDealsResult?.stale || []).map((oportunidade: Oportunidade) => [
+          String(oportunidade.id),
+          oportunidade,
+        ]),
+      );
+      const dadosComStale =
+        staleById.size > 0
+          ? dados.map((oportunidade) => {
+              const stale = staleById.get(String(oportunidade.id));
+              if (!stale) return oportunidade;
+              return {
+                ...oportunidade,
+                is_stale: stale.is_stale,
+                stale_days: stale.stale_days,
+                stale_since: stale.stale_since,
+                last_interaction_at: stale.last_interaction_at,
+              };
+            })
+          : dados;
+
+      setOportunidades(dadosComStale);
       setEstatisticas(stats);
       setUsuarios(usuariosData);
+      if (stalePolicyData) {
+        setStalePolicy(stalePolicyData);
+        syncStalePolicyDraft(stalePolicyData);
+      } else if (lifecycleEnabled) {
+        setStalePolicy(null);
+      }
+      if (engagementPolicyData) {
+        setEngagementPolicy(engagementPolicyData);
+        syncEngagementPolicyDraft(engagementPolicyData);
+      } else if (lifecycleEnabled) {
+        setEngagementPolicy(null);
+      }
     } catch (err: any) {
       console.error('Erro ao carregar dados:', err);
 
@@ -291,6 +921,7 @@ const PipelinePage: React.FC = () => {
         // Redirecionar para login após 2 segundos
         setTimeout(() => {
           localStorage.removeItem('authToken'); // ✅ Corrigido para 'authToken'
+          localStorage.removeItem('refreshToken');
           navigate('/login');
         }, 2000);
       } else {
@@ -300,18 +931,118 @@ const PipelinePage: React.FC = () => {
       }
     } finally {
       setLoading(false);
+      setStalePolicyLoading(false);
+      setEngagementPolicyLoading(false);
     }
   };
 
   // Carregar lista de usuários para os selects
+  const handleSalvarStalePolicy = async () => {
+    if (!canManageStalePolicy) {
+      toastService.warning('Você não possui permissão para alterar essa configuração.');
+      return;
+    }
+
+    const payload = {
+      enabled: stalePolicyDraft.enabled,
+      thresholdDays: normalizeIntegerWithinRange(
+        stalePolicyDraft.thresholdDays,
+        STALE_THRESHOLD_MIN,
+        STALE_THRESHOLD_MAX,
+      ),
+      autoArchiveEnabled: stalePolicyDraft.enabled ? stalePolicyDraft.autoArchiveEnabled : false,
+      autoArchiveAfterDays: normalizeIntegerWithinRange(
+        stalePolicyDraft.autoArchiveAfterDays,
+        STALE_AUTO_ARCHIVE_MIN,
+        STALE_AUTO_ARCHIVE_MAX,
+      ),
+    };
+
+    try {
+      setStalePolicySaving(true);
+      const updatedPolicy = await oportunidadesService.atualizarStalePolicy(payload);
+      setStalePolicy(updatedPolicy);
+      syncStalePolicyDraft(updatedPolicy);
+      toastService.success('Política de oportunidades paradas atualizada.');
+      await carregarDados();
+    } catch (err: any) {
+      if (err?.response?.status === 403) {
+        toastService.error('Sem permissão para atualizar a política stale.');
+      } else {
+        toastService.error('Não foi possível atualizar a política stale.');
+      }
+    } finally {
+      setStalePolicySaving(false);
+    }
+  };
+
+  const handleResetStalePolicyDraft = () => {
+    if (!stalePolicy) return;
+    syncStalePolicyDraft(stalePolicy);
+  };
+
+  const handleSalvarEngagementPolicy = async () => {
+    if (!canManageStalePolicy) {
+      toastService.warning('Você não possui permissão para alterar essa configuração.');
+      return;
+    }
+
+    const payload = {
+      hotMinProbability: normalizeIntegerWithinRange(
+        engagementPolicyDraft.hotMinProbability,
+        ENGAGEMENT_HOT_MIN_PROBABILITY_MIN,
+        ENGAGEMENT_HOT_MIN_PROBABILITY_MAX,
+      ),
+      hotCloseWindowDays: normalizeIntegerWithinRange(
+        engagementPolicyDraft.hotCloseWindowDays,
+        ENGAGEMENT_HOT_CLOSE_WINDOW_MIN,
+        ENGAGEMENT_HOT_CLOSE_WINDOW_MAX,
+      ),
+      nextActionDueSoonDays: normalizeIntegerWithinRange(
+        engagementPolicyDraft.nextActionDueSoonDays,
+        ENGAGEMENT_NEXT_ACTION_SOON_MIN,
+        ENGAGEMENT_NEXT_ACTION_SOON_MAX,
+      ),
+    };
+
+    try {
+      setEngagementPolicySaving(true);
+      const updatedPolicy = await oportunidadesService.atualizarEngagementPolicy(payload);
+      setEngagementPolicy(updatedPolicy);
+      syncEngagementPolicyDraft(updatedPolicy);
+      toastService.success('Política de aquecimento da pipeline atualizada.');
+      await carregarDados();
+    } catch (err: any) {
+      if (err?.response?.status === 403) {
+        toastService.error('Sem permissão para atualizar a política de aquecimento.');
+      } else {
+        toastService.error('Não foi possível atualizar a política de aquecimento.');
+      }
+    } finally {
+      setEngagementPolicySaving(false);
+    }
+  };
+
+  const handleResetEngagementPolicyDraft = () => {
+    if (!engagementPolicy) return;
+    syncEngagementPolicyDraft(engagementPolicy);
+  };
+
   const carregarUsuarios = async (): Promise<Usuario[]> => {
     try {
       setLoadingUsuarios(true);
       const response = await usuariosService.listarUsuarios({ ativo: true });
-      return response.usuarios || [];
+      return mergeUsuariosComFallback(response.usuarios || []);
     } catch (err) {
+      const status = (err as any)?.response?.status;
+      if (status === 401 || status === 403) {
+        console.warn(
+          '[Pipeline] Usuário sem permissão para listar usuários; aplicando fallback do usuário logado.',
+        );
+      }
       console.error('Erro ao carregar usuários:', err);
-      return [];
+      const usuarioFallback = getUsuarioLogadoFallback();
+      return usuarioFallback ? [usuarioFallback] : [];
     } finally {
       setLoadingUsuarios(false);
     }
@@ -319,54 +1050,337 @@ const PipelinePage: React.FC = () => {
 
   // Abrir modal para criar nova oportunidade
   const handleNovaOportunidade = (estagio: EstagioOportunidade = EstagioOportunidade.LEADS) => {
+    if (lifecycleFeatureEnabled && lifecycleView !== LifecycleViewOportunidade.OPEN) {
+      toastService.warning('Para criar oportunidade, altere para a visão "Abertas".');
+      return;
+    }
+
+    captureKanbanScrollSnapshot();
     setOportunidadeEditando(null);
     setEstagioNovaOportunidade(estagio);
     setShowModal(true);
   };
 
+  const getLifecycleStatus = (oportunidade: Oportunidade): LifecycleStatusOportunidade => {
+    if (oportunidade.lifecycle_status) return oportunidade.lifecycle_status;
+    if (oportunidade.estagio === EstagioOportunidade.GANHO) return LifecycleStatusOportunidade.WON;
+    if (oportunidade.estagio === EstagioOportunidade.PERDIDO)
+      return LifecycleStatusOportunidade.LOST;
+    return LifecycleStatusOportunidade.OPEN;
+  };
+
+  const isTerminalStage = (estagio: EstagioOportunidade): boolean =>
+    estagio === EstagioOportunidade.GANHO || estagio === EstagioOportunidade.PERDIDO;
+
+  const canMarkOpportunityAsWon = (oportunidade: Oportunidade): boolean =>
+    lifecycleFeatureEnabled &&
+    getLifecycleStatus(oportunidade) === LifecycleStatusOportunidade.OPEN &&
+    oportunidade.estagio === EstagioOportunidade.FECHAMENTO;
+
+  const canMarkOpportunityAsLost = (oportunidade: Oportunidade): boolean =>
+    lifecycleFeatureEnabled &&
+    getLifecycleStatus(oportunidade) === LifecycleStatusOportunidade.OPEN &&
+    !isTerminalStage(oportunidade.estagio);
+
+  const isOpportunityOpenForProcess = (oportunidade: Oportunidade): boolean =>
+    !lifecycleFeatureEnabled ||
+    getLifecycleStatus(oportunidade) === LifecycleStatusOportunidade.OPEN;
+
+  const resolveNextActionDeltaDays = (oportunidade: Oportunidade): number | null => {
+    const explicitDelta = Number(oportunidade.next_action_days_delta);
+    if (Number.isFinite(explicitDelta)) {
+      return Math.round(explicitDelta);
+    }
+
+    if (!oportunidade.next_action_at) {
+      return null;
+    }
+
+    const nextActionDate = new Date(oportunidade.next_action_at);
+    if (Number.isNaN(nextActionDate.getTime())) {
+      return null;
+    }
+
+    return differenceInDays(nextActionDate, new Date());
+  };
+
+  const getNextActionWarning = (
+    oportunidade: Oportunidade,
+  ): { label: string; className: string } | null => {
+    if (!isOpportunityOpenForProcess(oportunidade) || isTerminalStage(oportunidade.estagio)) {
+      return null;
+    }
+
+    const status = String(oportunidade.next_action_status || '').toLowerCase();
+    const daysDelta = resolveNextActionDeltaDays(oportunidade);
+
+    if (status === 'overdue' || (daysDelta !== null && daysDelta < 0)) {
+      const atrasoDias = daysDelta !== null ? Math.abs(daysDelta) : 0;
+      return {
+        label: `Acao atrasada ${atrasoDias}d`,
+        className: 'bg-red-100 text-red-700 border border-red-200',
+      };
+    }
+
+    const isDueSoon =
+      status === 'due_soon' ||
+      (daysDelta !== null &&
+        daysDelta >= 0 &&
+        daysDelta <= effectiveEngagementPolicy.nextActionDueSoonDays);
+    if (!isDueSoon) {
+      return null;
+    }
+
+    const prazoLabel = daysDelta === 0 ? 'Acao hoje' : `Acao em ${Math.max(daysDelta || 0, 0)}d`;
+    return {
+      label: prazoLabel,
+      className: 'bg-amber-100 text-amber-700 border border-amber-200',
+    };
+  };
+
+  const isHotNegotiationOpportunity = (
+    oportunidade: Oportunidade,
+    diasAteVencimento: number | null,
+  ): boolean => {
+    if (!isOpportunityOpenForProcess(oportunidade) || isTerminalStage(oportunidade.estagio)) {
+      return false;
+    }
+
+    if (Boolean(oportunidade.is_stale)) {
+      return false;
+    }
+
+    const hotStage =
+      oportunidade.estagio === EstagioOportunidade.NEGOCIACAO ||
+      oportunidade.estagio === EstagioOportunidade.FECHAMENTO;
+    if (!hotStage) {
+      return false;
+    }
+
+    if (Number(oportunidade.probabilidade || 0) < effectiveEngagementPolicy.hotMinProbability) {
+      return false;
+    }
+
+    const closeWindowHot =
+      diasAteVencimento !== null &&
+      diasAteVencimento <= effectiveEngagementPolicy.hotCloseWindowDays &&
+      diasAteVencimento >= -3;
+    const nextActionPressure = getNextActionWarning(oportunidade) !== null;
+    return closeWindowHot || nextActionPressure;
+  };
+
+  const canEditOpportunity = (oportunidade: Oportunidade): boolean =>
+    isOpportunityOpenForProcess(oportunidade) && !isTerminalStage(oportunidade.estagio);
+
+  const canDuplicateOpportunity = (oportunidade: Oportunidade): boolean =>
+    isOpportunityOpenForProcess(oportunidade) && !isTerminalStage(oportunidade.estagio);
+
+  const canCreateProposalDraft = (oportunidade: Oportunidade): boolean => {
+    if (!isOpportunityOpenForProcess(oportunidade)) {
+      return false;
+    }
+
+    return (
+      oportunidade.estagio === EstagioOportunidade.PROPOSTA ||
+      oportunidade.estagio === EstagioOportunidade.NEGOCIACAO ||
+      oportunidade.estagio === EstagioOportunidade.FECHAMENTO
+    );
+  };
+
+  const canManipulateKanban =
+    !lifecycleFeatureEnabled || lifecycleView === LifecycleViewOportunidade.OPEN;
+  const userRole = mapRoleToUserRole(user?.role);
+  const canSkipPipelineStages =
+    userRole === UserRole.GERENTE ||
+    userRole === UserRole.ADMIN ||
+    userRole === UserRole.SUPERADMIN;
+
   // Abrir modal para editar oportunidade existente
   const handleEditarOportunidade = (oportunidade: Oportunidade) => {
+    if (!canEditOpportunity(oportunidade)) {
+      toastService.warning(
+        'Edicao disponivel apenas para oportunidades abertas e fora dos estagios Ganho/Perdido.',
+      );
+      return;
+    }
+
+    captureKanbanScrollSnapshot();
     setOportunidadeEditando(oportunidade);
     setShowModal(true);
   };
 
-  // Abrir modal de detalhes
+  // Abrir pagina de detalhes
   const handleVerDetalhes = (oportunidade: Oportunidade) => {
-    setOportunidadeDetalhes(oportunidade);
+    abrirDetalhesOportunidade(oportunidade, 'atividades');
   };
 
-  // Abrir modal para confirmar exclusão
+  // Abrir modal para confirmar exclusao
   const handleDeletarOportunidade = (oportunidade: Oportunidade) => {
+    setDeleteMode(getDeleteModeForOpportunity(oportunidade));
     setOportunidadeDeletar(oportunidade);
     setShowModalDeletar(true);
   };
 
-  // Confirmar exclusão
+  // Confirmar exclusao
   const handleConfirmarDelecao = async () => {
     if (!oportunidadeDeletar) return;
 
     try {
       setLoadingDeletar(true);
-      await oportunidadesService.excluirOportunidade(oportunidadeDeletar.id);
-      setOportunidades((prev) => prev.filter((o) => o.id !== oportunidadeDeletar.id));
-
+      if (deleteMode === 'permanente') {
+        await oportunidadesService.excluirOportunidadePermanente(oportunidadeDeletar.id);
+        toastService.success('Oportunidade excluida permanentemente.');
+      } else {
+        await oportunidadesService.excluirOportunidade(oportunidadeDeletar.id);
+        toastService.success('Oportunidade enviada para a lixeira.');
+      }
       // Recarregar estatísticas
-      const stats = await oportunidadesService.obterEstatisticas();
-      setEstatisticas(stats);
-
-      toast.success('Oportunidade deletada com sucesso!');
+      await carregarDados();
     } catch (err) {
       console.error('Erro ao deletar oportunidade:', err);
-      toast.error('Erro ao deletar oportunidade');
+      toastService.error('Erro ao deletar oportunidade');
     } finally {
       setLoadingDeletar(false);
       setShowModalDeletar(false);
       setOportunidadeDeletar(null);
+      setDeleteMode('soft');
+    }
+  };
+
+  const handleArquivarOportunidade = async (oportunidade: Oportunidade) => {
+    await oportunidadesService.arquivarOportunidade(oportunidade.id);
+    toastService.success('Oportunidade arquivada com sucesso.');
+    await carregarDados();
+  };
+
+  const handleRestaurarOportunidade = async (oportunidade: Oportunidade) => {
+    await oportunidadesService.restaurarOportunidade(oportunidade.id);
+    toastService.success('Oportunidade restaurada com sucesso.');
+    await carregarDados();
+  };
+
+  const handleReabrirOportunidade = async (oportunidade: Oportunidade) => {
+    await oportunidadesService.reabrirOportunidade(oportunidade.id);
+    toastService.success('Oportunidade reaberta com sucesso.');
+    await carregarDados();
+  };
+
+  const handlePrepararPerdaOportunidade = (oportunidade: Oportunidade) => {
+    if (!canMarkOpportunityAsLost(oportunidade)) {
+      toastService.warning('Apenas oportunidades abertas podem ser marcadas como perdidas.');
+      return;
+    }
+
+    setOpenCardActionsMenuId(null);
+    setOpenListActionsMenuId(null);
+    setErroMotivoPerda(null);
+    setDraggedItem(null);
+    setOportunidadeParaPerder(oportunidade);
+    setShowModalMotivoPerda(true);
+  };
+
+  const handleMarcarOportunidadeComoGanha = async (oportunidade: Oportunidade) => {
+    if (!canMarkOpportunityAsWon(oportunidade)) {
+      toastService.warning(
+        'Somente oportunidades abertas em Fechamento podem ser marcadas como ganho.',
+      );
+      return;
+    }
+
+    const confirmou = await confirm({
+      title: 'Marcar oportunidade como ganha',
+      message: 'Ao confirmar, a oportunidade sera encerrada como ganha e saira da visao Abertas.',
+      confirmText: 'Marcar como ganho',
+      cancelText: 'Cancelar',
+      confirmButtonClass: 'bg-green-600 hover:bg-green-700 focus:ring-green-500',
+      icon: 'success',
+    });
+
+    if (!confirmou) {
+      return;
+    }
+
+    try {
+      setLoadingMudancaEstagio(true);
+      setErroMudancaEstagio(null);
+      setOpenCardActionsMenuId(null);
+      setOpenListActionsMenuId(null);
+      setDraggedItem(null);
+
+      await oportunidadesService.atualizarEstagio(oportunidade.id, {
+        estagio: EstagioOportunidade.GANHO,
+      });
+
+      await carregarDados();
+      toastService.success('Oportunidade marcada como ganha com sucesso!');
+      triggerSalesCelebration({
+        kind: 'venda-concluida',
+        subtitle: `"${oportunidade.titulo}" foi marcada como ganha.`,
+      });
+    } catch (err) {
+      console.error('Erro ao marcar oportunidade como ganha:', err);
+      const errorMessage = extrairMensagemErroApi(err, 'Erro ao marcar oportunidade como ganha');
+      toastService.error(errorMessage);
+      setErroMudancaEstagio(errorMessage);
+      setError(errorMessage);
+    } finally {
+      setLoadingMudancaEstagio(false);
+    }
+  };
+
+  const handleExcluirPermanenteOportunidade = async (oportunidade: Oportunidade) => {
+    await oportunidadesService.excluirOportunidadePermanente(oportunidade.id);
+    toastService.success('Oportunidade excluida permanentemente.');
+    await carregarDados();
+  };
+
+  const getDeleteModeForOpportunity = (oportunidade: Oportunidade): 'soft' | 'permanente' => {
+    const lifecycleStatus = getLifecycleStatus(oportunidade);
+    const shouldDeletePermanently =
+      lifecycleFeatureEnabled &&
+      (lifecycleView === LifecycleViewOportunidade.DELETED ||
+        lifecycleStatus === LifecycleStatusOportunidade.DELETED);
+
+    return shouldDeletePermanently ? 'permanente' : 'soft';
+  };
+
+  const handleLifecyclePrimaryAction = async (oportunidade: Oportunidade) => {
+    if (!lifecycleFeatureEnabled) return;
+
+    const lifecycleStatus = getLifecycleStatus(oportunidade);
+
+    try {
+      if (
+        lifecycleStatus === LifecycleStatusOportunidade.ARCHIVED ||
+        lifecycleStatus === LifecycleStatusOportunidade.DELETED
+      ) {
+        await handleRestaurarOportunidade(oportunidade);
+        return;
+      }
+
+      if (
+        oportunidade.estagio === EstagioOportunidade.GANHO ||
+        oportunidade.estagio === EstagioOportunidade.PERDIDO
+      ) {
+        await handleReabrirOportunidade(oportunidade);
+        return;
+      }
+
+      await handleArquivarOportunidade(oportunidade);
+    } catch (err) {
+      console.error('Erro ao executar acao de ciclo de vida:', err);
+      toastService.error('Não foi possível concluir a ação de ciclo de vida.');
     }
   };
 
   // Clonar oportunidade
   const handleClonarOportunidade = (oportunidade: Oportunidade) => {
+    if (!canDuplicateOpportunity(oportunidade)) {
+      toastService.warning(
+        'Duplicacao disponivel apenas para oportunidades abertas e fora dos estagios Ganho/Perdido.',
+      );
+      return;
+    }
     // Criar cópia dos dados (sem ID e datas)
     const oportunidadeClonada = {
       titulo: `${oportunidade.titulo} (Cópia)`,
@@ -386,32 +1400,39 @@ const PipelinePage: React.FC = () => {
     };
 
     // Abrir modal de edição com dados clonados
+    captureKanbanScrollSnapshot();
     setOportunidadeEditando(oportunidadeClonada as any);
     setShowModal(true);
-    toast.success('Oportunidade duplicada! Edite e salve para criar a cópia.');
+    toastService.success('Oportunidade duplicada! Edite e salve para criar a cópia.');
   };
 
   // Gerar proposta a partir da oportunidade
   const handleGerarProposta = async (oportunidade: Oportunidade, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    if (!canCreateProposalDraft(oportunidade)) {
+      toastService.warning(
+        'Rascunho de proposta disponivel apenas para oportunidades abertas em Proposta, Negociacao ou Fechamento.',
+      );
+      return;
+    }
 
     try {
       const response = await oportunidadesService.gerarProposta(oportunidade.id);
-      toast.success('Proposta gerada com sucesso!');
+      toastService.success('Rascunho de proposta criado. Complete os itens na tela de Propostas.');
 
       // Redirecionar para a página de propostas com a proposta recém-criada
-      navigate(`/comercial/propostas?proposta=${response.proposta.id}`);
+      navigate(`/vendas/propostas?proposta=${response.proposta.id}&mode=edit&origem=pipeline`);
     } catch (err: unknown) {
       console.error('Erro ao gerar proposta:', err);
       const errorMessage = err instanceof Error ? err.message : 'Erro ao gerar proposta';
-      toast.error(errorMessage);
+      toastService.error(errorMessage);
     }
   };
 
   // Salvar filtro atual
   const handleSalvarFiltro = () => {
     if (!nomeFiltroSalvar.trim()) {
-      toast.error('Digite um nome para o filtro');
+      toastService.error('Digite um nome para o filtro');
       return;
     }
 
@@ -427,7 +1448,7 @@ const PipelinePage: React.FC = () => {
 
     setShowModalSalvarFiltro(false);
     setNomeFiltroSalvar('');
-    toast.success('Filtro salvo com sucesso!');
+    toastService.success('Filtro salvo com sucesso!');
   };
 
   // Aplicar filtro salvo
@@ -437,7 +1458,7 @@ const PipelinePage: React.FC = () => {
       setFiltros(filtro.filtros);
       setFiltroSelecionado(filtroId);
       setPaginaAtual(1);
-      toast.success(`Filtro "${filtro.nome}" aplicado`);
+      toastService.success(`Filtro "${filtro.nome}" aplicado`);
     }
   };
 
@@ -451,7 +1472,7 @@ const PipelinePage: React.FC = () => {
       setFiltroSelecionado(null);
     }
 
-    toast.success('Filtro deletado');
+    toastService.success('Filtro deletado');
   };
 
   // Limpar filtros
@@ -487,6 +1508,17 @@ const PipelinePage: React.FC = () => {
   // Salvar oportunidade (criar ou atualizar)
   const handleSalvarOportunidade = async (data: NovaOportunidade) => {
     try {
+      const estagioAlterado =
+        !oportunidadeEditando || oportunidadeEditando.estagio !== data.estagio;
+      if (lifecycleFeatureEnabled && estagioAlterado && isTerminalStage(data.estagio)) {
+        const mensagem =
+          data.estagio === EstagioOportunidade.GANHO
+            ? 'Use a acao "Marcar como ganho" para encerrar a oportunidade.'
+            : 'Use a acao "Marcar como perdido" para registrar a perda com motivo.';
+        toastService.warning(mensagem);
+        throw new Error(mensagem);
+      }
+
       if (oportunidadeEditando) {
         // Atualizar existente
         await oportunidadesService.atualizarOportunidade({ id: oportunidadeEditando.id, ...data });
@@ -499,14 +1531,25 @@ const PipelinePage: React.FC = () => {
       await carregarDados();
       setShowModal(false);
       setOportunidadeEditando(null);
-      toast.success(
+      restoreKanbanScrollSnapshot({ defer: true });
+      toastService.success(
         oportunidadeEditando
           ? 'Oportunidade atualizada com sucesso!'
           : 'Oportunidade criada com sucesso!',
       );
+      const vendaConcluidaDireto =
+        data.estagio === EstagioOportunidade.GANHO &&
+        (!oportunidadeEditando || oportunidadeEditando.estagio !== EstagioOportunidade.GANHO);
+      if (vendaConcluidaDireto) {
+        triggerSalesCelebration({
+          kind: 'venda-concluida',
+          subtitle: `"${data.titulo}" foi registrada como ganha.`,
+        });
+      }
     } catch (err) {
       console.error('Erro ao salvar oportunidade:', err);
-      toast.error('Erro ao salvar oportunidade');
+      const errorMessage = extrairMensagemErroApi(err, 'Erro ao salvar oportunidade');
+      toastService.error(errorMessage);
       throw err; // Deixar o modal tratar o erro
     }
   };
@@ -539,19 +1582,19 @@ const PipelinePage: React.FC = () => {
       } else if (formato === 'excel') {
         // Excel Export usando xlsx
         const dadosExcel = oportunidadesFiltradas.map((op) => ({
-          Título: op.titulo,
-          Estágio: op.estagio,
-          Valor: op.valor,
-          'Probabilidade (%)': op.probabilidade,
-          Prioridade: op.prioridade || '',
-          Origem: op.origem || '',
-          Contato: op.nomeContato || '',
-          Email: op.emailContato || '',
-          Telefone: op.telefoneContato || '',
-          Empresa: op.empresaContato || '',
-          Responsável: op.responsavel?.nome || '',
-          'Data Esperada': op.dataFechamentoEsperado || '',
-          Descrição: op.descricao || '',
+          titulo: op.titulo,
+          estagio: op.estagio,
+          valor: op.valor,
+          probabilidadePercentual: op.probabilidade,
+          prioridade: op.prioridade || '',
+          origem: op.origem || '',
+          contato: op.nomeContato || '',
+          email: op.emailContato || '',
+          telefone: op.telefoneContato || '',
+          empresa: op.empresaContato || '',
+          responsavel: op.responsavel?.nome || '',
+          dataEsperada: op.dataFechamentoEsperado || '',
+          descricao: op.descricao || '',
         }));
 
         // Criar workbook
@@ -582,13 +1625,13 @@ const PipelinePage: React.FC = () => {
         // Adicionar aba de Estatísticas
         if (estatisticas) {
           const statsData = [
-            { Métrica: 'Total de Oportunidades', Valor: estatisticas.totalOportunidades },
+            { metrica: 'Total de Oportunidades', valor: estatisticas.totalOportunidades },
             {
-              Métrica: 'Valor Total do Pipeline',
-              Valor: formatarMoeda(estatisticas.valorTotalPipeline),
+              metrica: 'Valor Total do Pipeline',
+              valor: formatarMoeda(estatisticas.valorTotalPipeline),
             },
-            { Métrica: 'Ticket Médio', Valor: formatarMoeda(estatisticas.valorMedio) },
-            { Métrica: 'Taxa de Conversão', Valor: `${estatisticas.taxaConversao.toFixed(1)}%` },
+            { metrica: 'Ticket Medio', valor: formatarMoeda(estatisticas.valorMedio) },
+            { metrica: 'Taxa de Conversao', valor: `${estatisticas.taxaConversao.toFixed(1)}%` },
           ];
           const wsStats = XLSX.utils.json_to_sheet(statsData);
           wsStats['!cols'] = [{ wch: 30 }, { wch: 25 }];
@@ -600,11 +1643,10 @@ const PipelinePage: React.FC = () => {
           const opsEstagio = oportunidadesFiltradas.filter((op) => op.estagio === estagio.id);
           const valorTotal = opsEstagio.reduce((sum, op) => sum + op.valor, 0);
           return {
-            Estágio: estagio.nome,
-            Quantidade: opsEstagio.length,
-            'Valor Total': formatarMoeda(valorTotal),
-            'Valor Médio':
-              opsEstagio.length > 0 ? formatarMoeda(valorTotal / opsEstagio.length) : 'R$ 0,00',
+            estagio: estagio.nome,
+            quantidade: opsEstagio.length,
+            valorTotal: formatarMoeda(valorTotal),
+            valorMedio: opsEstagio.length > 0 ? formatarMoeda(valorTotal / opsEstagio.length) : 'R$ 0,00',
           };
         });
         const wsStaging = XLSX.utils.json_to_sheet(stagingData);
@@ -710,25 +1752,113 @@ const PipelinePage: React.FC = () => {
 
   // Drag and Drop handlers
   const handleDragStart = (oportunidade: Oportunidade) => {
+    if (!canManipulateKanban) return;
+
+    const lifecycleStatus = getLifecycleStatus(oportunidade);
+    if (lifecycleFeatureEnabled && lifecycleStatus !== LifecycleStatusOportunidade.OPEN) {
+      return;
+    }
+
+    setDragOverStage(null);
     setDraggedItem(oportunidade);
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = (e: React.DragEvent<HTMLElement>, estagio: EstagioOportunidade) => {
+    if (!draggedItem || !canManipulateKanban) return;
     e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'move';
+    }
+    if (dragOverStage !== estagio) {
+      setDragOverStage(estagio);
+    }
   };
 
-  const handleDrop = async (novoEstagio: EstagioOportunidade) => {
+  const handleDragLeave = (e: React.DragEvent<HTMLElement>, estagio: EstagioOportunidade) => {
+    const currentTarget = e.currentTarget;
+    const relatedTarget = e.relatedTarget as Node | null;
+    if (!relatedTarget || !currentTarget.contains(relatedTarget)) {
+      if (dragOverStage === estagio) {
+        setDragOverStage(null);
+      }
+    }
+  };
+
+  const getNomeEstagio = (estagio: EstagioOportunidade): string =>
+    ESTAGIOS_CONFIG.find((item) => item.id === estagio)?.nome || estagio;
+
+  const isForwardSkipTransition = (
+    estagioAtual: EstagioOportunidade,
+    novoEstagio: EstagioOportunidade,
+  ): boolean => {
+    const currentIndex = FORWARD_STAGE_ORDER.indexOf(estagioAtual);
+    const nextIndex = FORWARD_STAGE_ORDER.indexOf(novoEstagio);
+    if (currentIndex === -1 || nextIndex === -1) return false;
+    return nextIndex - currentIndex > 1;
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLElement>, novoEstagio: EstagioOportunidade) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverStage(null);
     if (!draggedItem) return;
 
+    if (!canManipulateKanban) {
+      toastService.warning('Movimentação no Kanban está disponível apenas na visão "Abertas".');
+      setDraggedItem(null);
+      return;
+    }
+
+    const lifecycleStatus = getLifecycleStatus(draggedItem);
+    if (lifecycleFeatureEnabled && lifecycleStatus !== LifecycleStatusOportunidade.OPEN) {
+      toastService.warning('Somente oportunidades abertas podem ser movimentadas no Kanban.');
+      setDraggedItem(null);
+      return;
+    }
+
+    const estagioAtual = draggedItem.estagio;
+
     // Não faz nada se soltar no mesmo estágio
-    if (draggedItem.estagio === novoEstagio) {
+    if (estagioAtual === novoEstagio) {
+      setDraggedItem(null);
+      return;
+    }
+
+    if (
+      lifecycleFeatureEnabled &&
+      (novoEstagio === EstagioOportunidade.GANHO || novoEstagio === EstagioOportunidade.PERDIDO)
+    ) {
+      toastService.warning(
+        'Use as acoes "Marcar como ganho" ou "Marcar como perdido" para encerrar a oportunidade.',
+      );
       setDraggedItem(null);
       return;
     }
 
     // ✅ Se for movido para PERDIDO, abrir modal de motivo de perda
+    const permitidos = ALLOWED_STAGE_TRANSITIONS[estagioAtual] || [];
+    const transitionAllowed = permitidos.includes(novoEstagio);
+    const skipForwardRequested = isForwardSkipTransition(estagioAtual, novoEstagio);
+
+    if (!transitionAllowed && !skipForwardRequested) {
+      const listaPermitidos = permitidos.map((stage) => getNomeEstagio(stage)).join(', ');
+      toastService.warning(
+        `Transicao invalida: ${getNomeEstagio(estagioAtual)} -> ${getNomeEstagio(novoEstagio)}. Permitidos: ${listaPermitidos || 'nenhum'}.`,
+      );
+      setDraggedItem(null);
+      return;
+    }
+
+    if (!transitionAllowed && skipForwardRequested && !canSkipPipelineStages) {
+      toastService.warning('Somente gerente, admin ou superadmin podem pular etapas no pipeline.');
+      setDraggedItem(null);
+      return;
+    }
+
     if (novoEstagio === EstagioOportunidade.PERDIDO) {
       setOportunidadeParaPerder(draggedItem);
+      setErroMotivoPerda(null);
       setShowModalMotivoPerda(true);
       return;
     }
@@ -737,28 +1867,42 @@ const PipelinePage: React.FC = () => {
     setMudancaEstagioData({
       oportunidade: draggedItem,
       novoEstagio: novoEstagio,
+      isPuloEtapa: !transitionAllowed && skipForwardRequested,
     });
+    setErroMudancaEstagio(null);
     setShowModalMudancaEstagio(true);
+  };
+
+  const extrairMensagemErroApi = (err: any, fallback: string) => {
+    const message = err?.response?.data?.message;
+    if (Array.isArray(message)) return message.join(', ');
+    if (typeof message === 'string' && message.trim()) return message;
+    if (err instanceof Error && err.message) return err.message;
+    return fallback;
   };
 
   // Confirmar mudança de estágio com motivo registrado
   const handleConfirmarMudancaEstagio = async (
     motivo: string,
     comentario: string,
-    proximaAcao?: Date,
+    proximaAcao?: ProximaAcaoAgendada,
+    justificativaPulo?: string,
   ) => {
     if (!mudancaEstagioData) return;
 
     try {
       setLoadingMudancaEstagio(true);
+      setErroMotivoPerda(null);
+      setErroMudancaEstagio(null);
 
-      const { oportunidade, novoEstagio } = mudancaEstagioData;
+      const { oportunidade, novoEstagio, isPuloEtapa } = mudancaEstagioData;
+      const justificativaPuloLimpa = justificativaPulo?.trim();
 
       // Atualizar estágio no backend
-      await oportunidadesService.atualizarOportunidade({
-        id: oportunidade.id,
+      await oportunidadesService.atualizarEstagio(oportunidade.id, {
         estagio: novoEstagio,
-        responsavel_id: oportunidade.responsavel?.id || '',
+        forcarTransicao: isPuloEtapa ? true : undefined,
+        justificativaForcamento: isPuloEtapa ? justificativaPuloLimpa : undefined,
       });
 
       // Criar atividade de histórico
@@ -766,9 +1910,13 @@ const PipelinePage: React.FC = () => {
         `Oportunidade movida de "${ESTAGIOS_CONFIG.find((e) => e.id === oportunidade.estagio)?.nome}" para "${ESTAGIOS_CONFIG.find((e) => e.id === novoEstagio)?.nome}"`,
         `Motivo: ${motivo}`,
         comentario ? `\nDetalhes: ${comentario}` : '',
-        proximaAcao
-          ? `\nPróxima ação agendada para: ${new Date(proximaAcao).toLocaleDateString('pt-BR')}`
+        isPuloEtapa
+          ? `\nPulo de etapa autorizado: ${justificativaPuloLimpa || 'justificativa nao informada'}`
           : '',
+        proximaAcao
+          ? `\nProxima acao: ${TIPO_ATIVIDADE_LABEL[proximaAcao.tipoEvento]} em ${new Date(proximaAcao.data).toLocaleDateString('pt-BR')} (responsavel: ${proximaAcao.responsavelNome})`
+          : '',
+        proximaAcao ? `\nDescricao da proxima acao: ${proximaAcao.descricao}` : '',
       ]
         .filter(Boolean)
         .join('\n');
@@ -780,31 +1928,60 @@ const PipelinePage: React.FC = () => {
           descricao: descricaoAtividade,
           dataAtividade: new Date(),
         });
+
+        if (proximaAcao) {
+          const descricaoProximaAcao = [
+            `Atividade planejada apos mudanca de estagio para "${ESTAGIOS_CONFIG.find((e) => e.id === novoEstagio)?.nome}".`,
+            `Responsavel planejado: ${proximaAcao.responsavelNome}.`,
+            `Descricao da tarefa: ${proximaAcao.descricao}`,
+            'Origem: movimentacao de estagio no pipeline.',
+          ].join('\n');
+
+          await oportunidadesService.criarAtividade({
+            oportunidadeId: oportunidade.id,
+            tipo: proximaAcao.tipoEvento,
+            descricao: descricaoProximaAcao,
+            dataAtividade: proximaAcao.data,
+            responsavelId: proximaAcao.responsavelId,
+          });
+        }
       } catch (err) {
         console.warn('Erro ao criar atividade de histórico:', err);
         // Continua mesmo se falhar ao criar atividade
       }
 
+      setAtividadesCalendarioPorOportunidade((prev) => {
+        if (!(oportunidade.id in prev)) return prev;
+        const next = { ...prev };
+        delete next[oportunidade.id];
+        return next;
+      });
+
       // Atualizar estado local
-      setOportunidades((prev) =>
-        prev.map((op) => (op.id === oportunidade.id ? { ...op, estagio: novoEstagio } : op)),
-      );
+      await carregarDados();
 
       // Recarregar estatísticas
-      const stats = await oportunidadesService.obterEstatisticas();
-      setEstatisticas(stats);
 
       // Fechar modal
       setShowModalMudancaEstagio(false);
       setMudancaEstagioData(null);
       setDraggedItem(null);
+      setErroMudancaEstagio(null);
 
       // Toast de sucesso (você pode usar uma lib de toast aqui)
-      toast.success('Oportunidade movida com sucesso!');
+      toastService.success('Oportunidade movida com sucesso!');
+      if (novoEstagio === EstagioOportunidade.GANHO) {
+        triggerSalesCelebration({
+          kind: 'venda-concluida',
+          subtitle: `"${oportunidade.titulo}" foi marcada como ganha.`,
+        });
+      }
     } catch (err) {
       console.error('Erro ao mover oportunidade:', err);
-      toast.error('Erro ao mover oportunidade');
-      setError('Erro ao mover oportunidade');
+      const errorMessage = extrairMensagemErroApi(err, 'Erro ao mover oportunidade');
+      toastService.error(errorMessage);
+      setErroMudancaEstagio(errorMessage);
+      setError(errorMessage);
     } finally {
       setLoadingMudancaEstagio(false);
     }
@@ -832,36 +2009,22 @@ const PipelinePage: React.FC = () => {
       });
 
       // Atualizar estado local
-      setOportunidades((prev) =>
-        prev.map((op) =>
-          op.id === oportunidadeParaPerder.id
-            ? { ...op, estagio: EstagioOportunidade.PERDIDO }
-            : op,
-        ),
-      );
+      await carregarDados();
 
       // Recarregar estatísticas
-      const stats = await oportunidadesService.obterEstatisticas();
-      setEstatisticas(stats);
 
       // Fechar modal
       setShowModalMotivoPerda(false);
       setOportunidadeParaPerder(null);
       setDraggedItem(null);
-
-      toast.success('Oportunidade marcada como perdida com sucesso!');
+      setErroMotivoPerda(null);
+      toastService.success('Oportunidade marcada como perdida com sucesso!');
     } catch (err: any) {
       console.error('Erro ao marcar oportunidade como perdida:', err);
-
-      // Verificar se é erro de validação (motivo obrigatório)
-      const errorMessage = err?.response?.data?.message;
-      if (Array.isArray(errorMessage)) {
-        toast.error(errorMessage.join(', '));
-      } else {
-        toast.error(errorMessage || 'Erro ao marcar oportunidade como perdida');
-      }
-
-      setError('Erro ao marcar oportunidade como perdida');
+      const errorMessage = extrairMensagemErroApi(err, 'Erro ao marcar oportunidade como perdida');
+      toastService.error(errorMessage);
+      setErroMotivoPerda(errorMessage);
+      setError(errorMessage);
     } finally {
       setLoadingMudancaEstagio(false);
     }
@@ -898,8 +2061,19 @@ const PipelinePage: React.FC = () => {
     }
 
     // Filtro por responsável
-    if (filtros.responsavel && op.responsavel?.id !== filtros.responsavel) {
-      return false;
+    if (filtros.responsavel) {
+      const responsavelOportunidadeId = String(op.responsavel?.id || '').trim();
+      const isUnassignedFilter =
+        filtros.responsavel === PIPELINE_UNASSIGNED_RESPONSAVEL_FILTER ||
+        filtros.responsavel === PIPELINE_LEGACY_UNASSIGNED_RESPONSAVEL_FILTER;
+
+      if (isUnassignedFilter) {
+        if (responsavelOportunidadeId) {
+          return false;
+        }
+      } else if (responsavelOportunidadeId !== filtros.responsavel) {
+        return false;
+      }
     }
 
     // Filtro por valor mínimo
@@ -958,27 +2132,118 @@ const PipelinePage: React.FC = () => {
   const oportunidadesPaginadas = oportunidadesOrdenadas.slice(indexInicio, indexFim);
 
   // Transformar oportunidades em eventos de calendário
-  const eventosCalendario = useMemo(() => {
-    return oportunidadesFiltradas.map((op) => {
-      // Usar dataFechamentoEsperado se existir, senão usar updatedAt
+  const idsOportunidadesCalendario = useMemo(
+    () =>
+      oportunidadesFiltradas
+        .map((oportunidade) => oportunidade.id)
+        .filter((id, index, array) => array.indexOf(id) === index),
+    [oportunidadesFiltradas],
+  );
+
+  useEffect(() => {
+    if (visualizacao !== 'calendario') return;
+    if (!idsOportunidadesCalendario.length) return;
+
+    const idsPendentes = idsOportunidadesCalendario.filter(
+      (id) => !(id in atividadesCalendarioPorOportunidade),
+    );
+
+    if (!idsPendentes.length) return;
+
+    let cancelado = false;
+    setLoadingAtividadesCalendario(true);
+
+    void Promise.all(
+      idsPendentes.map(async (oportunidadeId) => {
+        try {
+          const atividades = await oportunidadesService.listarAtividades(oportunidadeId);
+          return [oportunidadeId, atividades] as const;
+        } catch (err) {
+          console.warn(
+            `[Pipeline] Nao foi possivel carregar atividades da oportunidade ${oportunidadeId} para o calendario.`,
+            err,
+          );
+          return [oportunidadeId, [] as Atividade[]] as const;
+        }
+      }),
+    )
+      .then((results) => {
+        if (cancelado) return;
+        setAtividadesCalendarioPorOportunidade((prev) => {
+          const next = { ...prev };
+          results.forEach(([oportunidadeId, atividades]) => {
+            next[oportunidadeId] = atividades;
+          });
+          return next;
+        });
+      })
+      .finally(() => {
+        if (!cancelado) {
+          setLoadingAtividadesCalendario(false);
+        }
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [atividadesCalendarioPorOportunidade, idsOportunidadesCalendario, visualizacao]);
+
+  const eventosCalendario = useMemo<EventoCalendarioPipeline[]>(() => {
+    const coresAtividade: Record<TipoAtividade, string> = {
+      [TipoAtividade.LIGACAO]: '#2563EB',
+      [TipoAtividade.EMAIL]: '#7C3AED',
+      [TipoAtividade.REUNIAO]: '#0891B2',
+      [TipoAtividade.TAREFA]: '#D97706',
+      [TipoAtividade.NOTA]: '#6B7280',
+    };
+
+    const eventosOportunidade: EventoCalendarioPipeline[] = oportunidadesFiltradas.map((op) => {
       const dataEvento = op.dataFechamentoEsperado
         ? new Date(op.dataFechamentoEsperado)
         : new Date(op.updatedAt);
 
-      // Encontrar cor do estágio
       const estagioConfig = ESTAGIOS_CONFIG.find((e) => e.id === op.estagio);
       const cor = estagioConfig?.accentColor || '#159A9C';
 
       return {
-        id: op.id,
+        id: `opp-${op.id}`,
         title: op.titulo,
         start: dataEvento,
         end: dataEvento,
         resource: op,
         color: cor,
+        eventKind: 'oportunidade',
       };
     });
-  }, [oportunidadesFiltradas]);
+
+    const eventosAtividade: EventoCalendarioPipeline[] = oportunidadesFiltradas.flatMap((op) => {
+      const atividades = atividadesCalendarioPorOportunidade[op.id] || [];
+
+      return atividades
+        .filter((atividade) => {
+          if (atividade.tipo === TipoAtividade.NOTA) return false;
+          if (String(atividade.status || 'pending').toLowerCase() === 'completed') return false;
+          if (!(atividade.dataAtividade instanceof Date)) return false;
+          return !Number.isNaN(atividade.dataAtividade.getTime());
+        })
+        .map((atividade) => ({
+          id: `atv-${atividade.id}`,
+          title: `[${TIPO_ATIVIDADE_LABEL[atividade.tipo]}] ${op.titulo}`,
+          start: atividade.dataAtividade,
+          end: atividade.dataAtividade,
+          resource: op,
+          color: coresAtividade[atividade.tipo] || '#0F7B7D',
+          eventKind: 'atividade' as const,
+          atividadeId: atividade.id,
+          atividadeTipo: atividade.tipo,
+          atividadeDescricao: atividade.descricao,
+          atividadeResponsavelNome:
+            atividade.responsavel?.nome || atividade.criadoPor?.nome || 'Nao informado',
+        }));
+    });
+
+    return [...eventosAtividade, ...eventosOportunidade];
+  }, [atividadesCalendarioPorOportunidade, oportunidadesFiltradas]);
 
   // Dados para gráficos
   const dadosGraficos = useMemo(() => {
@@ -1048,12 +2313,47 @@ const PipelinePage: React.FC = () => {
   }, [oportunidadesFiltradas]);
 
   // Agrupar por estágio
+  const estagiosKanbanVisiveis = useMemo(() => {
+    if (!lifecycleFeatureEnabled) return ESTAGIOS_CONFIG;
+
+    if (lifecycleView === LifecycleViewOportunidade.OPEN) {
+      return ESTAGIOS_CONFIG.filter(
+        (estagio) =>
+          estagio.id !== EstagioOportunidade.GANHO && estagio.id !== EstagioOportunidade.PERDIDO,
+      );
+    }
+
+    if (lifecycleView === LifecycleViewOportunidade.CLOSED) {
+      return ESTAGIOS_CONFIG.filter(
+        (estagio) =>
+          estagio.id === EstagioOportunidade.GANHO || estagio.id === EstagioOportunidade.PERDIDO,
+      );
+    }
+
+    return ESTAGIOS_CONFIG;
+  }, [lifecycleFeatureEnabled, lifecycleView]);
+
+  useEffect(() => {
+    if (!filtros.estagio) {
+      return;
+    }
+
+    const estagioSelecionado = filtros.estagio as EstagioOportunidade;
+    const estagioPermitido = estagiosKanbanVisiveis.some(
+      (estagio) => estagio.id === estagioSelecionado,
+    );
+
+    if (!estagioPermitido) {
+      setFiltros((prev) => ({ ...prev, estagio: '' }));
+    }
+  }, [filtros.estagio, estagiosKanbanVisiveis]);
+
   const agrupadoPorEstagio = useMemo(() => {
-    return ESTAGIOS_CONFIG.map((estagio) => ({
+    return estagiosKanbanVisiveis.map((estagio) => ({
       ...estagio,
       oportunidades: oportunidadesFiltradas.filter((op) => op.estagio === estagio.id),
     }));
-  }, [oportunidadesFiltradas]);
+  }, [estagiosKanbanVisiveis, oportunidadesFiltradas]);
 
   // Calcular métricas
   const calcularValorTotal = (oportunidades: Oportunidade[]) => {
@@ -1067,303 +2367,832 @@ const PipelinePage: React.FC = () => {
     }).format(valor);
   };
 
+  const hasActiveFilters = Boolean(
+    filtros.responsavel ||
+      filtros.busca ||
+      filtros.estagio ||
+      filtros.prioridade ||
+      filtros.origem ||
+      filtros.valorMin ||
+      filtros.valorMax,
+  );
+
+  const activeKanbanFilterChips = useMemo(() => {
+    const chips: Array<{ label: string; value: string }> = [];
+
+    const busca = filtros.busca?.trim();
+    if (busca) chips.push({ label: 'Busca', value: busca });
+
+    if (lifecycleFeatureEnabled) {
+      const lifecycleLabel =
+        LIFECYCLE_VIEW_OPTIONS.find((option) => option.id === lifecycleView)?.label || 'Abertas';
+      chips.push({ label: 'Carteira', value: lifecycleLabel });
+    }
+
+    if (filtros.estagio) {
+      const estagioNome =
+        ESTAGIOS_CONFIG.find((e) => e.id === filtros.estagio)?.nome || filtros.estagio;
+      chips.push({ label: 'Estágio', value: estagioNome });
+    }
+
+    if (filtros.prioridade) {
+      const prioridadeLabelMap: Record<string, string> = {
+        [PrioridadeOportunidade.BAIXA]: 'Baixa',
+        [PrioridadeOportunidade.MEDIA]: 'Média',
+        [PrioridadeOportunidade.ALTA]: 'Alta',
+      };
+      chips.push({
+        label: 'Prioridade',
+        value: prioridadeLabelMap[filtros.prioridade] || filtros.prioridade,
+      });
+    }
+
+    if (filtros.origem) {
+      const origemLabelMap: Record<string, string> = {
+        [OrigemOportunidade.WEBSITE]: 'Website',
+        [OrigemOportunidade.INDICACAO]: 'Indicação',
+        [OrigemOportunidade.REDES_SOCIAIS]: 'Redes Sociais',
+        [OrigemOportunidade.EVENTO]: 'Evento',
+        [OrigemOportunidade.CAMPANHA]: 'Campanha',
+        [OrigemOportunidade.TELEFONE]: 'Telefone',
+        [OrigemOportunidade.EMAIL]: 'Email',
+        [OrigemOportunidade.PARCEIRO]: 'Parceiro',
+      };
+      chips.push({ label: 'Origem', value: origemLabelMap[filtros.origem] || filtros.origem });
+    }
+
+    const valorMin = filtros.valorMin?.trim();
+    const valorMax = filtros.valorMax?.trim();
+    if (valorMin || valorMax) {
+      const minNumber = valorMin ? Number(valorMin) : null;
+      const maxNumber = valorMax ? Number(valorMax) : null;
+      const formatOrRaw = (value: number | null, raw: string | undefined) => {
+        if (value === null) return raw || '';
+        if (Number.isFinite(value)) return formatarMoeda(value);
+        return raw || '';
+      };
+
+      const minLabel = formatOrRaw(minNumber, valorMin);
+      const maxLabel = formatOrRaw(maxNumber, valorMax);
+
+      if (minLabel && maxLabel) chips.push({ label: 'Valor', value: `${minLabel}–${maxLabel}` });
+      else if (minLabel) chips.push({ label: 'Valor ≥', value: minLabel });
+      else if (maxLabel) chips.push({ label: 'Valor ≤', value: maxLabel });
+    }
+
+    if (filtros.responsavel) {
+      const isUnassignedFilter =
+        filtros.responsavel === PIPELINE_UNASSIGNED_RESPONSAVEL_FILTER ||
+        filtros.responsavel === PIPELINE_LEGACY_UNASSIGNED_RESPONSAVEL_FILTER;
+      const responsavelNome =
+        isUnassignedFilter
+          ? 'Sem responsavel'
+          : usuarios.find((u) => u.id === filtros.responsavel)?.nome || filtros.responsavel;
+      chips.push({ label: 'Responsável', value: responsavelNome });
+    }
+
+    return chips;
+  }, [filtros, lifecycleFeatureEnabled, lifecycleView, usuarios]);
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b px-6 py-4">
-          <BackToNucleus nucleusName="CRM" nucleusPath="/nuclei/crm" />
-        </div>
-        <div className="flex items-center justify-center h-96">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#159A9C] mx-auto mb-4"></div>
-            <p className="text-[#002333]/60">Carregando pipeline...</p>
+      <div className="space-y-4 pt-1 sm:pt-2">
+        <SectionCard className="p-6 sm:p-8">
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#159A9C] mx-auto mb-4"></div>
+              <p className="text-[#002333]/60">Carregando pipeline...</p>
+            </div>
           </div>
-        </div>
+        </SectionCard>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus nucleusName="CRM" nucleusPath="/nuclei/crm" />
-      </div>
+    <div className="space-y-3 pt-1 sm:pt-2">
+      <SectionCard className="space-y-3 border border-[#BFD4DA]/70 bg-gradient-to-br from-[#F8FCFC] via-white to-[#EAF5F2] p-3 sm:p-4">
+        <div className="rounded-2xl border border-white/70 bg-white/75 p-4 shadow-[0_12px_28px_-22px_rgba(16,57,74,0.45)] backdrop-blur-sm sm:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-3xl space-y-2">
+              <h1 className="text-2xl font-bold tracking-[-0.02em] text-[#19384C] sm:text-3xl">
+                Pipeline de Vendas
+              </h1>
+              <p className="text-xs leading-relaxed text-[#5B7583] sm:text-sm">
+                Acompanhe e avance oportunidades no funil comercial.
+              </p>
+            </div>
 
-      <div className="p-6">
-        <div className="max-w-[1920px] mx-auto">
-          {/* Header da Página */}
-          <div className="bg-white rounded-lg shadow-sm border mb-6 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-[#002333] flex items-center mb-2">
-                  <Target className="h-8 w-8 mr-3 text-[#159A9C]" />
-                  Pipeline de Vendas
-                </h1>
-                <p className="text-[#002333]/60">
-                  Gerencie suas oportunidades de venda através de um funil visual
-                </p>
+            <div className="flex w-full justify-start lg:w-auto lg:justify-end">
+              <div className="flex items-center gap-2">
+                {lifecycleFeatureEnabled ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setWorkspaceTab((prev) => (prev === 'parametros' ? 'pipeline' : 'parametros'))
+                    }
+                    className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#D3E2E7] bg-white text-[#4B6775] transition-colors hover:bg-[#F4FAFC] ${
+                      workspaceTab === 'parametros' ? 'ring-2 ring-[#159A9C]/20' : ''
+                    }`}
+                    aria-label={workspaceTab === 'parametros' ? 'Voltar ao pipeline' : 'Configurar'}
+                    title={workspaceTab === 'parametros' ? 'Voltar ao pipeline' : 'Configurar'}
+                  >
+                    {workspaceTab === 'parametros' ? (
+                      <ArrowLeft className="h-4 w-4" />
+                    ) : (
+                      <Settings2 className="h-4 w-4" />
+                    )}
+                  </button>
+                ) : null}
+
+                <button
+                  onClick={() => handleNovaOportunidade()}
+                  disabled={
+                    lifecycleFeatureEnabled && lifecycleView !== LifecycleViewOportunidade.OPEN
+                  }
+                  title={
+                    lifecycleFeatureEnabled && lifecycleView !== LifecycleViewOportunidade.OPEN
+                      ? 'Troque para "Abertas" para criar oportunidades'
+                      : 'Nova Oportunidade'
+                  }
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#159A9C] px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_24px_-18px_rgba(15,123,125,0.9)] transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Plus className="h-4 w-4" />
+                  Nova Oportunidade
+                </button>
               </div>
-              <button
-                onClick={() => handleNovaOportunidade()}
-                className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors flex items-center gap-2 text-sm font-medium"
-              >
-                <Plus className="h-4 w-4" />
-                Nova Oportunidade
-              </button>
             </div>
           </div>
 
-          {/* Métricas do Pipeline */}
           {estatisticas && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-              {/* Total de Oportunidades */}
-              <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                      Total de Oportunidades
-                    </p>
-                    <p className="mt-2 text-3xl font-bold text-[#002333]">
-                      {estatisticas.totalOportunidades}
-                    </p>
-                  </div>
-                  <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
-                    <Target className="h-6 w-6 text-[#159A9C]" />
-                  </div>
-                </div>
+            <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
+              <div className="rounded-xl border border-[#D5E4EA] bg-white px-3 py-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#6A8796]">
+                  Oportunidades
+                </p>
+                <p className="mt-1 text-lg font-semibold text-[#173649]">
+                  {estatisticas.totalOportunidades}
+                </p>
               </div>
-
-              {/* Valor Total */}
-              <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                      Valor Total
-                    </p>
-                    <p className="mt-2 text-3xl font-bold text-[#002333]">
-                      {formatarMoeda(estatisticas.valorTotalPipeline)}
-                    </p>
-                  </div>
-                  <div className="h-12 w-12 rounded-2xl bg-[#0F7B7D]/10 flex items-center justify-center shadow-sm">
-                    <DollarSign className="h-6 w-6 text-[#0F7B7D]" />
-                  </div>
-                </div>
+              <div className="rounded-xl border border-[#CFE5DF] bg-[#F3FBF8] px-3 py-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#5B7D7D]">
+                  Valor em Pipeline
+                </p>
+                <p className="mt-1 text-lg font-semibold text-[#0F7B7D]">
+                  {formatarMoeda(estatisticas.valorTotalPipeline)}
+                </p>
               </div>
-
-              {/* Ticket Médio */}
-              <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                      Ticket Médio
-                    </p>
-                    <p className="mt-2 text-3xl font-bold text-[#002333]">
-                      {formatarMoeda(estatisticas.valorMedio)}
-                    </p>
-                  </div>
-                  <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
-                    <TrendingUp className="h-6 w-6 text-[#159A9C]" />
-                  </div>
-                </div>
+              <div className="rounded-xl border border-[#D5E4EA] bg-white px-3 py-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#6A8796]">
+                  Conversao
+                </p>
+                <p className="mt-1 text-lg font-semibold text-[#173649]">
+                  {estatisticas.taxaConversao.toFixed(1)}%
+                </p>
               </div>
-
-              {/* Taxa de Conversão */}
-              <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                      Taxa de Conversão
-                    </p>
-                    <p className="mt-2 text-3xl font-bold text-[#002333]">
-                      {estatisticas.taxaConversao.toFixed(1)}%
-                    </p>
-                  </div>
-                  <div className="h-12 w-12 rounded-2xl bg-[#002333]/10 flex items-center justify-center shadow-sm">
-                    <Target className="h-6 w-6 text-[#002333]" />
-                  </div>
-                </div>
+              <div className="rounded-xl border border-[#D5E4EA] bg-white px-3 py-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#6A8796]">
+                  Ticket Medio
+                </p>
+                <p className="mt-1 text-lg font-semibold text-[#173649]">
+                  {formatarMoeda(estatisticas.valorMedio)}
+                </p>
               </div>
             </div>
           )}
+        </div>
 
-          {/* Seletor de Visualização */}
-          <div className="bg-white rounded-lg shadow-sm border p-4 mb-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-[#002333]">Visualização:</span>
-                <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-                  <button
-                    onClick={() => setVisualizacao('kanban')}
-                    className={`px-3 py-1.5 rounded-md transition-colors flex items-center gap-2 text-sm font-medium ${visualizacao === 'kanban'
-                      ? 'bg-white text-[#159A9C] shadow-sm'
-                      : 'text-[#002333]/60 hover:text-[#002333]'
-                      }`}
-                  >
-                    <Grid3X3 className="h-4 w-4" />
-                    Kanban
-                  </button>
-                  <button
-                    onClick={() => setVisualizacao('lista')}
-                    className={`px-3 py-1.5 rounded-md transition-colors flex items-center gap-2 text-sm font-medium ${visualizacao === 'lista'
-                      ? 'bg-white text-[#159A9C] shadow-sm'
-                      : 'text-[#002333]/60 hover:text-[#002333]'
-                      }`}
-                  >
-                    <List className="h-4 w-4" />
-                    Lista
-                  </button>
-                  <button
-                    onClick={() => setVisualizacao('calendario')}
-                    className={`px-3 py-1.5 rounded-md transition-colors flex items-center gap-2 text-sm font-medium ${visualizacao === 'calendario'
-                      ? 'bg-white text-[#159A9C] shadow-sm'
-                      : 'text-[#002333]/60 hover:text-[#002333]'
-                      }`}
-                  >
-                    <Calendar className="h-4 w-4" />
-                    Calendário
-                  </button>
-                  <button
-                    onClick={() => setVisualizacao('grafico')}
-                    className={`px-3 py-1.5 rounded-md transition-colors flex items-center gap-2 text-sm font-medium ${visualizacao === 'grafico'
-                      ? 'bg-white text-[#159A9C] shadow-sm'
-                      : 'text-[#002333]/60 hover:text-[#002333]'
-                      }`}
-                  >
-                    <BarChart3 className="h-4 w-4" />
-                    Gráficos
-                  </button>
+        {lifecycleFeatureEnabled && workspaceTab === 'parametros' && (
+          <div className="space-y-3 rounded-2xl border border-[#B4BEC9]/35 bg-white/75 px-4 py-3 shadow-[0_12px_28px_-22px_rgba(16,57,74,0.35)] backdrop-blur-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="inline-flex items-center gap-2 text-sm font-semibold text-[#214251]">
+                <Settings2 className="h-4 w-4 text-[#159A9C]" />
+                <span>Configuracoes do pipeline</span>
+              </div>
+              <span className="text-xs text-[#607B89]">Use a engrenagem para voltar ao funil.</span>
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-3 rounded-lg border border-[#B4BEC9]/35 bg-white/80 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-[#002333]">
+                      Política de oportunidades paradas
+                    </p>
+                    <p className="text-xs text-[#002333]/65">
+                      Define quando mostrar o alerta "Parada Xd" e quando arquivar automaticamente.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border border-[#B4BEC9]/45 bg-[#DEEFE7]/50 px-2 py-0.5 text-xs font-medium text-[#0F7B7D]">
+                      {stalePolicyLoading
+                        ? 'Carregando...'
+                        : stalePolicy
+                          ? `Política: ${stalePolicy.source === 'tenant' ? 'tenant' : 'default'}`
+                          : 'Política indisponível'}
+                    </span>
+                    {stalePolicy && (
+                      <span className="rounded-full border border-[#B4BEC9]/45 bg-white px-2 py-0.5 text-xs font-medium text-[#002333]/70">
+                        Auto: {stalePolicy.autoArchiveSource === 'tenant' ? 'tenant' : 'default'}
+                      </span>
+                    )}
+                    {stalePolicyHasChanges && (
+                      <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                        Alterações não salvas
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <label className="inline-flex items-center gap-2 rounded-lg border border-[#B4BEC9]/50 bg-white px-3 py-2 text-sm text-[#002333]">
+                    <input
+                      type="checkbox"
+                      checked={stalePolicyDraft.enabled}
+                      onChange={(event) =>
+                        setStalePolicyDraft((prev) => ({
+                          ...prev,
+                          enabled: event.target.checked,
+                        }))
+                      }
+                      disabled={!canManageStalePolicy || stalePolicyLoading || stalePolicySaving}
+                      className="h-4 w-4 rounded border-[#B4BEC9] text-[#159A9C] focus:ring-[#159A9C]"
+                    />
+                    Ativar detecção de oportunidades paradas
+                  </label>
+
+                  <div className="rounded-lg border border-[#B4BEC9]/50 bg-white px-3 py-2">
+                    <label className="mb-1 block text-xs font-medium text-[#002333]/70">
+                      Limite para marcar parada (dias)
+                    </label>
+                    <input
+                      type="number"
+                      min={STALE_THRESHOLD_MIN}
+                      max={STALE_THRESHOLD_MAX}
+                      value={stalePolicyDraft.thresholdDays}
+                      onChange={(event) => {
+                        const parsed = Number(event.target.value);
+                        if (!Number.isFinite(parsed)) return;
+                        setStalePolicyDraft((prev) => ({ ...prev, thresholdDays: parsed }));
+                      }}
+                      onBlur={(event) => {
+                        const normalized = normalizeIntegerWithinRange(
+                          Number(event.target.value),
+                          STALE_THRESHOLD_MIN,
+                          STALE_THRESHOLD_MAX,
+                        );
+                        setStalePolicyDraft((prev) => ({ ...prev, thresholdDays: normalized }));
+                      }}
+                      disabled={
+                        !canManageStalePolicy ||
+                        stalePolicyLoading ||
+                        stalePolicySaving ||
+                        !stalePolicyDraft.enabled
+                      }
+                      className="w-full rounded-lg border border-[#B4BEC9]/70 px-3 py-1.5 text-sm text-[#002333] focus:border-[#159A9C] focus:outline-none disabled:cursor-not-allowed disabled:bg-[#F8FAFB] disabled:opacity-70"
+                    />
+                    <p className="mt-1 text-[11px] text-[#002333]/55">
+                      Faixa permitida: {STALE_THRESHOLD_MIN} a {STALE_THRESHOLD_MAX} dias.
+                    </p>
+                  </div>
+
+                  <label className="inline-flex items-center gap-2 rounded-lg border border-[#B4BEC9]/50 bg-white px-3 py-2 text-sm text-[#002333]">
+                    <input
+                      type="checkbox"
+                      checked={stalePolicyDraft.autoArchiveEnabled}
+                      onChange={(event) =>
+                        setStalePolicyDraft((prev) => ({
+                          ...prev,
+                          autoArchiveEnabled: event.target.checked,
+                        }))
+                      }
+                      disabled={
+                        !canManageStalePolicy ||
+                        stalePolicyLoading ||
+                        stalePolicySaving ||
+                        !stalePolicyDraft.enabled
+                      }
+                      className="h-4 w-4 rounded border-[#B4BEC9] text-[#159A9C] focus:ring-[#159A9C]"
+                    />
+                    Autoarquivar oportunidades paradas
+                  </label>
+
+                  <div className="rounded-lg border border-[#B4BEC9]/50 bg-white px-3 py-2">
+                    <label className="mb-1 block text-xs font-medium text-[#002333]/70">
+                      Dias para autoarquivar
+                    </label>
+                    <input
+                      type="number"
+                      min={STALE_AUTO_ARCHIVE_MIN}
+                      max={STALE_AUTO_ARCHIVE_MAX}
+                      value={stalePolicyDraft.autoArchiveAfterDays}
+                      onChange={(event) => {
+                        const parsed = Number(event.target.value);
+                        if (!Number.isFinite(parsed)) return;
+                        setStalePolicyDraft((prev) => ({
+                          ...prev,
+                          autoArchiveAfterDays: parsed,
+                        }));
+                      }}
+                      onBlur={(event) => {
+                        const normalized = normalizeIntegerWithinRange(
+                          Number(event.target.value),
+                          STALE_AUTO_ARCHIVE_MIN,
+                          STALE_AUTO_ARCHIVE_MAX,
+                        );
+                        setStalePolicyDraft((prev) => ({
+                          ...prev,
+                          autoArchiveAfterDays: normalized,
+                        }));
+                      }}
+                      disabled={
+                        !canManageStalePolicy ||
+                        stalePolicyLoading ||
+                        stalePolicySaving ||
+                        !stalePolicyDraft.enabled ||
+                        !stalePolicyDraft.autoArchiveEnabled
+                      }
+                      className="w-full rounded-lg border border-[#B4BEC9]/70 px-3 py-1.5 text-sm text-[#002333] focus:border-[#159A9C] focus:outline-none disabled:cursor-not-allowed disabled:bg-[#F8FAFB] disabled:opacity-70"
+                    />
+                    <p className="mt-1 text-[11px] text-[#002333]/55">
+                      Faixa permitida: {STALE_AUTO_ARCHIVE_MIN} a {STALE_AUTO_ARCHIVE_MAX} dias.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-[#002333]/60">
+                    {canManageStalePolicy
+                      ? 'Apenas usuários com permissão de automações conseguem salvar alterações.'
+                      : 'Somente leitura: sem permissão para alterar esta política.'}
+                  </p>
+                  {canManageStalePolicy && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleResetStalePolicyDraft}
+                        disabled={!stalePolicy || stalePolicySaving || !stalePolicyHasChanges}
+                        className="inline-flex items-center gap-2 rounded-lg border border-[#B4BEC9]/70 bg-white px-3 py-1.5 text-sm font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Reverter
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void handleSalvarStalePolicy();
+                        }}
+                        disabled={
+                          !stalePolicy ||
+                          stalePolicyLoading ||
+                          stalePolicySaving ||
+                          !stalePolicyHasChanges
+                        }
+                        className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <Save className="h-4 w-4" />
+                        {stalePolicySaving ? 'Salvando...' : 'Salvar política'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => carregarDados()}
-                  disabled={loading}
-                  className="p-2 text-[#002333]/60 hover:text-[#002333] hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
-                  title="Atualizar"
-                >
-                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                </button>
-                <button
-                  onClick={() => setShowModalExport(true)}
-                  className="p-2 text-[#002333]/60 hover:text-[#002333] hover:bg-gray-100 rounded-lg transition-colors"
-                  title="Exportar"
-                >
-                  <Download className="h-4 w-4" />
-                </button>
+              <div className="space-y-3 rounded-lg border border-[#B4BEC9]/35 bg-white/80 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-[#002333]">
+                      Política de aquecimento da negociação
+                    </p>
+                    <p className="text-xs text-[#002333]/65">
+                      Define quando mostrar os sinais "Quente" e "Ação em Xd".
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border border-[#B4BEC9]/45 bg-[#DEEFE7]/50 px-2 py-0.5 text-xs font-medium text-[#0F7B7D]">
+                      {engagementPolicyLoading
+                        ? 'Carregando...'
+                        : engagementPolicy
+                          ? `Hot: ${engagementPolicy.hotMinProbabilitySource}`
+                          : 'Política indisponível'}
+                    </span>
+                    {engagementPolicy && (
+                      <>
+                        <span className="rounded-full border border-[#B4BEC9]/45 bg-white px-2 py-0.5 text-xs font-medium text-[#002333]/70">
+                          Janela: {engagementPolicy.hotCloseWindowSource}
+                        </span>
+                        <span className="rounded-full border border-[#B4BEC9]/45 bg-white px-2 py-0.5 text-xs font-medium text-[#002333]/70">
+                          Ação: {engagementPolicy.nextActionDueSoonSource}
+                        </span>
+                      </>
+                    )}
+                    {engagementPolicyHasChanges && (
+                      <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                        Alterações não salvas
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <div className="rounded-lg border border-[#B4BEC9]/50 bg-white px-3 py-2">
+                    <label className="mb-1 block text-xs font-medium text-[#002333]/70">
+                      Probabilidade mínima para "Quente" (%)
+                    </label>
+                    <input
+                      type="number"
+                      min={ENGAGEMENT_HOT_MIN_PROBABILITY_MIN}
+                      max={ENGAGEMENT_HOT_MIN_PROBABILITY_MAX}
+                      value={engagementPolicyDraft.hotMinProbability}
+                      onChange={(event) => {
+                        const parsed = Number(event.target.value);
+                        if (!Number.isFinite(parsed)) return;
+                        setEngagementPolicyDraft((prev) => ({
+                          ...prev,
+                          hotMinProbability: parsed,
+                        }));
+                      }}
+                      onBlur={(event) => {
+                        const normalized = normalizeIntegerWithinRange(
+                          Number(event.target.value),
+                          ENGAGEMENT_HOT_MIN_PROBABILITY_MIN,
+                          ENGAGEMENT_HOT_MIN_PROBABILITY_MAX,
+                        );
+                        setEngagementPolicyDraft((prev) => ({
+                          ...prev,
+                          hotMinProbability: normalized,
+                        }));
+                      }}
+                      disabled={canManageStalePolicy === false || engagementPolicySaving}
+                      className="w-full rounded-lg border border-[#B4BEC9]/70 px-3 py-1.5 text-sm text-[#002333] focus:border-[#159A9C] focus:outline-none disabled:cursor-not-allowed disabled:bg-[#F8FAFB] disabled:opacity-70"
+                    />
+                    <p className="mt-1 text-[11px] text-[#002333]/55">
+                      Faixa: {ENGAGEMENT_HOT_MIN_PROBABILITY_MIN} a{' '}
+                      {ENGAGEMENT_HOT_MIN_PROBABILITY_MAX}.
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-[#B4BEC9]/50 bg-white px-3 py-2">
+                    <label className="mb-1 block text-xs font-medium text-[#002333]/70">
+                      Janela de fechamento para "Quente" (dias)
+                    </label>
+                    <input
+                      type="number"
+                      min={ENGAGEMENT_HOT_CLOSE_WINDOW_MIN}
+                      max={ENGAGEMENT_HOT_CLOSE_WINDOW_MAX}
+                      value={engagementPolicyDraft.hotCloseWindowDays}
+                      onChange={(event) => {
+                        const parsed = Number(event.target.value);
+                        if (!Number.isFinite(parsed)) return;
+                        setEngagementPolicyDraft((prev) => ({
+                          ...prev,
+                          hotCloseWindowDays: parsed,
+                        }));
+                      }}
+                      onBlur={(event) => {
+                        const normalized = normalizeIntegerWithinRange(
+                          Number(event.target.value),
+                          ENGAGEMENT_HOT_CLOSE_WINDOW_MIN,
+                          ENGAGEMENT_HOT_CLOSE_WINDOW_MAX,
+                        );
+                        setEngagementPolicyDraft((prev) => ({
+                          ...prev,
+                          hotCloseWindowDays: normalized,
+                        }));
+                      }}
+                      disabled={canManageStalePolicy === false || engagementPolicySaving}
+                      className="w-full rounded-lg border border-[#B4BEC9]/70 px-3 py-1.5 text-sm text-[#002333] focus:border-[#159A9C] focus:outline-none disabled:cursor-not-allowed disabled:bg-[#F8FAFB] disabled:opacity-70"
+                    />
+                    <p className="mt-1 text-[11px] text-[#002333]/55">
+                      Faixa: {ENGAGEMENT_HOT_CLOSE_WINDOW_MIN} a {ENGAGEMENT_HOT_CLOSE_WINDOW_MAX}{' '}
+                      dias.
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-[#B4BEC9]/50 bg-white px-3 py-2">
+                    <label className="mb-1 block text-xs font-medium text-[#002333]/70">
+                      Janela de "Ação próxima" (dias)
+                    </label>
+                    <input
+                      type="number"
+                      min={ENGAGEMENT_NEXT_ACTION_SOON_MIN}
+                      max={ENGAGEMENT_NEXT_ACTION_SOON_MAX}
+                      value={engagementPolicyDraft.nextActionDueSoonDays}
+                      onChange={(event) => {
+                        const parsed = Number(event.target.value);
+                        if (!Number.isFinite(parsed)) return;
+                        setEngagementPolicyDraft((prev) => ({
+                          ...prev,
+                          nextActionDueSoonDays: parsed,
+                        }));
+                      }}
+                      onBlur={(event) => {
+                        const normalized = normalizeIntegerWithinRange(
+                          Number(event.target.value),
+                          ENGAGEMENT_NEXT_ACTION_SOON_MIN,
+                          ENGAGEMENT_NEXT_ACTION_SOON_MAX,
+                        );
+                        setEngagementPolicyDraft((prev) => ({
+                          ...prev,
+                          nextActionDueSoonDays: normalized,
+                        }));
+                      }}
+                      disabled={canManageStalePolicy === false || engagementPolicySaving}
+                      className="w-full rounded-lg border border-[#B4BEC9]/70 px-3 py-1.5 text-sm text-[#002333] focus:border-[#159A9C] focus:outline-none disabled:cursor-not-allowed disabled:bg-[#F8FAFB] disabled:opacity-70"
+                    />
+                    <p className="mt-1 text-[11px] text-[#002333]/55">
+                      Faixa: {ENGAGEMENT_NEXT_ACTION_SOON_MIN} a {ENGAGEMENT_NEXT_ACTION_SOON_MAX}{' '}
+                      dias.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-[#002333]/60">
+                    {canManageStalePolicy
+                      ? 'Ajuste esses limiares para calibrar os sinais visuais do time comercial.'
+                      : 'Somente leitura: sem permissão para alterar esta política.'}
+                  </p>
+                  {canManageStalePolicy && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleResetEngagementPolicyDraft}
+                        disabled={
+                          !engagementPolicy || engagementPolicySaving || !engagementPolicyHasChanges
+                        }
+                        className="inline-flex items-center gap-2 rounded-lg border border-[#B4BEC9]/70 bg-white px-3 py-1.5 text-sm font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Reverter
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void handleSalvarEngagementPolicy();
+                        }}
+                        disabled={
+                          !engagementPolicy ||
+                          engagementPolicyLoading ||
+                          engagementPolicySaving ||
+                          !engagementPolicyHasChanges
+                        }
+                        className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <Save className="h-4 w-4" />
+                        {engagementPolicySaving ? 'Salvando...' : 'Salvar política'}
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-
-          {/* Barra de Filtros */}
-          <div className="bg-white rounded-lg shadow-sm border p-4 mb-6">
-            <div className="flex items-center gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#002333]/40" />
-                <input
-                  type="text"
-                  placeholder="Buscar oportunidades..."
-                  value={filtros.busca}
-                  onChange={(e) => setFiltros({ ...filtros, busca: e.target.value })}
-                  className="w-full pl-10 pr-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
-                />
-              </div>
-              <button
-                onClick={() => setShowFiltros(!showFiltros)}
-                className={`px-4 py-2 rounded-lg border transition-colors flex items-center gap-2 text-sm font-medium ${showFiltros
-                  ? 'bg-[#159A9C] text-white border-[#159A9C]'
-                  : 'bg-white text-[#002333] border-[#B4BEC9] hover:bg-gray-50'
-                  }`}
-              >
-                <Filter className="h-4 w-4" />
-                Filtros
-              </button>
-              {(filtros.responsavel ||
-                filtros.busca ||
-                filtros.estagio ||
-                filtros.prioridade ||
-                filtros.origem ||
-                filtros.valorMin ||
-                filtros.valorMax) && (
-                  <>
+        )}
+      </SectionCard>
+      {showPipelineWorkspace && (
+        <>
+          {/* Barra de trabalho sticky */}
+          <SectionCard className="z-20 border border-[#B4BEC9]/40 bg-white/95 p-3 shadow-[0_16px_26px_-22px_rgba(16,57,74,0.45)] backdrop-blur supports-[backdrop-filter]:bg-white/85 sm:p-4">
+            <div className="flex flex-col gap-3">
+              {lifecycleFeatureEnabled && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-[#607B89]">
+                    Carteira
+                  </span>
+                  {LIFECYCLE_VIEW_OPTIONS.map((option) => (
                     <button
-                      onClick={handleLimparFiltros}
-                      className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium"
-                    >
-                      <X className="h-4 w-4" />
-                      Limpar
-                    </button>
-                    <button
-                      onClick={() => setShowModalSalvarFiltro(true)}
-                      className="px-4 py-2 bg-[#159A9C]/10 text-[#0F7B7D] hover:bg-[#159A9C]/20 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium"
-                    >
-                      <Save className="h-4 w-4" />
-                      Salvar Filtro
-                    </button>
-                  </>
-                )}
-
-              {/* Dropdown de Filtros Salvos */}
-              {filtrosSalvos.length > 0 && (
-                <div className="relative">
-                  <button
-                    onClick={() =>
-                      document.getElementById('dropdown-filtros')?.classList.toggle('hidden')
-                    }
-                    className={`px-4 py-2 rounded-lg border transition-colors flex items-center gap-2 text-sm font-medium ${filtroSelecionado
-                      ? 'bg-[#159A9C]/10 text-[#0F7B7D] border-transparent'
-                      : 'bg-white text-[#002333] border-[#B4BEC9] hover:bg-gray-50'
+                      key={option.id}
+                      type="button"
+                      onClick={() => setLifecycleView(option.id)}
+                      className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
+                        lifecycleView === option.id
+                          ? 'border-[#159A9C] bg-[#159A9C] text-white'
+                          : 'border-[#B4BEC9]/70 bg-white text-[#002333] hover:bg-[#DEEFE7]/60'
                       }`}
-                  >
-                    <Bookmark className="h-4 w-4" />
-                    Filtros ({filtrosSalvos.length})
-                  </button>
-                  <div
-                    id="dropdown-filtros"
-                    className="hidden absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-10"
-                  >
-                    <div className="p-2">
-                      <p className="text-xs font-semibold text-[#002333]/60 uppercase tracking-wide px-3 py-2">
-                        Filtros Salvos
-                      </p>
-                      {filtrosSalvos.map((filtro) => (
-                        <div
-                          key={filtro.id}
-                          className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 rounded-lg group"
-                        >
-                          <button
-                            onClick={() => {
-                              handleAplicarFiltroSalvo(filtro.id);
-                              document.getElementById('dropdown-filtros')?.classList.add('hidden');
-                            }}
-                            className="flex-1 text-left text-sm text-[#002333] font-medium"
-                          >
-                            {filtroSelecionado === filtro.id && '✓ '}
-                            {filtro.nome}
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (confirm(`Deletar filtro "${filtro.nome}"?`)) {
-                                handleDeletarFiltroSalvo(filtro.id);
-                              }
-                            }}
-                            className="opacity-0 group-hover:opacity-100 p-1 text-red-600 hover:bg-red-50 rounded transition-all"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                  <span className="text-xs text-[#002333]/60">
+                    {LIFECYCLE_VIEW_DESCRIPTIONS[lifecycleView]}
+                  </span>
                 </div>
               )}
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="w-full flex flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                  <span className="text-sm font-medium text-[#002333]">Visualização:</span>
+                  <div className="grid grid-cols-2 gap-1 bg-gray-100 rounded-lg p-1 sm:flex sm:flex-wrap sm:items-center sm:gap-1">
+                    <button
+                      data-testid="pipeline-view-kanban"
+                      onClick={() => setVisualizacao('kanban')}
+                      type="button"
+                      aria-label="Visualizacao Cards"
+                      aria-pressed={visualizacao === 'kanban'}
+                      className={`px-3 py-1.5 rounded-md transition-colors flex items-center justify-center gap-2 text-sm font-medium ${
+                        visualizacao === 'kanban'
+                          ? 'bg-white text-[#159A9C] shadow-sm'
+                          : 'text-[#002333]/60 hover:text-[#002333]'
+                      }`}
+                    >
+                      <Grid3X3 className="h-4 w-4" />
+                      Kanban
+                    </button>
+                    <button
+                      data-testid="pipeline-view-lista"
+                      onClick={() => setVisualizacao('lista')}
+                      type="button"
+                      aria-label="Visualizacao Lista"
+                      aria-pressed={visualizacao === 'lista'}
+                      className={`px-3 py-1.5 rounded-md transition-colors flex items-center justify-center gap-2 text-sm font-medium ${
+                        visualizacao === 'lista'
+                          ? 'bg-white text-[#159A9C] shadow-sm'
+                          : 'text-[#002333]/60 hover:text-[#002333]'
+                      }`}
+                    >
+                      <List className="h-4 w-4" />
+                      Lista
+                    </button>
+                    <button
+                      data-testid="pipeline-view-calendario"
+                      onClick={() => setVisualizacao('calendario')}
+                      type="button"
+                      aria-label="Visualizacao Calendario"
+                      aria-pressed={visualizacao === 'calendario'}
+                      className={`px-3 py-1.5 rounded-md transition-colors flex items-center justify-center gap-2 text-sm font-medium ${
+                        visualizacao === 'calendario'
+                          ? 'bg-white text-[#159A9C] shadow-sm'
+                          : 'text-[#002333]/60 hover:text-[#002333]'
+                      }`}
+                    >
+                      <Calendar className="h-4 w-4" />
+                      Calendário
+                    </button>
+                    <button
+                      data-testid="pipeline-view-grafico"
+                      onClick={() => setVisualizacao('grafico')}
+                      type="button"
+                      aria-label="Visualizacao Graficos"
+                      aria-pressed={visualizacao === 'grafico'}
+                      className={`px-3 py-1.5 rounded-md transition-colors flex items-center justify-center gap-2 text-sm font-medium ${
+                        visualizacao === 'grafico'
+                          ? 'bg-white text-[#159A9C] shadow-sm'
+                          : 'text-[#002333]/60 hover:text-[#002333]'
+                      }`}
+                    >
+                      <BarChart3 className="h-4 w-4" />
+                      Gráficos
+                    </button>
+                  </div>
+                </div>
+
+                <div className="w-full sm:w-auto flex items-center justify-end gap-2">
+                  {visualizacao === 'kanban' && (
+                    <button
+                      type="button"
+                      onClick={() => setKanbanExpanded((prev) => !prev)}
+                      className="p-2 text-[#002333]/60 hover:text-[#002333] hover:bg-[#DEEFE7]/60 rounded-lg transition-colors"
+                      title={kanbanExpanded ? 'Sair da visualização ampliada' : 'Ampliar Kanban'}
+                      aria-label={
+                        kanbanExpanded ? 'Sair da visualização ampliada' : 'Ampliar Kanban'
+                      }
+                    >
+                      {kanbanExpanded ? (
+                        <Minimize2 className="h-4 w-4" />
+                      ) : (
+                        <Maximize2 className="h-4 w-4" />
+                      )}
+                    </button>
+                  )}
+                  <button
+                    data-testid="pipeline-refresh"
+                    onClick={() => carregarDados()}
+                    disabled={loading}
+                    type="button"
+                    className="p-2 text-[#002333]/60 hover:text-[#002333] hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+                    title="Atualizar"
+                    aria-label="Atualizar dados do pipeline"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                  </button>
+                  <button
+                    data-testid="pipeline-export"
+                    onClick={() => setShowModalExport(true)}
+                    type="button"
+                    className="p-2 text-[#002333]/60 hover:text-[#002333] hover:bg-gray-100 rounded-lg transition-colors"
+                    title="Exportar"
+                    aria-label="Exportar oportunidades"
+                  >
+                    <Download className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+                <div className="w-full sm:flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#002333]/40" />
+                  <input
+                    type="text"
+                    placeholder="Buscar oportunidades..."
+                    value={filtros.busca}
+                    onChange={(e) => setFiltros({ ...filtros, busca: e.target.value })}
+                    className="w-full pl-10 pr-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
+                  />
+                </div>
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                  <button
+                    onClick={() => setShowFiltros(!showFiltros)}
+                    className={`px-4 py-2 rounded-lg border transition-colors flex items-center gap-2 text-sm font-medium ${
+                      showFiltros
+                        ? 'bg-[#159A9C] text-white border-[#159A9C]'
+                        : 'bg-white text-[#002333] border-[#B4BEC9] hover:bg-gray-50'
+                    }`}
+                  >
+                    <Filter className="h-4 w-4" />
+                    Filtros
+                  </button>
+                  {hasActiveFilters && (
+                    <>
+                      <button
+                        onClick={handleLimparFiltros}
+                        className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium"
+                      >
+                        <X className="h-4 w-4" />
+                        Limpar
+                      </button>
+                      <button
+                        onClick={() => setShowModalSalvarFiltro(true)}
+                        className="px-4 py-2 bg-[#159A9C]/10 text-[#0F7B7D] hover:bg-[#159A9C]/20 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium"
+                      >
+                        <Save className="h-4 w-4" />
+                        Salvar Filtro
+                      </button>
+                    </>
+                  )}
+
+                  {/* Dropdown de Filtros Salvos */}
+                  {filtrosSalvos.length > 0 && (
+                    <div className="relative w-full sm:w-auto">
+                      <button
+                        onClick={() =>
+                          document.getElementById('dropdown-filtros')?.classList.toggle('hidden')
+                        }
+                        className={`w-full sm:w-auto px-4 py-2 rounded-lg border transition-colors flex items-center justify-center gap-2 text-sm font-medium ${
+                          filtroSelecionado
+                            ? 'bg-[#159A9C]/10 text-[#0F7B7D] border-transparent'
+                            : 'bg-white text-[#002333] border-[#B4BEC9] hover:bg-gray-50'
+                        }`}
+                      >
+                        <Bookmark className="h-4 w-4" />
+                        Filtros ({filtrosSalvos.length})
+                      </button>
+                      <div
+                        id="dropdown-filtros"
+                        className="hidden absolute left-0 sm:left-auto sm:right-0 mt-2 w-full sm:w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-10"
+                      >
+                        <div className="p-2">
+                          <p className="text-xs font-semibold text-[#002333]/60 uppercase tracking-wide px-3 py-2">
+                            Filtros Salvos
+                          </p>
+                          {filtrosSalvos.map((filtro) => (
+                            <div
+                              key={filtro.id}
+                              className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 rounded-lg group"
+                            >
+                              <button
+                                onClick={() => {
+                                  handleAplicarFiltroSalvo(filtro.id);
+                                  document
+                                    .getElementById('dropdown-filtros')
+                                    ?.classList.add('hidden');
+                                }}
+                                className="flex-1 text-left text-sm text-[#002333] font-medium"
+                              >
+                                {filtroSelecionado === filtro.id && '✓ '}
+                                {filtro.nome}
+                              </button>
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (await confirm(`Deletar filtro "${filtro.nome}"?`)) {
+                                    handleDeletarFiltroSalvo(filtro.id);
+                                  }
+                                }}
+                                className="opacity-0 group-hover:opacity-100 p-1 text-red-600 hover:bg-red-50 rounded transition-all"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Painel de Filtros Expandido */}
             {showFiltros && (
-              <div className="mt-4 pt-4 border-t grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="mt-4 w-full border-t pt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {/* Estágio */}
                 <div>
                   <label className="block text-sm font-medium text-[#002333] mb-2">Estágio</label>
@@ -1373,7 +3202,7 @@ const PipelinePage: React.FC = () => {
                     className="w-full px-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
                   >
                     <option value="">Todos os estágios</option>
-                    {ESTAGIOS_CONFIG.map((estagio) => (
+                    {estagiosKanbanVisiveis.map((estagio) => (
                       <option key={estagio.id} value={estagio.id}>
                         {estagio.nome}
                       </option>
@@ -1464,6 +3293,7 @@ const PipelinePage: React.FC = () => {
                     <option value="">
                       {loadingUsuarios ? 'Carregando...' : 'Todos os responsáveis'}
                     </option>
+                    <option value={PIPELINE_UNASSIGNED_RESPONSAVEL_FILTER}>Sem responsavel</option>
                     {usuarios.map((usuario) => (
                       <option key={usuario.id} value={usuario.id}>
                         {usuario.nome}
@@ -1473,7 +3303,7 @@ const PipelinePage: React.FC = () => {
                 </div>
               </div>
             )}
-          </div>
+          </SectionCard>
 
           {/* Error State */}
           {error && (
@@ -1500,6 +3330,7 @@ const PipelinePage: React.FC = () => {
                       <button
                         onClick={() => {
                           localStorage.removeItem('authToken'); // ✅ Corrigido para 'authToken'
+                          localStorage.removeItem('refreshToken');
                           navigate('/login');
                         }}
                         className="px-4 py-2 bg-white text-red-600 border border-red-600 rounded-lg hover:bg-red-50 transition-colors text-sm font-medium"
@@ -1515,304 +3346,684 @@ const PipelinePage: React.FC = () => {
 
           {/* Visualização Kanban */}
           {visualizacao === 'kanban' && (
-            <div className="flex gap-4 overflow-x-auto pb-4">
-              {agrupadoPorEstagio.map((estagio) => (
-                <div
-                  key={estagio.id}
-                  className="flex-shrink-0 w-80"
-                  onDragOver={handleDragOver}
-                  onDrop={() => handleDrop(estagio.id)}
-                >
-                  {/* Header da Coluna */}
-                  <div className={`${estagio.headerClass} rounded-t-lg p-4`}>
-                    <div className="flex items-center justify-between mb-2">
+            <div
+              className={
+                kanbanExpanded ? 'fixed inset-0 z-50 bg-[#F3F6F7] text-[#1E3A4B]' : undefined
+              }
+            >
+              {kanbanExpanded && (
+                <div className="min-h-14 px-4 sm:px-5 py-2 flex flex-col gap-2 border-b border-[#D6E2E6] bg-white/95 backdrop-blur-[2px]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-[#19384C]">
+                      <Grid3X3 className="h-4 w-4 text-[#159A9C]" />
+                      <span className="text-sm font-semibold">Pipeline • Kanban</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setKanbanExpanded(false)}
+                      className="p-2 rounded-lg text-[#002333]/70 hover:text-[#002333] hover:bg-[#DEEFE7]/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25"
+                      aria-label="Fechar visualização ampliada do Kanban"
+                      title="Fechar"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  {activeKanbanFilterChips.length > 0 && (
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                      <span className="text-xs font-medium text-[#607B89] whitespace-nowrap">
+                        Filtros:
+                      </span>
                       <div className="flex items-center gap-2">
-                        <span className="text-2xl">
-                          {estagio.id === EstagioOportunidade.LEADS
-                            ? '🎯'
-                            : estagio.id === EstagioOportunidade.QUALIFICACAO
-                              ? '✅'
-                              : estagio.id === EstagioOportunidade.PROPOSTA
-                                ? '📄'
-                                : estagio.id === EstagioOportunidade.NEGOCIACAO
-                                  ? '🤝'
-                                  : '🎉'}
-                        </span>
-                        <h3 className="font-bold text-white">{estagio.nome}</h3>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="px-3 py-1 rounded-full text-xs font-bold bg-white/25 backdrop-blur-sm text-white border border-white/30">
-                          {estagio.oportunidades.length}
-                        </span>
-                        <button
-                          onClick={() => handleNovaOportunidade(estagio.id)}
-                          className="p-1.5 hover:bg-white/20 rounded-lg transition-colors text-white"
-                          title="Adicionar oportunidade"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </button>
+                        {activeKanbanFilterChips.map((chip) => (
+                          <span
+                            key={`${chip.label}-${chip.value}`}
+                            className="inline-flex items-center gap-1 rounded-full border border-[#B4BEC9]/55 bg-white px-2.5 py-1 text-[12px] text-[#244455] whitespace-nowrap"
+                            title={`${chip.label}: ${chip.value}`}
+                          >
+                            <span className="text-[#6C8794]">{chip.label}:</span>
+                            <strong className="text-[#1E3A4B] font-semibold">{chip.value}</strong>
+                          </span>
+                        ))}
                       </div>
                     </div>
-                    <p className="text-sm text-white font-semibold">
-                      {formatarMoeda(calcularValorTotal(estagio.oportunidades))}
-                    </p>
-                  </div>
-
-                  {/* Cards das Oportunidades */}
-                  <div className="bg-gray-100 rounded-b-lg p-2 min-h-[500px] space-y-2">
-                    {estagio.oportunidades.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-16 text-center">
-                        <div className="text-6xl mb-4 opacity-20">
-                          {estagio.id === EstagioOportunidade.LEADS
-                            ? '🎯'
-                            : estagio.id === EstagioOportunidade.QUALIFICACAO
-                              ? '✅'
-                              : estagio.id === EstagioOportunidade.PROPOSTA
-                                ? '📄'
-                                : estagio.id === EstagioOportunidade.NEGOCIACAO
-                                  ? '🤝'
-                                  : '🎉'}
-                        </div>
-                        <p className="text-[#002333]/40 text-sm font-medium">
-                          Nenhuma oportunidade
-                        </p>
-                        <p className="text-[#002333]/30 text-xs mt-1">Arraste cards para cá</p>
-                      </div>
-                    ) : (
-                      estagio.oportunidades.map((oportunidade) => {
-                        // Determinar cor da probabilidade (heat map)
-                        const prob = oportunidade.probabilidade || 0;
-                        const probColor =
-                          prob <= 20
-                            ? 'bg-red-100 text-red-700'
-                            : prob <= 40
-                              ? 'bg-orange-100 text-orange-700'
-                              : prob <= 60
-                                ? 'bg-yellow-100 text-yellow-700'
-                                : prob <= 80
-                                  ? 'bg-green-100 text-green-700'
-                                  : 'bg-green-200 text-green-800';
-                        const probEmoji =
-                          prob <= 20
-                            ? '❄️'
-                            : prob <= 40
-                              ? '🌤️'
-                              : prob <= 60
-                                ? '☀️'
-                                : prob <= 80
-                                  ? '🔥'
-                                  : '🚀';
-
-                        // Calcular SLA
-                        const diasAteVencimento = oportunidade.dataFechamentoEsperado
-                          ? differenceInDays(
-                            new Date(oportunidade.dataFechamentoEsperado),
-                            new Date(),
-                          )
-                          : null;
-
-                        return (
-                          <div
-                            key={oportunidade.id}
-                            draggable
-                            onDragStart={() => handleDragStart(oportunidade)}
-                            onClick={() => handleVerDetalhes(oportunidade)}
-                            className="bg-white rounded-xl p-4 shadow-sm border hover:shadow-xl hover:-translate-y-1 transition-all duration-200 cursor-pointer relative group"
-                          >
-                            {/* Header com avatar e ações */}
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center gap-2">
-                                {/* Avatar do responsável */}
-                                {oportunidade.responsavel && (
-                                  <div
-                                    className="h-8 w-8 rounded-full bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] flex items-center justify-center text-white text-xs font-bold shadow-sm"
-                                    title={oportunidade.responsavel.nome}
-                                  >
-                                    {oportunidade.responsavel.nome?.charAt(0).toUpperCase() || 'U'}
-                                  </div>
-                                )}
-                                {/* Badge de prioridade */}
-                                {oportunidade.prioridade === PrioridadeOportunidade.ALTA && (
-                                  <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-semibold">
-                                    Alta
-                                  </span>
-                                )}
-                                {(oportunidade as any).prioridade === 'urgente' && (
-                                  <span className="px-2 py-0.5 bg-red-600 text-white rounded-full text-xs font-semibold">
-                                    Urgente
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleEditarOportunidade(oportunidade);
-                                  }}
-                                  className="text-[#159A9C] hover:bg-[#159A9C]/10 p-1.5 rounded-lg transition-colors"
-                                  title="Editar"
-                                >
-                                  <Edit2 className="h-4 w-4" />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleClonarOportunidade(oportunidade);
-                                  }}
-                                  className="text-[#0F7B7D] hover:bg-[#159A9C]/10 p-1.5 rounded-lg transition-colors"
-                                  title="Duplicar"
-                                >
-                                  <Copy className="h-4 w-4" />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeletarOportunidade(oportunidade);
-                                  }}
-                                  className="text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
-                                  title="Excluir"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Badge de SLA */}
-                            {diasAteVencimento !== null && (
-                              <>
-                                {diasAteVencimento < 0 && (
-                                  <div className="mb-3 px-2 py-1 bg-red-100 border border-red-200 rounded-lg flex items-center gap-2">
-                                    <AlertCircle className="h-4 w-4 text-red-600" />
-                                    <span className="text-xs font-semibold text-red-700">
-                                      Atrasado {Math.abs(diasAteVencimento)}d
-                                    </span>
-                                  </div>
-                                )}
-                                {diasAteVencimento >= 0 && diasAteVencimento < 7 && (
-                                  <div className="mb-3 px-2 py-1 bg-yellow-100 border border-yellow-200 rounded-lg flex items-center gap-2">
-                                    <AlertCircle className="h-4 w-4 text-yellow-600" />
-                                    <span className="text-xs font-semibold text-yellow-700">
-                                      Vence em {diasAteVencimento}d
-                                    </span>
-                                  </div>
-                                )}
-                              </>
-                            )}
-
-                            {/* Título */}
-                            <h4 className="font-bold text-[#002333] text-base mb-3 line-clamp-2 leading-tight">
-                              {oportunidade.titulo}
-                            </h4>
-
-                            {/* Valor em destaque */}
-                            <div className="mb-3 pb-3 border-b border-gray-100">
-                              <p className="text-2xl font-extrabold text-emerald-600">
-                                {formatarMoeda(Number(oportunidade.valor || 0))}
-                              </p>
-                            </div>
-
-                            {/* Badge de Probabilidade com Heat Map */}
-                            <div className="flex items-center justify-between mb-3">
-                              <span className="text-xs text-[#002333]/60 font-medium">
-                                Probabilidade
-                              </span>
-                              <span
-                                className={`px-3 py-1 rounded-full text-xs font-bold ${probColor} flex items-center gap-1`}
-                              >
-                                <span>{probEmoji}</span>
-                                <span>{oportunidade.probabilidade}%</span>
-                              </span>
-                            </div>
-
-                            {/* Cliente (prioritário) ou Contato */}
-                            {oportunidade.cliente ? (
-                              // Se tem cliente vinculado, mostra link clicável
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigate(`/clientes/${oportunidade.cliente.id}`);
-                                }}
-                                className="flex items-center gap-2 text-sm text-[#0F7B7D] hover:text-[#159A9C] hover:underline mb-2 transition-colors"
-                              >
-                                <Users className="h-4 w-4" />
-                                <span className="truncate font-medium">
-                                  {oportunidade.cliente.nome}
-                                </span>
-                              </button>
-                            ) : oportunidade.nomeContato ? (
-                              // Se não tem cliente, mas tem nome de contato, mostra o contato
-                              <div className="flex items-center gap-2 text-sm text-[#002333]/70 mb-2">
-                                <Users className="h-4 w-4 text-[#159A9C]" />
-                                <span className="truncate font-medium">
-                                  {oportunidade.nomeContato}
-                                </span>
-                              </div>
-                            ) : null}
-
-                            {/* Data */}
-                            {oportunidade.dataFechamentoEsperado && (
-                              <div className="flex items-center gap-2 text-sm text-[#002333]/70">
-                                <Calendar className="h-4 w-4 text-[#159A9C]" />
-                                <span className="font-medium">
-                                  {new Date(oportunidade.dataFechamentoEsperado).toLocaleDateString(
-                                    'pt-BR',
-                                  )}
-                                </span>
-                              </div>
-                            )}
-
-                            {/* Botões de ação */}
-                            <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditarOportunidade(oportunidade);
-                                }}
-                                className="flex-1 px-3 py-2 text-sm font-medium text-[#159A9C] hover:bg-[#159A9C]/10 rounded-lg transition-colors flex items-center justify-center gap-2"
-                                title="Editar"
-                              >
-                                <Edit2 className="h-4 w-4" />
-                                Editar
-                              </button>
-                              <button
-                                onClick={(e) => handleGerarProposta(oportunidade, e)}
-                                className="flex-1 px-3 py-2 text-sm font-medium text-white bg-[#159A9C] hover:bg-[#0F7B7D] rounded-lg transition-colors flex items-center justify-center gap-2"
-                                title="Gerar Proposta"
-                              >
-                                <FileText className="h-4 w-4" />
-                                Proposta
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeletarOportunidade(oportunidade);
-                                }}
-                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                title="Deletar"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
+                  )}
                 </div>
-              ))}
+              )}
+              <div
+                className={
+                  kanbanExpanded ? 'h-[calc(100vh-3.5rem)] px-4 sm:px-5 pt-3 pb-4' : undefined
+                }
+              >
+                {!canManipulateKanban && (
+                  <div className="mb-3 rounded-lg border border-[#B4BEC9]/50 bg-white px-3 py-2 text-sm text-[#002333]/80">
+                    A movimentação de cards e a criação direta por coluna ficam disponíveis apenas
+                    na visão "Abertas".
+                  </div>
+                )}
+                <div
+                  ref={kanbanBoardRef}
+                  className={
+                    kanbanExpanded
+                      ? 'flex gap-3 sm:gap-4 overflow-x-auto pb-3 h-full'
+                      : 'flex gap-3 sm:gap-4 overflow-x-auto pb-3 -mx-1 px-1 sm:mx-0 sm:px-0'
+                  }
+                >
+                  {agrupadoPorEstagio.map((estagio) => (
+                    <div
+                      key={estagio.id}
+                      data-testid={`pipeline-column-${estagio.id}`}
+                      className={
+                        kanbanExpanded
+                          ? 'flex-shrink-0 w-[min(18rem,calc(100vw-5rem))] sm:w-72 flex flex-col h-full'
+                          : 'flex-shrink-0 w-[min(18rem,calc(100vw-5rem))] sm:w-72 flex flex-col min-h-[26rem]'
+                      }
+                      role="region"
+                      aria-labelledby={`pipeline-column-title-${estagio.id}`}
+                      onDragOver={
+                        canManipulateKanban
+                          ? (event) => handleDragOver(event, estagio.id)
+                          : undefined
+                      }
+                      onDragLeave={
+                        canManipulateKanban
+                          ? (event) => handleDragLeave(event, estagio.id)
+                          : undefined
+                      }
+                      onDrop={
+                        canManipulateKanban ? (event) => handleDrop(event, estagio.id) : undefined
+                      }
+                    >
+                      {/* Header da Coluna */}
+                      <div className={`${estagio.headerClass} rounded-t-lg p-2.5 sm:p-3`}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/70 bg-white/90 text-[11px] font-bold tracking-wide text-[#214251] shadow-sm"
+                              aria-hidden="true"
+                            >
+                              {STAGE_MONOGRAM[estagio.id]}
+                            </span>
+                            <h3
+                              id={`pipeline-column-title-${estagio.id}`}
+                              className="text-xs sm:text-sm font-semibold text-[#002333]"
+                            >
+                              {estagio.nome}
+                            </h3>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#DEEFE7] text-[#002333] border border-[#B4BEC9]/55">
+                              {estagio.oportunidades.length}
+                            </span>
+                            <button
+                              onClick={() => handleNovaOportunidade(estagio.id)}
+                              type="button"
+                              disabled={
+                                !canManipulateKanban ||
+                                estagio.id === EstagioOportunidade.GANHO ||
+                                estagio.id === EstagioOportunidade.PERDIDO
+                              }
+                              className="p-1.5 hover:bg-[#DEEFE7]/70 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25 disabled:cursor-not-allowed disabled:opacity-50"
+                              aria-label={
+                                canManipulateKanban &&
+                                estagio.id !== EstagioOportunidade.GANHO &&
+                                estagio.id !== EstagioOportunidade.PERDIDO
+                                  ? `Adicionar oportunidade em ${estagio.nome}`
+                                  : 'Criacao por coluna disponivel apenas em etapas ativas e na visao Abertas'
+                              }
+                              title={
+                                canManipulateKanban &&
+                                estagio.id !== EstagioOportunidade.GANHO &&
+                                estagio.id !== EstagioOportunidade.PERDIDO
+                                  ? `Adicionar oportunidade em ${estagio.nome}`
+                                  : 'Disponivel apenas em etapas ativas e na visao Abertas'
+                              }
+                              style={{ color: estagio.accentColor }}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                        <p className="text-xs sm:text-sm text-[#002333]/70 font-semibold">
+                          {formatarMoeda(calcularValorTotal(estagio.oportunidades))}
+                        </p>
+                      </div>
+
+                      {/* Cards das Oportunidades */}
+                      <div
+                        data-testid={`pipeline-column-dropzone-${estagio.id}`}
+                        ref={(element) => {
+                          if (element) {
+                            kanbanColumnScrollRefs.current[String(estagio.id)] = element;
+                            return;
+                          }
+                          delete kanbanColumnScrollRefs.current[String(estagio.id)];
+                        }}
+                        className={
+                          kanbanExpanded
+                            ? `${STAGE_COLUMN_SURFACE_CLASS[estagio.id]} rounded-b-lg p-2 space-y-2 border border-[#B4BEC9]/40 border-t-0 flex-1 overflow-y-auto [scrollbar-gutter:stable] min-h-[16rem] ${
+                                dragOverStage === estagio.id
+                                  ? 'ring-2 ring-[#159A9C]/45 bg-[#DFF1EC]/90'
+                                  : ''
+                              }`
+                            : `${STAGE_COLUMN_SURFACE_CLASS[estagio.id]} rounded-b-lg p-2 space-y-2 border border-[#B4BEC9]/40 border-t-0 min-h-[16rem] ${
+                                dragOverStage === estagio.id
+                                  ? 'ring-2 ring-[#159A9C]/45 bg-[#DFF1EC]/90'
+                                  : ''
+                              }`
+                        }
+                        onDragOver={
+                          canManipulateKanban
+                            ? (event) => handleDragOver(event, estagio.id)
+                            : undefined
+                        }
+                        onDragLeave={
+                          canManipulateKanban
+                            ? (event) => handleDragLeave(event, estagio.id)
+                            : undefined
+                        }
+                        onDrop={
+                          canManipulateKanban ? (event) => handleDrop(event, estagio.id) : undefined
+                        }
+                      >
+                        {estagio.oportunidades.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center py-14 text-center">
+                            <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-full border border-[#B4BEC9]/55 bg-white/80 text-sm font-bold tracking-wide text-[#36505F]">
+                              {STAGE_MONOGRAM[estagio.id]}
+                            </div>
+                            <p className="text-[#002333]/60 text-sm font-semibold">
+                              Nenhuma oportunidade
+                            </p>
+                            <p className="mt-1 max-w-[14rem] text-[#002333]/45 text-xs leading-relaxed">
+                              {STAGE_EMPTY_HINT[estagio.id]}
+                            </p>
+                            {canManipulateKanban &&
+                              estagio.id !== EstagioOportunidade.GANHO &&
+                              estagio.id !== EstagioOportunidade.PERDIDO && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleNovaOportunidade(estagio.id)}
+                                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-[#BFD4DA] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#0F7B7D] transition-colors hover:bg-[#F1F8F7]"
+                                >
+                                  <Plus className="h-3.5 w-3.5" />
+                                  Criar nesta etapa
+                                </button>
+                              )}
+                          </div>
+                        ) : (
+                          estagio.oportunidades.map((oportunidade) => {
+                            // Determinar cor da probabilidade (heat map)
+                            const prob = oportunidade.probabilidade || 0;
+                            const probColor =
+                              prob <= 20
+                                ? 'bg-red-100 text-red-700'
+                                : prob <= 40
+                                  ? 'bg-orange-100 text-orange-700'
+                                  : prob <= 60
+                                    ? 'bg-yellow-100 text-yellow-700'
+                                    : prob <= 80
+                                      ? 'bg-green-100 text-green-700'
+                                      : 'bg-green-200 text-green-800';
+                            const probEmoji =
+                              prob <= 20
+                                ? '❄️'
+                                : prob <= 40
+                                  ? '🌤️'
+                                  : prob <= 60
+                                    ? '☀️'
+                                    : prob <= 80
+                                      ? '🔥'
+                                      : '🚀';
+
+                            // Calcular SLA
+                            const diasAteVencimento = oportunidade.dataFechamentoEsperado
+                              ? differenceInDays(
+                                  new Date(oportunidade.dataFechamentoEsperado),
+                                  new Date(),
+                                )
+                              : null;
+                            const lifecycleStatusCard = getLifecycleStatus(oportunidade);
+                            const deleteModeCard = getDeleteModeForOpportunity(oportunidade);
+                            const staleDaysCard = Number(oportunidade.stale_days || 0);
+                            const showStaleBadge =
+                              Boolean(oportunidade.is_stale) &&
+                              staleDaysCard > 0 &&
+                              lifecycleStatusCard === LifecycleStatusOportunidade.OPEN &&
+                              !isTerminalStage(oportunidade.estagio);
+                            const showDeadlineWarningCard =
+                              diasAteVencimento !== null &&
+                              isOpportunityOpenForProcess(oportunidade) &&
+                              !isTerminalStage(oportunidade.estagio);
+                            const nextActionWarningCard = getNextActionWarning(oportunidade);
+                            const showHotNegotiationBadgeCard = isHotNegotiationOpportunity(
+                              oportunidade,
+                              diasAteVencimento,
+                            );
+                            const isDragEnabled =
+                              canManipulateKanban &&
+                              (!lifecycleFeatureEnabled ||
+                                lifecycleStatusCard === LifecycleStatusOportunidade.OPEN) &&
+                              oportunidade.estagio !== EstagioOportunidade.GANHO &&
+                              oportunidade.estagio !== EstagioOportunidade.PERDIDO;
+                            const cardId = String(oportunidade.id);
+                            const cardActionsMenuOpen = openCardActionsMenuId === cardId;
+                            const lifecyclePrimaryLabel =
+                              lifecycleStatusCard === LifecycleStatusOportunidade.ARCHIVED ||
+                              lifecycleStatusCard === LifecycleStatusOportunidade.DELETED
+                                ? 'Restaurar'
+                                : oportunidade.estagio === EstagioOportunidade.GANHO ||
+                                    oportunidade.estagio === EstagioOportunidade.PERDIDO
+                                  ? 'Reabrir'
+                                  : 'Arquivar';
+                            const canMarkAsWonCard = canMarkOpportunityAsWon(oportunidade);
+                            const canMarkAsLostCard = canMarkOpportunityAsLost(oportunidade);
+                            const canEditCard = canEditOpportunity(oportunidade);
+                            const canDuplicateCard = canDuplicateOpportunity(oportunidade);
+                            const canCreateProposalCard = canCreateProposalDraft(oportunidade);
+                            const showClosingQuickActionsCard =
+                              oportunidade.estagio === EstagioOportunidade.FECHAMENTO &&
+                              (canMarkAsWonCard || canMarkAsLostCard);
+
+                            return (
+                              <div
+                                key={oportunidade.id}
+                                data-testid={`pipeline-card-${oportunidade.id}`}
+                                draggable={isDragEnabled}
+                                onDragStart={(event) => {
+                                  if (!isDragEnabled) {
+                                    event.preventDefault();
+                                    return;
+                                  }
+                                  event.dataTransfer?.setData(
+                                    'text/plain',
+                                    String(oportunidade.id),
+                                  );
+                                  if (event.dataTransfer) {
+                                    event.dataTransfer.effectAllowed = 'move';
+                                  }
+                                  handleDragStart(oportunidade);
+                                }}
+                                onClick={() => handleVerDetalhes(oportunidade)}
+                                onDragEnd={() => {
+                                  setDraggedItem(null);
+                                  setDragOverStage(null);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.currentTarget !== e.target) return;
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    handleVerDetalhes(oportunidade);
+                                  }
+                                }}
+                                tabIndex={0}
+                                role="button"
+                                aria-label={`Abrir oportunidade: ${oportunidade.titulo}`}
+                                aria-grabbed={draggedItem?.id === oportunidade.id}
+                                className={`bg-white rounded-lg p-3 shadow-sm border border-[#B4BEC9]/35 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer relative group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/30 ${
+                                  cardActionsMenuOpen ? 'z-40' : 'z-0'
+                                }`}
+                              >
+                                {/* Header com avatar e badges */}
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {/* Avatar do responsável */}
+                                    {oportunidade.responsavel && (
+                                      <div
+                                        className="h-7 w-7 rounded-full bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] flex items-center justify-center text-white text-[11px] font-bold shadow-sm"
+                                        title={oportunidade.responsavel.nome}
+                                      >
+                                        {oportunidade.responsavel.nome?.charAt(0).toUpperCase() ||
+                                          'U'}
+                                      </div>
+                                    )}
+                                    {/* Badge de prioridade */}
+                                    {oportunidade.prioridade === PrioridadeOportunidade.ALTA && (
+                                      <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-semibold">
+                                        Alta
+                                      </span>
+                                    )}
+                                    {(oportunidade as any).prioridade === 'urgente' && (
+                                      <span className="px-2 py-0.5 bg-red-600 text-white rounded-full text-xs font-semibold">
+                                        Urgente
+                                      </span>
+                                    )}
+                                    {showStaleBadge && (
+                                      <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-semibold">
+                                        Parada {staleDaysCard}d
+                                      </span>
+                                    )}
+                                    {showHotNegotiationBadgeCard && (
+                                      <span className="px-2 py-0.5 bg-[#FFE6CC] text-[#B45309] rounded-full text-xs font-semibold border border-[#F9C78F]">
+                                        Quente
+                                      </span>
+                                    )}
+                                    {nextActionWarningCard && (
+                                      <span
+                                        className={`px-2 py-0.5 rounded-full text-xs font-semibold ${nextActionWarningCard.className}`}
+                                      >
+                                        {nextActionWarningCard.label}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Badge de SLA */}
+                                {showDeadlineWarningCard && (
+                                  <>
+                                    {diasAteVencimento < 0 && (
+                                      <div className="mb-2 px-2 py-1 bg-red-100 border border-red-200 rounded-lg flex items-center gap-2">
+                                        <AlertCircle className="h-4 w-4 text-red-600" />
+                                        <span className="text-xs font-semibold text-red-700">
+                                          Atrasado {Math.abs(diasAteVencimento)}d
+                                        </span>
+                                      </div>
+                                    )}
+                                    {diasAteVencimento >= 0 && diasAteVencimento < 7 && (
+                                      <div className="mb-2 px-2 py-1 bg-yellow-100 border border-yellow-200 rounded-lg flex items-center gap-2">
+                                        <AlertCircle className="h-4 w-4 text-yellow-600" />
+                                        <span className="text-xs font-semibold text-yellow-700">
+                                          Vence em {diasAteVencimento}d
+                                        </span>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+
+                                {/* Título */}
+                                <h4
+                                  className="font-semibold text-[#002333] text-sm mb-2 line-clamp-2 leading-snug"
+                                  title={oportunidade.titulo}
+                                >
+                                  {oportunidade.titulo}
+                                </h4>
+
+                                {/* Valor em destaque */}
+                                <div className="mb-2 pb-2 border-b border-gray-100">
+                                  <p className="text-lg font-bold text-[#0F7B7D]">
+                                    {formatarMoeda(Number(oportunidade.valor || 0))}
+                                  </p>
+                                </div>
+
+                                {/* Badge de Probabilidade com Heat Map */}
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-xs text-[#002333]/60 font-medium">
+                                    Probabilidade
+                                  </span>
+                                  <span
+                                    className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${probColor} flex items-center gap-1`}
+                                  >
+                                    <span>{probEmoji}</span>
+                                    <span>{oportunidade.probabilidade}%</span>
+                                  </span>
+                                </div>
+
+                                {/* Cliente (prioritário) ou Contato */}
+                                {oportunidade.cliente ? (
+                                  // Se tem cliente vinculado, mostra link clicável
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate(`/clientes/${oportunidade.cliente.id}`);
+                                    }}
+                                    type="button"
+                                    className="flex items-center gap-2 text-xs text-[#0F7B7D] hover:text-[#159A9C] hover:underline mb-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25 rounded"
+                                    aria-label={`Abrir cliente ${oportunidade.cliente.nome}`}
+                                  >
+                                    <Users className="h-3.5 w-3.5" />
+                                    <span className="truncate font-medium">
+                                      {oportunidade.cliente.nome}
+                                    </span>
+                                  </button>
+                                ) : oportunidade.nomeContato ? (
+                                  // Se não tem cliente, mas tem nome de contato, mostra o contato
+                                  <div className="flex items-center gap-2 text-xs text-[#002333]/70 mb-2">
+                                    <Users className="h-3.5 w-3.5 text-[#159A9C]" />
+                                    <span className="truncate font-medium">
+                                      {oportunidade.nomeContato}
+                                    </span>
+                                  </div>
+                                ) : null}
+
+                                {oportunidade.propostaPrincipal && (
+                                  <div
+                                    className={`mb-2 rounded-lg border px-2 py-1.5 text-xs ${
+                                      oportunidade.propostaPrincipal.sugerePerda
+                                        ? 'border-red-200 bg-red-50 text-red-700'
+                                        : 'border-[#B4BEC9]/60 bg-[#F6FAFB] text-[#244455]'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <FileText className="h-3.5 w-3.5" />
+                                      <span className="font-semibold">
+                                        {oportunidade.propostaPrincipal.numero ||
+                                          'Proposta principal'}
+                                      </span>
+                                      <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide">
+                                        {oportunidade.propostaPrincipal.status}
+                                      </span>
+                                    </div>
+                                    {oportunidade.propostaPrincipal.sugerePerda && (
+                                      <div className="mt-1 text-[11px] font-medium">
+                                        Proposta rejeitada ou expirada. Avalie marcar a oportunidade
+                                        como perdida.
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Data */}
+                                {oportunidade.dataFechamentoEsperado && (
+                                  <div className="flex items-center gap-2 text-xs text-[#002333]/70">
+                                    <Calendar className="h-3.5 w-3.5 text-[#159A9C]" />
+                                    <span className="font-medium">
+                                      {new Date(
+                                        oportunidade.dataFechamentoEsperado,
+                                      ).toLocaleDateString('pt-BR')}
+                                    </span>
+                                  </div>
+                                )}
+
+                                {/* Ações */}
+                                <div className="flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
+                                  {showClosingQuickActionsCard ? (
+                                    <div className="flex items-center gap-1">
+                                      {canMarkAsWonCard && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            void handleMarcarOportunidadeComoGanha(oportunidade);
+                                          }}
+                                          type="button"
+                                          className="inline-flex items-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2 py-1 text-xs font-semibold text-green-700 transition-colors hover:bg-green-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/25"
+                                          title="Marcar como ganho"
+                                        >
+                                          <CheckCircle className="h-3.5 w-3.5" />
+                                          Ganho
+                                        </button>
+                                      )}
+                                      {canMarkAsLostCard && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handlePrepararPerdaOportunidade(oportunidade);
+                                          }}
+                                          type="button"
+                                          className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-700 transition-colors hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/25"
+                                          title="Marcar como perdido"
+                                        >
+                                          <AlertCircle className="h-3.5 w-3.5" />
+                                          Perdido
+                                        </button>
+                                      )}
+                                    </div>
+                                  ) : lifecycleFeatureEnabled ? (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setOpenCardActionsMenuId(null);
+                                        void handleLifecyclePrimaryAction(oportunidade);
+                                      }}
+                                      type="button"
+                                      className="inline-flex items-center gap-1 rounded-lg border border-[#D4E2E7] bg-[#F8FBFC] px-2 py-1 text-xs font-semibold text-[#4F6D7B] transition-colors hover:bg-[#EEF5F7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25"
+                                      title={`${lifecyclePrimaryLabel} oportunidade`}
+                                    >
+                                      {lifecyclePrimaryLabel === 'Arquivar' ? (
+                                        <Archive className="h-3.5 w-3.5" />
+                                      ) : (
+                                        <RotateCcw className="h-3.5 w-3.5" />
+                                      )}
+                                      {lifecyclePrimaryLabel}
+                                    </button>
+                                  ) : (
+                                    <span className="text-xs text-[#002333]/55">Ações rápidas</span>
+                                  )}
+
+                                  <div
+                                    className="relative ml-auto"
+                                    onClick={(event) => event.stopPropagation()}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        setOpenCardActionsMenuId((prev) =>
+                                          prev === cardId ? null : cardId,
+                                        );
+                                      }}
+                                      className="inline-flex items-center gap-1 rounded-lg border border-[#B4BEC9]/70 bg-white px-2 py-1 text-xs font-semibold text-[#002333] transition-colors hover:bg-[#DEEFE7]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25"
+                                      aria-expanded={cardActionsMenuOpen}
+                                      aria-label="Abrir menu de ações"
+                                    >
+                                      Ações
+                                      <MoreHorizontal className="h-3.5 w-3.5" />
+                                    </button>
+
+                                    {cardActionsMenuOpen && (
+                                      <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-[#B4BEC9]/60 bg-white p-1 shadow-lg">
+                                        {lifecycleFeatureEnabled && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setOpenCardActionsMenuId(null);
+                                              void handleLifecyclePrimaryAction(oportunidade);
+                                            }}
+                                            className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#0F7B7D] transition-colors hover:bg-[#DEEFE7]/60"
+                                          >
+                                            {lifecyclePrimaryLabel}
+                                          </button>
+                                        )}
+                                        {canMarkAsWonCard && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setOpenCardActionsMenuId(null);
+                                              void handleMarcarOportunidadeComoGanha(oportunidade);
+                                            }}
+                                            className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-green-700 transition-colors hover:bg-green-50"
+                                          >
+                                            Marcar como ganho
+                                          </button>
+                                        )}
+                                        {canMarkAsLostCard && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setOpenCardActionsMenuId(null);
+                                              handlePrepararPerdaOportunidade(oportunidade);
+                                            }}
+                                            className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-red-700 transition-colors hover:bg-red-50"
+                                          >
+                                            Marcar como perdido
+                                          </button>
+                                        )}
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setOpenCardActionsMenuId(null);
+                                            handleVerDetalhes(oportunidade);
+                                          }}
+                                          className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                        >
+                                          Ver detalhes
+                                        </button>
+                                        {canEditCard && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setOpenCardActionsMenuId(null);
+                                              handleEditarOportunidade(oportunidade);
+                                            }}
+                                            className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                          >
+                                            Editar
+                                          </button>
+                                        )}
+                                        {canDuplicateCard && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setOpenCardActionsMenuId(null);
+                                              handleClonarOportunidade(oportunidade);
+                                            }}
+                                            className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                          >
+                                            Duplicar
+                                          </button>
+                                        )}
+                                        {canCreateProposalCard && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setOpenCardActionsMenuId(null);
+                                              void handleGerarProposta(oportunidade);
+                                            }}
+                                            className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                          >
+                                            Criar rascunho de proposta
+                                          </button>
+                                        )}
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setOpenCardActionsMenuId(null);
+                                            handleDeletarOportunidade(oportunidade);
+                                          }}
+                                          className={`block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors ${
+                                            deleteModeCard === 'permanente'
+                                              ? 'text-red-700 hover:bg-red-100'
+                                              : 'text-red-600 hover:bg-red-50'
+                                          }`}
+                                        >
+                                          {deleteModeCard === 'permanente'
+                                            ? 'Excluir permanente'
+                                            : 'Mover para lixeira'}
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 
           {/* Visualização Lista */}
           {visualizacao === 'lista' && (
-            <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+            <DataTableCard>
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gray-50 border-b">
+                  <thead className="bg-[#DEEFE7]/35 border-b border-[#B4BEC9]/40">
                     <tr>
                       <th
                         onClick={() => handleOrdenar('titulo')}
-                        className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                        className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-[#DEEFE7]/55 transition-colors"
                       >
                         <div className="flex items-center gap-2">
                           Título
@@ -1821,7 +4032,7 @@ const PipelinePage: React.FC = () => {
                       </th>
                       <th
                         onClick={() => handleOrdenar('estagio')}
-                        className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                        className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-[#DEEFE7]/55 transition-colors"
                       >
                         <div className="flex items-center gap-2">
                           Estágio
@@ -1830,7 +4041,7 @@ const PipelinePage: React.FC = () => {
                       </th>
                       <th
                         onClick={() => handleOrdenar('valor')}
-                        className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                        className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-[#DEEFE7]/55 transition-colors"
                       >
                         <div className="flex items-center gap-2">
                           Valor
@@ -1839,7 +4050,7 @@ const PipelinePage: React.FC = () => {
                       </th>
                       <th
                         onClick={() => handleOrdenar('probabilidade')}
-                        className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                        className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-[#DEEFE7]/55 transition-colors"
                       >
                         <div className="flex items-center gap-2">
                           Probabilidade
@@ -1853,7 +4064,7 @@ const PipelinePage: React.FC = () => {
                       </th>
                       <th
                         onClick={() => handleOrdenar('dataFechamentoEsperado')}
-                        className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                        className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-[#DEEFE7]/55 transition-colors"
                       >
                         <div className="flex items-center gap-2">
                           Data Esperada
@@ -1867,7 +4078,7 @@ const PipelinePage: React.FC = () => {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-white divide-y divide-[#B4BEC9]/25">
                     {oportunidadesPaginadas.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="px-6 py-8 text-center text-[#002333]/60">
@@ -1879,6 +4090,40 @@ const PipelinePage: React.FC = () => {
                         const estagioInfo = ESTAGIOS_CONFIG.find(
                           (e) => e.id === oportunidade.estagio,
                         );
+                        const lifecycleStatus = getLifecycleStatus(oportunidade);
+                        const deleteModeList = getDeleteModeForOpportunity(oportunidade);
+                        const staleDaysList = Number(oportunidade.stale_days || 0);
+                        const showStaleBadgeList =
+                          Boolean(oportunidade.is_stale) &&
+                          staleDaysList > 0 &&
+                          lifecycleStatus === LifecycleStatusOportunidade.OPEN &&
+                          !isTerminalStage(oportunidade.estagio);
+                        const diasAteVencimentoList = oportunidade.dataFechamentoEsperado
+                          ? differenceInDays(
+                              new Date(oportunidade.dataFechamentoEsperado),
+                              new Date(),
+                            )
+                          : null;
+                        const nextActionWarningList = getNextActionWarning(oportunidade);
+                        const showHotNegotiationBadgeList = isHotNegotiationOpportunity(
+                          oportunidade,
+                          diasAteVencimentoList,
+                        );
+                        const listRowId = String(oportunidade.id);
+                        const listActionsMenuOpen = openListActionsMenuId === listRowId;
+                        const lifecyclePrimaryLabelList =
+                          lifecycleStatus === LifecycleStatusOportunidade.ARCHIVED ||
+                          lifecycleStatus === LifecycleStatusOportunidade.DELETED
+                            ? 'Restaurar'
+                            : oportunidade.estagio === EstagioOportunidade.GANHO ||
+                                oportunidade.estagio === EstagioOportunidade.PERDIDO
+                              ? 'Reabrir'
+                              : 'Arquivar';
+                        const canMarkAsWonList = canMarkOpportunityAsWon(oportunidade);
+                        const canMarkAsLostList = canMarkOpportunityAsLost(oportunidade);
+                        const canEditList = canEditOpportunity(oportunidade);
+                        const canDuplicateList = canDuplicateOpportunity(oportunidade);
+                        const canCreateProposalList = canCreateProposalDraft(oportunidade);
                         return (
                           <tr
                             key={oportunidade.id}
@@ -1892,6 +4137,29 @@ const PipelinePage: React.FC = () => {
                               {oportunidade.descricao && (
                                 <div className="text-sm text-[#002333]/60 line-clamp-1">
                                   {oportunidade.descricao}
+                                </div>
+                              )}
+                              {(showStaleBadgeList ||
+                                showHotNegotiationBadgeList ||
+                                Boolean(nextActionWarningList)) && (
+                                <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                                  {showStaleBadgeList && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+                                      Parada {staleDaysList}d
+                                    </span>
+                                  )}
+                                  {showHotNegotiationBadgeList && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-[#FFE6CC] text-[#B45309] border border-[#F9C78F]">
+                                      Quente
+                                    </span>
+                                  )}
+                                  {nextActionWarningList && (
+                                    <span
+                                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${nextActionWarningList.className}`}
+                                    >
+                                      {nextActionWarningList.label}
+                                    </span>
+                                  )}
                                 </div>
                               )}
                             </td>
@@ -1914,39 +4182,133 @@ const PipelinePage: React.FC = () => {
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-[#002333]/60">
                               {oportunidade.dataFechamentoEsperado
                                 ? new Date(oportunidade.dataFechamentoEsperado).toLocaleDateString(
-                                  'pt-BR',
-                                )
+                                    'pt-BR',
+                                  )
                                 : '-'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                              <div className="flex items-center justify-end gap-2">
+                              <div
+                                className="relative inline-block text-left"
+                                onClick={(event) => event.stopPropagation()}
+                              >
                                 <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleEditarOportunidade(oportunidade);
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setOpenListActionsMenuId((prev) =>
+                                      prev === listRowId ? null : listRowId,
+                                    );
                                   }}
-                                  className="text-[#159A9C] hover:text-[#0F7B7D] transition-colors p-1"
-                                  title="Editar"
+                                  className="inline-flex items-center gap-1 rounded-lg border border-[#D4E2E7] bg-[#F8FBFC] px-2.5 py-1.5 text-xs font-semibold text-[#4F6D7B] transition-colors hover:bg-[#EEF5F7]"
+                                  aria-expanded={listActionsMenuOpen}
+                                  aria-label="Abrir menu de ações da linha"
                                 >
-                                  <Edit2 className="h-4 w-4" />
+                                  Ações
+                                  <MoreHorizontal className="h-3.5 w-3.5" />
                                 </button>
-                                <button
-                                  onClick={(e) => handleGerarProposta(oportunidade, e)}
-                                  className="text-[#159A9C] hover:text-[#0F7B7D] transition-colors p-1"
-                                  title="Gerar Proposta"
-                                >
-                                  <FileText className="h-4 w-4" />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeletarOportunidade(oportunidade);
-                                  }}
-                                  className="text-red-600 hover:text-red-700 transition-colors p-1"
-                                  title="Deletar"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
+
+                                {listActionsMenuOpen && (
+                                  <div className="absolute right-0 top-full z-30 mt-1 w-44 rounded-lg border border-[#B4BEC9]/60 bg-white p-1 shadow-lg">
+                                    {lifecycleFeatureEnabled && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setOpenListActionsMenuId(null);
+                                          void handleLifecyclePrimaryAction(oportunidade);
+                                        }}
+                                        className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#0F7B7D] transition-colors hover:bg-[#DEEFE7]/60"
+                                      >
+                                        {lifecyclePrimaryLabelList}
+                                      </button>
+                                    )}
+                                    {canMarkAsWonList && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setOpenListActionsMenuId(null);
+                                          void handleMarcarOportunidadeComoGanha(oportunidade);
+                                        }}
+                                        className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-green-700 transition-colors hover:bg-green-50"
+                                      >
+                                        Marcar como ganho
+                                      </button>
+                                    )}
+                                    {canMarkAsLostList && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setOpenListActionsMenuId(null);
+                                          handlePrepararPerdaOportunidade(oportunidade);
+                                        }}
+                                        className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-red-700 transition-colors hover:bg-red-50"
+                                      >
+                                        Marcar como perdido
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenListActionsMenuId(null);
+                                        handleVerDetalhes(oportunidade);
+                                      }}
+                                      className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                    >
+                                      Ver detalhes
+                                    </button>
+                                    {canEditList && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setOpenListActionsMenuId(null);
+                                          handleEditarOportunidade(oportunidade);
+                                        }}
+                                        className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                      >
+                                        Editar
+                                      </button>
+                                    )}
+                                    {canDuplicateList && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setOpenListActionsMenuId(null);
+                                          handleClonarOportunidade(oportunidade);
+                                        }}
+                                        className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                      >
+                                        Duplicar
+                                      </button>
+                                    )}
+                                    {canCreateProposalList && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setOpenListActionsMenuId(null);
+                                          void handleGerarProposta(oportunidade);
+                                        }}
+                                        className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                      >
+                                        Criar rascunho de proposta
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenListActionsMenuId(null);
+                                        handleDeletarOportunidade(oportunidade);
+                                      }}
+                                      className={`block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors ${
+                                        deleteModeList === 'permanente'
+                                          ? 'text-red-700 hover:bg-red-100'
+                                          : 'text-red-600 hover:bg-red-50'
+                                      }`}
+                                    >
+                                      {deleteModeList === 'permanente'
+                                        ? 'Excluir permanente'
+                                        : 'Mover para lixeira'}
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -1959,22 +4321,22 @@ const PipelinePage: React.FC = () => {
 
               {/* Paginação */}
               {totalPaginas > 1 && (
-                <div className="border-t px-6 py-4 flex items-center justify-between bg-gray-50">
-                  <div className="text-sm text-[#002333]/60">
+                <div className="border-t border-[#B4BEC9]/35 px-4 sm:px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-[#DEEFE7]/35">
+                  <div className="text-xs sm:text-sm text-[#002333]/60">
                     Mostrando {indexInicio + 1} a{' '}
                     {Math.min(indexFim, oportunidadesOrdenadas.length)} de{' '}
                     {oportunidadesOrdenadas.length} oportunidades
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                     <button
                       onClick={() => setPaginaAtual((prev) => Math.max(1, prev - 1))}
                       disabled={paginaAtual === 1}
-                      className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium text-[#002333] hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="px-3 py-1.5 border border-[#B4BEC9]/70 rounded-lg text-sm font-medium text-[#002333] hover:bg-[#DEEFE7]/55 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
                     >
                       Anterior
                     </button>
 
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 overflow-x-auto max-w-[130px] sm:max-w-none">
                       {Array.from({ length: totalPaginas }, (_, i) => i + 1)
                         .filter((page) => {
                           // Mostrar apenas páginas próximas à atual
@@ -1991,10 +4353,11 @@ const PipelinePage: React.FC = () => {
                               {showEllipsis && <span className="px-2 text-[#002333]/40">...</span>}
                               <button
                                 onClick={() => setPaginaAtual(page)}
-                                className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${paginaAtual === page
-                                  ? 'bg-[#159A9C] text-white'
-                                  : 'text-[#002333] hover:bg-gray-100'
-                                  }`}
+                                className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
+                                  paginaAtual === page
+                                    ? 'bg-[#159A9C] text-white'
+                                    : 'text-[#002333] hover:bg-[#DEEFE7]/55'
+                                }`}
                               >
                                 {page}
                               </button>
@@ -2006,19 +4369,24 @@ const PipelinePage: React.FC = () => {
                     <button
                       onClick={() => setPaginaAtual((prev) => Math.min(totalPaginas, prev + 1))}
                       disabled={paginaAtual === totalPaginas}
-                      className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium text-[#002333] hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="px-3 py-1.5 border border-[#B4BEC9]/70 rounded-lg text-sm font-medium text-[#002333] hover:bg-[#DEEFE7]/55 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
                     >
                       Próxima
                     </button>
                   </div>
                 </div>
               )}
-            </div>
+            </DataTableCard>
           )}
 
           {/* Visualização Calendário */}
           {visualizacao === 'calendario' && (
-            <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+            <SectionCard className="overflow-hidden">
+              <div className="border-b border-[#B4BEC9]/30 bg-[#DEEFE7]/35 px-4 py-2 text-xs text-[#002333]/70">
+                {loadingAtividadesCalendario
+                  ? 'Atualizando eventos de atividades agendadas...'
+                  : 'Clique em eventos de atividade para abrir a oportunidade na aba de atividades.'}
+              </div>
               <style>{`
                 .rbc-calendar {
                   font-family: inherit;
@@ -2029,15 +4397,15 @@ const PipelinePage: React.FC = () => {
                   font-weight: 600;
                   font-size: 14px;
                   color: #002333;
-                  background-color: #F9FAFB;
-                  border-bottom: 2px solid #E5E7EB;
+                  background-color: #DEEFE7;
+                  border-bottom: 1px solid #B4BEC9;
                 }
                 .rbc-toolbar {
                   padding: 16px 24px;
                   display: flex;
                   justify-content: space-between;
                   align-items: center;
-                  border-bottom: 1px solid #E5E7EB;
+                  border-bottom: 1px solid #B4BEC9;
                   background-color: #FFFFFF;
                 }
                 .rbc-toolbar button {
@@ -2052,7 +4420,7 @@ const PipelinePage: React.FC = () => {
                   transition: all 0.2s;
                 }
                 .rbc-toolbar button:hover {
-                  background-color: #F3F4F6;
+                  background-color: #DEEFE7;
                   border-color: #159A9C;
                 }
                 .rbc-toolbar button.rbc-active {
@@ -2068,10 +4436,10 @@ const PipelinePage: React.FC = () => {
                   overflow: visible;
                 }
                 .rbc-day-bg {
-                  border: 1px solid #E5E7EB;
+                  border: 1px solid #B4BEC9;
                 }
                 .rbc-off-range-bg {
-                  background-color: #F9FAFB;
+                  background-color: #DEEFE7;
                 }
                 .rbc-today {
                   background-color: #DEEFE7 !important;
@@ -2092,7 +4460,7 @@ const PipelinePage: React.FC = () => {
                   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
                 }
                 .rbc-event.rbc-selected {
-                  outline: 2px solid #002333;
+                  outline: 2px solid #159A9C;
                   outline-offset: 2px;
                 }
                 .rbc-event-label {
@@ -2125,6 +4493,40 @@ const PipelinePage: React.FC = () => {
                 .rbc-show-more:hover {
                   text-decoration: underline;
                 }
+                @media (max-width: 640px) {
+                  .rbc-calendar {
+                    min-height: 560px;
+                  }
+                  .rbc-toolbar {
+                    padding: 12px;
+                    flex-direction: column;
+                    align-items: stretch;
+                    gap: 8px;
+                  }
+                  .rbc-toolbar .rbc-toolbar-label {
+                    margin: 4px 0;
+                    text-align: center;
+                    font-size: 14px;
+                  }
+                  .rbc-toolbar .rbc-btn-group {
+                    display: flex;
+                    flex-wrap: wrap;
+                    justify-content: center;
+                    gap: 6px;
+                  }
+                  .rbc-toolbar button {
+                    padding: 6px 10px;
+                    font-size: 12px;
+                  }
+                  .rbc-header {
+                    font-size: 11px;
+                    padding: 8px 4px;
+                  }
+                  .rbc-date-cell {
+                    padding: 4px;
+                    font-size: 12px;
+                  }
+                }
               `}</style>
 
               <BigCalendar
@@ -2137,13 +4539,36 @@ const PipelinePage: React.FC = () => {
                 onView={(view) => setCalendarView(view)}
                 date={calendarDate}
                 onNavigate={(date) => setCalendarDate(date)}
-                onSelectEvent={(event: any) => {
-                  // Abrir modal da oportunidade ao clicar no evento
-                  if (event.resource) {
-                    handleEditarOportunidade(event.resource);
+                onSelectEvent={(event: EventoCalendarioPipeline) => {
+                  if (!event.resource) return;
+
+                  if (event.eventKind === 'atividade') {
+                    abrirDetalhesOportunidade(event.resource, 'atividades', {
+                      kind: 'atividade',
+                      title: event.title,
+                      dataEvento: event.start,
+                      tipoAtividadeLabel: event.atividadeTipo
+                        ? TIPO_ATIVIDADE_LABEL[event.atividadeTipo]
+                        : undefined,
+                      responsavelNome: event.atividadeResponsavelNome,
+                      prioridade: event.resource.prioridade,
+                      descricao: event.atividadeDescricao,
+                    });
+                    return;
                   }
+
+                  abrirDetalhesOportunidade(event.resource, 'detalhes', {
+                    kind: 'oportunidade',
+                    title: event.title,
+                    dataEvento: event.start,
+                    prioridade: event.resource.prioridade,
+                    descricao: `Etapa atual: ${
+                      ESTAGIOS_CONFIG.find((estagio) => estagio.id === event.resource.estagio)
+                        ?.nome || event.resource.estagio
+                    }.`,
+                  });
                 }}
-                eventPropGetter={(event: any) => ({
+                eventPropGetter={(event: EventoCalendarioPipeline) => ({
                   style: {
                     backgroundColor: event.color,
                     borderRadius: '4px',
@@ -2184,7 +4609,7 @@ const PipelinePage: React.FC = () => {
                   ))}
                 </div>
               </div>
-            </div>
+            </SectionCard>
           )}
 
           {/* Visualização Gráficos */}
@@ -2193,14 +4618,14 @@ const PipelinePage: React.FC = () => {
               {/* Grid 2x3 de gráficos */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* 1. Funil de Conversão */}
-                <div className="bg-white rounded-lg shadow-sm border p-6">
+                <SectionCard className="p-6">
                   <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
                     <TrendingUp className="h-5 w-5 text-[#159A9C]" />
                     Funil de Conversão
                   </h3>
                   <ResponsiveContainer width="100%" height={300}>
                     <RechartsBarChart data={dadosGraficos.funil}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#B4BEC9" />
                       <XAxis
                         dataKey="nome"
                         tick={{ fontSize: 12, fill: '#002333' }}
@@ -2212,7 +4637,7 @@ const PipelinePage: React.FC = () => {
                       <Tooltip
                         contentStyle={{
                           backgroundColor: '#fff',
-                          border: '1px solid #E5E7EB',
+                          border: '1px solid #B4BEC9',
                           borderRadius: '8px',
                           fontSize: '12px',
                         }}
@@ -2221,17 +4646,17 @@ const PipelinePage: React.FC = () => {
                       <Bar dataKey="quantidade" fill="#159A9C" radius={[8, 8, 0, 0]} />
                     </RechartsBarChart>
                   </ResponsiveContainer>
-                </div>
+                </SectionCard>
 
                 {/* 2. Valor por Estágio */}
-                <div className="bg-white rounded-lg shadow-sm border p-6">
+                <SectionCard className="p-6">
                   <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
                     <DollarSign className="h-5 w-5 text-[#159A9C]" />
                     Valor por Estágio
                   </h3>
                   <ResponsiveContainer width="100%" height={300}>
                     <RechartsBarChart data={dadosGraficos.valorPorEstagio} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#B4BEC9" />
                       <XAxis
                         type="number"
                         tick={{ fontSize: 12, fill: '#002333' }}
@@ -2246,7 +4671,7 @@ const PipelinePage: React.FC = () => {
                       <Tooltip
                         contentStyle={{
                           backgroundColor: '#fff',
-                          border: '1px solid #E5E7EB',
+                          border: '1px solid #B4BEC9',
                           borderRadius: '8px',
                           fontSize: '12px',
                         }}
@@ -2261,17 +4686,17 @@ const PipelinePage: React.FC = () => {
                       <Bar dataKey="valor" fill="#0F7B7D" radius={[0, 8, 8, 0]} />
                     </RechartsBarChart>
                   </ResponsiveContainer>
-                </div>
+                </SectionCard>
 
                 {/* 3. Taxa de Conversão */}
-                <div className="bg-white rounded-lg shadow-sm border p-6">
+                <SectionCard className="p-6">
                   <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
                     <Target className="h-5 w-5 text-[#159A9C]" />
                     Taxa de Conversão
                   </h3>
                   <ResponsiveContainer width="100%" height={300}>
                     <LineChart data={dadosGraficos.taxaConversao}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#B4BEC9" />
                       <XAxis
                         dataKey="nome"
                         tick={{ fontSize: 12, fill: '#002333' }}
@@ -2286,7 +4711,7 @@ const PipelinePage: React.FC = () => {
                       <Tooltip
                         contentStyle={{
                           backgroundColor: '#fff',
-                          border: '1px solid #E5E7EB',
+                          border: '1px solid #B4BEC9',
                           borderRadius: '8px',
                           fontSize: '12px',
                         }}
@@ -2302,10 +4727,10 @@ const PipelinePage: React.FC = () => {
                       />
                     </LineChart>
                   </ResponsiveContainer>
-                </div>
+                </SectionCard>
 
                 {/* 4. Origem das Oportunidades */}
-                <div className="bg-white rounded-lg shadow-sm border p-6">
+                <SectionCard className="p-6">
                   <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
                     <Users className="h-5 w-5 text-[#159A9C]" />
                     Origem das Oportunidades
@@ -2334,24 +4759,24 @@ const PipelinePage: React.FC = () => {
                       <Tooltip
                         contentStyle={{
                           backgroundColor: '#fff',
-                          border: '1px solid #E5E7EB',
+                          border: '1px solid #B4BEC9',
                           borderRadius: '8px',
                           fontSize: '12px',
                         }}
                       />
                     </PieChart>
                   </ResponsiveContainer>
-                </div>
+                </SectionCard>
 
                 {/* 5. Performance por Responsável */}
-                <div className="bg-white rounded-lg shadow-sm border p-6 lg:col-span-2">
+                <SectionCard className="p-6 lg:col-span-2">
                   <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
                     <Users className="h-5 w-5 text-[#159A9C]" />
                     Top 5 - Performance por Responsável
                   </h3>
                   <ResponsiveContainer width="100%" height={300}>
                     <RechartsBarChart data={dadosGraficos.performance}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#B4BEC9" />
                       <XAxis dataKey="nome" tick={{ fontSize: 12, fill: '#002333' }} />
                       <YAxis
                         yAxisId="left"
@@ -2367,7 +4792,7 @@ const PipelinePage: React.FC = () => {
                       <Tooltip
                         contentStyle={{
                           backgroundColor: '#fff',
-                          border: '1px solid #E5E7EB',
+                          border: '1px solid #B4BEC9',
                           borderRadius: '8px',
                           fontSize: '12px',
                         }}
@@ -2388,20 +4813,20 @@ const PipelinePage: React.FC = () => {
                       <Bar
                         yAxisId="left"
                         dataKey="valor"
-                        fill="#6366f1"
+                        fill="#159A9C"
                         name="Valor"
                         radius={[8, 8, 0, 0]}
                       />
                       <Bar
                         yAxisId="right"
                         dataKey="quantidade"
-                        fill="#f59e0b"
+                        fill="#FBBF24"
                         name="Quantidade"
                         radius={[8, 8, 0, 0]}
                       />
                     </RechartsBarChart>
                   </ResponsiveContainer>
-                </div>
+                </SectionCard>
               </div>
 
               {/* Resumo Estatístico */}
@@ -2410,35 +4835,37 @@ const PipelinePage: React.FC = () => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
                     <p className="text-white/80 text-sm mb-1">Total Oportunidades</p>
-                    <p className="text-3xl font-bold">{oportunidadesFiltradas.length}</p>
+                    <p className="text-2xl sm:text-3xl font-bold leading-tight break-words">
+                      {oportunidadesFiltradas.length}
+                    </p>
                   </div>
                   <div>
                     <p className="text-white/80 text-sm mb-1">Valor Total</p>
-                    <p className="text-3xl font-bold">
+                    <p className="text-2xl sm:text-3xl font-bold leading-tight break-words">
                       {formatarMoeda(calcularValorTotal(oportunidadesFiltradas))}
                     </p>
                   </div>
                   <div>
                     <p className="text-white/80 text-sm mb-1">Ticket Médio</p>
-                    <p className="text-3xl font-bold">
+                    <p className="text-2xl sm:text-3xl font-bold leading-tight break-words">
                       {formatarMoeda(
                         oportunidadesFiltradas.length > 0
                           ? calcularValorTotal(oportunidadesFiltradas) /
-                          oportunidadesFiltradas.length
+                              oportunidadesFiltradas.length
                           : 0,
                       )}
                     </p>
                   </div>
                   <div>
                     <p className="text-white/80 text-sm mb-1">Taxa Conversão</p>
-                    <p className="text-3xl font-bold">
+                    <p className="text-2xl sm:text-3xl font-bold leading-tight break-words">
                       {dadosGraficos.funil[0]?.quantidade > 0
                         ? (
-                          ((dadosGraficos.funil.find((f) => f.nome === 'Ganho')?.quantidade ||
-                            0) /
-                            dadosGraficos.funil[0].quantidade) *
-                          100
-                        ).toFixed(1)
+                            ((dadosGraficos.funil.find((f) => f.nome === 'Ganho')?.quantidade ||
+                              0) /
+                              dadosGraficos.funil[0].quantidade) *
+                            100
+                          ).toFixed(1)
                         : 0}
                       %
                     </p>
@@ -2447,8 +4874,21 @@ const PipelinePage: React.FC = () => {
               </div>
             </div>
           )}
-        </div>
-      </div>
+        </>
+      )}
+
+      {showBackToTop && !kanbanExpanded && (
+        <button
+          type="button"
+          onClick={handleVoltarAoTopo}
+          className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 rounded-full border border-[#B4BEC9]/70 bg-white/95 px-4 py-2 text-sm font-medium text-[#1E3A4B] shadow-lg transition-colors hover:bg-[#DEEFE7]"
+          aria-label="Voltar ao topo"
+          title="Voltar ao topo"
+        >
+          <ArrowUp className="h-4 w-4" />
+          Topo
+        </button>
+      )}
 
       {/* Modal Oportunidade Refatorado */}
       <ModalOportunidadeRefatorado
@@ -2456,10 +4896,13 @@ const PipelinePage: React.FC = () => {
         onClose={() => {
           setShowModal(false);
           setOportunidadeEditando(null);
+          restoreKanbanScrollSnapshot({ defer: true });
         }}
         onSave={handleSalvarOportunidade}
         oportunidade={oportunidadeEditando}
         estagioInicial={estagioNovaOportunidade}
+        estagiosPermitidos={estagiosKanbanVisiveis.map((estagio) => estagio.id)}
+        lifecycleFeatureEnabled={lifecycleFeatureEnabled}
         usuarios={usuarios}
         loadingUsuarios={false}
       />
@@ -2480,12 +4923,21 @@ const PipelinePage: React.FC = () => {
             setShowModalMudancaEstagio(false);
             setMudancaEstagioData(null);
             setDraggedItem(null);
+            setErroMudancaEstagio(null);
           }}
           onConfirm={handleConfirmarMudancaEstagio}
           estagioOrigem={mudancaEstagioData.oportunidade.estagio}
           estagioDestino={mudancaEstagioData.novoEstagio}
           tituloOportunidade={mudancaEstagioData.oportunidade.titulo}
+          isPuloEtapa={mudancaEstagioData.isPuloEtapa}
+          responsaveis={usuarios.map((item) => ({
+            id: item.id,
+            nome: item.nome,
+            email: item.email,
+          }))}
+          responsavelPadraoId={mudancaEstagioData.oportunidade.responsavel?.id || user?.id}
           loading={loadingMudancaEstagio}
+          errorMessage={erroMudancaEstagio}
         />
       )}
 
@@ -2497,24 +4949,15 @@ const PipelinePage: React.FC = () => {
             setShowModalMotivoPerda(false);
             setOportunidadeParaPerder(null);
             setDraggedItem(null);
+            setErroMotivoPerda(null);
           }}
           onConfirm={handleConfirmarPerda}
           tituloOportunidade={oportunidadeParaPerder.titulo}
           valorOportunidade={oportunidadeParaPerder.valor}
           loading={loadingMudancaEstagio}
+          errorMessage={erroMotivoPerda}
         />
       )}
-
-      {/* Modal de Detalhes */}
-      <ModalDetalhesOportunidade
-        oportunidade={oportunidadeDetalhes}
-        onClose={() => setOportunidadeDetalhes(null)}
-        onEditar={(oportunidade) => {
-          setOportunidadeEditando(oportunidade);
-          setShowModal(true);
-        }}
-        onClonar={handleClonarOportunidade}
-      />
 
       {/* Modal de Confirmação de Exclusão */}
       {showModalDeletar && oportunidadeDeletar && (
@@ -2525,13 +4968,18 @@ const PipelinePage: React.FC = () => {
                 <AlertCircle className="h-6 w-6 text-red-600" />
               </div>
               <h3 className="text-xl font-bold text-center text-[#002333] mb-2">
-                Confirmar Exclusão
+                {deleteMode === 'permanente'
+                  ? 'Confirmar Exclusao Permanente'
+                  : 'Confirmar Exclusao'}
               </h3>
               <p className="text-center text-gray-600 mb-6">
-                Tem certeza que deseja deletar a oportunidade{' '}
-                <strong>"{oportunidadeDeletar.titulo}"</strong>?
+                Tem certeza que deseja{' '}
+                {deleteMode === 'permanente' ? 'excluir permanentemente' : 'enviar para a lixeira'}{' '}
+                a oportunidade <strong>"{oportunidadeDeletar.titulo}"</strong>?
                 <br />
-                Esta ação não pode ser desfeita.
+                {deleteMode === 'permanente'
+                  ? 'Esta ação não pode ser desfeita.'
+                  : 'Você poderá restaurar depois pela visão Lixeira.'}
               </p>
               <div className="flex gap-3">
                 <button
@@ -2547,17 +4995,21 @@ const PipelinePage: React.FC = () => {
                 <button
                   onClick={handleConfirmarDelecao}
                   disabled={loadingDeletar}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                  className={`flex-1 px-4 py-2 text-white rounded-lg transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2 ${
+                    deleteMode === 'permanente'
+                      ? 'bg-red-600 hover:bg-red-700'
+                      : 'bg-[#159A9C] hover:bg-[#0F7B7D]'
+                  }`}
                 >
                   {loadingDeletar ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      Deletando...
+                      {deleteMode === 'permanente' ? 'Excluindo...' : 'Movendo...'}
                     </>
                   ) : (
                     <>
                       <Trash2 className="h-4 w-4" />
-                      Deletar
+                      {deleteMode === 'permanente' ? 'Excluir permanente' : 'Mover para lixeira'}
                     </>
                   )}
                 </button>

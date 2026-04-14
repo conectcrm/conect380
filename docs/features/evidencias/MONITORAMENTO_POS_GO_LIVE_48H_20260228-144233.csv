@@ -1,0 +1,3 @@
+﻿"timestamp_utc","ciclo","health_ok","health_status","health_latency_ms","metrics_ok","metrics_status","monitor_age_sec","monitor_last_duration_sec","monitor_empresas_falha","ciclos_success","ciclos_partial","ciclos_fatal_error","ciclos_skipped_concurrent","delta_ciclos_total","delta_failure_rate_pct","alertas_total","alertas_critical","alertas_webhook_pagamento_falha","alertas_status_sincronizacao_divergente","alertas_referencia_integracao_invalida","alertas_estorno_falha"
+"2026-02-28T17:42:33Z","1","True","200","50,67","True","200","94","0,279","0","3","0","0","0",,,,,,,,
+"2026-02-28T17:42:43Z","2","True","200","12,46","True","200","104","0,279","0","3","0","0","0","0",,,,,,,

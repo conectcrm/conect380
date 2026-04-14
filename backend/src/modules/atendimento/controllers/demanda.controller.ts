@@ -14,6 +14,9 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { DemandaService } from '../services/demanda.service';
 import { CreateDemandaDto } from '../dto/create-demanda.dto';
 import { UpdateDemandaDto } from '../dto/update-demanda.dto';
@@ -38,7 +41,8 @@ import { UpdateDemandaDto } from '../dto/update-demanda.dto';
  */
 @ApiTags('Demandas Cliente')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.ATENDIMENTO_TICKETS_READ)
 @Controller('demandas')
 export class DemandaController {
   private readonly logger = new Logger(DemandaController.name);
@@ -49,6 +53,7 @@ export class DemandaController {
    * Criar nova demanda
    */
   @Post()
+  @Permissions(Permission.ATENDIMENTO_TICKETS_CREATE)
   @ApiOperation({ summary: 'Criar nova demanda para cliente/ticket' })
   async criar(@Body() dto: CreateDemandaDto, @Request() req, @EmpresaId() empresaId: string) {
     this.logger.log(`📋 Criando demanda - User: ${req.user.email}`);
@@ -119,6 +124,7 @@ export class DemandaController {
    * Atualizar demanda
    */
   @Patch(':id')
+  @Permissions(Permission.ATENDIMENTO_TICKETS_UPDATE)
   @ApiOperation({ summary: 'Atualizar demanda' })
   async atualizar(@Param('id') id: string, @Body() dto: UpdateDemandaDto, @EmpresaId() empresaId: string) {
     return await this.demandaService.atualizar(id, dto, empresaId);
@@ -128,6 +134,7 @@ export class DemandaController {
    * Atribuir responsável
    */
   @Patch(':id/responsavel')
+  @Permissions(Permission.ATENDIMENTO_TICKETS_ASSIGN)
   @ApiOperation({ summary: 'Atribuir responsável à demanda' })
   async atribuirResponsavel(
     @Param('id') id: string,
@@ -141,6 +148,7 @@ export class DemandaController {
    * Alterar status
    */
   @Patch(':id/status')
+  @Permissions(Permission.ATENDIMENTO_TICKETS_UPDATE)
   @ApiOperation({ summary: 'Alterar status da demanda' })
   async alterarStatus(
     @Param('id') id: string,
@@ -154,6 +162,7 @@ export class DemandaController {
    * Iniciar demanda
    */
   @Patch(':id/iniciar')
+  @Permissions(Permission.ATENDIMENTO_TICKETS_UPDATE)
   @ApiOperation({ summary: 'Iniciar demanda (status → em_andamento)' })
   async iniciar(@Param('id') id: string, @EmpresaId() empresaId: string) {
     return await this.demandaService.iniciar(id, empresaId);
@@ -163,6 +172,7 @@ export class DemandaController {
    * Concluir demanda
    */
   @Patch(':id/concluir')
+  @Permissions(Permission.ATENDIMENTO_TICKETS_CLOSE)
   @ApiOperation({ summary: 'Concluir demanda (status → concluida)' })
   async concluir(@Param('id') id: string, @EmpresaId() empresaId: string) {
     return await this.demandaService.concluir(id, empresaId);
@@ -172,6 +182,7 @@ export class DemandaController {
    * Cancelar demanda
    */
   @Patch(':id/cancelar')
+  @Permissions(Permission.ATENDIMENTO_TICKETS_CLOSE)
   @ApiOperation({ summary: 'Cancelar demanda' })
   async cancelar(@Param('id') id: string, @EmpresaId() empresaId: string) {
     return await this.demandaService.cancelar(id, empresaId);
@@ -181,6 +192,7 @@ export class DemandaController {
    * Deletar demanda
    */
   @Delete(':id')
+  @Permissions(Permission.ATENDIMENTO_TICKETS_CLOSE)
   @ApiOperation({ summary: 'Deletar demanda' })
   async deletar(@Param('id') id: string, @EmpresaId() empresaId: string) {
     await this.demandaService.deletar(id, empresaId);

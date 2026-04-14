@@ -39,6 +39,7 @@ export enum FormaPagamento {
   BOLETO = 'boleto',
   TRANSFERENCIA = 'transferencia',
   DINHEIRO = 'dinheiro',
+  A_COMBINAR = 'a_combinar',
 }
 
 @Entity('faturas')
@@ -152,6 +153,12 @@ export class Fatura {
     transactionId?: string;
     paymentMethod?: string;
     installments?: number;
+    boleto?: {
+      paymentId?: string | null;
+      barcode?: string | null;
+      linhaDigitavel?: string | null;
+      pdfUrl?: string | null;
+    };
     migrationInfo?: {
       originalClienteId?: number;
       migratedAt?: string;

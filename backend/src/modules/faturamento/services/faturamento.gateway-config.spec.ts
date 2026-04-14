@@ -1,0 +1,327 @@
+import { FaturamentoService } from './faturamento.service';
+import { FormaPagamento, StatusFatura } from '../entities/fatura.entity';
+
+describe('FaturamentoService - configuracao de gateway por empresa', () => {
+  const originalEnv = {
+    FINANCEIRO_MVP_MODE: process.env.FINANCEIRO_MVP_MODE,
+    MVP_MODE: process.env.MVP_MODE,
+    FINANCEIRO_BOLETO_ENABLED: process.env.FINANCEIRO_BOLETO_ENABLED,
+  };
+  const faturaRepository = {
+    save: jest.fn(async (value) => value),
+  };
+  const itemFaturaRepository = {};
+  const pagamentoRepository = {
+    findOne: jest.fn(async () => null),
+    save: jest.fn(async (value) => value),
+  };
+  const contratoRepository = {};
+  const clienteRepository = {
+    findOne: jest.fn(),
+  };
+  const propostasService = {};
+  const emailService = {
+    obterDiagnosticoEntregaEmail: jest.fn(),
+  };
+  const mercadoPagoService = {
+    createPreference: jest.fn(),
+    createBoletoPayment: jest.fn(),
+  };
+  const empresaConfigRepository = {
+    findOne: jest.fn(),
+  };
+
+  let service: FaturamentoService;
+  let buscarFaturaPorIdSpy: jest.SpyInstance;
+  let registrarPagamentoPendenteSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    process.env.FINANCEIRO_MVP_MODE = 'false';
+    process.env.MVP_MODE = 'false';
+    process.env.FINANCEIRO_BOLETO_ENABLED = 'false';
+
+    emailService.obterDiagnosticoEntregaEmail.mockResolvedValue({
+      operacional: true,
+      simulado: false,
+      status: 'ok',
+      detalhe: 'SMTP configurado.',
+    });
+
+    service = new FaturamentoService(
+      faturaRepository as any,
+      itemFaturaRepository as any,
+      pagamentoRepository as any,
+      contratoRepository as any,
+      clienteRepository as any,
+      propostasService as any,
+      emailService as any,
+      mercadoPagoService as any,
+      empresaConfigRepository as any,
+    );
+
+    buscarFaturaPorIdSpy = jest.spyOn(service, 'buscarFaturaPorId');
+    registrarPagamentoPendenteSpy = jest
+      .spyOn(service as any, 'registrarPagamentoPendentePorLink')
+      .mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    process.env.FINANCEIRO_MVP_MODE = originalEnv.FINANCEIRO_MVP_MODE;
+    process.env.MVP_MODE = originalEnv.MVP_MODE;
+    process.env.FINANCEIRO_BOLETO_ENABLED = originalEnv.FINANCEIRO_BOLETO_ENABLED;
+  });
+
+  const prepararCenarioGeracaoLink = (
+    formaPagamentoPreferida: FormaPagamento,
+    options?: {
+      mockPreferenceSuccess?: boolean;
+      mockBoletoSuccess?: boolean;
+      valorTotal?: number;
+      valorPago?: number;
+    },
+  ) => {
+    const faturaMock: any = {
+      id: 701,
+      numero: 'FT2026000701',
+      clienteId: 'cliente-1',
+      status: StatusFatura.PENDENTE,
+      dataVencimento: new Date('2026-12-20T00:00:00.000Z'),
+      valorTotal: options?.valorTotal ?? 450,
+      valorPago: options?.valorPago ?? 0,
+      formaPagamentoPreferida,
+      metadados: {},
+    };
+
+    empresaConfigRepository.findOne.mockResolvedValueOnce({
+      gatewayPagamentoProvider: 'mercadopago',
+      gatewayPagamentoAccessToken: 'token-tenant-123',
+      gatewayPagamentoWebhookSecret: 'webhook-secret-tenant',
+    });
+    clienteRepository.findOne.mockResolvedValueOnce({
+      id: 'cliente-1',
+      nome: 'Cliente Teste',
+      email: 'cliente@teste.com',
+      documento: '12345678909',
+    });
+    if (
+      formaPagamentoPreferida === FormaPagamento.BOLETO &&
+      options?.mockBoletoSuccess !== false
+    ) {
+      mercadoPagoService.createBoletoPayment.mockResolvedValueOnce({
+        id: 'mp-pay-701',
+        transaction_details: {
+          external_resource_url: 'https://mercadopago.example/boleto/mp-pay-701.pdf',
+        },
+        point_of_interaction: {
+          transaction_data: {
+            ticket_url: 'https://mercadopago.example/boleto/mp-pay-701.pdf',
+            barcode: '23793381286008300004133070000012089160000100000',
+            line: {
+              content: '23793381286008300004133070000012089160000100000',
+            },
+          },
+        },
+      });
+    } else if (options?.mockPreferenceSuccess !== false) {
+      mercadoPagoService.createPreference.mockResolvedValueOnce({
+        id: 'pref-tenant-1',
+        init_point: 'https://mercadopago.example/pref-tenant-1',
+      });
+    }
+    buscarFaturaPorIdSpy.mockResolvedValueOnce(faturaMock);
+
+    return faturaMock;
+  };
+
+  it('marca bloqueio quando provider da empresa nao e suportado', async () => {
+    empresaConfigRepository.findOne.mockResolvedValueOnce({
+      gatewayPagamentoProvider: 'stripe',
+      gatewayPagamentoAccessToken: null,
+      gatewayPagamentoWebhookSecret: null,
+    });
+
+    const prontidao = await service.obterProntidaoCobranca('empresa-1');
+
+    expect(prontidao.gateway.status).toBe('bloqueio');
+    expect(prontidao.gateway.operacional).toBe(false);
+    expect(prontidao.gateway.detalhe.toLowerCase()).toContain('nao suportado');
+  });
+
+  it('usa access token da empresa ao gerar link de pagamento', async () => {
+    prepararCenarioGeracaoLink(FormaPagamento.PIX);
+
+    const resultado = await service.gerarLinkPagamentoFatura(701, 'empresa-1');
+
+    expect(mercadoPagoService.createPreference).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        accessTokenOverride: 'token-tenant-123',
+      }),
+    );
+    expect(mercadoPagoService.createPreference).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payment_methods: expect.objectContaining({
+          default_payment_type_id: 'bank_transfer',
+          excluded_payment_types: expect.arrayContaining([
+            expect.objectContaining({ id: 'credit_card' }),
+            expect.objectContaining({ id: 'debit_card' }),
+            expect.objectContaining({ id: 'ticket' }),
+          ]),
+        }),
+      }),
+      expect.any(Object),
+    );
+    expect(mercadoPagoService.createPreference).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payment_methods: expect.not.objectContaining({
+          default_payment_method_id: expect.anything(),
+        }),
+      }),
+      expect.any(Object),
+    );
+    expect(resultado.link).toBe('https://mercadopago.example/pref-tenant-1');
+    expect(registrarPagamentoPendenteSpy).toHaveBeenCalled();
+  });
+
+  it('restringe checkout para cartao de credito quando forma preferida for cartao_credito', async () => {
+    prepararCenarioGeracaoLink(FormaPagamento.CARTAO_CREDITO);
+
+    await service.gerarLinkPagamentoFatura(701, 'empresa-1');
+
+    expect(mercadoPagoService.createPreference).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payment_methods: expect.objectContaining({
+          default_payment_type_id: 'credit_card',
+          excluded_payment_types: expect.arrayContaining([
+            expect.objectContaining({ id: 'bank_transfer' }),
+            expect.objectContaining({ id: 'ticket' }),
+            expect.objectContaining({ id: 'debit_card' }),
+          ]),
+        }),
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it('gera boleto direto no Mercado Pago e retorna URL de boleto/pdf', async () => {
+    process.env.FINANCEIRO_BOLETO_ENABLED = 'true';
+    service = new FaturamentoService(
+      faturaRepository as any,
+      itemFaturaRepository as any,
+      pagamentoRepository as any,
+      contratoRepository as any,
+      clienteRepository as any,
+      propostasService as any,
+      emailService as any,
+      mercadoPagoService as any,
+      empresaConfigRepository as any,
+    );
+    buscarFaturaPorIdSpy = jest.spyOn(service, 'buscarFaturaPorId');
+    registrarPagamentoPendenteSpy = jest
+      .spyOn(service as any, 'registrarPagamentoPendentePorLink')
+      .mockResolvedValue(undefined);
+
+    prepararCenarioGeracaoLink(FormaPagamento.BOLETO);
+
+    const resultado = await service.gerarLinkPagamentoFatura(701, 'empresa-1');
+
+    expect(mercadoPagoService.createBoletoPayment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        transaction_amount: 450,
+        payment_method_id: 'bolbradesco',
+        payer: expect.objectContaining({
+          email: 'cliente@teste.com',
+          identification: expect.objectContaining({
+            type: 'CPF',
+            number: '12345678909',
+          }),
+        }),
+      }),
+      expect.any(Object),
+    );
+    expect(mercadoPagoService.createPreference).not.toHaveBeenCalled();
+    expect(resultado).toMatchObject({
+      paymentId: 'mp-pay-701',
+      link: 'https://mercadopago.example/boleto/mp-pay-701.pdf',
+      boletoPdfUrl: 'https://mercadopago.example/boleto/mp-pay-701.pdf',
+      boletoBarcode: '23793381286008300004133070000012089160000100000',
+    });
+  });
+
+  it('usa apenas o saldo em aberto ao gerar cobranca online', async () => {
+    prepararCenarioGeracaoLink(FormaPagamento.PIX, {
+      valorTotal: 450,
+      valorPago: 200,
+    });
+
+    await service.gerarLinkPagamentoFatura(701, 'empresa-1');
+
+    expect(mercadoPagoService.createPreference).toHaveBeenCalledWith(
+      expect.objectContaining({
+        items: expect.arrayContaining([
+          expect.objectContaining({
+            unit_price: 250,
+          }),
+        ]),
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it('bloqueia cobranca online quando nao existe saldo em aberto', async () => {
+    prepararCenarioGeracaoLink(FormaPagamento.PIX, {
+      valorTotal: 0,
+      valorPago: 0,
+    });
+
+    await expect(service.gerarLinkPagamentoFatura(701, 'empresa-1')).rejects.toThrow(
+      /saldo em aberto/i,
+    );
+    expect(mercadoPagoService.createBoletoPayment).not.toHaveBeenCalled();
+    expect(mercadoPagoService.createPreference).not.toHaveBeenCalled();
+  });
+
+  it('bloqueia link online quando forma preferida exigir fluxo manual', async () => {
+    prepararCenarioGeracaoLink(FormaPagamento.DINHEIRO);
+
+    await expect(service.gerarLinkPagamentoFatura(701, 'empresa-1')).rejects.toThrow(
+      /fluxo manual de recebimento/i,
+    );
+    expect(mercadoPagoService.createPreference).not.toHaveBeenCalled();
+  });
+
+  it('converte bloqueio de policy do Mercado Pago em erro funcional', async () => {
+    prepararCenarioGeracaoLink(FormaPagamento.PIX, { mockPreferenceSuccess: false });
+    mercadoPagoService.createPreference.mockRejectedValueOnce({
+      message: 'At least one policy returned UNAUTHORIZED.',
+      status: 403,
+      cause: [
+        {
+          code: 'PA_UNAUTHORIZED_RESULT_FROM_POLICIES',
+          description: 'At least one policy returned UNAUTHORIZED.',
+          blocked_by: 'PolicyAgent',
+        },
+      ],
+    });
+
+    await expect(service.gerarLinkPagamentoFatura(701, 'empresa-1')).rejects.toThrow(
+      /Mercado Pago bloqueou esta cobranca/i,
+    );
+    expect(registrarPagamentoPendenteSpy).not.toHaveBeenCalled();
+  });
+
+  it('converte bad_request do Mercado Pago em erro de validacao', async () => {
+    prepararCenarioGeracaoLink(FormaPagamento.PIX, { mockPreferenceSuccess: false });
+    mercadoPagoService.createPreference.mockRejectedValueOnce({
+      message: 'invalid default_payment_method_id. The default payment method is excluded',
+      error: 'bad_request',
+      status: 400,
+    });
+
+    await expect(service.gerarLinkPagamentoFatura(701, 'empresa-1')).rejects.toThrow(
+      /Mercado Pago rejeitou os dados da cobranca/i,
+    );
+    expect(registrarPagamentoPendenteSpy).not.toHaveBeenCalled();
+  });
+});

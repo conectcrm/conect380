@@ -1,8 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
 import { Mail, CheckCircle, XCircle, Loader2, ArrowRight, RefreshCw } from 'lucide-react';
 import { empresaService } from '../../services/empresaService';
+import { toastService } from '../../services/toastService';
+import Conect360Logo from '../../components/ui/Conect360Logo';
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null;
+};
+
+const normalizeApiErrorMessage = (err: unknown): string | undefined => {
+  const errRecord = isRecord(err) ? err : undefined;
+  const response = errRecord && isRecord(errRecord['response']) ? errRecord['response'] : undefined;
+  const data = response && isRecord(response['data']) ? response['data'] : undefined;
+  const responseMessage = data ? data['message'] : undefined;
+
+  if (Array.isArray(responseMessage)) {
+    const joined = responseMessage
+      .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+      .join('. ');
+    return joined || undefined;
+  }
+
+  if (typeof responseMessage === 'string' && responseMessage.trim()) {
+    return responseMessage;
+  }
+
+  const message = err instanceof Error ? err.message : undefined;
+  return message?.trim() ? message : undefined;
+};
 
 export const VerificacaoEmailPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -37,7 +63,7 @@ export const VerificacaoEmailPage: React.FC = () => {
 
       if (response.success) {
         setStatus('success');
-        setMessage(response.message || 'Email verificado com sucesso!');
+        setMessage(response.message || 'E-mail verificado com sucesso!');
 
         // Redirecionar para login após 3 segundos
         setTimeout(() => {
@@ -50,24 +76,26 @@ export const VerificacaoEmailPage: React.FC = () => {
         }, 3000);
       } else {
         setStatus('error');
-        setMessage(response.message || 'Erro ao verificar email');
+        setMessage(response.message || 'Erro ao verificar e-mail');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro na verificação:', error);
 
-      if (error.message.includes('expirado')) {
+      const errorMessage = normalizeApiErrorMessage(error) || 'Erro ao verificar e-mail';
+
+      if (errorMessage.toLowerCase().includes('expirado')) {
         setStatus('expired');
         setMessage('O link de verificação expirou');
       } else {
         setStatus('error');
-        setMessage(error.message || 'Erro ao verificar email');
+        setMessage(errorMessage);
       }
     }
   };
 
   const reenviarEmail = async () => {
     if (!email) {
-      toast.error('Email não fornecido');
+      toastService.error('E-mail não fornecido');
       return;
     }
 
@@ -75,12 +103,12 @@ export const VerificacaoEmailPage: React.FC = () => {
       setIsResending(true);
       await empresaService.reenviarEmailAtivacao(email);
 
-      toast.success('Email de ativação reenviado com sucesso!');
+      toastService.success('E-mail de ativação reenviado com sucesso!');
       setStatus('loading');
       setMessage('Verifique sua caixa de entrada...');
-    } catch (error: any) {
-      console.error('Erro ao reenviar email:', error);
-      toast.error(error.message || 'Erro ao reenviar email');
+    } catch (error: unknown) {
+      console.error('Erro ao reenviar e-mail:', error);
+      toastService.error(normalizeApiErrorMessage(error) || 'Erro ao reenviar e-mail');
     } finally {
       setIsResending(false);
     }
@@ -91,11 +119,11 @@ export const VerificacaoEmailPage: React.FC = () => {
       case 'loading':
         return (
           <div className="text-center">
-            <div className="w-20 h-20 mx-auto mb-6 bg-blue-100 rounded-full flex items-center justify-center">
-              <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
+            <div className="w-20 h-20 mx-auto mb-6 bg-[#159A9C]/10 rounded-full flex items-center justify-center">
+              <Loader2 className="w-10 h-10 text-[#159A9C] animate-spin" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Verificando Email</h1>
-            <p className="text-gray-600 mb-6">Aguarde enquanto verificamos seu email...</p>
+            <h1 className="text-2xl font-bold text-[#002333] mb-4">Verificando e-mail</h1>
+            <p className="text-[#002333]/70 mb-6">Aguarde enquanto verificamos seu e-mail...</p>
           </div>
         );
 
@@ -105,9 +133,9 @@ export const VerificacaoEmailPage: React.FC = () => {
             <div className="w-20 h-20 mx-auto mb-6 bg-green-100 rounded-full flex items-center justify-center">
               <CheckCircle className="w-10 h-10 text-green-600" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Email Verificado!</h1>
-            <p className="text-gray-600 mb-6">{message}</p>
-            <p className="text-sm text-gray-500 mb-6">
+            <h1 className="text-2xl font-bold text-[#002333] mb-4">E-mail verificado!</h1>
+            <p className="text-[#002333]/70 mb-6">{message}</p>
+            <p className="text-sm text-[#002333]/60 mb-6">
               Você será redirecionado para o login em alguns segundos...
             </p>
             <button
@@ -119,9 +147,9 @@ export const VerificacaoEmailPage: React.FC = () => {
                   },
                 })
               }
-              className="inline-flex items-center gap-2 px-6 py-3 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors text-sm font-medium"
             >
-              Ir para Login
+              Ir para login
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
@@ -133,19 +161,19 @@ export const VerificacaoEmailPage: React.FC = () => {
             <div className="w-20 h-20 mx-auto mb-6 bg-yellow-100 rounded-full flex items-center justify-center">
               <Mail className="w-10 h-10 text-yellow-600" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Link Expirado</h1>
-            <p className="text-gray-600 mb-6">
+            <h1 className="text-2xl font-bold text-[#002333] mb-4">Link expirado</h1>
+            <p className="text-[#002333]/70 mb-6">
               {message}. Você pode solicitar um novo link de verificação.
             </p>
             {email && (
               <div className="space-y-4">
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-[#002333]/60">
                   Reenviar para: <strong>{email}</strong>
                 </p>
                 <button
                   onClick={reenviarEmail}
                   disabled={isResending}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                 >
                   {isResending ? (
                     <>
@@ -155,7 +183,7 @@ export const VerificacaoEmailPage: React.FC = () => {
                   ) : (
                     <>
                       <RefreshCw className="w-4 h-4" />
-                      Reenviar Email
+                      Reenviar e-mail
                     </>
                   )}
                 </button>
@@ -171,18 +199,18 @@ export const VerificacaoEmailPage: React.FC = () => {
             <div className="w-20 h-20 mx-auto mb-6 bg-red-100 rounded-full flex items-center justify-center">
               <XCircle className="w-10 h-10 text-red-600" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Erro na Verificação</h1>
-            <p className="text-gray-600 mb-6">{message}</p>
+            <h1 className="text-2xl font-bold text-[#002333] mb-4">Erro na verificação</h1>
+            <p className="text-[#002333]/70 mb-6">{message}</p>
             <div className="space-y-4">
               {email && (
                 <>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-[#002333]/60">
                     Reenviar para: <strong>{email}</strong>
                   </p>
                   <button
                     onClick={reenviarEmail}
                     disabled={isResending}
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors mr-4"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                   >
                     {isResending ? (
                       <>
@@ -192,7 +220,7 @@ export const VerificacaoEmailPage: React.FC = () => {
                     ) : (
                       <>
                         <RefreshCw className="w-4 h-4" />
-                        Reenviar Email
+                        Reenviar e-mail
                       </>
                     )}
                   </button>
@@ -200,9 +228,9 @@ export const VerificacaoEmailPage: React.FC = () => {
               )}
               <button
                 onClick={() => navigate('/login')}
-                className="inline-flex items-center gap-2 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-[#002333] rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
               >
-                Ir para Login
+                Ir para login
               </button>
             </div>
           </div>
@@ -211,15 +239,23 @@ export const VerificacaoEmailPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#DEEFE7] to-white flex items-center justify-center py-12 px-4">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4">
       <div className="max-w-md w-full">
-        <div className="bg-white rounded-lg shadow-lg p-8">{renderContent()}</div>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-center mb-6">
+            <Conect360Logo size="lg" variant="full" className="w-auto" />
+          </div>
+          {renderContent()}
+        </div>
 
         {/* Footer */}
         <div className="text-center mt-8">
-          <p className="text-gray-600 text-sm">
+          <p className="text-[#002333]/60 text-sm">
             Precisa de ajuda?{' '}
-            <a href="mailto:suporte@fenixcrm.com" className="text-[#159A9C] hover:underline">
+            <a
+              href="mailto:suporte@conectsuite.com.br"
+              className="text-[#159A9C] hover:underline"
+            >
               Entre em contato
             </a>
           </p>

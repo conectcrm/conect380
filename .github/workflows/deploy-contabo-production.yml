@@ -1,0 +1,326 @@
+name: Deploy Contabo Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_ref:
+        description: "Branch/tag/SHA para deploy (vazio = commit atual)"
+        required: false
+        default: ""
+        type: string
+      run_smoke:
+        description: "Executar smoke pos-deploy"
+        required: false
+        default: true
+        type: boolean
+      allow_non_main_target:
+        description: "Permitir target_ref fora da main (apenas emergencia)"
+        required: false
+        default: false
+        type: boolean
+      upload_runtime_env:
+        description: "Enviar runtime env para as VMs"
+        required: false
+        default: true
+        type: boolean
+      skip_migrations:
+        description: "Pular migrations (nao recomendado)"
+        required: false
+        default: false
+        type: boolean
+      no_cache_build:
+        description: "Build Docker sem cache"
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches:
+      - main
+      - production
+    paths:
+      - "backend/**"
+      - "frontend-web/**"
+      - "deploy/contabo/**"
+      - ".production/scripts/**"
+      - ".github/workflows/deploy-contabo-production.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-contabo-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Contabo
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || vars.CONTABO_AUTO_DEPLOY_ENABLED == 'true'
+    environment:
+      name: production
+    timeout-minutes: 120
+    env:
+      PROFILE_PATH: deploy/contabo/deploy-profile.local.psd1
+      RUNTIME_ENV_PATH: deploy/contabo/.env.app-vm
+      SSH_KEY_PATH: /home/runner/.ssh/id_ed25519
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve deploy options
+        id: options
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            TARGET_REF="${{ inputs.target_ref }}"
+            RUN_SMOKE="${{ inputs.run_smoke }}"
+            ALLOW_NON_MAIN_TARGET="${{ inputs.allow_non_main_target }}"
+            UPLOAD_RUNTIME_ENV="${{ inputs.upload_runtime_env }}"
+            SKIP_MIGRATIONS="${{ inputs.skip_migrations }}"
+            NO_CACHE_BUILD="${{ inputs.no_cache_build }}"
+          else
+            TARGET_REF="${GITHUB_SHA}"
+            RUN_SMOKE="true"
+            ALLOW_NON_MAIN_TARGET="false"
+            UPLOAD_RUNTIME_ENV="true"
+            SKIP_MIGRATIONS="false"
+            NO_CACHE_BUILD="false"
+          fi
+
+          if [ -z "${TARGET_REF}" ]; then
+            TARGET_REF="${GITHUB_SHA}"
+          fi
+
+          echo "target_ref=${TARGET_REF}" >> "${GITHUB_OUTPUT}"
+          echo "run_smoke=${RUN_SMOKE}" >> "${GITHUB_OUTPUT}"
+          echo "allow_non_main_target=${ALLOW_NON_MAIN_TARGET}" >> "${GITHUB_OUTPUT}"
+          echo "upload_runtime_env=${UPLOAD_RUNTIME_ENV}" >> "${GITHUB_OUTPUT}"
+          echo "skip_migrations=${SKIP_MIGRATIONS}" >> "${GITHUB_OUTPUT}"
+          echo "no_cache_build=${NO_CACHE_BUILD}" >> "${GITHUB_OUTPUT}"
+
+      - name: Guardrail target_ref em main
+        if: github.event_name == 'workflow_dispatch' && steps.options.outputs.allow_non_main_target != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${GITHUB_REF_NAME}" != "main" ]; then
+            echo "::error::Use o workflow da branch main para deploy em producao (branch atual: ${GITHUB_REF_NAME})."
+            echo "::error::Para excecao operacional, execute novamente com allow_non_main_target=true."
+            exit 1
+          fi
+
+          target_ref="${{ steps.options.outputs.target_ref }}"
+          if ! target_sha="$(git rev-parse "${target_ref}^{commit}" 2>/dev/null)"; then
+            echo "::error::target_ref invalido: ${target_ref}"
+            exit 1
+          fi
+
+          git fetch --no-tags --prune origin main
+          main_sha="$(git rev-parse origin/main)"
+
+          if ! git merge-base --is-ancestor "${target_sha}" "${main_sha}"; then
+            echo "::error::target_ref ${target_ref} (${target_sha}) nao pertence a historia da origin/main."
+            echo "::error::Para excecao operacional, execute novamente com allow_non_main_target=true."
+            exit 1
+          fi
+
+      - name: Checkout target ref for deploy scripts
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          target_ref="${{ steps.options.outputs.target_ref }}"
+
+          # Garante que commits de qualquer branch/tag estejam disponiveis
+          # antes de resolver o target_ref (branch, tag ou SHA).
+          git fetch --no-tags --prune origin '+refs/heads/*:refs/remotes/origin/*'
+          git fetch --no-tags --prune origin '+refs/tags/*:refs/tags/*'
+
+          target_sha=""
+          if target_sha="$(git rev-parse "${target_ref}^{commit}" 2>/dev/null)"; then
+            :
+          elif target_sha="$(git rev-parse "origin/${target_ref}^{commit}" 2>/dev/null)"; then
+            :
+          else
+            echo "::error::target_ref invalido: ${target_ref}"
+            exit 1
+          fi
+
+          git checkout --detach "${target_sha}"
+          echo "Deploy scripts alinhados ao target_ref ${target_ref} (${target_sha})."
+
+      - name: Validate required secrets
+        shell: bash
+        env:
+          CONTABO_SSH_PRIVATE_KEY: ${{ secrets.CONTABO_SSH_PRIVATE_KEY }}
+          CONTABO_DEPLOY_PROFILE_PSD1: ${{ secrets.CONTABO_DEPLOY_PROFILE_PSD1 }}
+          CONTABO_RUNTIME_ENV_FILE: ${{ secrets.CONTABO_RUNTIME_ENV_FILE }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${CONTABO_SSH_PRIVATE_KEY}" ]; then
+            echo "::error::Secret CONTABO_SSH_PRIVATE_KEY nao configurado."
+            exit 1
+          fi
+
+          if [ -z "${CONTABO_DEPLOY_PROFILE_PSD1}" ]; then
+            echo "::error::Secret CONTABO_DEPLOY_PROFILE_PSD1 nao configurado."
+            exit 1
+          fi
+
+          if [ "${{ steps.options.outputs.upload_runtime_env }}" = "true" ] && [ -z "${CONTABO_RUNTIME_ENV_FILE}" ]; then
+            echo "::error::Secret CONTABO_RUNTIME_ENV_FILE nao configurado e upload_runtime_env=true."
+            exit 1
+          fi
+
+      - name: Prepare secure deploy files
+        shell: bash
+        env:
+          CONTABO_SSH_PRIVATE_KEY: ${{ secrets.CONTABO_SSH_PRIVATE_KEY }}
+          CONTABO_DEPLOY_PROFILE_PSD1: ${{ secrets.CONTABO_DEPLOY_PROFILE_PSD1 }}
+          CONTABO_RUNTIME_ENV_FILE: ${{ secrets.CONTABO_RUNTIME_ENV_FILE }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "${SSH_KEY_PATH}")"
+          chmod 700 "$(dirname "${SSH_KEY_PATH}")"
+
+          printf '%s' "${CONTABO_SSH_PRIVATE_KEY}" > "${SSH_KEY_PATH}"
+          chmod 600 "${SSH_KEY_PATH}"
+
+          printf '%s' "${CONTABO_DEPLOY_PROFILE_PSD1}" > "${PROFILE_PATH}"
+          sed -i '/^[[:space:]]*SshKeyPath[[:space:]]*=/d' "${PROFILE_PATH}"
+
+          if [ "${{ steps.options.outputs.upload_runtime_env }}" = "true" ]; then
+            printf '%s' "${CONTABO_RUNTIME_ENV_FILE}" > "${RUNTIME_ENV_PATH}"
+          fi
+
+      - name: Guardrail MFA x SMTP
+        if: steps.options.outputs.upload_runtime_env == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          read_env() {
+            local key="$1"
+            local value=""
+            value="$(grep -E "^${key}=" "${RUNTIME_ENV_PATH}" | tail -n 1 | sed "s/^${key}=//" | tr -d '\r' || true)"
+            printf '%s' "${value}"
+          }
+
+          smtp_host="$(read_env SMTP_HOST)"
+          smtp_user="$(read_env SMTP_USER)"
+          smtp_pass="$(read_env SMTP_PASS)"
+          smtp_password="$(read_env SMTP_PASSWORD)"
+
+          missing=()
+          if [ -z "${smtp_host}" ]; then missing+=("SMTP_HOST"); fi
+          if [ -z "${smtp_user}" ]; then missing+=("SMTP_USER"); fi
+          if [ -z "${smtp_pass}" ] && [ -z "${smtp_password}" ]; then missing+=("SMTP_PASS/SMTP_PASSWORD"); fi
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Fluxos de autenticacao (forgot-password/MFA) exigem SMTP global. Faltam variaveis: ${missing[*]}."
+            exit 1
+          fi
+
+      - name: Guardrail pagamentos Mercado Pago
+        if: steps.options.outputs.upload_runtime_env == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          read_env() {
+            local key="$1"
+            local value=""
+            value="$(grep -E "^${key}=" "${RUNTIME_ENV_PATH}" | tail -n 1 | sed "s/^${key}=//" | tr -d '\r' || true)"
+            printf '%s' "${value}"
+          }
+
+          providers="$(read_env PAGAMENTOS_GATEWAY_ENABLED_PROVIDERS | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
+          if [[ ",${providers}," != *",mercado_pago,"* ]]; then
+            echo "Mercado Pago nao habilitado em PAGAMENTOS_GATEWAY_ENABLED_PROVIDERS; guardrail especifico nao aplicavel."
+            exit 0
+          fi
+
+          mp_token="$(read_env MERCADO_PAGO_ACCESS_TOKEN)"
+          mp_webhook_secret="$(read_env MERCADO_PAGO_WEBHOOK_SECRET)"
+          mp_mock="$(read_env MERCADO_PAGO_MOCK | tr '[:upper:]' '[:lower:]')"
+
+          missing=()
+          if [ -z "${mp_token}" ]; then missing+=("MERCADO_PAGO_ACCESS_TOKEN"); fi
+          if [ -z "${mp_webhook_secret}" ]; then missing+=("MERCADO_PAGO_WEBHOOK_SECRET"); fi
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Mercado Pago habilitado, mas variaveis obrigatorias ausentes: ${missing[*]}."
+            exit 1
+          fi
+
+          if [ "${mp_mock}" = "true" ] || [ "${mp_mock}" = "1" ]; then
+            echo "::error::MERCADO_PAGO_MOCK deve permanecer false em producao."
+            exit 1
+          fi
+
+      - name: Deploy (contabo script)
+        shell: pwsh
+        env:
+          SUPERADMIN_EMAIL: ${{ secrets.CONTABO_SMOKE_SUPERADMIN_EMAIL }}
+          SUPERADMIN_PASSWORD: ${{ secrets.CONTABO_SMOKE_SUPERADMIN_PASSWORD }}
+          SUPERADMIN_MFA_CODE: ${{ secrets.CONTABO_SMOKE_SUPERADMIN_MFA_CODE }}
+          EXPECTED_OWNER_EMPRESA_ID: ${{ secrets.CONTABO_SMOKE_EXPECTED_OWNER_EMPRESA_ID }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $deployParams = @{
+            ProfilePath = "${{ env.PROFILE_PATH }}"
+            Execute = $true
+            TargetRef = "${{ steps.options.outputs.target_ref }}"
+          }
+
+          if ("${{ steps.options.outputs.upload_runtime_env }}" -eq 'true') {
+            $deployParams.UploadRuntimeEnv = $true
+          }
+
+          if ("${{ steps.options.outputs.skip_migrations }}" -eq 'true') {
+            $deployParams.SkipMigrations = $true
+          }
+
+          if ("${{ steps.options.outputs.no_cache_build }}" -eq 'true') {
+            $deployParams.NoCacheBuild = $true
+          }
+
+          if ("${{ steps.options.outputs.run_smoke }}" -eq 'true') {
+            $deployParams.RunSmoke = $true
+          }
+          else {
+            $deployParams.SkipSmoke = $true
+          }
+
+          if (-not [string]::IsNullOrWhiteSpace($env:SUPERADMIN_EMAIL)) {
+            $deployParams.SuperAdminEmail = $env:SUPERADMIN_EMAIL
+          }
+
+          if (-not [string]::IsNullOrWhiteSpace($env:SUPERADMIN_PASSWORD)) {
+            $deployParams.SuperAdminPassword = $env:SUPERADMIN_PASSWORD
+          }
+
+          if (-not [string]::IsNullOrWhiteSpace($env:SUPERADMIN_MFA_CODE)) {
+            $deployParams.SuperAdminMfaCode = $env:SUPERADMIN_MFA_CODE
+          }
+
+          if (-not [string]::IsNullOrWhiteSpace($env:EXPECTED_OWNER_EMPRESA_ID)) {
+            $deployParams.ExpectedOwnerEmpresaId = $env:EXPECTED_OWNER_EMPRESA_ID
+          }
+
+          & ./deploy/contabo/deploy-prod.ps1 @deployParams
+
+      - name: Cleanup sensitive files
+        if: always()
+        shell: bash
+        run: |
+          rm -f "${SSH_KEY_PATH}" "${PROFILE_PATH}" "${RUNTIME_ENV_PATH}"

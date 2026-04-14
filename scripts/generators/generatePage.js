@@ -16,6 +16,9 @@ const colors = {
   cyan: '\x1b[36m'
 };
 
+const MODULE_OPTIONS = ['ATENDIMENTO', 'CRM', 'VENDAS', 'FINANCEIRO', 'BILLING', 'ADMINISTRACAO'];
+const ROLE_OPTIONS = ['superadmin', 'admin', 'gerente', 'vendedor', 'suporte', 'financeiro'];
+
 class PageGenerator {
   constructor() {
     this.rl = readline.createInterface({
@@ -29,6 +32,9 @@ class PageGenerator {
       entityNamePlural: '',
       fields: [],
       permissions: [],
+      module: 'CRM',
+      roles: ['superadmin', 'admin'],
+      routePath: '',
       hasAudit: true,
       hasExport: true,
       hasFilters: true
@@ -53,6 +59,7 @@ class PageGenerator {
       await this.collectEntityInfo();
       await this.collectFields();
       await this.collectPermissions();
+      await this.collectGovernance();
       await this.collectFeatures();
       
       console.log(`${colors.yellow}Gerando arquivos...${colors.reset}`);
@@ -67,12 +74,14 @@ class PageGenerator {
       console.log(`  🔧 ${this.getServicePath()}`);
       console.log(`  🧪 ${this.getTestPath()}`);
       console.log(`  📘 ${this.getTypesPath()}`);
+      console.log(`  🗂️  ${this.getGovernancePath()}`);
       console.log('');
       console.log('Próximos passos:');
       console.log('1. Implementar as rotas da API no backend');
       console.log('2. Adicionar a nova página às rotas do frontend');
-      console.log('3. Configurar permissões no sistema');
-      console.log('4. Executar os testes');
+      console.log('3. Atualizar menuConfig com requiredModule e permissions');
+      console.log('4. Validar perfis do role matrix com o manifesto gerado');
+      console.log('5. Executar os testes');
 
     } catch (error) {
       console.error(`${colors.red}Erro: ${error.message}${colors.reset}`);
@@ -154,6 +163,51 @@ class PageGenerator {
     console.log('');
   }
 
+  async collectGovernance() {
+    console.log(`${colors.blue}🧭 Governança (módulo e perfis)${colors.reset}`);
+    console.log(`Módulos disponíveis: ${MODULE_OPTIONS.join(', ')}`);
+
+    const moduleInputRaw = await this.question(
+      `Módulo da funcionalidade (padrão: ${this.config.module}): `
+    );
+    const moduleInput = moduleInputRaw.trim().toUpperCase();
+    if (moduleInput) {
+      if (!MODULE_OPTIONS.includes(moduleInput)) {
+        throw new Error(`Módulo inválido: ${moduleInput}. Use um dos módulos listados.`);
+      }
+      this.config.module = moduleInput;
+    }
+
+    console.log(`Perfis disponíveis: ${ROLE_OPTIONS.join(', ')}`);
+    const roleInputRaw = await this.question(
+      `Perfis autorizados (csv, padrão: ${this.config.roles.join(',')}): `
+    );
+    const roleInput = roleInputRaw.trim().toLowerCase();
+    if (roleInput) {
+      const roles = roleInput
+        .split(',')
+        .map((role) => role.trim())
+        .filter(Boolean);
+
+      const invalidRoles = roles.filter((role) => !ROLE_OPTIONS.includes(role));
+      if (invalidRoles.length > 0) {
+        throw new Error(
+          `Perfis inválidos: ${invalidRoles.join(', ')}. Use apenas: ${ROLE_OPTIONS.join(', ')}`
+        );
+      }
+
+      this.config.roles = Array.from(new Set(roles));
+    }
+
+    const routeSuggestion = `/${this.config.entityNamePlural.toLowerCase()}`;
+    const routeInputRaw = await this.question(
+      `Rota principal da funcionalidade (padrão: ${routeSuggestion}): `
+    );
+    this.config.routePath = routeInputRaw.trim() || routeSuggestion;
+
+    console.log('');
+  }
+
   async collectFeatures() {
     console.log(`${colors.blue}⚙️  Funcionalidades${colors.reset}`);
     
@@ -180,6 +234,12 @@ class PageGenerator {
     // Gerar testes
     const testContent = this.generateTestContent();
     fs.writeFileSync(this.getTestPath(), testContent);
+
+    // Gerar manifesto de governanca
+    const governanceContent = this.generateGovernanceContent();
+    const governancePath = this.getGovernancePath();
+    fs.mkdirSync(path.dirname(governancePath), { recursive: true });
+    fs.writeFileSync(governancePath, governanceContent);
   }
 
   generatePageContent() {
@@ -305,6 +365,33 @@ describe('${this.config.entityName}Page', () => {
 
   // TODO: Adicionar mais testes específicos
 });`;
+  }
+
+  generateGovernanceContent() {
+    const manifest = {
+      feature: {
+        id: this.config.entityName.toLowerCase(),
+        entityName: this.config.entityName,
+        displayName: this.config.entityDisplayName
+      },
+      ownership: {
+        module: this.config.module,
+        allowedRoles: this.config.roles
+      },
+      access: {
+        routePath: this.config.routePath,
+        permissions: this.config.permissions
+      },
+      checklist: [
+        'Atualizar menuConfig.requiredModule para o modulo informado',
+        'Atualizar menuConfig.permissions e ROUTE_PERMISSION_RULES',
+        'Garantir cobertura no catalogo de permissoes e defaults por role',
+        'Adicionar/atualizar testes de permissao e rota'
+      ],
+      generatedAt: new Date().toISOString()
+    };
+
+    return `${JSON.stringify(manifest, null, 2)}\n`;
   }
 
   generateFieldsInterface() {
@@ -434,6 +521,13 @@ describe('${this.config.entityName}Page', () => {
 
   getTestPath() {
     return path.join(__dirname, `../../frontend-web/src/pages/__tests__/${this.config.entityName}Page.test.tsx`);
+  }
+
+  getGovernancePath() {
+    return path.join(
+      __dirname,
+      `../../docs/feature-governance/${this.config.entityName.toLowerCase()}.feature.json`
+    );
   }
 
   question(prompt) {

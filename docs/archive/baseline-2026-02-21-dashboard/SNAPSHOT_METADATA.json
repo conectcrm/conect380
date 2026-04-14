@@ -1,0 +1,15 @@
+{
+  "snapshotDate": "2026-02-21",
+  "capturedAt": "2026-02-21T01:52:26.433Z",
+  "baseUrl": "http://localhost:3000",
+  "route": "/dashboard",
+  "viewport": {
+    "width": 1920,
+    "height": 1080
+  },
+  "files": [
+    "dashboard-atual-viewport-1920x1080-2026-02-21.png",
+    "dashboard-atual-fullpage-2026-02-21.png"
+  ],
+  "notes": "Snapshot de baseline antes da refatoracao visual do dashboard."
+}

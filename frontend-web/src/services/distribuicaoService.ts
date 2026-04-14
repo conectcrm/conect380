@@ -102,11 +102,12 @@ export interface EstatisticasDistribuicao {
 export const distribuirTicket = async (ticketId: string): Promise<ResultadoDistribuicao> => {
   try {
     const response = await api.post(`/atendimento/distribuicao/${ticketId}`);
+    const payload = response.data?.data ?? response.data?.ticket ?? null;
 
     return {
       ticketId,
-      atendenteId: response.data.ticket?.atendenteId || null,
-      atendenteNome: response.data.ticket?.atendente?.nome,
+      atendenteId: payload?.atendenteId || null,
+      atendenteNome: payload?.atendente?.nome,
       sucesso: response.data.success,
       mensagem: response.data.message,
     };
@@ -131,11 +132,12 @@ export const distribuirTicket = async (ticketId: string): Promise<ResultadoDistr
 export const redistribuirFila = async (filaId: string): Promise<ResultadoRedistribuicao> => {
   try {
     const response = await api.post(`/atendimento/distribuicao/fila/${filaId}/redistribuir`);
+    const payload = response.data?.data ?? response.data ?? {};
 
     return {
       filaId,
-      distribuidos: response.data.distribuidos || 0,
-      total: response.data.total || 0,
+      distribuidos: payload.distribuidos || 0,
+      total: payload.total || payload.distribuidos || 0,
       sucesso: response.data.success,
       mensagem: response.data.message,
     };
@@ -161,11 +163,11 @@ export const redistribuirFila = async (filaId: string): Promise<ResultadoRedistr
  */
 export const buscarConfiguracao = async (
   filaId: string,
-  empresaId: string,
+  empresaId?: string,
 ): Promise<ConfiguracaoDistribuicao | null> => {
   try {
     const response = await api.get(`/atendimento/distribuicao/configuracao/${filaId}`, {
-      params: { empresaId },
+      ...(empresaId ? { params: { empresaId } } : {}),
     });
 
     if (response.data && response.data.success) {
@@ -197,12 +199,12 @@ export const buscarConfiguracao = async (
  */
 export const atualizarConfiguracao = async (
   filaId: string,
-  empresaId: string,
+  empresaId: string | undefined,
   configuracao: Partial<ConfiguracaoDistribuicao>,
 ): Promise<boolean> => {
   try {
     const response = await api.patch(`/atendimento/distribuicao/configuracao/${filaId}`, {
-      empresaId,
+      ...(empresaId ? { empresaId } : {}),
       autoDistribuicao: configuracao.distribuicaoAutomatica,
       algoritmo: configuracao.estrategiaDistribuicao,
     });
@@ -221,22 +223,57 @@ export const atualizarConfiguracao = async (
  * @returns Estatísticas da distribuição
  */
 export const buscarEstatisticas = async (
-  empresaId: string,
+  empresaId?: string,
 ): Promise<EstatisticasDistribuicao | null> => {
   try {
     const response = await api.get(`/atendimento/distribuicao/estatisticas`, {
-      params: { empresaId },
+      ...(empresaId ? { params: { empresaId } } : {}),
     });
 
     if (response.data && response.data.success) {
       const data = response.data.data;
+      const totalDistribuidos =
+        Number(data.totalDistribuidos ?? data.totalEmAtendimento ?? 0) +
+        Number(data.totalFinalizados ?? 0);
+      const totalPendentes = Number(data.totalPendentes ?? data.totalAguardando ?? 0);
+      const totalConsiderado = totalDistribuidos + totalPendentes;
+      const taxaDistribuicao =
+        data.taxaDistribuicao !== undefined
+          ? Number(data.taxaDistribuicao)
+          : totalConsiderado > 0
+            ? Number(((totalDistribuidos / totalConsiderado) * 100).toFixed(1))
+            : 0;
+
+      const distribuicaoPorAtendente = Array.isArray(data.distribuicaoPorAtendente)
+        ? data.distribuicaoPorAtendente.map((item: any) => ({
+            atendenteId: String(item.atendenteId ?? ''),
+            atendenteNome: String(item.atendenteNome ?? 'Atendente'),
+            quantidade: Number(item.quantidade ?? 0),
+            percentual: Number(item.percentual ?? 0),
+          }))
+        : [];
+
+      const atendenteComMaisTickets =
+        data.atendenteComMaisTickets &&
+        typeof data.atendenteComMaisTickets === 'object' &&
+        data.atendenteComMaisTickets.nome
+          ? {
+              nome: String(data.atendenteComMaisTickets.nome),
+              quantidade: Number(data.atendenteComMaisTickets.quantidade ?? 0),
+            }
+          : distribuicaoPorAtendente.length > 0
+            ? {
+                nome: distribuicaoPorAtendente[0].atendenteNome,
+                quantidade: distribuicaoPorAtendente[0].quantidade,
+              }
+            : null;
 
       return {
-        totalDistribuidos: data.totalEmAtendimento + data.totalFinalizados,
-        totalPendentes: data.totalAguardando,
-        taxaDistribuicao: 0,
-        atendenteComMaisTickets: null,
-        distribuicaoPorAtendente: [],
+        totalDistribuidos,
+        totalPendentes,
+        taxaDistribuicao,
+        atendenteComMaisTickets,
+        distribuicaoPorAtendente,
       };
     }
 
@@ -260,13 +297,11 @@ interface FilaDistribuicao {
   algoritmo: EstrategiaDistribuicao | string;
 }
 
-export const listarFilas = async (empresaId: string): Promise<FilaDistribuicao[]> => {
+export const listarFilas = async (empresaId?: string): Promise<FilaDistribuicao[]> => {
   try {
     const response = await api.get<{ success: boolean; data: FilaDistribuicao[] }>(
       '/atendimento/distribuicao/filas',
-      {
-        params: { empresaId },
-      },
+      empresaId ? { params: { empresaId } } : undefined,
     );
 
     return response.data?.success ? response.data.data : [];

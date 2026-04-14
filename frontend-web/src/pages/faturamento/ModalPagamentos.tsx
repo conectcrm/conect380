@@ -1,31 +1,47 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { X, Plus, CreditCard, DollarSign, CheckCircle, Clock, RotateCcw } from 'lucide-react';
 import {
-  X,
-  Plus,
-  CreditCard,
-  DollarSign,
-  Calendar,
-  CheckCircle,
-  Clock,
-  AlertTriangle,
-} from 'lucide-react';
-import { Fatura, StatusPagamento } from '../../services/faturamentoService';
+  faturamentoService,
+  Fatura,
+  FormaPagamento,
+  StatusFatura,
+  StatusPagamento,
+} from '../../services/faturamentoService';
+import MoneyInputNoPrefix from '../../components/inputs/MoneyInputNoPrefix';
+import ModalMotivoEstorno from './ModalMotivoEstorno';
+import { getFinanceiroFeatureFlags } from '../../config/financeiroFeatureFlags';
 
-interface Pagamento {
+interface PagamentoHistorico {
   id: number;
   valor: number;
   data: string;
   metodo: string;
   status: StatusPagamento;
+  tipo?: string;
+  transacaoId?: string;
   comprovante?: string;
   observacoes?: string;
+}
+
+interface NovoPagamentoFormulario {
+  valor: number;
+  data: string;
+  metodo: string;
+  observacoes?: string;
+}
+
+interface EstornoAlvo {
+  id: number;
+  valor: number;
+  transacaoId?: string;
 }
 
 interface ModalPagamentosProps {
   isOpen: boolean;
   onClose: () => void;
   fatura: Fatura;
-  onRegistrarPagamento: (pagamento: Omit<Pagamento, 'id'>) => Promise<void>;
+  onRegistrarPagamento: (pagamento: NovoPagamentoFormulario) => Promise<void>;
+  onEstornarPagamento: (pagamentoId: number, motivo: string) => Promise<void>;
 }
 
 export default function ModalPagamentos({
@@ -33,190 +49,346 @@ export default function ModalPagamentos({
   onClose,
   fatura,
   onRegistrarPagamento,
+  onEstornarPagamento,
 }: ModalPagamentosProps) {
-  const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
-  const [novoPagamento, setNovoPagamento] = useState({
+  const financeiroFeatureFlags = getFinanceiroFeatureFlags();
+  const metodosDisponiveis = [
+    { value: 'pix', label: 'PIX' },
+    { value: 'cartao_credito', label: 'Cartao de Credito' },
+    { value: 'cartao_debito', label: 'Cartao de Debito' },
+    ...(financeiroFeatureFlags.boletoEnabled ? [{ value: 'boleto', label: 'Boleto' }] : []),
+    { value: 'transferencia', label: 'Transferencia' },
+    { value: 'dinheiro', label: 'Dinheiro' },
+  ];
+
+  const normalizarMetodoPagamento = (value: string): string => {
+    return metodosDisponiveis.some((item) => item.value === value)
+      ? value
+      : metodosDisponiveis[0]?.value || 'pix';
+  };
+
+  const [pagamentos, setPagamentos] = useState<PagamentoHistorico[]>([]);
+  const [novoPagamento, setNovoPagamento] = useState<NovoPagamentoFormulario>({
     valor: 0,
     data: new Date().toISOString().split('T')[0],
-    metodo: 'pix',
+    metodo: normalizarMetodoPagamento('pix'),
     observacoes: '',
   });
   const [carregando, setCarregando] = useState(false);
+  const [carregandoHistorico, setCarregandoHistorico] = useState(false);
+  const [estornandoPagamentoId, setEstornandoPagamentoId] = useState<number | null>(null);
+  const [estornoAlvo, setEstornoAlvo] = useState<EstornoAlvo | null>(null);
+  const [motivoEstorno, setMotivoEstorno] = useState('');
+  const [erroEstorno, setErroEstorno] = useState<string | null>(null);
+  const [erroHistorico, setErroHistorico] = useState<string | null>(null);
+  const [erroFormulario, setErroFormulario] = useState<string | null>(null);
+
+  const carregarHistoricoPagamentos = useCallback(async () => {
+    setCarregandoHistorico(true);
+    setErroHistorico(null);
+    try {
+      const lista = await faturamentoService.listarPagamentos(fatura.id);
+      const historico: PagamentoHistorico[] = lista.map((pagamento) => ({
+        id: pagamento.id,
+        valor: pagamento.valor,
+        data: pagamento.dataPagamento || pagamento.criadoEm,
+        metodo: pagamento.formaPagamento || pagamento.metodoPagamento || 'pix',
+        status: pagamento.status,
+        tipo: pagamento.tipo,
+        transacaoId: pagamento.transacaoId,
+        comprovante: pagamento.comprovante,
+        observacoes: pagamento.observacoes,
+      }));
+      setPagamentos(historico);
+    } catch (error) {
+      console.error('Erro ao carregar historico de pagamentos:', error);
+      setPagamentos([]);
+      setErroHistorico('Nao foi possivel carregar o historico de pagamentos desta fatura.');
+    } finally {
+      setCarregandoHistorico(false);
+    }
+  }, [fatura.id]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setNovoPagamento((prev) => ({
+      ...prev,
+      metodo: normalizarMetodoPagamento(prev.metodo),
+    }));
+    carregarHistoricoPagamentos();
+  }, [isOpen, carregarHistoricoPagamentos]);
 
   const valorPago = pagamentos.reduce(
-    (total, p) => (p.status === StatusPagamento.APROVADO ? total + p.valor : total),
+    (total, pagamento) =>
+      pagamento.status === StatusPagamento.APROVADO ? total + pagamento.valor : total,
     0,
   );
-  const valorRestante = fatura.valorTotal - valorPago;
+  const valorRestante = Math.max(0, fatura.valorTotal - valorPago);
+  const podeRegistrarNovoPagamento = fatura.status !== StatusFatura.CANCELADA && valorRestante > 0;
+  const formatarMoeda = (valor: number): string =>
+    valor.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
 
   const handleRegistrarPagamento = async () => {
+    if (fatura.status === StatusFatura.CANCELADA) {
+      setErroFormulario('Nao e permitido registrar pagamento para fatura cancelada.');
+      return;
+    }
     if (novoPagamento.valor <= 0 || novoPagamento.valor > valorRestante) {
-      alert('Valor inválido para pagamento');
+      setErroFormulario('Informe um valor valido, maior que zero e ate o valor restante.');
       return;
     }
 
+    setErroFormulario(null);
     setCarregando(true);
     try {
-      await onRegistrarPagamento({
-        ...novoPagamento,
-        status: StatusPagamento.APROVADO,
-      });
+      await onRegistrarPagamento(novoPagamento);
 
-      // Resetar formulário
       setNovoPagamento({
         valor: 0,
         data: new Date().toISOString().split('T')[0],
-        metodo: 'pix',
+        metodo: normalizarMetodoPagamento('pix'),
         observacoes: '',
       });
+
+      await carregarHistoricoPagamentos();
     } catch (error) {
       console.error('Erro ao registrar pagamento:', error);
+      setErroFormulario('Falha ao registrar pagamento. Tente novamente.');
     } finally {
       setCarregando(false);
+    }
+  };
+
+  const handleEstornarPagamento = (pagamento: PagamentoHistorico) => {
+    const podeEstornar =
+      pagamento.status === StatusPagamento.APROVADO &&
+      String(pagamento.tipo || 'pagamento').toLowerCase() !== 'estorno' &&
+      pagamento.valor > 0;
+
+    if (!podeEstornar) {
+      setErroFormulario('Este pagamento nao pode ser estornado.');
+      return;
+    }
+
+    if (!pagamento.id || pagamento.id <= 0) {
+      setErroFormulario('Pagamento invalido para estorno.');
+      return;
+    }
+
+    setErroFormulario(null);
+    setErroEstorno(null);
+    setMotivoEstorno('');
+    setEstornoAlvo({
+      id: pagamento.id,
+      valor: pagamento.valor,
+      transacaoId: pagamento.transacaoId,
+    });
+  };
+
+  const fecharModalEstorno = () => {
+    if (estornandoPagamentoId) {
+      return;
+    }
+
+    setEstornoAlvo(null);
+    setMotivoEstorno('');
+    setErroEstorno(null);
+  };
+
+  const confirmarEstorno = async () => {
+    if (!estornoAlvo || !estornoAlvo.id) {
+      return;
+    }
+
+    const motivo = motivoEstorno.trim();
+    if (!motivo) {
+      setErroEstorno('Motivo do estorno e obrigatorio.');
+      return;
+    }
+
+    setErroEstorno(null);
+    setEstornandoPagamentoId(estornoAlvo.id);
+    try {
+      await onEstornarPagamento(estornoAlvo.id, motivo);
+      setEstornoAlvo(null);
+      setMotivoEstorno('');
+      await carregarHistoricoPagamentos();
+    } catch (error) {
+      console.error('Erro ao estornar pagamento:', error);
+      setErroEstorno('Falha ao estornar pagamento. Tente novamente.');
+    } finally {
+      setEstornandoPagamentoId(null);
     }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0D1F2A]/45 p-4"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !carregando) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-[#DCE8EC] bg-white shadow-[0_30px_60px_-30px_rgba(7,36,51,0.55)]"
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#E1EAEE] bg-white p-6">
           <div>
-            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <CreditCard className="w-6 h-6 text-green-600" />
+            <h2 className="flex items-center gap-2 text-xl font-semibold text-[#173A4D]">
+              <CreditCard className="h-6 w-6 text-[#159A9C]" />
               Pagamentos - Fatura #{fatura.numero}
             </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              Valor Total: R${' '}
-              {fatura.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </p>
+            <p className="mt-1 text-sm text-gray-600">Valor total: {formatarMoeda(fatura.valorTotal)}</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-            <X className="w-5 h-5 text-gray-500" />
+          <button
+            onClick={onClose}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#5E7784] transition hover:bg-[#F4F8FA]"
+          >
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="p-6">
-          {/* Status do Pagamento */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <DollarSign className="w-5 h-5 text-blue-600" />
-                <span className="text-sm font-medium text-blue-800">Valor Total</span>
+        <div className="space-y-6 p-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="rounded-lg bg-blue-50 p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-blue-600" />
+                <span className="text-sm font-medium text-blue-800">Valor total</span>
               </div>
-              <p className="text-2xl font-bold text-blue-900">
-                R$ {fatura.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </p>
+              <p className="text-2xl font-bold text-blue-900">{formatarMoeda(fatura.valorTotal)}</p>
             </div>
 
-            <div className="bg-green-50 p-4 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <CheckCircle className="w-5 h-5 text-green-600" />
-                <span className="text-sm font-medium text-green-800">Valor Pago</span>
+            <div className="rounded-lg bg-green-50 p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <span className="text-sm font-medium text-green-800">Valor pago</span>
               </div>
-              <p className="text-2xl font-bold text-green-900">
-                R$ {valorPago.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </p>
+              <p className="text-2xl font-bold text-green-900">{formatarMoeda(valorPago)}</p>
             </div>
 
-            <div className="bg-orange-50 p-4 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <Clock className="w-5 h-5 text-orange-600" />
+            <div className="rounded-lg bg-orange-50 p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <Clock className="h-5 w-5 text-orange-600" />
                 <span className="text-sm font-medium text-orange-800">Restante</span>
               </div>
-              <p className="text-2xl font-bold text-orange-900">
-                R$ {valorRestante.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </p>
+              <p className="text-2xl font-bold text-orange-900">{formatarMoeda(valorRestante)}</p>
             </div>
           </div>
 
-          {/* Histórico de Pagamentos */}
           <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Histórico de Pagamentos</h3>
+            <h3 className="mb-4 text-lg font-semibold text-gray-900">Historico de pagamentos</h3>
 
-            {pagamentos.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <CreditCard className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+            {carregandoHistorico ? (
+              <div className="py-8 text-center text-gray-500">Carregando pagamentos...</div>
+            ) : erroHistorico ? (
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {erroHistorico}
+              </div>
+            ) : pagamentos.length === 0 ? (
+              <div className="py-8 text-center text-gray-500">
+                <CreditCard className="mx-auto mb-4 h-12 w-12 text-gray-300" />
                 <p>Nenhum pagamento registrado</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {pagamentos.map((pagamento) => (
-                  <div
-                    key={pagamento.id}
-                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
-                  >
+                  <div key={pagamento.id} className="flex items-center justify-between rounded-lg bg-gray-50 p-4">
                     <div className="flex items-center gap-4">
                       <div
-                        className={`w-3 h-3 rounded-full ${
-                          pagamento.status === StatusPagamento.APROVADO
-                            ? 'bg-green-500'
-                            : pagamento.status === StatusPagamento.PENDENTE
-                              ? 'bg-yellow-500'
-                              : 'bg-red-500'
+                        className={`h-3 w-3 rounded-full ${
+                          pagamento.tipo === 'estorno'
+                            ? 'bg-orange-500'
+                            : pagamento.status === StatusPagamento.APROVADO
+                              ? 'bg-green-500'
+                              : pagamento.status === StatusPagamento.PENDENTE
+                                ? 'bg-yellow-500'
+                                : 'bg-red-500'
                         }`}
                       />
                       <div>
-                        <p className="font-medium text-gray-900">
-                          R$ {pagamento.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </p>
+                        <p className="font-medium text-gray-900">{formatarMoeda(pagamento.valor)}</p>
                         <p className="text-sm text-gray-600">
-                          {new Date(pagamento.data).toLocaleDateString('pt-BR')} •{' '}
-                          {pagamento.metodo.toUpperCase()}
+                          {new Date(pagamento.data).toLocaleDateString('pt-BR')} -{' '}
+                          {faturamentoService.formatarFormaPagamento(pagamento.metodo as FormaPagamento)}
+                          {pagamento.transacaoId ? ` - ${pagamento.transacaoId}` : ''}
                         </p>
                       </div>
                     </div>
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        pagamento.status === StatusPagamento.APROVADO
-                          ? 'bg-green-100 text-green-800'
-                          : pagamento.status === StatusPagamento.PENDENTE
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-red-100 text-red-800'
-                      }`}
-                    >
-                      {pagamento.status}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-medium ${
+                          pagamento.tipo === 'estorno'
+                            ? 'bg-orange-100 text-orange-800'
+                            : pagamento.status === StatusPagamento.APROVADO
+                              ? 'bg-green-100 text-green-800'
+                              : pagamento.status === StatusPagamento.PENDENTE
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-red-100 text-red-800'
+                        }`}
+                      >
+                        {pagamento.tipo === 'estorno' ? 'estorno' : pagamento.status}
+                      </span>
+                      {pagamento.status === StatusPagamento.APROVADO &&
+                      pagamento.tipo !== 'estorno' &&
+                      pagamento.valor > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => handleEstornarPagamento(pagamento)}
+                          disabled={estornandoPagamentoId === pagamento.id}
+                          className="inline-flex items-center gap-1 rounded-md border border-orange-300 bg-white px-2 py-1 text-xs font-medium text-orange-700 transition hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          {estornandoPagamentoId === pagamento.id ? 'Estornando...' : 'Estornar'}
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Registrar Novo Pagamento */}
-          {valorRestante > 0 && (
+          {podeRegistrarNovoPagamento && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Registrar Novo Pagamento</h3>
+              <h3 className="mb-4 text-lg font-semibold text-gray-900">Registrar novo pagamento</h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Valor do Pagamento
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Valor do pagamento
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    max={valorRestante}
+                  <MoneyInputNoPrefix
                     value={novoPagamento.valor}
-                    onChange={(e) =>
+                    onValueChange={(value) =>
                       setNovoPagamento((prev) => ({
                         ...prev,
-                        valor: parseFloat(e.target.value) || 0,
+                        valor: Math.min(value || 0, valorRestante),
                       }))
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    isAllowed={({ floatValue }) =>
+                      floatValue === undefined || floatValue <= valorRestante
+                    }
+                    className="w-full rounded-lg border border-[#D4E2E7] px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-[#159A9C]"
                     placeholder="0,00"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Máximo: R$ {valorRestante.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  <p className="mt-1 text-xs text-gray-500">
+                    Maximo: {formatarMoeda(valorRestante)}
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Data do Pagamento
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Data do pagamento
                   </label>
                   <input
                     type="date"
@@ -227,37 +399,39 @@ export default function ModalPagamentos({
                         data: e.target.value,
                       }))
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full rounded-lg border border-[#D4E2E7] px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-[#159A9C]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Método de Pagamento
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Metodo de pagamento
                   </label>
                   <select
                     value={novoPagamento.metodo}
                     onChange={(e) =>
                       setNovoPagamento((prev) => ({
                         ...prev,
-                        metodo: e.target.value,
+                        metodo: normalizarMetodoPagamento(e.target.value),
                       }))
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full rounded-lg border border-[#D4E2E7] px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-[#159A9C]"
                   >
-                    <option value="pix">PIX</option>
-                    <option value="cartao_credito">Cartão de Crédito</option>
-                    <option value="cartao_debito">Cartão de Débito</option>
-                    <option value="boleto">Boleto</option>
-                    <option value="transferencia">Transferência</option>
-                    <option value="dinheiro">Dinheiro</option>
+                    {metodosDisponiveis.map((metodo) => (
+                      <option key={metodo.value} value={metodo.value}>
+                        {metodo.label}
+                      </option>
+                    ))}
                   </select>
+                  {!financeiroFeatureFlags.boletoEnabled && (
+                    <p className="mt-1 text-xs text-[#5E7784]">
+                      {financeiroFeatureFlags.boletoDisabledReason}
+                    </p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Observações
-                  </label>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Observacoes</label>
                   <input
                     type="text"
                     value={novoPagamento.observacoes}
@@ -267,36 +441,62 @@ export default function ModalPagamentos({
                         observacoes: e.target.value,
                       }))
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    placeholder="Observações do pagamento"
+                    className="w-full rounded-lg border border-[#D4E2E7] px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-[#159A9C]"
+                    placeholder="Observacoes do pagamento"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t">
+              {erroFormulario && (
+                <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {erroFormulario}
+                </div>
+              )}
+
+              <div className="mt-6 flex items-center justify-end gap-3 border-t pt-4">
                 <button
                   onClick={onClose}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  className="rounded-lg bg-gray-100 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-200"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleRegistrarPagamento}
                   disabled={carregando || novoPagamento.valor <= 0}
-                  className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-lg transition-colors flex items-center gap-2"
+                  className="flex items-center gap-2 rounded-lg bg-[#159A9C] px-6 py-2 text-white transition-colors hover:bg-[#117C7E] disabled:cursor-not-allowed disabled:bg-gray-300"
                 >
                   {carregando ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                   ) : (
-                    <Plus className="w-4 h-4" />
+                    <Plus className="h-4 w-4" />
                   )}
-                  Registrar Pagamento
+                  Registrar pagamento
                 </button>
               </div>
             </div>
           )}
+
+          {fatura.status === StatusFatura.CANCELADA && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              Esta fatura esta cancelada. O registro manual de pagamento permanece bloqueado.
+            </div>
+          )}
         </div>
       </div>
+
+      <ModalMotivoEstorno
+        isOpen={Boolean(estornoAlvo)}
+        pagamentoId={estornoAlvo?.id}
+        valor={estornoAlvo?.valor}
+        transacaoId={estornoAlvo?.transacaoId}
+        motivo={motivoEstorno}
+        loading={estornandoPagamentoId === estornoAlvo?.id}
+        erro={erroEstorno}
+        onMotivoChange={setMotivoEstorno}
+        onCancel={fecharModalEstorno}
+        onConfirm={() => void confirmarEstorno()}
+      />
     </div>
   );
 }
+

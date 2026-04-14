@@ -10,9 +10,10 @@ interface MonthViewProps {
   onDateClick: (date: Date) => void;
   onDragStart: (eventId: string) => void;
   onDragEnd: () => void;
-  onDrop: (date: Date) => void;
+  onDrop: (date: Date, eventId: string) => void;
   draggedEvent: string | null;
   dropTarget: Date | null;
+  canDragEvent?: (event: CalendarEvent) => boolean;
 }
 
 export const MonthView: React.FC<MonthViewProps> = ({
@@ -25,6 +26,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
   onDrop,
   draggedEvent,
   dropTarget,
+  canDragEvent,
 }) => {
   const calendarDays = generateCalendarDays(date, events);
   const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -39,8 +41,8 @@ export const MonthView: React.FC<MonthViewProps> = ({
   const handleDrop = (e: React.DragEvent, day: CalendarDay) => {
     e.preventDefault();
     const eventId = e.dataTransfer.getData('text/plain');
-    if (eventId && draggedEvent) {
-      onDrop(day.date);
+    if (eventId) {
+      onDrop(day.date, eventId);
     }
   };
 
@@ -111,21 +113,16 @@ export const MonthView: React.FC<MonthViewProps> = ({
               {/* Lista de eventos */}
               <div className="space-y-1">
                 {day.events.slice(0, 3).map((event) => (
-                  <div
-                    key={event.id}
-                    className="calendar-event"
-                    style={{
-                      opacity: draggedEvent === event.id ? 0.3 : 1,
-                    }}
-                  >
+                  <div key={event.id} className="calendar-event" style={{ opacity: draggedEvent === event.id ? 0.3 : 1 }}>
                     <CalendarEventComponent
                       event={event}
                       onClick={onEventClick}
-                      onDragStart={onDragStart}
-                      onDragEnd={onDragEnd}
+                      onDragStart={canDragEvent?.(event) === false ? undefined : onDragStart}
+                      onDragEnd={canDragEvent?.(event) === false ? undefined : onDragEnd}
                       compact={true}
                       className="text-xs"
                       isDragging={draggedEvent === event.id}
+                      isDraggable={canDragEvent ? canDragEvent(event) : true}
                     />
                   </div>
                 ))}

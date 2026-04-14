@@ -1,0 +1,477 @@
+.sales-celebration-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 160;
+  pointer-events: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: clamp(48px, 6.5vh, 88px);
+}
+
+.sales-celebration-stage {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.sales-celebration-stage.is-medium .sales-celebration-veil {
+  background: radial-gradient(
+    circle at 50% 26%,
+    rgba(10, 122, 124, 0.14) 0%,
+    rgba(7, 42, 54, 0.05) 38%,
+    rgba(7, 42, 54, 0.02) 100%
+  );
+}
+
+.sales-celebration-stage.is-medium .sales-celebration-spotlight {
+  opacity: 0.74;
+  filter: blur(10px);
+}
+
+.sales-celebration-stage.is-medium .sales-celebration-banner {
+  border-color: rgba(21, 154, 156, 0.26);
+  box-shadow:
+    0 20px 40px rgba(0, 35, 51, 0.24),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+}
+
+.sales-celebration-stage.is-medium .sales-celebration-confetti.is-back {
+  opacity: 0.72;
+}
+
+.sales-celebration-stage.is-medium .sales-celebration-sparkle {
+  width: 7px;
+  height: 7px;
+}
+
+.sales-celebration-stage.is-high .sales-celebration-veil {
+  background: radial-gradient(
+    circle at 50% 24%,
+    rgba(10, 122, 124, 0.24) 0%,
+    rgba(7, 42, 54, 0.09) 40%,
+    rgba(7, 42, 54, 0.04) 100%
+  );
+}
+
+.sales-celebration-stage.is-high .sales-celebration-banner {
+  border-color: rgba(21, 154, 156, 0.4);
+  box-shadow:
+    0 32px 56px rgba(0, 35, 51, 0.34),
+    0 0 0 1px rgba(255, 255, 255, 0.12) inset;
+}
+
+.sales-celebration-veil {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 50% 26%,
+    rgba(10, 122, 124, 0.2) 0%,
+    rgba(7, 42, 54, 0.07) 38%,
+    rgba(7, 42, 54, 0.03) 100%
+  );
+  animation: sales-celebration-veil-inout 2600ms ease forwards;
+}
+
+.sales-celebration-spotlight {
+  position: absolute;
+  left: 50%;
+  top: 16%;
+  width: min(92vw, 720px);
+  height: min(52vh, 360px);
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(191, 250, 248, 0.2) 0%, rgba(191, 250, 248, 0.03) 68%);
+  filter: blur(12px);
+  animation: sales-celebration-spotlight-pulse 1320ms ease-in-out 2;
+}
+
+.sales-celebration-banner-slot {
+  position: absolute;
+  top: clamp(48px, 8vh, 92px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(96vw, 620px);
+  display: flex;
+  justify-content: center;
+}
+
+.sales-celebration-banner {
+  position: relative;
+  overflow: visible;
+  min-width: min(94vw, 420px);
+  max-width: min(94vw, 560px);
+  border: 1px solid rgba(21, 154, 156, 0.34);
+  border-radius: 18px;
+  background:
+    radial-gradient(120% 120% at 80% 0%, rgba(255, 255, 255, 0.26) 0%, transparent 46%),
+    linear-gradient(135deg, rgba(7, 80, 82, 0.97) 0%, rgba(21, 154, 156, 0.98) 72%);
+  color: #f8fdfd;
+  box-shadow:
+    0 26px 50px rgba(0, 35, 51, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  padding: 14px 18px 15px;
+  animation: sales-celebration-banner-inout 2550ms cubic-bezier(0.22, 0.84, 0.24, 1) forwards;
+}
+
+.sales-celebration-glow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 260px;
+  height: 140px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(217, 253, 251, 0.38) 0%, rgba(217, 253, 251, 0.04) 70%);
+  filter: blur(8px);
+  animation: sales-celebration-glow-pulse 1100ms ease-in-out 2;
+}
+
+.sales-celebration-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sales-celebration-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(231, 255, 250, 0.22);
+  border: 1px solid rgba(231, 255, 250, 0.54);
+  box-shadow: 0 0 0 4px rgba(231, 255, 250, 0.09);
+  animation: sales-celebration-icon-pulse 900ms ease-in-out 2;
+}
+
+.sales-celebration-icon {
+  width: 20px;
+  height: 20px;
+  stroke-width: 2.4;
+}
+
+.sales-celebration-copy {
+  min-width: 0;
+}
+
+.sales-celebration-title {
+  font-size: 1rem;
+  line-height: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.015em;
+}
+
+.sales-celebration-subtitle {
+  margin-top: 2px;
+  font-size: 0.86rem;
+  line-height: 1.22rem;
+  color: rgba(237, 252, 252, 0.94);
+  word-break: break-word;
+}
+
+.sales-celebration-burst-piece {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 5px;
+  height: 16px;
+  border-radius: 999px;
+  opacity: 0;
+  transform: translate(-50%, -50%) rotate(var(--rotate, 0deg));
+  transform-origin: center;
+  background: var(--color, #deefe7);
+  animation: sales-celebration-burst-out 640ms ease-out forwards;
+  animation-delay: var(--delay, 0ms);
+}
+
+.sales-celebration-confetti {
+  position: absolute;
+  left: 50%;
+  top: -8vh;
+  width: var(--width, 7px);
+  height: var(--height, 13px);
+  border-radius: 999px;
+  opacity: 0;
+  transform: translate(-50%, 0) rotate(0deg);
+  animation: sales-celebration-confetti-fall var(--duration, 1080ms) ease-out forwards;
+  animation-delay: var(--delay, 0ms);
+  background: var(--color, #deefe7);
+}
+
+.sales-celebration-confetti.is-back {
+  filter: blur(0.35px);
+  opacity: 0.85;
+}
+
+.sales-celebration-confetti.is-front {
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.26));
+}
+
+.sales-celebration-sparkle {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  opacity: 0;
+  background: rgba(255, 255, 255, 0.96);
+  transform: translate(var(--x, 0px), var(--y, 0px)) scale(0.4);
+  animation: sales-celebration-sparkle var(--duration, 680ms) ease-out forwards;
+  animation-delay: var(--delay, 0ms);
+}
+
+.sales-celebration-comet {
+  position: absolute;
+  top: -16px;
+  left: -160px;
+  width: 92px;
+  height: 3px;
+  border-radius: 999px;
+  opacity: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0),
+    rgba(236, 252, 252, 0.82),
+    rgba(255, 255, 255, 0)
+  );
+  filter: drop-shadow(0 0 7px rgba(236, 252, 252, 0.52));
+  animation: sales-celebration-comet-slide 840ms ease-out 140ms forwards;
+}
+
+.sales-celebration-comet::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  transform: translate(50%, -50%);
+  background: #ecfcfc;
+}
+
+@keyframes sales-celebration-banner-inout {
+  0% {
+    opacity: 0;
+    transform: translateY(-26px) scale(0.92);
+  }
+  12% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.98);
+  }
+}
+
+@keyframes sales-celebration-veil-inout {
+  0% {
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes sales-celebration-spotlight-pulse {
+  0% {
+    opacity: 0.28;
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+  55% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+  100% {
+    opacity: 0.42;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes sales-celebration-icon-pulse {
+  0% {
+    transform: scale(0.72);
+  }
+  55% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes sales-celebration-glow-pulse {
+  0% {
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes sales-celebration-burst-out {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(var(--rotate, 0deg)) scale(0.3);
+  }
+  18% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(
+        calc(-50% + var(--tx, 0px)),
+        calc(-50% + var(--ty, 0px))
+      )
+      rotate(var(--rotate, 0deg))
+      scale(0.95);
+  }
+}
+
+@keyframes sales-celebration-confetti-fall {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0) rotate(0deg) scale(0.72);
+  }
+  10% {
+    opacity: 0.98;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(
+        calc(-50% + var(--x, 0px) + var(--drift, 0px)),
+        var(--drop, 65vh)
+      )
+      rotate(var(--rotate, 220deg))
+      scale(1);
+  }
+}
+
+@keyframes sales-celebration-sparkle {
+  0% {
+    opacity: 0;
+    transform: translate(var(--x, 0px), var(--y, 0px)) scale(0.4);
+  }
+  28% {
+    opacity: 0.92;
+    transform: translate(var(--x, 0px), var(--y, 0px)) scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--x, 0px), calc(var(--y, 0px) + 3.8vh)) scale(0.8);
+  }
+}
+
+@keyframes sales-celebration-comet-slide {
+  0% {
+    opacity: 0;
+    transform: translateX(0) rotate(-4deg);
+  }
+  18% {
+    opacity: 0.92;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(760px) rotate(3deg);
+  }
+}
+
+@media (max-width: 640px) {
+  .sales-celebration-banner {
+    min-width: min(94vw, 420px);
+    padding: 12px 14px;
+  }
+
+  .sales-celebration-banner-slot {
+    top: clamp(44px, 7vh, 76px);
+  }
+
+  .sales-celebration-title {
+    font-size: 0.93rem;
+  }
+
+  .sales-celebration-subtitle {
+    font-size: 0.8rem;
+    line-height: 1.15rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sales-celebration-banner {
+    animation: none;
+  }
+
+  .sales-celebration-veil {
+    animation: none;
+    opacity: 0.2;
+  }
+
+  .sales-celebration-burst-piece,
+  .sales-celebration-confetti,
+  .sales-celebration-sparkle,
+  .sales-celebration-comet,
+  .sales-celebration-glow,
+  .sales-celebration-spotlight,
+  .sales-celebration-icon-wrap {
+    display: none;
+  }
+}
+
+body.sales-celebration-active #root {
+  animation: sales-celebration-root-pop-medium 2600ms ease-out forwards;
+}
+
+body.sales-celebration-medium #root {
+  animation: sales-celebration-root-pop-medium 2600ms ease-out forwards;
+}
+
+body.sales-celebration-high #root {
+  animation: sales-celebration-root-pop-high 2600ms ease-out forwards;
+}
+
+@keyframes sales-celebration-root-pop-medium {
+  0% {
+    filter: saturate(1) brightness(1);
+  }
+  15% {
+    filter: saturate(1.06) brightness(1.015);
+  }
+  100% {
+    filter: saturate(1) brightness(1);
+  }
+}
+
+@keyframes sales-celebration-root-pop-high {
+  0% {
+    filter: saturate(1) brightness(1);
+  }
+  14% {
+    filter: saturate(1.12) brightness(1.03);
+  }
+  100% {
+    filter: saturate(1) brightness(1);
+  }
+}

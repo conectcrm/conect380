@@ -9,6 +9,8 @@ import {
 import { AssinaturaEmpresa } from './assinatura-empresa.entity';
 import { PlanoModulo } from './plano-modulo.entity';
 
+export type PlanoPeriodicidadeCobranca = 'mensal' | 'anual';
+
 @Entity('planos')
 export class Plano {
   @PrimaryGeneratedColumn('uuid')
@@ -18,13 +20,25 @@ export class Plano {
   nome: string;
 
   @Column({ length: 50, unique: true })
-  codigo: string; // starter, professional, enterprise
+  codigo: string; // starter, business, enterprise
 
   @Column({ type: 'text', nullable: true })
   descricao: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   preco: number;
+
+  @Column({ name: 'periodicidade_cobranca', type: 'varchar', length: 20, default: 'mensal' })
+  periodicidadeCobranca: PlanoPeriodicidadeCobranca;
+
+  @Column({ name: 'dias_trial', type: 'int', default: 0 })
+  diasTrial: number;
+
+  @Column({ name: 'gateway_price_id', type: 'varchar', length: 120, nullable: true })
+  gatewayPriceId: string | null;
+
+  @Column({ name: 'publicado_checkout', type: 'boolean', default: true })
+  publicadoCheckout: boolean;
 
   @Column({ type: 'int', default: 1 })
   limiteUsuarios: number;
@@ -36,7 +50,7 @@ export class Plano {
   limiteStorage: number;
 
   @Column({ type: 'int', default: 1000 })
-  limiteApiCalls: number; // por hora
+  limiteApiCalls: number; // por dia
 
   @Column({ type: 'boolean', default: false })
   whiteLabel: boolean;

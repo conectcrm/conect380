@@ -2,6 +2,9 @@ import { Controller, Post, Body, Get, UseGuards, Logger } from '@nestjs/common';
 import { IAService, ContextoConversa } from './ia.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permission } from '../../common/permissions/permissions.constants';
 
 class GerarRespostaDto {
   ticketId: string;
@@ -15,7 +18,8 @@ class GerarRespostaDto {
 }
 
 @Controller('ia')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.CONFIG_AUTOMACOES_MANAGE)
 export class IAController {
   private readonly logger = new Logger(IAController.name);
 

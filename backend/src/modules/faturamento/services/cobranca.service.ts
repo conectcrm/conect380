@@ -61,7 +61,7 @@ export class CobrancaService {
     empresaId: string,
     filtros?: {
     status?: StatusPlanoCobranca;
-    clienteId?: number;
+    clienteId?: string;
     contratoId?: number;
   },
   ): Promise<PlanoCobranca[]> {
@@ -70,14 +70,14 @@ export class CobrancaService {
       .leftJoinAndSelect('plano.contrato', 'contrato')
       .leftJoinAndSelect('plano.usuarioResponsavel', 'usuario')
       .where('plano.ativo = :ativo', { ativo: true })
-      .andWhere('plano.empresaId = :empresaId', { empresaId });
+      .andWhere('contrato.empresa_id = :empresaId', { empresaId });
 
     if (filtros?.status) {
       query.andWhere('plano.status = :status', { status: filtros.status });
     }
 
-    if (filtros?.clienteId) {
-      query.andWhere('plano.clienteId = :clienteId', { clienteId: filtros.clienteId });
+    if (typeof filtros?.clienteId === 'string' && filtros.clienteId.trim()) {
+      query.andWhere('plano.clienteId = :clienteId', { clienteId: filtros.clienteId.trim() });
     }
 
     if (filtros?.contratoId) {
@@ -88,10 +88,15 @@ export class CobrancaService {
   }
 
   async buscarPlanoPorId(id: number, empresaId: string): Promise<PlanoCobranca> {
-    const plano = await this.planoCobrancaRepository.findOne({
-      where: { id, ativo: true, empresaId },
-      relations: ['contrato', 'usuarioResponsavel', 'faturas'],
-    });
+    const plano = await this.planoCobrancaRepository
+      .createQueryBuilder('plano')
+      .leftJoinAndSelect('plano.contrato', 'contrato')
+      .leftJoinAndSelect('plano.usuarioResponsavel', 'usuario')
+      .leftJoinAndSelect('plano.faturas', 'faturas')
+      .where('plano.id = :id', { id })
+      .andWhere('plano.ativo = :ativo', { ativo: true })
+      .andWhere('contrato.empresa_id = :empresaId', { empresaId })
+      .getOne();
 
     if (!plano) {
       throw new NotFoundException('Plano de cobrança não encontrado');
@@ -101,10 +106,15 @@ export class CobrancaService {
   }
 
   async buscarPlanoPorCodigo(codigo: string, empresaId: string): Promise<PlanoCobranca> {
-    const plano = await this.planoCobrancaRepository.findOne({
-      where: { codigo, ativo: true, empresaId },
-      relations: ['contrato', 'usuarioResponsavel', 'faturas'],
-    });
+    const plano = await this.planoCobrancaRepository
+      .createQueryBuilder('plano')
+      .leftJoinAndSelect('plano.contrato', 'contrato')
+      .leftJoinAndSelect('plano.usuarioResponsavel', 'usuario')
+      .leftJoinAndSelect('plano.faturas', 'faturas')
+      .where('plano.codigo = :codigo', { codigo })
+      .andWhere('plano.ativo = :ativo', { ativo: true })
+      .andWhere('contrato.empresa_id = :empresaId', { empresaId })
+      .getOne();
 
     if (!plano) {
       throw new NotFoundException('Plano de cobrança não encontrado');
@@ -180,88 +190,107 @@ export class CobrancaService {
     return planoAtualizado;
   }
 
-  async processarCobrancasRecorrentes(empresaId: string): Promise<void> {
+  async processarCobrancasRecorrentes(
+    empresaId: string,
+  ): Promise<{ processados: number; sucesso: number; falhas: number }> {
     this.logger.log('Iniciando processamento de cobranças recorrentes...');
 
     // Buscar planos ativos que precisam de cobrança
     const planosParaCobranca = await this.planoCobrancaRepository
       .createQueryBuilder('plano')
+      .leftJoin('plano.contrato', 'contrato')
       .where('plano.status = :status', { status: StatusPlanoCobranca.ATIVO })
       .andWhere('plano.proximaCobranca <= :agora', { agora: new Date() })
       .andWhere('plano.ativo = :ativo', { ativo: true })
-      .andWhere('plano.empresaId = :empresaId', { empresaId })
+      .andWhere('contrato.empresa_id = :empresaId', { empresaId })
       .getMany();
 
     this.logger.log(`Encontrados ${planosParaCobranca.length} planos para cobrança`);
 
+    let sucesso = 0;
+    let falhas = 0;
+
     for (const plano of planosParaCobranca) {
       try {
         await this.gerarFaturaRecorrente(plano, empresaId);
+        sucesso += 1;
       } catch (error) {
+        falhas += 1;
         this.logger.error(`Erro ao processar cobrança do plano ${plano.codigo}: ${error.message}`);
       }
     }
 
     this.logger.log('Processamento de cobranças recorrentes concluído');
+    return {
+      processados: planosParaCobranca.length,
+      sucesso,
+      falhas,
+    };
   }
 
   async gerarFaturaRecorrente(plano: PlanoCobranca, empresaId: string): Promise<Fatura> {
     try {
-      if (plano.empresaId !== empresaId) {
-        throw new BadRequestException('Plano de cobrança não pertence à empresa autenticada');
+      const planoEscopoEmpresa = await this.planoCobrancaRepository
+        .createQueryBuilder('plano')
+        .leftJoinAndSelect('plano.contrato', 'contrato')
+        .where('plano.id = :id', { id: plano.id })
+        .andWhere('plano.ativo = :ativo', { ativo: true })
+        .andWhere('contrato.empresa_id = :empresaId', { empresaId })
+        .getOne();
+
+      if (!planoEscopoEmpresa) {
+        throw new BadRequestException('Plano de cobranca nao pertence a empresa autenticada');
       }
 
-      // Verificar se plano pode gerar nova fatura
-      if (!plano.podeGerarNovaFatura()) {
-        throw new BadRequestException('Plano não pode gerar nova fatura');
+      const planoAtual = planoEscopoEmpresa;
+
+      if (!planoAtual.podeGerarNovaFatura()) {
+        throw new BadRequestException('Plano nao pode gerar nova fatura');
       }
 
-      // Verificar se já existe fatura para este período
       const faturaExistente = await this.faturaRepository.findOne({
         where: {
           empresaId,
-          contratoId: plano.contratoId,
-          dataVencimento: plano.proximaCobranca,
+          contratoId: planoAtual.contratoId,
+          dataVencimento: planoAtual.proximaCobranca,
           ativo: true,
         },
       });
 
       if (faturaExistente) {
-        this.logger.warn(`Fatura já existe para o período: ${plano.codigo}`);
+        this.logger.warn(`Fatura ja existe para o periodo: ${planoAtual.codigo}`);
         return faturaExistente;
       }
 
-      // Calcular juros e multa se houver atraso
       const diasAtraso = Math.max(
         0,
-        Math.ceil((new Date().getTime() - plano.proximaCobranca.getTime()) / (1000 * 60 * 60 * 24)),
+        Math.ceil(
+          (new Date().getTime() - planoAtual.proximaCobranca.getTime()) / (1000 * 60 * 60 * 24),
+        ),
       );
-      const { juros, multa } = plano.calcularJurosMulta(plano.valorRecorrente, diasAtraso);
+      const { juros, multa } = planoAtual.calcularJurosMulta(planoAtual.valorRecorrente, diasAtraso);
 
-      // Criar fatura
       const createFaturaDto: CreateFaturaDto = {
-        contratoId: plano.contratoId,
-        clienteId: plano.clienteId,
-        usuarioResponsavelId: plano.usuarioResponsavelId,
+        contratoId: planoAtual.contratoId,
+        clienteId: planoAtual.clienteId,
+        usuarioResponsavelId: planoAtual.usuarioResponsavelId,
         tipo: TipoFatura.RECORRENTE,
-        descricao: `${plano.nome} - Período: ${plano.proximaCobranca.toLocaleDateString('pt-BR')}`,
-        dataVencimento: plano.proximaCobranca.toISOString().split('T')[0],
+        descricao: `${planoAtual.nome} - Periodo: ${planoAtual.proximaCobranca.toLocaleDateString('pt-BR')}`,
+        dataVencimento: planoAtual.proximaCobranca.toISOString().split('T')[0],
         valorDesconto: 0,
         itens: [
           {
-            descricao: plano.nome,
+            descricao: planoAtual.nome,
             quantidade: 1,
-            valorUnitario: plano.valorRecorrente,
-            unidade: 'mês',
-            codigoProduto: plano.codigo,
+            valorUnitario: planoAtual.valorRecorrente,
+            unidade: 'mes',
+            codigoProduto: planoAtual.codigo,
           },
         ],
       };
 
-      // Obter empresaId do contrato relacionado
       const fatura = await this.faturamentoService.criarFatura(createFaturaDto, empresaId);
 
-      // Adicionar juros e multa se houver
       if (juros > 0 || multa > 0) {
         fatura.valorJuros = juros;
         fatura.valorMulta = multa;
@@ -269,24 +298,21 @@ export class CobrancaService {
         await this.faturaRepository.save(fatura);
       }
 
-      // Atualizar plano
-      plano.ciclosExecutados++;
-      plano.proximaCobranca = plano.calcularProximaCobranca();
+      planoAtual.ciclosExecutados++;
+      planoAtual.proximaCobranca = planoAtual.calcularProximaCobranca();
 
-      // Verificar se atingiu limite de ciclos
-      if (plano.limiteCiclos && plano.ciclosExecutados >= plano.limiteCiclos) {
-        plano.status = StatusPlanoCobranca.EXPIRADO;
-        plano.dataFim = new Date();
+      if (planoAtual.limiteCiclos && planoAtual.ciclosExecutados >= planoAtual.limiteCiclos) {
+        planoAtual.status = StatusPlanoCobranca.EXPIRADO;
+        planoAtual.dataFim = new Date();
       }
 
-      await this.planoCobrancaRepository.save(plano);
+      await this.planoCobrancaRepository.save(planoAtual);
 
-      // Enviar email de cobrança
-      if (plano.configuracoes?.notificacoesEmail !== false) {
-        await this.enviarEmailCobranca(fatura, plano);
+      if (planoAtual.configuracoes?.notificacoesEmail !== false) {
+        await this.enviarEmailCobranca(fatura, planoAtual);
       }
 
-      this.logger.log(`Fatura recorrente gerada: ${fatura.numero} para plano ${plano.codigo}`);
+      this.logger.log(`Fatura recorrente gerada: ${fatura.numero} para plano ${planoAtual.codigo}`);
 
       return fatura;
     } catch (error) {
@@ -295,7 +321,9 @@ export class CobrancaService {
     }
   }
 
-  async enviarLembreteVencimento(empresaId: string): Promise<void> {
+  async enviarLembreteVencimento(
+    empresaId: string,
+  ): Promise<{ processados: number; sucesso: number; falhas: number }> {
     this.logger.log('Enviando lembretes de vencimento...');
 
     // Buscar planos que precisam de lembrete
@@ -304,21 +332,32 @@ export class CobrancaService {
 
     const planosLembrete = await this.planoCobrancaRepository
       .createQueryBuilder('plano')
+      .leftJoin('plano.contrato', 'contrato')
       .where('plano.status = :status', { status: StatusPlanoCobranca.ATIVO })
       .andWhere('plano.enviarLembrete = :enviarLembrete', { enviarLembrete: true })
       .andWhere('DATE(plano.proximaCobranca) = DATE(:dataLembrete)', { dataLembrete })
-      .andWhere('plano.empresaId = :empresaId', { empresaId })
+      .andWhere('contrato.empresa_id = :empresaId', { empresaId })
       .getMany();
+
+    let sucesso = 0;
+    let falhas = 0;
 
     for (const plano of planosLembrete) {
       try {
         await this.enviarEmailLembrete(plano);
+        sucesso += 1;
       } catch (error) {
+        falhas += 1;
         this.logger.error(`Erro ao enviar lembrete para plano ${plano.codigo}: ${error.message}`);
       }
     }
 
     this.logger.log(`Enviados ${planosLembrete.length} lembretes de vencimento`);
+    return {
+      processados: planosLembrete.length,
+      sucesso,
+      falhas,
+    };
   }
 
   private async gerarCodigoPlano(): Promise<string> {

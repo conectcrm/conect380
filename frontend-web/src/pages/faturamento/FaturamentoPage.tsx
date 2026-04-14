@@ -1,19 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import {
   Plus,
   Search,
   Edit3,
   Trash2,
   FileText,
+  RefreshCw,
   DollarSign,
-  Filter,
   Download,
   MoreVertical,
-  Eye,
   Send,
   Link2,
+  Copy,
+  ExternalLink,
   Calendar,
   Activity,
   Settings,
@@ -22,6 +23,8 @@ import {
   AlertCircle,
   XCircle,
   Building2,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   ChevronDown,
   X,
@@ -29,34 +32,32 @@ import {
   BarChart3,
   Mail,
   CreditCard,
-  Bell,
-  Shield,
 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {
   faturamentoService,
   Fatura,
   NovaFatura,
+  FormaPagamento,
   StatusFatura,
   TipoFatura,
-  FormaPagamento,
+  OrigemFaturaOperacional,
   FiltrosFatura,
-  FaturasPaginadasResponse,
+  ProntidaoCobranca,
 } from '../../services/faturamentoService';
-import ModalFatura from './ModalFatura';
+import ModalFatura, { ModalFaturaDraft } from './ModalFatura';
 import ModalDetalhesFatura from './ModalDetalhesFatura';
-import ModalConfigurarCards from './ModalConfigurarCards';
 import ModalPagamentos from './ModalPagamentos';
 import NotificacoesFaturamento from '../../components/notificacoes/NotificacoesFaturamento';
-import SkeletonCard from '../../components/skeleton/SkeletonCard';
 import SkeletonTable from '../../components/skeleton/SkeletonTable';
 import RelatoriosAvancados from '../../components/analytics/RelatoriosAvancados';
-import EmailAutomacao from '../../components/email/EmailAutomacao';
+import EmailAutomacao, {
+  EnvioEmailAutomacaoPayload,
+  ResultadoEnvioEmailAutomacao,
+} from '../../components/email/EmailAutomacao';
 import GatewayPagamento from '../../components/pagamento/GatewayPagamento';
-import DashboardIA from '../../components/analytics/DashboardIA';
-import WorkflowAutomacao from '../../components/automacao/WorkflowAutomacao';
-import NotificacoesInteligentes from '../../components/notificacoes/NotificacoesInteligentes';
-import BackupRecuperacao from '../../components/backup/BackupRecuperacao';
-import { BackToNucleus } from '../../components/navigation/BackToNucleus';
+import WorkflowAutomacao, { WorkflowExecutionResult } from '../../components/automacao/WorkflowAutomacao';
 import { useFaturasPaginadas } from '../../hooks/useFaturasPaginadas';
 import { useDebounce } from 'use-debounce';
 import { obterNomeCliente, obterEmailCliente } from '../../utils/formatacao';
@@ -67,6 +68,15 @@ import {
 } from '../../hooks/useConfirmacaoInteligente';
 import NotificacaoSucesso from '../../components/common/NotificacaoSucesso';
 import { useNotificacaoFinanceira } from '../../hooks/useNotificacao';
+import { getPagamentosGatewayUiConfig } from '../../config/pagamentosGatewayFlags';
+import {
+  DataTableCard,
+  FiltersBar,
+  PageHeader,
+  SectionCard,
+} from '../../components/layout-v2';
+import { exportToCSV, exportToExcel, ExportColumn } from '../../utils/exportUtils';
+import { propostasService, Proposta as PropostaComercial } from '../../services/propostasService';
 
 interface DashboardCards {
   totalFaturas: number;
@@ -77,31 +87,70 @@ interface DashboardCards {
   faturasDoMes: number;
 }
 
-interface CardConfig {
-  id: string;
-  title: string;
-  value: string | number;
-  icon: React.ComponentType<any>;
-  color: string;
-  gradient: string;
-  description: string;
-  isActive: boolean;
-}
+type WorkflowConfig = Record<string, unknown>;
+
+type PagamentoFormulario = {
+  valor: number;
+  data: string;
+  metodo: string;
+  observacoes?: string;
+};
+
+type StatusProntidao = 'ok' | 'alerta' | 'bloqueio';
+
+const STATUS_BLOQUEIO_ACOES_FINANCEIRAS: StatusFatura[] = [
+  StatusFatura.PAGA,
+  StatusFatura.CANCELADA,
+];
+const STATUS_ELEGIVEIS_COBRANCA: StatusFatura[] = [
+  StatusFatura.PENDENTE,
+  StatusFatura.ENVIADA,
+  StatusFatura.PARCIALMENTE_PAGA,
+  StatusFatura.VENCIDA,
+];
+
+type StatusFilaFaturamento = 'contrato_assinado' | 'dispensa_contrato_aprovada' | 'faturamento_liberado';
+
+const STATUSS_FILA_FATURAMENTO: StatusFilaFaturamento[] = [
+  'contrato_assinado',
+  'dispensa_contrato_aprovada',
+  'faturamento_liberado',
+];
+
+const STATUSS_FILA_SET = new Set<string>(STATUSS_FILA_FATURAMENTO);
+
+const STATUS_LABELS_FILA: Record<StatusFilaFaturamento, string> = {
+  contrato_assinado: 'Contrato assinado',
+  dispensa_contrato_aprovada: 'Dispensa aprovada',
+  faturamento_liberado: 'Faturamento liberado',
+};
+
+const ORIGEM_FATURA_LABELS: Record<OrigemFaturaOperacional, string> = {
+  faturamento: 'Faturamento (venda/renovacao)',
+  avulso: 'Avulso (contas a receber)',
+};
 
 export default function FaturamentoPage() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const faturaIdParam = searchParams.get('faturaId');
+  const clienteIdParam = (searchParams.get('clienteId') || '').trim();
+  const clienteNomeParam = (searchParams.get('cliente') || '').trim();
+  const visaoParam = (searchParams.get('visao') || '').trim().toLowerCase();
+  const statusFilaParam = (searchParams.get('statusFila') || '').trim().toLowerCase();
   const [faturas, setFaturas] = useState<Fatura[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [modalAberto, setModalAberto] = useState(false);
   const [modalDetalhesAberto, setModalDetalhesAberto] = useState(false);
-  const [modalConfigurarCardsAberto, setModalConfigurarCardsAberto] = useState(false);
   const [modalPagamentosAberto, setModalPagamentosAberto] = useState(false);
   const [faturaEdicao, setFaturaEdicao] = useState<Fatura | null>(null);
   const [faturaDetalhes, setFaturaDetalhes] = useState<Fatura | null>(null);
   const [faturaPagamentos, setFaturaPagamentos] = useState<Fatura | null>(null);
   const [busca, setBusca] = useState('');
-  const [filtros, setFiltros] = useState<FiltrosFatura>({});
+  const [filtros, setFiltros] = useState<FiltrosFatura>({
+    periodoCampo: 'vencimento',
+    origem: 'faturamento',
+  });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
@@ -114,23 +163,66 @@ export default function FaturamentoPage() {
   }>({});
   const [buscaDebounced] = useDebounce(busca, 500);
 
+  useEffect(() => {
+    if (clienteNomeParam && !busca.trim()) {
+      setBusca(clienteNomeParam);
+    }
+  }, [clienteNomeParam, busca]);
+
+  useEffect(() => {
+    if (!clienteIdParam) {
+      return;
+    }
+
+    setFiltros((prev) => {
+      if (prev.clienteId === clienteIdParam) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        clienteId: clienteIdParam,
+      };
+    });
+  }, [clienteIdParam]);
+
   // Estados para seleção múltipla
   const [faturasSelecionadas, setFaturasSelecionadas] = useState<number[]>([]);
   const [mostrarAcoesMassa, setMostrarAcoesMassa] = useState(false);
   const [processandoAcaoMassa, setProcessandoAcaoMassa] = useState(false);
   const [progressoAcaoMassa, setProgressoAcaoMassa] = useState(0);
+  const [mostrarFiltrosAvancados, setMostrarFiltrosAvancados] = useState(false);
+  const [menuAcoesAbertoId, setMenuAcoesAbertoId] = useState<number | null>(null);
+  const [rascunhoFaturaModal, setRascunhoFaturaModal] = useState<ModalFaturaDraft | null>(null);
+  const [filaFaturamento, setFilaFaturamento] = useState<PropostaComercial[]>([]);
+  const [filtroStatusFila, setFiltroStatusFila] = useState<'todos' | StatusFilaFaturamento>('todos');
+  const [carregandoFilaFaturamento, setCarregandoFilaFaturamento] = useState(false);
+  const [erroFilaFaturamento, setErroFilaFaturamento] = useState<string | null>(null);
 
   // Estado para loading e skeleton
-  const [carregandoFaturas, setCarregandoFaturas] = useState(false);
 
   // Estados para funcionalidades avançadas da Semana 2
-  const [modalRelatoriosAberto, setModalRelatoriosAberto] = useState(false);
-  const [modalEmailAberto, setModalEmailAberto] = useState(false);
-  const [modalGatewayAberto, setModalGatewayAberto] = useState(false);
   const [faturaGateway, setFaturaGateway] = useState<Fatura | null>(null);
   const [visaoAtiva, setVisaoAtiva] = useState<
-    'dashboard' | 'relatorios' | 'email' | 'ia' | 'workflows' | 'notificacoes' | 'backup'
+    'dashboard' | 'fila' | 'prontidao' | 'relatorios' | 'email' | 'workflows'
   >('dashboard');
+
+  useEffect(() => {
+    if (visaoParam !== 'fila') {
+      return;
+    }
+    setVisaoAtiva('fila');
+  }, [visaoParam]);
+
+  useEffect(() => {
+    if (!statusFilaParam) {
+      return;
+    }
+
+    if (STATUSS_FILA_SET.has(statusFilaParam)) {
+      setFiltroStatusFila(statusFilaParam as StatusFilaFaturamento);
+    }
+  }, [statusFilaParam]);
 
   const [dashboardCards, setDashboardCards] = useState<DashboardCards>({
     totalFaturas: 0,
@@ -140,19 +232,46 @@ export default function FaturamentoPage() {
     faturasPagas: 0,
     faturasDoMes: 0,
   });
-
-  // Estado para configuração dos cards
-  const [cardsConfigurados, setCardsConfigurados] = useState<string[]>([
-    'totalFaturas',
-    'valorTotalPendente',
-    'valorTotalPago',
-    'faturasDoMes',
-  ]);
+  const [prontidaoCobranca, setProntidaoCobranca] = useState<ProntidaoCobranca | null>(null);
+  const [carregandoProntidaoCobranca, setCarregandoProntidaoCobranca] = useState(false);
+  const [erroProntidaoCobranca, setErroProntidaoCobranca] = useState<string | null>(null);
 
   // Hooks para confirmação inteligente
   const confirmacao = useConfirmacaoInteligente();
   const validacao = useValidacaoFinanceira();
   const notificacao = useNotificacaoFinanceira();
+  const gatewayUiConfig = getPagamentosGatewayUiConfig();
+  const gatewayFlagHabilitada = gatewayUiConfig.onlineGatewayUiEnabled;
+  const linkFlagHabilitado = gatewayUiConfig.paymentLinkEnabled;
+  const gatewayBackendOperacional = prontidaoCobranca?.prontoParaCobrancaOnline ?? true;
+  const emailCobrancaOperacional = prontidaoCobranca?.prontoParaCobrancaPorEmail ?? true;
+  const gatewayUiHabilitada = gatewayFlagHabilitada && gatewayBackendOperacional;
+  const linkPagamentoHabilitado = linkFlagHabilitado && gatewayBackendOperacional;
+  const motivoBloqueioGateway =
+    prontidaoCobranca?.gateway?.detalhe ||
+    gatewayUiConfig.motivoBloqueio ||
+    'Gateway indisponivel no ambiente atual.';
+  const motivoBloqueioEmailCobranca =
+    prontidaoCobranca?.email?.detalhe || 'Envio de cobranca por e-mail indisponivel.';
+  const cobrancaOnlineOperacional = gatewayUiHabilitada && linkPagamentoHabilitado;
+  const fallbackOperacionalCobranca =
+    prontidaoCobranca?.recomendacaoOperacional ||
+    'Fluxo recomendado: enviar a fatura ao cliente e registrar o recebimento em "Registrar Pgto" apos a confirmacao bancaria.';
+  const pdfDownloadHabilitado = faturamentoService.suportaDownloadPdfFatura();
+  const statusPermiteAcoesFinanceiras = (status: StatusFatura): boolean =>
+    !STATUS_BLOQUEIO_ACOES_FINANCEIRAS.includes(status);
+  const statusPermiteCobranca = (status: StatusFatura): boolean =>
+    STATUS_ELEGIVEIS_COBRANCA.includes(status);
+  const obterFaturaPorId = (id: number): Fatura | undefined => faturas.find((item) => item.id === id);
+  const resolverFormaPagamentoFatura = (fatura: Fatura): FormaPagamento =>
+    (fatura.formaPagamento || fatura.formaPagamentoPreferida || FormaPagamento.PIX) as FormaPagamento;
+  const formaPagamentoPermiteCobrancaOnline = (formaPagamento: FormaPagamento): boolean =>
+    [
+      FormaPagamento.PIX,
+      FormaPagamento.CARTAO_CREDITO,
+      FormaPagamento.CARTAO_DEBITO,
+      FormaPagamento.BOLETO,
+    ].includes(formaPagamento);
 
   // Dados paginados com aggregates (React Query)
   const faturasQuery = useFaturasPaginadas({
@@ -164,21 +283,6 @@ export default function FaturamentoPage() {
     sortOrder,
   });
   const { data: respostaPaginada, isLoading, refetch } = faturasQuery;
-
-  useEffect(() => {
-    // Carregar configuração dos cards do localStorage
-    const configSalva = localStorage.getItem('faturamento-cards-config');
-    if (configSalva) {
-      try {
-        const config = JSON.parse(configSalva);
-        if (Array.isArray(config) && config.length >= 1 && config.length <= 4) {
-          setCardsConfigurados(config);
-        }
-      } catch (error) {
-        console.error('Erro ao carregar configuração dos cards:', error);
-      }
-    }
-  }, []);
 
   // Buscar automaticamente ao alterar a busca (debounced) ou filtros/sort/paginação via botão
   useEffect(() => {
@@ -219,126 +323,45 @@ export default function FaturamentoPage() {
     });
   }, [respostaPaginada, isLoading]);
 
-  // Função para obter a classe do grid baseada no número de cards
-  const obterClasseGrid = (numeroCards: number): string => {
-    switch (numeroCards) {
-      case 1:
-        return 'grid-cols-1 max-w-md mx-auto'; // Card único centralizado
-      case 2:
-        return 'grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto'; // 2 cards centralizados
-      case 3:
-        return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
-      case 4:
-      default:
-        return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4';
-    }
-  };
-
-  // Função para obter classes adicionais do card baseado na quantidade
-  const obterClassesCard = (numeroCards: number): string => {
-    switch (numeroCards) {
-      case 1:
-        return 'p-8'; // Padding maior para card único
-      case 2:
-        return 'p-7'; // Padding um pouco maior para 2 cards
-      default:
-        return 'p-6'; // Padding padrão para 3+ cards
-    }
-  };
-
-  // Função para salvar configuração dos cards
-  const salvarConfiguracaoCards = (novaConfiguracao: string[]) => {
-    setCardsConfigurados(novaConfiguracao);
-    localStorage.setItem('faturamento-cards-config', JSON.stringify(novaConfiguracao));
-  };
-
-  // Função para obter todas as configurações de cards disponíveis
-  const obterTodasConfiguracoesCards = (): CardConfig[] => {
-    return [
-      {
-        id: 'totalFaturas',
-        title: 'Total de Faturas',
-        value: dashboardCards.totalFaturas,
-        icon: FileText,
-        color: 'text-[#159A9C]',
-        gradient: '',
-        description: 'Visão geral de todas as faturas cadastradas',
-        isActive: cardsConfigurados.includes('totalFaturas'),
-      },
-      {
-        id: 'faturasPagas',
-        title: 'Faturas Pagas',
-        value: dashboardCards.faturasPagas,
-        icon: CheckCircle,
-        color: 'text-green-600',
-        gradient: '',
-        description: 'Faturas finalizadas e quitadas',
-        isActive: cardsConfigurados.includes('faturasPagas'),
-      },
-      {
-        id: 'faturasVencidas',
-        title: 'Faturas Vencidas',
-        value: dashboardCards.faturasVencidas,
-        icon: AlertCircle,
-        color: 'text-red-600',
-        gradient: '',
-        description: 'Faturas atrasadas que requerem atenção',
-        isActive: cardsConfigurados.includes('faturasVencidas'),
-      },
-      {
-        id: 'valorTotalPendente',
-        title: 'Valor Pendente',
-        value: `R$ ${Number(dashboardCards.valorTotalPendente).toLocaleString('pt-BR', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })}`,
-        icon: Clock,
-        color: 'text-yellow-600',
-        gradient: '',
-        description: 'Valor total aguardando recebimento',
-        isActive: cardsConfigurados.includes('valorTotalPendente'),
-      },
-      {
-        id: 'valorTotalPago',
-        title: 'Valor Recebido',
-        value: `R$ ${Number(dashboardCards.valorTotalPago).toLocaleString('pt-BR', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })}`,
-        icon: DollarSign,
-        color: 'text-green-600',
-        gradient: '',
-        description: 'Total de valores já recebidos',
-        isActive: cardsConfigurados.includes('valorTotalPago'),
-      },
-      {
-        id: 'faturasDoMes',
-        title: 'Faturas do Mês',
-        value: dashboardCards.faturasDoMes,
-        icon: Calendar,
-        color: 'text-[#159A9C]',
-        gradient: '',
-        description: 'Faturas emitidas no mês atual',
-        isActive: cardsConfigurados.includes('faturasDoMes'),
-      },
-    ];
-  };
 
   const carregarFaturas = async () => {
     try {
-      console.log('Recarregando faturas...');
-
       // Estratégia agressiva de atualização do cache
       await queryClient.removeQueries({ queryKey: ['faturas-paginadas'] }); // Remove completamente do cache
       await queryClient.invalidateQueries({ queryKey: ['faturas-paginadas'] }); // Invalida todas as queries relacionadas
       await queryClient.refetchQueries({ queryKey: ['faturas-paginadas'] }); // Força uma nova busca imediatamente
       await refetch();
-
-      console.log('Faturas recarregadas com sucesso');
     } catch (error) {
       console.error('Erro ao recarregar faturas:', error);
     }
   };
+
+  const carregarProntidaoCobranca = async () => {
+    try {
+      setCarregandoProntidaoCobranca(true);
+      setErroProntidaoCobranca(null);
+      const prontidao = await faturamentoService.obterProntidaoCobranca();
+      setProntidaoCobranca(prontidao);
+    } catch (error) {
+      console.error('Erro ao carregar prontidao de cobranca:', error);
+      setErroProntidaoCobranca(
+        obterMensagemErro(error, 'Nao foi possivel obter a prontidao operacional de cobranca.'),
+      );
+      setProntidaoCobranca(null);
+    } finally {
+      setCarregandoProntidaoCobranca(false);
+    }
+  };
+
+  useEffect(() => {
+    void carregarProntidaoCobranca();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    void carregarFilaFaturamento();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const buscarFaturas = async () => {
     setPage(1);
@@ -352,18 +375,27 @@ export default function FaturamentoPage() {
   };
 
   const abrirModalEdicao = (fatura: Fatura) => {
+    setRascunhoFaturaModal(null);
     setFaturaEdicao(fatura);
     setModalAberto(true);
   };
 
   const abrirModalCriacao = () => {
+    setRascunhoFaturaModal(null);
     setFaturaEdicao(null);
+    setModalAberto(true);
+  };
+
+  const abrirModalCriacaoComRascunho = (rascunho: ModalFaturaDraft) => {
+    setFaturaEdicao(null);
+    setRascunhoFaturaModal(rascunho);
     setModalAberto(true);
   };
 
   const fecharModal = () => {
     setModalAberto(false);
     setFaturaEdicao(null);
+    setRascunhoFaturaModal(null);
   };
 
   const abrirModalDetalhes = (fatura: Fatura) => {
@@ -377,6 +409,13 @@ export default function FaturamentoPage() {
   };
 
   const abrirModalPagamentos = (fatura: Fatura) => {
+    if (!statusPermiteAcoesFinanceiras(fatura.status)) {
+      notificacao.mostrarAviso(
+        'Acao indisponivel',
+        `Nao e permitido registrar pagamento para faturas com status ${faturamentoService.formatarStatusFatura(fatura.status)}.`,
+      );
+      return;
+    }
     setFaturaPagamentos(fatura);
     setModalPagamentosAberto(true);
   };
@@ -386,9 +425,330 @@ export default function FaturamentoPage() {
     setFaturaPagamentos(null);
   };
 
+  const alternarMenuAcoes = (event: React.MouseEvent, faturaId: number) => {
+    event.stopPropagation();
+    setMenuAcoesAbertoId((atual) => (atual === faturaId ? null : faturaId));
+  };
+
+  const fecharMenuAcoes = () => {
+    setMenuAcoesAbertoId(null);
+  };
+
   const marcarNotificacaoComoLida = (notificacaoId: string) => {
-    console.log('Marcar notificação como lida:', notificacaoId);
-    // Implementar lógica para marcar notificação como lida
+    void notificacaoId;
+  };
+
+  const obterMensagemErro = (error: unknown, fallback: string) => {
+    const err = error as {
+      response?: {
+        data?: {
+          message?: string;
+          error?: string;
+          errors?: string[];
+        };
+      };
+      message?: string;
+    };
+    return (
+      err?.response?.data?.message ||
+      err?.response?.data?.error ||
+      (Array.isArray(err?.response?.data?.errors) ? err.response.data.errors.join(', ') : null) ||
+      err?.message ||
+      fallback
+    );
+  };
+
+  const normalizarStatusFila = (status: unknown): StatusFilaFaturamento | null => {
+    const statusNormalizado = String(status || '').trim().toLowerCase();
+    return STATUSS_FILA_SET.has(statusNormalizado)
+      ? (statusNormalizado as StatusFilaFaturamento)
+      : null;
+  };
+
+  const mapearFormaPagamentoProposta = (formaPagamento: unknown): FormaPagamento => {
+    const forma = String(formaPagamento || '').trim().toLowerCase();
+    if (forma === 'boleto') {
+      return FormaPagamento.BOLETO;
+    }
+    if (forma === 'cartao' || forma === 'cartao_credito') {
+      return FormaPagamento.CARTAO_CREDITO;
+    }
+    if (forma === 'cartao_debito') {
+      return FormaPagamento.CARTAO_DEBITO;
+    }
+    if (forma === 'transferencia') {
+      return FormaPagamento.TRANSFERENCIA;
+    }
+    if (forma === 'dinheiro') {
+      return FormaPagamento.DINHEIRO;
+    }
+    if (forma === 'a_combinar') {
+      return FormaPagamento.A_COMBINAR;
+    }
+    return FormaPagamento.PIX;
+  };
+
+  const resolverDataVencimentoRascunho = (proposta: PropostaComercial): string => {
+    const candidatos = [
+      (proposta as any).dataVencimento,
+      (proposta as any).dataValidade,
+      (proposta as any).validade,
+    ];
+
+    for (const candidato of candidatos) {
+      if (typeof candidato !== 'string' || !candidato.trim()) {
+        continue;
+      }
+      const data = new Date(candidato);
+      if (!Number.isNaN(data.getTime())) {
+        return data.toISOString().slice(0, 10);
+      }
+    }
+
+    const fallback = new Date();
+    fallback.setDate(fallback.getDate() + 30);
+    return fallback.toISOString().slice(0, 10);
+  };
+
+  const montarRascunhoFaturaDaProposta = (proposta: PropostaComercial): ModalFaturaDraft => {
+    const cliente =
+      proposta?.cliente && typeof proposta.cliente === 'object' ? proposta.cliente : null;
+
+    const itensOriginais = Array.isArray(proposta?.produtos) ? proposta.produtos : [];
+    const itens: Array<{
+      descricao: string;
+      quantidade: number;
+      valorUnitario: number;
+      unidade: string;
+      codigoProduto?: string;
+      percentualDesconto: number;
+      valorDesconto: number;
+    }> = itensOriginais
+      .map((item, index) => {
+        const registro = item as unknown as Record<string, unknown>;
+        const produto =
+          registro.produto && typeof registro.produto === 'object'
+            ? (registro.produto as Record<string, unknown>)
+            : null;
+
+        const quantidade = Math.max(Number(registro.quantidade || 0), 1);
+        const subtotal = Number(registro.subtotal || 0);
+        const valorUnitarioCalculado = quantidade > 0 ? subtotal / quantidade : 0;
+        const valorUnitario = Number(
+          registro.precoUnitario || registro.valorUnitario || produto?.preco || valorUnitarioCalculado || 0,
+        );
+        const descricao = String(
+          registro.nome || produto?.nome || registro.descricao || `Item ${index + 1}`,
+        ).trim();
+
+        return {
+          descricao: descricao || `Item ${index + 1}`,
+          quantidade,
+          valorUnitario: Number.isFinite(valorUnitario) ? Math.max(valorUnitario, 0.01) : 0.01,
+          unidade: 'un',
+          codigoProduto: produto?.id ? String(produto.id) : undefined,
+          percentualDesconto: Math.max(Number(registro.desconto || registro.percentualDesconto || 0), 0),
+          valorDesconto: Math.max(Number(registro.valorDesconto || 0), 0),
+        };
+      })
+      .filter((item) => item.descricao && item.quantidade > 0 && item.valorUnitario > 0);
+
+    const valorTotalProposta = Number(proposta?.total || 0);
+    if (itens.length === 0 && Number.isFinite(valorTotalProposta) && valorTotalProposta > 0) {
+      itens.push({
+        descricao: String((proposta as any)?.titulo || `Proposta ${proposta?.numero || proposta?.id || ''}`).trim(),
+        quantidade: 1,
+        valorUnitario: valorTotalProposta,
+        unidade: 'un',
+        codigoProduto: undefined,
+        percentualDesconto: 0,
+        valorDesconto: 0,
+      });
+    }
+
+    const numeroProposta = String(proposta?.numero || proposta?.id || '').trim();
+    const statusFila = normalizarStatusFila(proposta?.status);
+    const observacoesFila =
+      statusFila === 'dispensa_contrato_aprovada'
+        ? 'Dispensa de contrato aprovada. Revisar politicas internas antes da emissao.'
+        : statusFila === 'faturamento_liberado'
+          ? 'Faturamento previamente liberado no fluxo comercial.'
+          : 'Contrato assinado. Proposta pronta para faturamento.';
+
+    return {
+      dados: {
+        propostaId: proposta?.id || undefined,
+        clienteId: cliente?.id || '',
+        tipo: TipoFatura.UNICA,
+        dataVencimento: resolverDataVencimentoRascunho(proposta),
+        formaPagamento: mapearFormaPagamentoProposta(proposta?.formaPagamento),
+        observacoes: numeroProposta
+          ? `Fatura gerada a partir da proposta ${numeroProposta}. ${observacoesFila}`
+          : observacoesFila,
+        itens,
+      },
+      cliente: cliente
+        ? {
+            id: String(cliente.id || ''),
+            nome: String(cliente.nome || 'Cliente'),
+            email: typeof cliente.email === 'string' ? cliente.email : '',
+            telefone: typeof cliente.telefone === 'string' ? cliente.telefone : '',
+            documento: typeof cliente.documento === 'string' ? cliente.documento : '',
+          }
+        : null,
+      contrato: null,
+    };
+  };
+
+  const carregarFilaFaturamento = async () => {
+    try {
+      setCarregandoFilaFaturamento(true);
+      setErroFilaFaturamento(null);
+
+      const propostas = await propostasService.findAll();
+      const prontas = (Array.isArray(propostas) ? propostas : [])
+        .filter((proposta) => normalizarStatusFila(proposta?.status))
+        .sort((a, b) => {
+          const aData = new Date(String((a as any)?.updatedAt || (a as any)?.atualizadaEm || 0)).getTime();
+          const bData = new Date(String((b as any)?.updatedAt || (b as any)?.atualizadaEm || 0)).getTime();
+          return bData - aData;
+        });
+
+      setFilaFaturamento(prontas);
+    } catch (error) {
+      console.error('Erro ao carregar fila de faturamento:', error);
+      setFilaFaturamento([]);
+      setErroFilaFaturamento(
+        obterMensagemErro(error, 'Nao foi possivel carregar as propostas prontas para faturar.'),
+      );
+    } finally {
+      setCarregandoFilaFaturamento(false);
+    }
+  };
+
+  const prepararFaturaDaFila = (proposta: PropostaComercial) => {
+    const clienteId =
+      proposta?.cliente && typeof proposta.cliente === 'object'
+        ? String((proposta.cliente as unknown as Record<string, unknown>).id || '').trim()
+        : '';
+
+    if (!clienteId) {
+      notificacao.mostrarAviso(
+        'Cliente pendente',
+        'Esta proposta nao possui cliente vinculado. Selecione o cliente manualmente ao criar a fatura.',
+      );
+    }
+
+    const rascunho = montarRascunhoFaturaDaProposta(proposta);
+    abrirModalCriacaoComRascunho(rascunho);
+  };
+
+  const obterSinalErro = (error: unknown): { status?: number; texto: string } => {
+    const err = error as {
+      response?: {
+        status?: number;
+        data?: Record<string, unknown>;
+      };
+      message?: unknown;
+    };
+
+    const partes: string[] = [];
+    const data = (err?.response?.data || {}) as Record<string, unknown>;
+
+    const adicionarTexto = (valor: unknown) => {
+      if (typeof valor === 'string' && valor.trim().length > 0) {
+        partes.push(valor.trim());
+      }
+    };
+
+    const mensagem = data.message;
+    if (Array.isArray(mensagem)) {
+      mensagem.forEach((item) => adicionarTexto(item));
+    } else {
+      adicionarTexto(mensagem);
+    }
+
+    adicionarTexto(data.error);
+    const errors = data.errors;
+    if (Array.isArray(errors)) {
+      errors.forEach((item) => adicionarTexto(item));
+    } else {
+      adicionarTexto(errors);
+    }
+    adicionarTexto(data.detalhe);
+    adicionarTexto(data.detalhes);
+    adicionarTexto(data.code);
+    adicionarTexto(data.codigo);
+    adicionarTexto(err?.message);
+
+    return {
+      status: err?.response?.status,
+      texto: partes.join(' | ').toLowerCase(),
+    };
+  };
+
+  const erroIndicaIndisponibilidadeCobrancaOnline = (error: unknown): boolean => {
+    const { status, texto } = obterSinalErro(error);
+    if (status === 503) {
+      return true;
+    }
+
+    const marcadores = [
+      'mercado pago',
+      'gateway',
+      'checkout',
+      'link de pagamento',
+      'payment link',
+      'access token',
+      'access_token',
+      'nao inicializado',
+      'indisponivel',
+      'url publica',
+      'webhook',
+    ];
+
+    return marcadores.some((marcador) => texto.includes(marcador));
+  };
+
+  const erroIndicaFalhaEnvioCobranca = (detalhe: string | undefined): boolean => {
+    const texto = String(detalhe || '').toLowerCase();
+    if (!texto) {
+      return false;
+    }
+
+    const marcadores = [
+      'smtp',
+      'email',
+      'mailer',
+      'mail',
+      'transport',
+      'autentic',
+      'timeout',
+      'connection',
+      'conexao',
+      'host',
+      'socket',
+    ];
+
+    return marcadores.some((marcador) => texto.includes(marcador));
+  };
+
+  const aplicarFaturaAtualizadaNosEstados = (faturaAtualizada: Fatura) => {
+    setFaturas((prev) =>
+      prev.map((item) => (item.id === faturaAtualizada.id ? faturaAtualizada : item)),
+    );
+    setFaturaDetalhes((atual) =>
+      atual && atual.id === faturaAtualizada.id ? faturaAtualizada : atual,
+    );
+    setFaturaPagamentos((atual) =>
+      atual && atual.id === faturaAtualizada.id ? faturaAtualizada : atual,
+    );
+  };
+
+  const sincronizarFaturaAtualizada = async (faturaId: number) => {
+    const faturaAtualizada = await faturamentoService.obterFatura(faturaId);
+    aplicarFaturaAtualizadaNosEstados(faturaAtualizada);
+    return faturaAtualizada;
   };
 
   const abrirFaturaNotificacao = (faturaId: number) => {
@@ -398,105 +758,463 @@ export default function FaturamentoPage() {
     }
   };
 
+  useEffect(() => {
+    if (!faturaIdParam) {
+      return;
+    }
+
+    const faturaId = Number(faturaIdParam);
+    if (!Number.isInteger(faturaId) || faturaId <= 0) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('faturaId');
+      setSearchParams(nextParams, { replace: true });
+      return;
+    }
+
+    let ativo = true;
+    const abrirFaturaViaQuery = async () => {
+      try {
+        const faturaAlvo = await faturamentoService.obterFatura(faturaId);
+
+        if (!ativo || !faturaAlvo) {
+          return;
+        }
+
+        setVisaoAtiva('dashboard');
+        abrirModalDetalhes(faturaAlvo);
+      } catch (error) {
+        if (!ativo) {
+          return;
+        }
+        notificacao.erro.operacaoFalhou(
+          'abrir fatura por link',
+          obterMensagemErro(error, 'Nao foi possivel abrir a fatura informada.'),
+        );
+      } finally {
+        if (!ativo) {
+          return;
+        }
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.delete('faturaId');
+        setSearchParams(nextParams, { replace: true });
+      }
+    };
+
+    abrirFaturaViaQuery();
+
+    return () => {
+      ativo = false;
+    };
+  }, [faturaIdParam, setSearchParams]);
+
+  useEffect(() => {
+    if (menuAcoesAbertoId === null) {
+      return;
+    }
+
+    const handleMouseDownForaMenu = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('[data-menu-acoes-root="true"]')) {
+        return;
+      }
+      setMenuAcoesAbertoId(null);
+    };
+
+    document.addEventListener('mousedown', handleMouseDownForaMenu);
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDownForaMenu);
+    };
+  }, [menuAcoesAbertoId]);
+
   // Handlers para funcionalidades avançadas da Semana 2
   const abrirModalGateway = (fatura: Fatura) => {
+    if (!statusPermiteCobranca(fatura.status)) {
+      notificacao.mostrarAviso(
+        'Acao indisponivel',
+        `Pagamento online nao permitido para faturas com status ${faturamentoService.formatarStatusFatura(fatura.status)}.`,
+      );
+      return;
+    }
+    if (!gatewayUiHabilitada) {
+      notificacao.mostrarAviso('Gateway indisponivel', motivoBloqueioGateway);
+      return;
+    }
     setFaturaGateway(fatura);
-    setModalGatewayAberto(true);
   };
 
   const fecharModalGateway = () => {
-    setModalGatewayAberto(false);
     setFaturaGateway(null);
   };
 
-  const handlePagamentoConcluido = async (transacao: any) => {
+  const handlePagamentoConcluido = async (transacao: unknown) => {
     try {
-      // Atualiza o status da fatura para pago
-      if (faturaGateway) {
-        await faturamentoService.atualizarFatura(faturaGateway.id, {
-          status: StatusFatura.PAGA,
-        });
-        carregarFaturas();
-        fecharModalGateway();
+      await carregarFaturas();
+
+      const statusTransacao =
+        transacao && typeof transacao === 'object' && 'status' in transacao
+          ? String((transacao as { status?: unknown }).status || '').toLowerCase()
+          : '';
+
+      if (statusTransacao === 'pendente') {
+        notificacao.mostrarSucesso(
+          'Solicitacao enviada',
+          'Link/fluxo de pagamento gerado no backend. A baixa oficial depende do processamento e webhook.',
+        );
+      } else if (statusTransacao === 'aprovado') {
+        notificacao.mostrarAviso(
+          'Pagamento online em verificacao',
+          'A baixa financeira oficial depende de confirmacao do backend (webhook/processamento).',
+        );
+      } else {
+        notificacao.mostrarAviso(
+          'Pagamento nao confirmado',
+          'A fatura permanece com status controlado apenas pelo backend.',
+        );
       }
+
+      fecharModalGateway();
     } catch (error) {
       console.error('Erro ao processar pagamento:', error);
     }
   };
 
-  const handleEnviarEmail = async (faturaIds: number[], templateId: string) => {
+  const handleEnviarEmail = async (
+    envios: EnvioEmailAutomacaoPayload[],
+  ): Promise<ResultadoEnvioEmailAutomacao[]> => {
     try {
-      // Simula envio de email - integrar com serviço real
-      console.log('Enviando emails para faturas:', faturaIds, 'template:', templateId);
-      // await emailService.enviarEmails(faturaIds, templateId);
-      alert('Emails enviados com sucesso!');
+      if (!envios.length) {
+        notificacao.mostrarAviso(
+          'Seleção necessária',
+          'Selecione ao menos uma fatura para envio.',
+        );
+        return [];
+      }
+
+      const resultados = await Promise.allSettled(
+        envios.map((envio) =>
+          faturamentoService.enviarFaturaPorEmail(envio.faturaId, {
+            templateId: envio.templateId,
+            assunto: envio.assunto,
+            conteudo: envio.conteudo,
+          }),
+        ),
+      );
+      const detalhados: ResultadoEnvioEmailAutomacao[] = resultados.map((resultado, index) => {
+        const faturaId = envios[index]?.faturaId || 0;
+        if (resultado.status === 'fulfilled') {
+          return {
+            faturaId,
+            status: resultado.value.simulado ? 'simulado' : 'enviado',
+            detalhe: resultado.value.message || resultado.value.detalhes || resultado.value.motivo,
+          };
+        }
+        return {
+          faturaId,
+          status: 'falha',
+          detalhe: obterMensagemErro(resultado.reason, 'Falha ao enviar e-mail.'),
+        };
+      });
+
+      const enviados = resultados.filter((r) => r.status === 'fulfilled').length;
+      const simulados = resultados.filter(
+        (r) => r.status === 'fulfilled' && Boolean(r.value.simulado),
+      ).length;
+      const reais = enviados - simulados;
+      const falhas = resultados.length - enviados;
+      const templateIds = Array.from(
+        new Set(envios.map((envio) => envio.templateId).filter(Boolean)),
+      );
+      const sufixoTemplate =
+        templateIds.length === 1
+          ? ` (template ${templateIds[0]})`
+          : templateIds.length > 1
+            ? ` (${templateIds.length} templates)`
+            : '';
+
+      if (reais > 0) {
+        notificacao.mostrarSucesso(
+          'E-mails enviados',
+          `${reais} e-mail(s) enviado(s) com sucesso${sufixoTemplate}.`,
+        );
+      }
+
+      if (simulados > 0) {
+        notificacao.mostrarAviso(
+          'Envio simulado',
+          `${simulados} e-mail(s) foram simulados. Verifique o SMTP da empresa para envio real.`,
+        );
+      }
+
+      if (falhas > 0) {
+        const primeiraFalha = resultados.find(
+          (r): r is PromiseRejectedResult => r.status === 'rejected',
+        );
+        notificacao.erro.operacaoFalhou(
+          'enviar e-mails em lote',
+          `${falhas} envio(s) falharam. ${obterMensagemErro(primeiraFalha?.reason, 'Falha ao enviar e-mails.')}`,
+        );
+      }
+      return detalhados;
     } catch (error) {
       console.error('Erro ao enviar emails:', error);
-      alert('Erro ao enviar emails. Tente novamente.');
+      notificacao.erro.operacaoFalhou(
+        'enviar e-mails',
+        obterMensagemErro(error, 'Erro ao enviar e-mails.'),
+      );
+      return envios.map((envio) => ({
+        faturaId: envio.faturaId,
+        status: 'falha',
+        detalhe: obterMensagemErro(error, 'Erro ao enviar e-mails.'),
+      }));
     }
   };
 
   const handleExportarRelatorio = (tipo: 'pdf' | 'excel' | 'csv') => {
-    // Simula exportação - integrar com serviço real
-    console.log('Exportando relatório:', tipo);
-    alert(`Relatório ${tipo.toUpperCase()} será baixado em breve!`);
+    try {
+      if (!faturas.length) {
+        notificacao.mostrarAviso('Exportação indisponível', 'Não há faturas para exportar.');
+        return;
+      }
+
+      const dataAtual = new Date().toISOString().split('T')[0];
+      const nomeArquivoBase = 'relatorio_faturamento_' + dataAtual;
+      const dadosRelatorio = faturas.map((fatura) => {
+        const valorTotal = Number(fatura.valorTotal || 0);
+        const valorPagoRaw = Number((fatura as any).valorPago || 0);
+        const valorPago =
+          valorPagoRaw > 0
+            ? valorPagoRaw
+            : fatura.status === StatusFatura.PAGA
+              ? valorTotal
+              : 0;
+
+        return {
+          numero: fatura.numero,
+          cliente: obterNomeCliente(fatura.cliente, fatura.clienteId),
+          status: faturamentoService.formatarStatusFatura(fatura.status),
+          responsavel:
+            (fatura as any).usuarioResponsavel?.nome ||
+            (fatura as any).usuarioResponsavel?.name ||
+            (fatura as any).usuarioResponsavelId ||
+            '-',
+          origem: faturamentoService.formatarTipoFatura(fatura.tipo),
+          valorTotal,
+          valorPago,
+          valorAberto: Math.max(valorTotal - valorPago, 0),
+          dataEmissao: new Date(fatura.dataEmissao).toLocaleDateString('pt-BR'),
+          dataVencimento: new Date(fatura.dataVencimento).toLocaleDateString('pt-BR'),
+          dataCriacao: new Date(fatura.criadoEm).toLocaleString('pt-BR'),
+          dataAtualizacao: new Date(fatura.atualizadoEm).toLocaleString('pt-BR'),
+        };
+      });
+
+      const colunasExportacao: ExportColumn[] = [
+        { key: 'numero', label: 'Numero' },
+        { key: 'cliente', label: 'Cliente' },
+        { key: 'status', label: 'Status', transform: (value: unknown) => String(value || '') },
+        { key: 'responsavel', label: 'Responsável' },
+        { key: 'origem', label: 'Origem' },
+        { key: 'valorTotal', label: 'Valor Total' },
+        { key: 'valorPago', label: 'Valor Pago' },
+        { key: 'valorAberto', label: 'Valor em Aberto' },
+        { key: 'dataEmissao', label: 'Data Emissão' },
+        { key: 'dataVencimento', label: 'Data Vencimento' },
+        { key: 'dataCriacao', label: 'Criado em' },
+        { key: 'dataAtualizacao', label: 'Atualizado em' },
+      ];
+
+      if (tipo === 'csv') {
+        exportToCSV(dadosRelatorio, colunasExportacao, nomeArquivoBase);
+        notificacao.mostrarSucesso('Relatório exportado', 'Arquivo CSV gerado com sucesso.');
+        return;
+      }
+
+      if (tipo === 'excel') {
+        exportToExcel(dadosRelatorio, colunasExportacao, nomeArquivoBase, 'Faturamento');
+        notificacao.mostrarSucesso('Relatório exportado', 'Arquivo Excel gerado com sucesso.');
+        return;
+      }
+
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.text('Relatório de Faturamento', 14, 18);
+      doc.setFontSize(10);
+      doc.text('Gerado em ' + new Date().toLocaleString('pt-BR'), 14, 25);
+      doc.text('Total de faturas: ' + faturas.length, 14, 31);
+
+      const linhasTabela = faturas.map((fatura) => [
+        fatura.numero,
+        obterNomeCliente(fatura.cliente, fatura.clienteId),
+        faturamentoService.formatarStatusFatura(fatura.status),
+        faturamentoService.formatarTipoFatura(fatura.tipo),
+        String(
+          (fatura as any).usuarioResponsavel?.nome ||
+            (fatura as any).usuarioResponsavel?.name ||
+            (fatura as any).usuarioResponsavelId ||
+            '-',
+        ),
+        Number(fatura.valorTotal || 0).toLocaleString('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+        }),
+        new Date(fatura.dataVencimento).toLocaleDateString('pt-BR'),
+      ]);
+
+      autoTable(doc, {
+        startY: 38,
+        head: [['Número', 'Cliente', 'Status', 'Origem', 'Responsável', 'Valor Total', 'Vencimento']],
+        body: linhasTabela,
+        theme: 'grid',
+        headStyles: {
+          fillColor: [21, 154, 156],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+        },
+        styles: { fontSize: 7, cellPadding: 2 },
+        columnStyles: {
+          0: { cellWidth: 20 },
+          1: { cellWidth: 45 },
+          2: { cellWidth: 22 },
+          3: { cellWidth: 20 },
+          4: { cellWidth: 35 },
+          5: { cellWidth: 28, halign: 'right' },
+          6: { cellWidth: 20 },
+        },
+      });
+
+      doc.save(nomeArquivoBase + '.pdf');
+      notificacao.mostrarSucesso('Relatório exportado', 'Arquivo PDF gerado com sucesso.');
+    } catch (error) {
+      console.error('Erro ao exportar relatório:', error);
+      notificacao.erro.operacaoFalhou(
+        'exportar relatório',
+        obterMensagemErro(error, 'Falha ao exportar relatório.'),
+      );
+    }
   };
 
-  const handleExecutarWorkflow = async (config: any) => {
+  const handleExecutarWorkflow = async (
+    acao: string,
+    config: WorkflowConfig,
+  ): Promise<WorkflowExecutionResult> => {
     try {
-      console.log('Executando workflow:', config);
-      // Integrar com serviço de workflows
-      alert('Workflow executado com sucesso!');
+      void config;
+
+      if (acao === 'workflow_lembrete_vencimento') {
+        const resultadoBackend = await faturamentoService.enviarLembretesVencimento();
+        const processados = Number(resultadoBackend.processados || 0);
+        const sucesso = Number(resultadoBackend.sucesso || 0);
+        const falhas = Number(resultadoBackend.falhas || 0);
+        const mensagem =
+          processados > 0
+            ? falhas > 0
+              ? 'Lembretes executados: ' + sucesso + ' sucesso(s) e ' + falhas + ' falha(s).'
+              : sucesso + ' lembrete(s) de vencimento enviado(s).'
+            : 'Nenhum lembrete elegivel encontrado pelo backend.';
+
+        if (falhas > 0) {
+          notificacao.mostrarAviso('Workflow com divergencias', mensagem);
+        } else {
+          notificacao.mostrarSucesso('Workflow executado', mensagem);
+        }
+
+        return {
+          processados,
+          sucesso,
+          falhas,
+          mensagem,
+        };
+      }
+
+      if (acao === 'workflow_cobranca_vencidas') {
+        const resultadoLote = await faturamentoService.gerarCobrancaFaturasVencidas();
+        const sucesso = Number(resultadoLote.sucesso || 0);
+        const falhas = Number(resultadoLote.falhas || 0);
+        const simuladas = Number(resultadoLote.simuladas || 0);
+
+        if (Number(resultadoLote.solicitadas || 0) === 0) {
+          return {
+            processados: 0,
+            sucesso: 0,
+            falhas: 0,
+            mensagem: 'Nenhuma fatura vencida para cobranca neste momento.',
+          };
+        }
+
+        if (sucesso > 0) {
+          notificacao.mostrarSucesso('Workflow executado', sucesso + ' cobranca(s) enviada(s).');
+        }
+        if (simuladas > 0) {
+          notificacao.mostrarAviso(
+            'Workflow em modo simulado',
+            simuladas + ' envio(s) foram simulados. Configure SMTP na empresa para envio real.',
+          );
+        }
+        if (falhas > 0) {
+          notificacao.mostrarAviso('Workflow com falhas', falhas + ' cobranca(s) nao puderam ser enviadas.');
+        }
+
+        return {
+          processados: Number(resultadoLote.processadas || 0),
+          sucesso,
+          falhas,
+          mensagem:
+            'Lote de cobranca finalizado: ' +
+            sucesso +
+            ' envio(s) real(is), ' +
+            simuladas +
+            ' simulado(s), ' +
+            falhas +
+            ' falha(s).',
+        };
+      }
+
+      if (acao === 'workflow_sincronizacao_financeira') {
+        const [vencidas, recorrentes] = await Promise.all([
+          faturamentoService.verificarFaturasVencidas(),
+          faturamentoService.processarCobrancasRecorrentes(),
+        ]);
+
+        const processados = Number(vencidas.processados || 0) + Number(recorrentes.processados || 0);
+        const sucesso = Number(vencidas.sucesso || 0) + Number(recorrentes.sucesso || 0);
+        const falhas = Number(vencidas.falhas || 0) + Number(recorrentes.falhas || 0);
+
+        await carregarFaturas();
+
+        const mensagem =
+          falhas > 0
+            ? 'Sincronizacao concluida com ' + falhas + ' falha(s).'
+            : 'Sincronizacao financeira executada com sucesso.';
+
+        if (falhas > 0) {
+          notificacao.mostrarAviso('Workflow com divergencias', mensagem);
+        } else {
+          notificacao.mostrarSucesso('Workflow executado', mensagem);
+        }
+
+        return {
+          processados,
+          sucesso,
+          falhas,
+          mensagem,
+        };
+      }
+
+      const mensagem = 'Acao de workflow nao mapeada: ' + acao;
+      notificacao.mostrarAviso('Workflow indisponivel', mensagem);
+      return {
+        processados: 0,
+        sucesso: 0,
+        falhas: 0,
+        mensagem,
+      };
     } catch (error) {
       console.error('Erro ao executar workflow:', error);
-      alert('Erro ao executar workflow. Tente novamente.');
-    }
-  };
-
-  const handleAcaoNotificacao = async (acao: string, dados: any) => {
-    try {
-      console.log('Executando ação da notificação:', acao, dados);
-      // Integrar com serviços apropriados baseado na ação
-      switch (acao) {
-        case 'navegar_faturas':
-          setVisaoAtiva('dashboard');
-          break;
-        case 'abrir_fatura':
-          if (dados.faturaId) {
-            const fatura = faturas.find((f) => f.id === dados.faturaId);
-            if (fatura) abrirModalDetalhes(fatura);
-          }
-          break;
-        case 'enviar_cobranca_lote':
-          setVisaoAtiva('email');
-          break;
-        default:
-          console.log('Ação não implementada:', acao);
-      }
-    } catch (error) {
-      console.error('Erro ao executar ação da notificação:', error);
-    }
-  };
-
-  const handleExecutarBackup = async (config?: any) => {
-    try {
-      console.log('Iniciando backup:', config);
-      // Integrar com serviço de backup
-      return Promise.resolve();
-    } catch (error) {
-      console.error('Erro ao executar backup:', error);
+      notificacao.erro.operacaoFalhou(
+        'executar workflow',
+        obterMensagemErro(error, 'Erro ao executar workflow.'),
+      );
       throw error;
-    }
-  };
-
-  const handleRestaurarBackup = async (backupId?: string, opcoes?: any) => {
-    try {
-      console.log('Restaurando backup:', backupId, opcoes);
-      // Integrar com serviço de restauração
-      alert('Backup restaurado com sucesso!');
-    } catch (error) {
-      console.error('Erro ao restaurar backup:', error);
-      alert('Erro ao restaurar backup. Tente novamente.');
     }
   };
 
@@ -504,15 +1222,21 @@ export default function FaturamentoPage() {
     try {
       if (faturaEdicao) {
         await faturamentoService.atualizarFatura(faturaEdicao.id, dadosFatura);
+        notificacao.mostrarSucesso('Fatura atualizada', 'Fatura atualizada com sucesso.');
       } else {
         await faturamentoService.criarFatura(dadosFatura);
+        notificacao.mostrarSucesso('Fatura criada', 'Fatura criada com sucesso.');
       }
 
       fecharModal();
       carregarFaturas();
+      void carregarFilaFaturamento();
     } catch (error) {
       console.error('Erro ao salvar fatura:', error);
-      alert('Erro ao salvar fatura. Tente novamente.');
+      notificacao.erro.operacaoFalhou(
+        'salvar fatura',
+        obterMensagemErro(error, 'Erro ao salvar fatura.'),
+      );
     }
   };
 
@@ -522,7 +1246,7 @@ export default function FaturamentoPage() {
       const fatura = faturas.find((f) => f.id === id);
       if (!fatura) {
         console.error('Fatura não encontrada:', id);
-        alert('Fatura não encontrada.');
+        notificacao.mostrarAviso('Fatura não encontrada', `Não foi possível localizar a fatura ${id}.`);
         return;
       }
 
@@ -537,19 +1261,17 @@ export default function FaturamentoPage() {
         tipoConfirmacao,
         async () => {
           try {
-            console.log('Excluindo fatura:', id);
             await faturamentoService.excluirFatura(id);
-            console.log('Fatura excluída com sucesso');
 
             // Estratégia agressiva de atualização do cache
             await queryClient.removeQueries({ queryKey: ['faturas-paginadas'] }); // Remove completamente do cache
             await queryClient.invalidateQueries({ queryKey: ['faturas-paginadas'] }); // Invalida todas as queries relacionadas
             await queryClient.refetchQueries({ queryKey: ['faturas-paginadas'] }); // Força uma nova busca imediatamente
 
-            // Recarregar dados - força atualização completa
+            // Recarregar dados - Força atualização completa
             await refetch();
 
-            // Também força uma atualização do estado local para garantir
+            // Também Força uma atualização do estado local para garantir
             setFaturas((prev) => prev.filter((f) => f.id !== id));
 
             // Atualizar faturas selecionadas removendo a excluída
@@ -557,50 +1279,247 @@ export default function FaturamentoPage() {
 
             // Mostrar notificação de sucesso
             notificacao.mostrarSucesso(
-              'Fatura Excluída',
+              'Fatura excluída',
               `Fatura #${faturamentoService.formatarNumeroFatura(fatura.numero)} foi excluída com sucesso.`,
             );
           } catch (error) {
             console.error('Erro ao excluir fatura no serviço:', error);
-            alert('Erro ao excluir fatura. Verifique se ela não possui dependências.');
-            throw error; // Re-throw para ser capturado pelo catch externo
+            throw new Error(
+              obterMensagemErro(error, 'Erro ao excluir fatura. Verifique se ela não possui dependências.'),
+            );
           }
         },
         dadosContexto,
       );
     } catch (error) {
       console.error('Erro ao excluir fatura:', error);
-      alert('Erro ao excluir fatura. Tente novamente.');
+      notificacao.erro.operacaoFalhou(
+        'excluir fatura',
+        obterMensagemErro(error, 'Erro ao excluir fatura.'),
+      );
     }
   };
 
   const gerarLinkPagamento = async (id: number) => {
-    try {
-      const link = await faturamentoService.gerarLinkPagamento(id);
-      navigator.clipboard.writeText(link);
-      notificacao.mostrarSucesso(
-        'Link Copiado',
-        'Link de pagamento copiado para a área de transferência!',
+    const faturaAlvo = obterFaturaPorId(id);
+    const formaPagamentoAtual = faturaAlvo ? resolverFormaPagamentoFatura(faturaAlvo) : null;
+    if (faturaAlvo && !statusPermiteCobranca(faturaAlvo.status)) {
+      notificacao.mostrarAviso(
+        'Acao indisponivel',
+        `Nao e permitido gerar link de pagamento para faturas com status ${faturamentoService.formatarStatusFatura(faturaAlvo.status)}.`
       );
+      return;
+    }
+    if (faturaAlvo && !formaPagamentoPermiteCobrancaOnline(formaPagamentoAtual)) {
+      notificacao.mostrarAviso(
+        'Forma de pagamento manual',
+        `A forma ${faturamentoService.formatarFormaPagamento(formaPagamentoAtual)} usa fluxo manual. Para cobranca online, selecione PIX, Cartao de Credito, Cartao de Debito ou Boleto na fatura.`
+      );
+      return;
+    }
+
+    if (!linkPagamentoHabilitado) {
+      notificacao.mostrarAviso('Link de pagamento indisponivel', motivoBloqueioGateway);
+      return;
+    }
+
+    try {
+      const resultadoLink = await faturamentoService.gerarLinkPagamento(id);
+      await navigator.clipboard.writeText(resultadoLink.link);
+      if (formaPagamentoAtual === FormaPagamento.BOLETO) {
+        const detalhePdf = resultadoLink.boletoPdfUrl
+          ? ' PDF do boleto disponivel em Abrir boleto/Baixar boleto PDF.'
+          : ' Use Abrir boleto para visualizar e baixar.';
+        notificacao.mostrarSucesso(
+          'Boleto gerado',
+          `Link do boleto copiado para a area de transferencia.${detalhePdf}`,
+        );
+      } else {
+        notificacao.mostrarSucesso(
+          'Link de pagamento copiado',
+          'O link de pagamento foi copiado para a area de transferencia.',
+        );
+      }
       carregarFaturas(); // Recarregar para atualizar o link
     } catch (error) {
       console.error('Erro ao gerar link de pagamento:', error);
-      notificacao.erro.operacaoFalhou('gerar link de pagamento');
+      if (erroIndicaIndisponibilidadeCobrancaOnline(error)) {
+        notificacao.mostrarAviso(
+          'Cobranca online indisponivel',
+          `${obterMensagemErro(error, 'Servico de cobranca online indisponivel no backend.')} ${fallbackOperacionalCobranca}`,
+        );
+        return;
+      }
+      notificacao.erro.operacaoFalhou(
+        'gerar link de pagamento',
+        obterMensagemErro(error, 'Recurso indisponivel no backend atual.'),
+      );
+    }
+  };
+
+  const obterMetadadosBoleto = (fatura: Fatura): Record<string, unknown> | null => {
+    const metadados =
+      fatura.metadados && typeof fatura.metadados === 'object' && !Array.isArray(fatura.metadados)
+        ? (fatura.metadados as Record<string, unknown>)
+        : null;
+    const boleto =
+      metadados && typeof metadados.boleto === 'object' && !Array.isArray(metadados.boleto)
+        ? (metadados.boleto as Record<string, unknown>)
+        : null;
+    return boleto;
+  };
+
+  const obterLinkPagamentoValido = (fatura: Fatura): string | null => {
+    const linkPrincipal = String(fatura.linkPagamento || '').trim();
+    if (linkPrincipal.length > 0) {
+      return linkPrincipal;
+    }
+
+    const boleto = obterMetadadosBoleto(fatura);
+    const linkBoleto = String(boleto?.pdfUrl || '').trim();
+    return linkBoleto.length > 0 ? linkBoleto : null;
+  };
+
+  const obterBoletoPdfValido = (fatura: Fatura): string | null => {
+    const boleto = obterMetadadosBoleto(fatura);
+    const pdfUrl = String(boleto?.pdfUrl || '').trim();
+    if (pdfUrl.length > 0) {
+      return pdfUrl;
+    }
+    const link = String(fatura.linkPagamento || '').trim();
+    return link.length > 0 ? link : null;
+  };
+
+  const abrirBoleto = (fatura: Fatura) => {
+    const link = obterLinkPagamentoValido(fatura);
+    if (!link) {
+      notificacao.mostrarAviso(
+        'Boleto indisponivel',
+        'Esta fatura ainda nao possui link de pagamento. Gere o link primeiro.',
+      );
+      return;
+    }
+
+    const aba = window.open(link, '_blank', 'noopener,noreferrer');
+    if (!aba) {
+      notificacao.mostrarAviso(
+        'Popup bloqueado',
+        'Nao foi possivel abrir o boleto em nova aba. Verifique o bloqueador de popups.',
+      );
+      return;
+    }
+
+    notificacao.mostrarSucesso('Boleto aberto', 'O boleto foi aberto em uma nova aba.');
+  };
+
+  const baixarBoletoPdf = (fatura: Fatura) => {
+    const formaPagamentoAtual = resolverFormaPagamentoFatura(fatura);
+    if (formaPagamentoAtual !== FormaPagamento.BOLETO) {
+      notificacao.mostrarAviso(
+        'Forma de pagamento',
+        'Esta fatura nao esta configurada como boleto.',
+      );
+      return;
+    }
+
+    const linkPdf = obterBoletoPdfValido(fatura);
+    if (!linkPdf) {
+      notificacao.mostrarAviso(
+        'PDF indisponivel',
+        'Ainda nao existe PDF/link do boleto para esta fatura. Gere o boleto primeiro.',
+      );
+      return;
+    }
+
+    const aba = window.open(linkPdf, '_blank', 'noopener,noreferrer');
+    if (!aba) {
+      notificacao.mostrarAviso(
+        'Popup bloqueado',
+        'Nao foi possivel abrir o PDF em nova aba. Verifique o bloqueador de popups.',
+      );
+      return;
+    }
+
+    notificacao.mostrarSucesso(
+      'PDF do boleto aberto',
+      'O PDF do boleto foi aberto em nova aba para download/impressao.',
+    );
+  };
+
+  const copiarLinkBoleto = async (fatura: Fatura) => {
+    const link = obterLinkPagamentoValido(fatura);
+    if (!link) {
+      notificacao.mostrarAviso(
+        'Link indisponivel',
+        'Esta fatura ainda nao possui link de pagamento. Gere o link primeiro.',
+      );
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(link);
+      notificacao.mostrarSucesso(
+        'Link copiado',
+        'Link de pagamento copiado para a area de transferencia.',
+      );
+    } catch (error) {
+      console.error('Erro ao copiar link de pagamento:', error);
+      notificacao.erro.operacaoFalhou(
+        'copiar link de pagamento',
+        'Nao foi possivel copiar o link automaticamente.',
+      );
     }
   };
 
   const enviarPorEmail = async (id: number) => {
+    const faturaAlvo = obterFaturaPorId(id);
+    if (faturaAlvo && !statusPermiteCobranca(faturaAlvo.status)) {
+      notificacao.mostrarAviso(
+        'Acao indisponivel',
+        `Nao e permitido enviar cobranca para faturas com status ${faturamentoService.formatarStatusFatura(faturaAlvo.status)}.`,
+      );
+      return;
+    }
+
+    if (!emailCobrancaOperacional) {
+      notificacao.mostrarAviso(
+        'Envio de cobranca indisponivel',
+        `${motivoBloqueioEmailCobranca} ${fallbackOperacionalCobranca}`,
+      );
+      return;
+    }
+
     try {
-      await faturamentoService.enviarFaturaPorEmail(id);
-      notificacao.mostrarSucesso('Email Enviado', 'Fatura enviada por email com sucesso!');
+      const resultado = await faturamentoService.enviarFaturaPorEmail(id);
+      if (resultado.simulado) {
+        notificacao.mostrarAviso(
+          'Envio simulado',
+          resultado.message ||
+            resultado.detalhes ||
+            'Envio executado em modo simulado. Verifique o SMTP da empresa para envio real.',
+        );
+        return;
+      }
+      notificacao.mostrarSucesso('E-mail enviado', 'Fatura enviada por e-mail com sucesso.');
+      await carregarFaturas();
     } catch (error) {
       console.error('Erro ao enviar fatura por email:', error);
-      notificacao.erro.operacaoFalhou('enviar fatura por email');
+      notificacao.erro.operacaoFalhou(
+        'enviar fatura por e-mail',
+        obterMensagemErro(error, 'Falha ao enviar fatura por e-mail.'),
+      );
     }
   };
 
   const baixarPDF = async (id: number) => {
     try {
+      if (!pdfDownloadHabilitado) {
+        notificacao.mostrarAviso(
+          'Download de PDF indisponivel',
+          'A API de PDF de faturas ainda nao foi habilitada neste ambiente.',
+        );
+        return [];
+      }
       const blob = await faturamentoService.baixarPDF(id);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -612,67 +1531,88 @@ export default function FaturamentoPage() {
       document.body.removeChild(a);
     } catch (error) {
       console.error('Erro ao baixar PDF:', error);
-      alert('Erro ao baixar PDF. Tente novamente.');
+      notificacao.erro.operacaoFalhou(
+        'baixar PDF da fatura',
+        obterMensagemErro(error, 'Download de PDF indisponível no backend atual.'),
+      );
     }
   };
 
-  const registrarPagamento = async (pagamento: any) => {
+  const registrarPagamento = async (pagamento: PagamentoFormulario) => {
     try {
       if (!faturaPagamentos) {
-        throw new Error('Fatura não encontrada');
+        throw new Error('Fatura nao encontrada');
+      }
+      if (!statusPermiteAcoesFinanceiras(faturaPagamentos.status)) {
+        notificacao.mostrarAviso(
+          'Acao indisponivel',
+          `Nao e permitido registrar pagamento para faturas com status ${faturamentoService.formatarStatusFatura(faturaPagamentos.status)}.`,
+        );
+        return;
       }
 
-      // Preparar dados do pagamento no formato esperado pela API
-      const dadosPagamento = {
+      const dadosPagamentoManual = {
         faturaId: faturaPagamentos.id,
         valor: pagamento.valor,
         dataPagamento: pagamento.data,
-        formaPagamento: pagamento.metodo,
-        metodoPagamento: pagamento.metodo, // Para compatibilidade com backend
-        tipo: 'pagamento', // TipoPagamento.PAGAMENTO
+        metodoPagamento: pagamento.metodo,
         observacoes: pagamento.observacoes || '',
-        transacaoId: `PAG_${Date.now()}_${faturaPagamentos.id}`, // ID único para a transação
-        gatewayTransacaoId: `PAG_${Date.now()}_${faturaPagamentos.id}`, // Para processar depois
+        origemId: 'financeiro.faturamento.ui',
+        correlationId: 'manual_' + faturaPagamentos.id + '_' + Date.now(),
       };
 
-      console.log('Registrando pagamento:', dadosPagamento);
-
-      // Chamar o serviço real para criar o pagamento
-      const pagamentoCreated = await faturamentoService.criarPagamento(dadosPagamento);
-      console.log('Pagamento criado:', pagamentoCreated);
-
-      // Processar o pagamento como aprovado automaticamente (para pagamentos manuais)
-      if (pagamentoCreated.id) {
-        console.log('Processando pagamento como aprovado...');
-        const processarData = {
-          gatewayTransacaoId: dadosPagamento.gatewayTransacaoId,
-          novoStatus: 'aprovado',
-          webhookData: {
-            source: 'manual',
-            timestamp: new Date().toISOString(),
-            userRegistered: true,
-          },
-        };
-
-        await faturamentoService.processarPagamento(pagamentoCreated.id, processarData);
-        console.log('Pagamento processado como aprovado');
-      }
+      await faturamentoService.registrarPagamentoManual(dadosPagamentoManual);
 
       notificacao.sucesso.pagamentoRegistrado(pagamento.valor);
 
-      // Estratégia agressiva de atualização do cache após pagamento
+      // Estrategia agressiva de atualizacao do cache apos pagamento
       await queryClient.removeQueries({ queryKey: ['faturas-paginadas'] });
       await queryClient.invalidateQueries({ queryKey: ['faturas-paginadas'] });
       await queryClient.refetchQueries({ queryKey: ['faturas-paginadas'] });
 
-      // Recarregar faturas após registrar pagamento
+      // Recarregar faturas apos registrar pagamento
       await carregarFaturas();
 
-      // Fechar modal após sucesso
+      // Fechar modal apos sucesso
       fecharModalPagamentos();
     } catch (error) {
       console.error('Erro ao registrar pagamento:', error);
-      notificacao.erro.operacaoFalhou('registrar pagamento');
+      notificacao.erro.operacaoFalhou(
+        'registrar pagamento',
+        obterMensagemErro(error, 'Falha ao registrar pagamento no backend.'),
+      );
+      throw error;
+    }
+  };
+
+  const estornarPagamento = async (pagamentoId: number, motivo: string) => {
+    try {
+      const pagamentoEstornado = await faturamentoService.estornarPagamento(pagamentoId, motivo);
+      notificacao.mostrarSucesso('Estorno concluído', 'Pagamento estornado com sucesso.');
+
+      await queryClient.removeQueries({ queryKey: ['faturas-paginadas'] });
+      await queryClient.invalidateQueries({ queryKey: ['faturas-paginadas'] });
+      await queryClient.refetchQueries({ queryKey: ['faturas-paginadas'] });
+      await carregarFaturas();
+
+      const faturaIdAtualizada = Number(pagamentoEstornado?.faturaId || 0);
+      if (faturaIdAtualizada > 0) {
+        try {
+          const faturaAtualizada = await faturamentoService.obterFatura(faturaIdAtualizada);
+          setFaturaDetalhes((atual) =>
+            atual && atual.id === faturaIdAtualizada ? faturaAtualizada : atual,
+          );
+          setFaturaPagamentos((atual) =>
+            atual && atual.id === faturaIdAtualizada ? faturaAtualizada : atual,
+          );
+        } catch {}
+      }
+    } catch (error) {
+      console.error('Erro ao estornar pagamento:', error);
+      notificacao.erro.operacaoFalhou(
+        'estornar pagamento',
+        obterMensagemErro(error, 'Falha ao estornar pagamento.'),
+      );
       throw error;
     }
   };
@@ -681,8 +1621,44 @@ export default function FaturamentoPage() {
   const handleAcaoMassa = async (acao: string) => {
     if (faturasSelecionadas.length === 0) {
       notificacao.mostrarAviso(
-        'Seleção Necessária',
+        'Seleção necessária',
         'Selecione pelo menos uma fatura para executar esta ação.',
+      );
+      return;
+    }
+
+    const faturasSelecionadasData = faturas.filter((f) => faturasSelecionadas.includes(f.id));
+
+    if (acao === 'excluir') {
+      confirmacao.confirmar(
+        'excluir-multiplas-faturas',
+        async () => {
+          try {
+            setProcessandoAcaoMassa(true);
+            setProgressoAcaoMassa(0);
+
+            for (let i = 0; i < faturasSelecionadas.length; i++) {
+              const faturaId = faturasSelecionadas[i];
+              await faturamentoService.excluirFatura(faturaId);
+              setProgressoAcaoMassa(((i + 1) / faturasSelecionadas.length) * 100);
+            }
+
+            await queryClient.removeQueries({ queryKey: ['faturas-paginadas'] });
+            await queryClient.invalidateQueries({ queryKey: ['faturas-paginadas'] });
+            await queryClient.refetchQueries({ queryKey: ['faturas-paginadas'] });
+            await carregarFaturas();
+
+            setFaturasSelecionadas([]);
+            setMostrarAcoesMassa(false);
+          } catch (error) {
+            console.error('Erro ao executar exclusão em massa:', error);
+            throw new Error(obterMensagemErro(error, 'Erro ao excluir faturas selecionadas.'));
+          } finally {
+            setProcessandoAcaoMassa(false);
+            setProgressoAcaoMassa(0);
+          }
+        },
+        { quantidadeItens: faturasSelecionadas.length },
       );
       return;
     }
@@ -691,23 +1667,92 @@ export default function FaturamentoPage() {
       setProcessandoAcaoMassa(true);
       setProgressoAcaoMassa(0);
 
-      const faturasSelecionadasData = faturas.filter((f) => faturasSelecionadas.includes(f.id));
-
       switch (acao) {
-        case 'enviar-email':
-          for (let i = 0; i < faturasSelecionadasData.length; i++) {
-            const fatura = faturasSelecionadasData[i];
-            console.log(`Enviando email da fatura ${fatura.numero}...`);
-            await enviarPorEmail(fatura.id);
-            setProgressoAcaoMassa(((i + 1) / faturasSelecionadasData.length) * 100);
+        case 'enviar-email': {
+          const elegiveis = faturasSelecionadasData.filter((fatura) => statusPermiteCobranca(fatura.status));
+          const ignoradas = faturasSelecionadasData.length - elegiveis.length;
+
+          if (!emailCobrancaOperacional) {
+            notificacao.mostrarAviso(
+              'Envio de cobranca indisponivel',
+              `${motivoBloqueioEmailCobranca} ${fallbackOperacionalCobranca}`,
+            );
+            break;
           }
-          notificacao.mostrarSucesso(
-            'Emails Enviados',
-            `${faturasSelecionadas.length} email(s) enviado(s) com sucesso!`,
-          );
+
+          if (elegiveis.length === 0) {
+            notificacao.mostrarAviso(
+              'Acao indisponivel',
+              'Nenhuma fatura selecionada esta elegivel para envio de cobranca por e-mail.',
+            );
+            break;
+          }
+
+          let sucesso = 0;
+          let simuladas = 0;
+          let falhas = 0;
+          let primeiraFalha: unknown;
+
+          for (let i = 0; i < elegiveis.length; i++) {
+            const fatura = elegiveis[i];
+            try {
+              const resultado = await faturamentoService.enviarFaturaPorEmail(fatura.id);
+              if (resultado.simulado) {
+                simuladas += 1;
+              } else {
+                sucesso += 1;
+              }
+            } catch (error) {
+              falhas += 1;
+              if (!primeiraFalha) {
+                primeiraFalha = error;
+              }
+            } finally {
+              setProgressoAcaoMassa(((i + 1) / elegiveis.length) * 100);
+            }
+          }
+
+          if (sucesso > 0) {
+            notificacao.mostrarSucesso(
+              'E-mails enviados',
+              `${sucesso} e-mail(s) enviado(s) com sucesso.`,
+            );
+          }
+
+          if (simuladas > 0) {
+            notificacao.mostrarAviso(
+              'Envio simulado',
+              `${simuladas} e-mail(s) foram simulados. Verifique o SMTP da empresa para envio real.`,
+            );
+          }
+
+          if (falhas > 0) {
+            notificacao.erro.operacaoFalhou(
+              'enviar e-mails em lote',
+              `${falhas} envio(s) falharam. ${obterMensagemErro(primeiraFalha, 'Falha ao enviar e-mails.')}`,
+            );
+          }
+
+          if (ignoradas > 0) {
+            notificacao.mostrarAviso(
+              'Faturas ignoradas',
+              `${ignoradas} fatura(s) foram ignoradas por status nao elegivel para cobranca.`,
+            );
+          }
+
+          await queryClient.invalidateQueries({ queryKey: ['faturas-paginadas'] });
+          await carregarFaturas();
           break;
+        }
 
         case 'baixar-pdfs':
+          if (!pdfDownloadHabilitado) {
+            notificacao.mostrarAviso(
+              'Download de PDF indisponivel',
+              'A API de PDF de faturas ainda nao foi habilitada neste ambiente.',
+            );
+            break;
+          }
           for (let i = 0; i < faturasSelecionadas.length; i++) {
             const faturaId = faturasSelecionadas[i];
             await baixarPDF(faturaId);
@@ -716,24 +1761,100 @@ export default function FaturamentoPage() {
           }
           break;
 
-        case 'gerar-cobranca':
-          for (let i = 0; i < faturasSelecionadasData.length; i++) {
-            const fatura = faturasSelecionadasData[i];
-            if (fatura.status === StatusFatura.VENCIDA || fatura.status === StatusFatura.PENDENTE) {
-              console.log(`Gerando cobrança da fatura ${fatura.numero}...`);
-              // TODO: Implementar geração de cobrança
-            }
-            setProgressoAcaoMassa(((i + 1) / faturasSelecionadasData.length) * 100);
-          }
-          notificacao.mostrarSucesso('Cobranças Geradas', 'Cobranças geradas com sucesso!');
-          break;
+        case 'gerar-cobranca': {
+          const elegiveis = faturasSelecionadasData.filter((fatura) => statusPermiteCobranca(fatura.status));
+          const ignoradasPorStatus = faturasSelecionadasData.length - elegiveis.length;
 
-        case 'exportar':
+          if (!emailCobrancaOperacional) {
+            notificacao.mostrarAviso(
+              'Geracao de cobranca indisponivel',
+              `${motivoBloqueioEmailCobranca} ${fallbackOperacionalCobranca}`,
+            );
+            break;
+          }
+
+          if (elegiveis.length === 0) {
+            notificacao.mostrarAviso(
+              'Sem cobrancas processadas',
+              'Nenhuma fatura selecionada estava apta para geracao de cobranca.',
+            );
+            break;
+          }
+
+          setProgressoAcaoMassa(25);
+          const resultadoCobranca = await faturamentoService.gerarCobrancaEmLote(
+            elegiveis.map((fatura) => fatura.id),
+          );
+          setProgressoAcaoMassa(80);
+
+          if (resultadoCobranca.sucesso > 0) {
+            notificacao.mostrarSucesso(
+              'Cobrança em lote concluída',
+              `${resultadoCobranca.sucesso} cobrança(s) enviada(s) com sucesso.` +
+                (resultadoCobranca.simuladas > 0
+                  ? ` ${resultadoCobranca.simuladas} envio(s) em modo simulado.`
+                  : ''),
+            );
+          } else if (resultadoCobranca.simuladas > 0) {
+            notificacao.mostrarAviso(
+              'Cobrança em modo simulado',
+              `${resultadoCobranca.simuladas} envio(s) processado(s) em simulação. Configure SMTP para envio real. ${fallbackOperacionalCobranca}`,
+            );
+          }
+
+          const ignoradasTotais = resultadoCobranca.ignoradas + ignoradasPorStatus;
+          if (ignoradasTotais > 0) {
+            notificacao.mostrarAviso(
+              'Faturas ignoradas',
+              `${ignoradasTotais} fatura(s) foram ignoradas por status não elegível para cobrança.`,
+            );
+          }
+
+          if (resultadoCobranca.falhas > 0) {
+            const primeiraFalha = resultadoCobranca.resultados.find(
+              (item) => !item.enviado && item.motivo !== 'status_nao_elegivel',
+            );
+            const existeFalhaOperacionalEntrega = resultadoCobranca.resultados.some(
+              (item) =>
+                !item.enviado &&
+                item.motivo !== 'status_nao_elegivel' &&
+                erroIndicaFalhaEnvioCobranca(item.detalhes),
+            );
+            notificacao.erro.operacaoFalhou(
+              'gerar cobrança em lote',
+              `${resultadoCobranca.falhas} fatura(s) falharam.` +
+                (primeiraFalha?.detalhes ? ` ${primeiraFalha.detalhes}` : ''),
+            );
+            if (existeFalhaOperacionalEntrega) {
+              notificacao.mostrarAviso(
+                'Contingencia recomendada',
+                `Falha operacional no envio automatico de cobrancas. ${fallbackOperacionalCobranca}`,
+              );
+            }
+          }
+
+          if (
+            resultadoCobranca.sucesso === 0 &&
+            resultadoCobranca.simuladas === 0 &&
+            resultadoCobranca.falhas === 0
+          ) {
+            notificacao.mostrarAviso(
+              'Sem cobranças processadas',
+              'Nenhuma fatura selecionada estava apta para geração de cobrança.',
+            );
+          }
+
+          await queryClient.invalidateQueries({ queryKey: ['faturas-paginadas'] });
+          await carregarFaturas();
+          setProgressoAcaoMassa(100);
+          break;
+        }
+        case 'exportar': {
           setProgressoAcaoMassa(50);
           const csvData = faturasSelecionadasData
             .map(
               (f) =>
-                `${f.numero},${f.cliente.nome},${f.valorTotal},${f.status},${f.dataVencimento}`,
+                `${f.numero},${obterNomeCliente(f.cliente, f.clienteId)},${f.valorTotal},${f.status},${f.dataVencimento}`,
             )
             .join('\n');
           const blob = new Blob([csvData], { type: 'text/csv' });
@@ -747,43 +1868,24 @@ export default function FaturamentoPage() {
           URL.revokeObjectURL(url);
           setProgressoAcaoMassa(100);
           break;
-
-        case 'excluir':
-          // Usar confirmação inteligente para exclusão em massa
-          confirmacao.confirmar(
-            'excluir-multiplas-faturas',
-            async () => {
-              for (let i = 0; i < faturasSelecionadas.length; i++) {
-                const faturaId = faturasSelecionadas[i];
-                console.log(`Excluindo fatura ${faturaId}...`);
-                await faturamentoService.excluirFatura(faturaId);
-                setProgressoAcaoMassa(((i + 1) / faturasSelecionadas.length) * 100);
-              }
-
-              // Estratégia agressiva de atualização do cache após exclusão em massa
-              await queryClient.removeQueries({ queryKey: ['faturas-paginadas'] }); // Remove completamente do cache
-              await queryClient.invalidateQueries({ queryKey: ['faturas-paginadas'] }); // Invalida todas as queries relacionadas
-              await queryClient.refetchQueries({ queryKey: ['faturas-paginadas'] }); // Força uma nova busca imediatamente
-              carregarFaturas();
-
-              // Notificação de sucesso é exibida automaticamente pelo hook
-            },
-            { quantidadeItens: faturasSelecionadas.length },
-          );
-          return; // Sair da função para não executar o finally
-          break;
+        }
 
         default:
-          console.log('Ação não implementada:', acao);
+          notificacao.mostrarAviso(
+            'Ação indisponível',
+            `A ação "${acao}" ainda não está disponível nesta versão.`,
+          );
           setProgressoAcaoMassa(100);
       }
 
-      // Limpar seleção após ação
       setFaturasSelecionadas([]);
       setMostrarAcoesMassa(false);
     } catch (error) {
       console.error('Erro ao executar ação em massa:', error);
-      alert('Erro ao executar ação. Tente novamente.');
+      notificacao.erro.operacaoFalhou(
+        'executar ação em massa',
+        obterMensagemErro(error, 'Erro ao executar ação em massa.'),
+      );
     } finally {
       setProcessandoAcaoMassa(false);
       setProgressoAcaoMassa(0);
@@ -797,11 +1899,17 @@ export default function FaturamentoPage() {
   };
 
   const toggleSelecaoTodas = () => {
-    if (faturasSelecionadas.length === faturas.length) {
-      setFaturasSelecionadas([]);
-    } else {
-      setFaturasSelecionadas(faturas.map((f) => f.id));
+    const idsFiltrados = faturasFiltradas.map((fatura) => fatura.id);
+    const todosFiltradosSelecionados =
+      idsFiltrados.length > 0 &&
+      idsFiltrados.every((id) => faturasSelecionadas.includes(id));
+
+    if (todosFiltradosSelecionados) {
+      setFaturasSelecionadas((prev) => prev.filter((id) => !idsFiltrados.includes(id)));
+      return;
     }
+
+    setFaturasSelecionadas((prev) => Array.from(new Set([...prev, ...idsFiltrados])));
   };
 
   const getStatusIcon = (status: StatusFatura, size: string = 'w-4 h-4') => {
@@ -836,483 +1944,1205 @@ export default function FaturamentoPage() {
     }
   };
 
-  const faturasFiltradas = faturas.filter(
-    (fatura) =>
-      fatura.numero.toLowerCase().includes(busca.toLowerCase()) ||
-      fatura.cliente?.nome?.toLowerCase().includes(busca.toLowerCase()) ||
-      fatura.observacoes?.toLowerCase().includes(busca.toLowerCase()),
-  );
+  const faturasFiltradas = useMemo(() => faturas, [faturas]);
+
+  const hasActiveListFilters = useMemo(() => {
+    if (busca.trim()) return true;
+
+    const normalized: Record<string, unknown> = { ...(filtros as Record<string, unknown>) };
+
+    // Defaults: nao contam como "filtros ativos" na UX.
+    if (normalized.periodoCampo === 'vencimento') delete normalized.periodoCampo;
+    if (normalized.origem === 'faturamento') delete normalized.origem;
+
+    return Object.values(normalized).some((value) => {
+      if (value === undefined || value === null) return false;
+      if (typeof value === 'boolean') return value;
+      if (typeof value === 'number') return Number.isFinite(value) && value !== 0;
+      if (Array.isArray(value)) return value.length > 0;
+      return String(value).trim().length > 0;
+    });
+  }, [busca, filtros]);
+
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(total / pageSize)), [pageSize, total]);
 
   useEffect(() => {
     setMostrarAcoesMassa(faturasSelecionadas.length > 0);
   }, [faturasSelecionadas]);
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus nucleusName="Financeiro" nucleusPath="/nuclei/financeiro" />
-      </div>
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(Number(value || 0));
 
-      <div className="p-6">
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-[#002333] flex items-center">
-                <FileText className="h-8 w-8 mr-3 text-[#159A9C]" />
-                Faturamento
-                {carregando && (
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#159A9C] ml-3"></div>
-                )}
-              </h1>
-              <p className="mt-2 text-[#B4BEC9]">
-                {carregando
-                  ? 'Carregando faturas...'
-                  : `Gerencie suas ${dashboardCards.totalFaturas} faturas, pagamentos e cobranças`}
-              </p>
+  const btnPrimary =
+    'inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition hover:bg-[#117C7E] disabled:cursor-not-allowed disabled:opacity-60';
+
+  const btnSecondary =
+    'inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-60';
+
+  const painelMetricas = [
+    {
+      label: 'Total de faturas',
+      value: String(dashboardCards.totalFaturas),
+      highlightClass: 'text-[#173A4D]',
+      hint: `${dashboardCards.faturasDoMes} no periodo atual`,
+    },
+    {
+      label: 'Vencidas',
+      value: String(dashboardCards.faturasVencidas),
+      highlightClass: 'text-[#B4233A]',
+      hint: 'Acompanhe cobrancas em atraso',
+    },
+    {
+      label: 'Pendente',
+      value: formatCurrency(dashboardCards.valorTotalPendente),
+      highlightClass: 'text-[#9B5A00]',
+      hint: 'Saldo em aberto para recebimento',
+    },
+    {
+      label: 'Recebido',
+      value: formatCurrency(dashboardCards.valorTotalPago),
+      highlightClass: 'text-[#0F6C38]',
+      hint: `${dashboardCards.faturasPagas} faturas baixadas`,
+    },
+  ];
+
+  const resumoFilaFaturamento = useMemo(() => {
+    const contadores: Record<StatusFilaFaturamento, number> = {
+      contrato_assinado: 0,
+      dispensa_contrato_aprovada: 0,
+      faturamento_liberado: 0,
+    };
+
+    filaFaturamento.forEach((proposta) => {
+      const status = normalizarStatusFila(proposta?.status);
+      if (status) {
+        contadores[status] += 1;
+      }
+    });
+
+    return contadores;
+  }, [filaFaturamento]);
+
+  const filaFaturamentoFiltrada = useMemo(() => {
+    if (filtroStatusFila === 'todos') {
+      return filaFaturamento;
+    }
+
+    return filaFaturamento.filter(
+      (proposta) => normalizarStatusFila(proposta?.status) === filtroStatusFila,
+    );
+  }, [filaFaturamento, filtroStatusFila]);
+
+  const painelDivergencias = useMemo(() => {
+    const divergenciasItensVsTotal = faturas.reduce<Array<{ numero: string; diferenca: number }>>(
+      (acc, fatura) => {
+        const totalItens = Array.isArray(fatura.itens)
+          ? fatura.itens.reduce((sum, item) => sum + Number(item.valorTotal || 0), 0)
+          : 0;
+        const totalEsperado = Math.max(
+          totalItens - Number(fatura.valorDesconto || 0) + Number(fatura.valorImpostos || 0),
+          0,
+        );
+        const totalFatura = Number(fatura.valorTotal || 0);
+        const diferenca = Number((totalEsperado - totalFatura).toFixed(2));
+        if (Math.abs(diferenca) > 0.01) {
+          acc.push({ numero: fatura.numero, diferenca });
+        }
+        return acc;
+      },
+      [],
+    );
+
+    const pagamentosParciaisSemBaixaFinal = faturas.filter((fatura) => {
+      const total = Number(fatura.valorTotal || 0);
+      const pago = Number(fatura.valorPago || 0);
+      return fatura.status === StatusFatura.PARCIALMENTE_PAGA && pago > 0 && pago < total;
+    });
+
+    const estornosPendentesConciliacao = faturas.reduce((acc, fatura) => {
+      const pagamentos = Array.isArray(fatura.pagamentos) ? fatura.pagamentos : [];
+      const estornos = pagamentos.filter((pagamento) => {
+        const tipo = String(pagamento.tipo || '').toLowerCase();
+        const status = String(pagamento.status || '').toLowerCase();
+        const valor = Number(pagamento.valor || 0);
+        return (tipo === 'estorno' || valor < 0) && status === 'estornado';
+      });
+      return acc + estornos.length;
+    }, 0);
+
+    return {
+      itensVsTotal: divergenciasItensVsTotal.length,
+      parciaisSemBaixaFinal: pagamentosParciaisSemBaixaFinal.length,
+      estornosPendentesConciliacao: estornosPendentesConciliacao,
+      total:
+        divergenciasItensVsTotal.length +
+        pagamentosParciaisSemBaixaFinal.length +
+        estornosPendentesConciliacao,
+      primeiraDivergenciaItens: divergenciasItensVsTotal[0] || null,
+    };
+  }, [faturas]);
+
+  const painelProntidao = useMemo(() => {
+    const statusGatewayProntidao: StatusProntidao =
+      prontidaoCobranca?.gateway?.status || (gatewayUiHabilitada ? 'ok' : 'alerta');
+    const statusEmailProntidao: StatusProntidao = prontidaoCobranca?.email?.status || 'alerta';
+
+    const itens: Array<{
+      id: string;
+      titulo: string;
+      detalhe: string;
+      status: StatusProntidao;
+    }> = [
+      {
+        id: 'gateway-online',
+        titulo: 'Gateway online habilitado',
+        detalhe:
+          prontidaoCobranca?.gateway?.detalhe ||
+          (gatewayUiHabilitada
+            ? 'Pagamento online disponivel para cobranca direta.'
+            : motivoBloqueioGateway),
+        status: statusGatewayProntidao,
+      },
+      {
+        id: 'link-pagamento',
+        titulo: 'Geracao de link de pagamento',
+        detalhe: linkPagamentoHabilitado
+          ? 'Link de pagamento liberado para envio ao cliente.'
+          : prontidaoCobranca?.gateway?.detalhe || motivoBloqueioGateway,
+        status: linkPagamentoHabilitado
+          ? 'ok'
+          : statusGatewayProntidao === 'bloqueio'
+            ? 'bloqueio'
+            : 'alerta',
+      },
+      {
+        id: 'email-cobranca',
+        titulo: 'Envio de cobranca por e-mail',
+        detalhe:
+          prontidaoCobranca?.email?.detalhe ||
+          (carregandoProntidaoCobranca
+            ? 'Carregando prontidao do backend para envio de cobranca.'
+            : erroProntidaoCobranca || motivoBloqueioEmailCobranca),
+        status: statusEmailProntidao,
+      },
+      {
+        id: 'itens-vs-total',
+        titulo: 'Consistencia dos totais',
+        detalhe:
+          painelDivergencias.itensVsTotal > 0
+            ? `${painelDivergencias.itensVsTotal} fatura(s) com diferenca entre itens e valor total.`
+            : 'Sem divergencias entre itens, descontos, impostos e total final.',
+        status: painelDivergencias.itensVsTotal > 0 ? 'bloqueio' : 'ok',
+      },
+      {
+        id: 'estornos',
+        titulo: 'Estornos pendentes de conciliacao',
+        detalhe:
+          painelDivergencias.estornosPendentesConciliacao > 0
+            ? `${painelDivergencias.estornosPendentesConciliacao} estorno(s) aguardando revisao bancaria.`
+            : 'Nenhum estorno pendente de conciliacao.',
+        status: painelDivergencias.estornosPendentesConciliacao > 0 ? 'alerta' : 'ok',
+      },
+      {
+        id: 'parciais',
+        titulo: 'Pagamentos parciais sem baixa final',
+        detalhe:
+          painelDivergencias.parciaisSemBaixaFinal > 0
+            ? `${painelDivergencias.parciaisSemBaixaFinal} fatura(s) parcialmente paga(s) sem baixa final.`
+            : 'Nao ha pendencia de baixa final em pagamentos parciais.',
+        status: painelDivergencias.parciaisSemBaixaFinal > 0 ? 'alerta' : 'ok',
+      },
+    ];
+
+    const bloqueios = itens.filter((item) => item.status === 'bloqueio').length;
+    const alertas = itens.filter((item) => item.status === 'alerta').length;
+    const statusGeral: StatusProntidao = bloqueios > 0 ? 'bloqueio' : alertas > 0 ? 'alerta' : 'ok';
+
+    return {
+      itens,
+      bloqueios,
+      alertas,
+      statusGeral,
+      prontoParaFechamento: bloqueios === 0 && alertas === 0,
+    };
+  }, [
+    carregandoProntidaoCobranca,
+    erroProntidaoCobranca,
+    gatewayUiHabilitada,
+    linkPagamentoHabilitado,
+    motivoBloqueioEmailCobranca,
+    motivoBloqueioGateway,
+    painelDivergencias.estornosPendentesConciliacao,
+    painelDivergencias.itensVsTotal,
+    painelDivergencias.parciaisSemBaixaFinal,
+    prontidaoCobranca?.email?.detalhe,
+    prontidaoCobranca?.email?.status,
+    prontidaoCobranca?.gateway?.detalhe,
+    prontidaoCobranca?.gateway?.status,
+  ]);
+
+  const estilosStatusProntidao: Record<StatusProntidao, string> = {
+    ok: 'border-[#CFEADB] bg-[#F2FBF6] text-[#1A7A4B]',
+    alerta: 'border-[#F6D7B2] bg-[#FFF8EE] text-[#9B5A00]',
+    bloqueio: 'border-[#F2CACA] bg-[#FFF5F5] text-[#A12D2D]',
+  };
+
+  const rotulosStatusProntidao: Record<StatusProntidao, string> = {
+    ok: 'OK',
+    alerta: 'Atencao',
+    bloqueio: 'Bloqueio',
+  };
+
+  const visoes: Array<{
+    id: 'dashboard' | 'fila' | 'prontidao' | 'relatorios' | 'email' | 'workflows';
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+  }> = [
+    { id: 'dashboard', label: 'Faturas', icon: FileText },
+    { id: 'fila', label: 'Fila de faturamento', icon: CreditCard },
+    { id: 'prontidao', label: 'Prontidao', icon: Activity },
+    { id: 'relatorios', label: 'Relatórios', icon: BarChart3 },
+    { id: 'email', label: 'Automação de E-mails', icon: Mail },
+    { id: 'workflows', label: 'Workflows', icon: Settings },
+  ];
+
+  const periodoCampoAtual = filtros.periodoCampo === 'emissao' ? 'emissao' : 'vencimento';
+
+  const formatDateToInput = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const aplicarPeriodoRapido = (atalho: 'hoje' | '7d' | '30d' | 'mesAtual' | 'mesAnterior') => {
+    const hoje = new Date();
+    let inicio = new Date(hoje);
+    let fim = new Date(hoje);
+
+    if (atalho === '7d') {
+      inicio = new Date(hoje);
+      inicio.setDate(hoje.getDate() - 6);
+    }
+
+    if (atalho === '30d') {
+      inicio = new Date(hoje);
+      inicio.setDate(hoje.getDate() - 29);
+    }
+
+    if (atalho === 'mesAtual') {
+      inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      fim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+    }
+
+    if (atalho === 'mesAnterior') {
+      inicio = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+      fim = new Date(hoje.getFullYear(), hoje.getMonth(), 0);
+    }
+
+    setFiltros((prev) => ({
+      ...prev,
+      periodoCampo: prev.periodoCampo === 'emissao' ? 'emissao' : 'vencimento',
+      dataInicial: formatDateToInput(inicio),
+      dataFinal: formatDateToInput(fim),
+    }));
+    setPage(1);
+  };
+
+  const filtrosAtivos =
+    Boolean(busca) ||
+    Boolean(filtros.status) ||
+    Boolean(filtros.tipo) ||
+    filtros.origem === 'avulso' ||
+    Boolean(filtros.dataInicial) ||
+    Boolean(filtros.dataFinal) ||
+    periodoCampoAtual !== 'vencimento' ||
+    sortBy !== 'dataVencimento' ||
+    sortOrder !== 'DESC';
+
+  const filtrosAvancadosAtivosCount = [
+    Boolean(filtros.tipo),
+    filtros.origem === 'avulso',
+    Boolean(filtros.dataInicial),
+    Boolean(filtros.dataFinal),
+    periodoCampoAtual !== 'vencimento',
+    sortBy !== 'dataVencimento',
+    sortOrder !== 'DESC',
+  ].filter(Boolean).length;
+
+  const limparFiltros = () => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('clienteId');
+    nextParams.delete('cliente');
+    setSearchParams(nextParams, { replace: true });
+    setBusca('');
+    setFiltros({ periodoCampo: 'vencimento', origem: 'faturamento' });
+    setSortBy('dataVencimento');
+    setSortOrder('DESC');
+    setPage(1);
+    refetch();
+  };
+
+
+  const renderFiltrosDashboard = () => (
+    <div className="space-y-4 rounded-2xl border border-[#D4E1E8] bg-gradient-to-br from-[#F7FBFD] to-[#F1F7FA] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
+      <div className="flex w-full flex-col gap-4">
+        <div className="flex w-full flex-col gap-3 xl:flex-row xl:items-end">
+          <div className="w-full xl:flex-1">
+            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Buscar faturas</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
+              <input
+                type="text"
+                placeholder="Buscar por numero, cliente ou observacoes..."
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                onKeyDown={handleSearch}
+                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+              />
+            </div>
+          </div>
+
+          <div className="w-full xl:w-[220px]">
+            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Status</label>
+            <select
+              value={filtros.status || ''}
+              onChange={(e) =>
+                setFiltros((prev) => ({
+                  ...prev,
+                  status: (e.target.value as StatusFatura) || undefined,
+                }))
+              }
+              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+            >
+              <option value="">Todos os status</option>
+              <option value={StatusFatura.PENDENTE}>Pendente</option>
+              <option value={StatusFatura.ENVIADA}>Enviada</option>
+              <option value={StatusFatura.PARCIALMENTE_PAGA}>Parcialmente paga</option>
+              <option value={StatusFatura.PAGA}>Paga</option>
+              <option value={StatusFatura.VENCIDA}>Vencida</option>
+              <option value={StatusFatura.CANCELADA}>Cancelada</option>
+            </select>
+          </div>
+
+          <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:justify-end">
+            <button
+              type="button"
+              onClick={() => setMostrarFiltrosAvancados((atual) => !atual)}
+              className={`inline-flex h-10 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors ${
+                mostrarFiltrosAvancados || filtrosAvancadosAtivosCount > 0
+                  ? 'border-[#159A9C] bg-[#E8F6F6] text-[#0F7B7D]'
+                  : 'border-[#B4BEC9] bg-white text-[#19384C] hover:bg-[#F6FAF9]'
+              }`}
+            >
+              <Settings className="h-4 w-4" />
+              Filtros avancados
+              {filtrosAvancadosAtivosCount > 0 && (
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#0F7B7D] px-1.5 text-xs font-semibold text-white">
+                  {filtrosAvancadosAtivosCount}
+                </span>
+              )}
+              <ChevronDown
+                className={`h-4 w-4 transition-transform ${mostrarFiltrosAvancados ? 'rotate-180' : ''}`}
+              />
+            </button>
+
+            <button
+              onClick={buscarFaturas}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#159A9C] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#0F7B7D]"
+              aria-label="Buscar"
+            >
+              <Search className="h-4 w-4" />
+              Buscar
+            </button>
+
+            {filtrosAtivos && (
+              <button
+                className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-[#B4BEC9] bg-white px-3 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
+                onClick={limparFiltros}
+              >
+                <X className="h-4 w-4" />
+                Limpar
+              </button>
+            )}
+          </div>
+        </div>
+
+        {mostrarFiltrosAvancados && (
+          <div className="rounded-xl border border-[#DCE8EC] bg-[#F8FBFC] p-3 sm:p-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="w-full">
+                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                  Tipo
+                </label>
+                <select
+                  value={filtros.tipo || ''}
+                  onChange={(e) =>
+                    setFiltros((prev) => ({
+                      ...prev,
+                      tipo: (e.target.value as TipoFatura) || undefined,
+                    }))
+                  }
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                >
+                  <option value="">Todos os tipos</option>
+                  <option value={TipoFatura.UNICA}>Unica</option>
+                  <option value={TipoFatura.RECORRENTE}>Recorrente</option>
+                  <option value={TipoFatura.PARCELA}>Parcela</option>
+                  <option value={TipoFatura.ADICIONAL}>Adicional</option>
+                </select>
+              </div>
+
+              <div className="w-full">
+                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                  Origem operacional
+                </label>
+                <select
+                  value={filtros.origem || 'faturamento'}
+                  onChange={(e) =>
+                    setFiltros((prev) => ({
+                      ...prev,
+                      origem: (e.target.value as OrigemFaturaOperacional) || 'faturamento',
+                    }))
+                  }
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                >
+                  <option value="faturamento">{ORIGEM_FATURA_LABELS.faturamento}</option>
+                  <option value="avulso">{ORIGEM_FATURA_LABELS.avulso}</option>
+                </select>
+              </div>
+
+              <div className="w-full">
+                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                  Base periodo
+                </label>
+                <select
+                  value={periodoCampoAtual}
+                  onChange={(e) =>
+                    setFiltros((prev) => ({
+                      ...prev,
+                      periodoCampo: e.target.value === 'emissao' ? 'emissao' : 'vencimento',
+                    }))
+                  }
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                >
+                  <option value="vencimento">Vencimento</option>
+                  <option value="emissao">Emissao</option>
+                </select>
+              </div>
+
+              <div className="w-full">
+                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                  Data inicial
+                </label>
+                <input
+                  type="date"
+                  value={filtros.dataInicial || ''}
+                  onChange={(e) =>
+                    setFiltros((prev) => ({
+                      ...prev,
+                      dataInicial: e.target.value || undefined,
+                    }))
+                  }
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                />
+              </div>
+
+              <div className="w-full">
+                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                  Data final
+                </label>
+                <input
+                  type="date"
+                  value={filtros.dataFinal || ''}
+                  onChange={(e) =>
+                    setFiltros((prev) => ({
+                      ...prev,
+                      dataFinal: e.target.value || undefined,
+                    }))
+                  }
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                />
+              </div>
+
+              <div className="w-full">
+                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                  Ordenar por
+                </label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                >
+                  <option value="dataVencimento">Vencimento</option>
+                  <option value="dataEmissao">Emissao</option>
+                  <option value="valorTotal">Valor</option>
+                  <option value="status">Status</option>
+                </select>
+              </div>
+
+              <div className="w-full">
+                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                  Ordem
+                </label>
+                <select
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value as 'ASC' | 'DESC')}
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                >
+                  <option value="DESC">Desc</option>
+                  <option value="ASC">Asc</option>
+                </select>
+              </div>
             </div>
 
-            {/* Botão de ação principal */}
-            <div className="mt-4 sm:mt-0 flex items-center gap-3">
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#DFEAEE] pt-3">
+              <span className="text-xs font-medium text-[#607B89]">Atalhos de periodo:</span>
+              <button
+                type="button"
+                onClick={() => aplicarPeriodoRapido('hoje')}
+                className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+              >
+                Hoje
+              </button>
+              <button
+                type="button"
+                onClick={() => aplicarPeriodoRapido('7d')}
+                className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+              >
+                Ultimos 7 dias
+              </button>
+              <button
+                type="button"
+                onClick={() => aplicarPeriodoRapido('30d')}
+                className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+              >
+                Ultimos 30 dias
+              </button>
+              <button
+                type="button"
+                onClick={() => aplicarPeriodoRapido('mesAtual')}
+                className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+              >
+                Este mes
+              </button>
+              <button
+                type="button"
+                onClick={() => aplicarPeriodoRapido('mesAnterior')}
+                className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+              >
+                Mes anterior
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Chips de filtros aplicados */}
+        {filtrosAtivos && (
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            {busca && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+                Busca: "{busca}"
+                <button
+                  className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                  onClick={() => setBusca('')}
+                  aria-label="Limpar busca"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {filtros.status && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+                Status: {faturamentoService.formatarStatusFatura(filtros.status)}
+                <button
+                  className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                  onClick={() => setFiltros((prev) => ({ ...prev, status: undefined }))}
+                  aria-label="Limpar filtro de status"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {filtros.tipo && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+                Tipo: {faturamentoService.formatarTipoFatura(filtros.tipo)}
+                <button
+                  className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                  onClick={() => setFiltros((prev) => ({ ...prev, tipo: undefined }))}
+                  aria-label="Limpar filtro de tipo"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {filtros.origem === 'avulso' && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+                Origem: {ORIGEM_FATURA_LABELS.avulso}
+                <button
+                  className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                  onClick={() =>
+                    setFiltros((prev) => ({
+                      ...prev,
+                      origem: 'faturamento',
+                    }))
+                  }
+                  aria-label="Voltar origem para faturamento"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {(filtros.dataInicial || filtros.dataFinal) && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+                {periodoCampoAtual === 'vencimento' ? 'Vencimento' : 'Emissao'}:{' '}
+                {filtros.dataInicial
+                  ? new Date(`${filtros.dataInicial}T00:00:00`).toLocaleDateString('pt-BR')
+                  : '...'}{' '}
+                a{' '}
+                {filtros.dataFinal
+                  ? new Date(`${filtros.dataFinal}T00:00:00`).toLocaleDateString('pt-BR')
+                  : '...'}
+                <button
+                  className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                  onClick={() =>
+                    setFiltros((prev) => ({
+                      ...prev,
+                      dataInicial: undefined,
+                      dataFinal: undefined,
+                    }))
+                  }
+                  aria-label="Limpar filtro de periodo"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {!filtros.dataInicial && !filtros.dataFinal && periodoCampoAtual === 'emissao' && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+                Base periodo: Emissao
+                <button
+                  className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                  onClick={() =>
+                    setFiltros((prev) => ({
+                      ...prev,
+                      periodoCampo: 'vencimento',
+                    }))
+                  }
+                  aria-label="Voltar base para vencimento"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {(sortBy !== 'dataVencimento' || sortOrder !== 'DESC') && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+                Ordenacao: {sortBy} ({sortOrder})
+                <button
+                  className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                  onClick={() => {
+                    setSortBy('dataVencimento');
+                    setSortOrder('DESC');
+                  }}
+                  aria-label="Resetar ordenacao"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+  const renderFilaFaturamento = () => (
+    <SectionCard className="space-y-4 p-4 sm:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#476776]">
+            Fila operacional
+          </p>
+          <h3 className="mt-1 text-lg font-semibold text-[#173A4D]">
+            Propostas prontas para faturar
+          </h3>
+          <p className="mt-1 text-sm text-[#5E7784]">
+            Vendas com contrato assinado ou dispensa aprovada aguardando emissao da fatura.
+          </p>
+        </div>
+
+        <button
+          onClick={() => void carregarFilaFaturamento()}
+          disabled={carregandoFilaFaturamento}
+          className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {carregandoFilaFaturamento ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Atualizando
+            </>
+          ) : (
+            <>
+              <Activity className="h-4 w-4" />
+              Atualizar fila
+            </>
+          )}
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-2">
+          <span className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-3 py-1 text-xs font-semibold text-[#2D4958]">
+            Total {filaFaturamentoFiltrada.length}
+          </span>
+          <span className="inline-flex items-center rounded-full border border-[#DCEBFF] bg-[#F4F8FF] px-3 py-1 text-xs font-semibold text-[#255E9A]">
+            Contrato assinado {resumoFilaFaturamento.contrato_assinado}
+          </span>
+          <span className="inline-flex items-center rounded-full border border-[#D8EFE9] bg-[#F1FBF8] px-3 py-1 text-xs font-semibold text-[#11795E]">
+            Dispensa aprovada {resumoFilaFaturamento.dispensa_contrato_aprovada}
+          </span>
+          <span className="inline-flex items-center rounded-full border border-[#F5E4CC] bg-[#FFF8EE] px-3 py-1 text-xs font-semibold text-[#9A6112]">
+            Faturamento liberado {resumoFilaFaturamento.faturamento_liberado}
+          </span>
+        </div>
+
+        <div className="w-full sm:w-auto">
+          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#5E7784]">
+            Status da fila
+          </label>
+          <select
+            value={filtroStatusFila}
+            onChange={(event) =>
+              setFiltroStatusFila(event.target.value as 'todos' | StatusFilaFaturamento)
+            }
+            className="h-9 w-full rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#159A9C]/45 focus:ring-2 focus:ring-[#159A9C]/15 sm:w-[220px]"
+          >
+            <option value="todos">Todos os status</option>
+            <option value="contrato_assinado">Contrato assinado</option>
+            <option value="dispensa_contrato_aprovada">Dispensa aprovada</option>
+            <option value="faturamento_liberado">Faturamento liberado</option>
+          </select>
+        </div>
+      </div>
+
+      {carregandoFilaFaturamento ? (
+        <div className="rounded-xl border border-dashed border-[#D4E2E7] bg-[#FAFCFD] p-4 text-sm text-[#5E7784]">
+          Carregando fila de faturamento...
+        </div>
+      ) : erroFilaFaturamento ? (
+        <div className="rounded-xl border border-[#F5D2D7] bg-[#FFF7F8] p-4 text-sm text-[#9F2F46]">
+          {erroFilaFaturamento}
+        </div>
+      ) : filaFaturamentoFiltrada.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-[#D4E2E7] bg-[#FAFCFD] p-4 text-sm text-[#5E7784]">
+          Nenhuma proposta encontrada para o filtro selecionado.
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-[#DCE7EC]">
+          <table className="min-w-full divide-y divide-[#E7EEF2] text-sm">
+            <thead className="bg-[#F7FBFD] text-left text-xs font-semibold uppercase tracking-wide text-[#5E7784]">
+              <tr>
+                <th className="px-3 py-2.5">Proposta</th>
+                <th className="px-3 py-2.5">Cliente</th>
+                <th className="px-3 py-2.5">Status</th>
+                <th className="px-3 py-2.5">Valor</th>
+                <th className="px-3 py-2.5">Atualizada em</th>
+                <th className="px-3 py-2.5 text-right">Acao</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#EEF3F6] bg-white">
+              {filaFaturamentoFiltrada.slice(0, 8).map((proposta, index) => {
+                const statusFila = normalizarStatusFila(proposta.status);
+                const clienteNome =
+                  proposta?.cliente && typeof proposta.cliente === 'object'
+                    ? String(proposta.cliente.nome || 'Cliente')
+                    : String(proposta?.cliente || 'Cliente');
+                const valorProposta = Number(proposta?.total || (proposta as any)?.valor || 0);
+                const dataAtualizacaoRaw =
+                  (proposta as any)?.updatedAt ||
+                  (proposta as any)?.atualizadaEm ||
+                  (proposta as any)?.createdAt ||
+                  (proposta as any)?.criadaEm;
+                const dataAtualizacao = dataAtualizacaoRaw
+                  ? new Date(String(dataAtualizacaoRaw)).toLocaleString('pt-BR')
+                  : '-';
+                const statusTone =
+                  statusFila === 'dispensa_contrato_aprovada'
+                    ? 'border-[#D8EFE9] bg-[#F1FBF8] text-[#11795E]'
+                    : statusFila === 'faturamento_liberado'
+                      ? 'border-[#F5E4CC] bg-[#FFF8EE] text-[#9A6112]'
+                      : 'border-[#DCEBFF] bg-[#F4F8FF] text-[#255E9A]';
+
+                return (
+                  <tr key={String(proposta?.id || proposta?.numero || `fila-${index}`)}>
+                    <td className="px-3 py-3">
+                      <p className="font-semibold text-[#173A4D]">
+                        {String(proposta?.numero || proposta?.id || '-')}
+                      </p>
+                      <p className="text-xs text-[#5E7784]">{String((proposta as any)?.titulo || '-')}</p>
+                    </td>
+                    <td className="px-3 py-3 text-[#244455]">{clienteNome}</td>
+                    <td className="px-3 py-3">
+                      <span
+                        className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${statusTone}`}
+                      >
+                        {statusFila ? STATUS_LABELS_FILA[statusFila] : 'Status nao mapeado'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 font-medium text-[#173A4D]">
+                      {formatCurrency(valorProposta)}
+                    </td>
+                    <td className="px-3 py-3 text-[#5E7784]">{dataAtualizacao}</td>
+                    <td className="px-3 py-3 text-right">
+                      <button
+                        onClick={() => prepararFaturaDaFila(proposta)}
+                        className="inline-flex h-8 items-center rounded-lg border border-[#159A9C]/35 bg-[#EAF8F8] px-3 text-xs font-semibold text-[#0E7E80] transition hover:border-[#159A9C] hover:bg-[#DFF3F3]"
+                      >
+                        Criar fatura
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {filaFaturamentoFiltrada.length > 8 && (
+            <div className="border-t border-[#EEF3F6] bg-[#FBFDFE] px-3 py-2 text-xs text-[#5E7784]">
+              Exibindo as 8 propostas mais recentes da fila ({filaFaturamentoFiltrada.length} no total).
+            </div>
+          )}
+        </div>
+      )}
+    </SectionCard>
+  );
+
+  return (
+    <div className="space-y-4 pt-1 sm:pt-2">
+      <SectionCard className="space-y-[18px] border-[#CBDAE2] bg-gradient-to-br from-white via-white to-[#F3FAF8] p-5 shadow-[0_24px_46px_-34px_rgba(16,57,74,0.38)]">
+        <PageHeader
+          eyebrow={
+            <span className="inline-flex items-center rounded-full border border-[#BFD9E2] bg-[#EFF8FB] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#3F6A7C]">
+              Nucleo Financeiro
+            </span>
+          }
+          title={
+            <span className="text-[27px] font-bold leading-[1.03] tracking-[-0.018em] text-[#002333] sm:text-[28px]">
+              <span className="text-[#0F7B7D]">Faturamento</span>
+            </span>
+          }
+          titleClassName="leading-none sm:inline-flex sm:items-center"
+          description={
+            carregando
+              ? 'Carregando faturas...'
+              : `Gerencie ${dashboardCards.totalFaturas} faturas, cobranças e recebimentos.`
+          }
+          descriptionClassName="max-w-[64ch] text-[12px] leading-[1.4] text-[#5B7A89] sm:border-l sm:border-[#D7E5EC] sm:pl-3 sm:text-[13px]"
+          inlineDescriptionOnDesktop
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
               <NotificacoesFaturamento
                 faturas={faturas}
                 onMarcarComoLida={marcarNotificacaoComoLida}
                 onAbrirFatura={abrirFaturaNotificacao}
               />
-              <button
-                onClick={() => setModalConfigurarCardsAberto(true)}
-                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm text-sm font-medium"
-                title="Configurar Cards"
-              >
-                <Settings className="w-4 h-4" />
-                Configurar Cards
+              <button onClick={() => void carregarFaturas()} className={btnSecondary} disabled={carregando}>
+                <RefreshCw className={`h-4 w-4 ${carregando ? 'animate-spin' : ''}`} />
+                Atualizar
               </button>
-              <button
-                onClick={abrirModalCriacao}
-                className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm text-sm font-medium"
-              >
-                <Plus className="w-4 h-4" />
-                Nova Fatura
+              <button onClick={abrirModalCriacao} className={btnPrimary}>
+                <Plus className="h-4 w-4" />
+                Nova fatura
               </button>
             </div>
-          </div>
+          }
+        />
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {painelMetricas.map((item) => (
+            <div key={item.label} className="rounded-xl border border-[#D2E1E8] bg-white px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[#5F7B89]">{item.label}</p>
+              <p className={`mt-1 text-lg font-semibold ${item.highlightClass}`}>{item.value}</p>
+              <p className="mt-1 text-xs text-[#688390]">{item.hint}</p>
+            </div>
+          ))}
         </div>
 
-        {/* Navegação por Abas - Funcionalidades Avançadas */}
-        <div className="bg-white rounded-lg shadow-sm mb-4">
-          <div className="border-b">
-            <nav className="flex space-x-4 px-6 overflow-x-auto">
-              <button
-                onClick={() => setVisaoAtiva('dashboard')}
-                className={`py-4 px-3 border-b-2 font-medium text-sm transition-colors flex-shrink-0 ${
-                  visaoAtiva === 'dashboard'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4" />
-                  Dashboard & Faturas
-                </div>
-              </button>
+      <FiltersBar className="gap-2 p-2 sm:gap-3">
+        {visoes.map((visao) => {
+          const Icon = visao.icon;
+          const ativo = visaoAtiva === visao.id;
+          return (
+            <button
+              key={visao.id}
+              onClick={() => setVisaoAtiva(visao.id)}
+              className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition ${
+                ativo
+                  ? 'border-[#159A9C] bg-[#E8F6F6] text-[#0F7B7D] shadow-sm'
+                  : 'border-[#D4E2E7] bg-white text-[#244455] hover:border-[#159A9C]/40 hover:bg-[#F6FAFB]'
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {visao.label}
+            </button>
+          );
+        })}
+      </FiltersBar>
 
-              <button
-                onClick={() => setVisaoAtiva('ia')}
-                className={`py-4 px-3 border-b-2 font-medium text-sm transition-colors flex-shrink-0 ${
-                  visaoAtiva === 'ia'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Activity className="w-4 h-4" />
-                  Dashboard IA
-                </div>
-              </button>
-
-              <button
-                onClick={() => setVisaoAtiva('relatorios')}
-                className={`py-4 px-3 border-b-2 font-medium text-sm transition-colors flex-shrink-0 ${
-                  visaoAtiva === 'relatorios'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4" />
-                  Relatórios Avançados
-                </div>
-              </button>
-
-              <button
-                onClick={() => setVisaoAtiva('email')}
-                className={`py-4 px-3 border-b-2 font-medium text-sm transition-colors flex-shrink-0 ${
-                  visaoAtiva === 'email'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Mail className="w-4 h-4" />
-                  Automação de Emails
-                </div>
-              </button>
-
-              <button
-                onClick={() => setVisaoAtiva('workflows')}
-                className={`py-4 px-3 border-b-2 font-medium text-sm transition-colors flex-shrink-0 ${
-                  visaoAtiva === 'workflows'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Settings className="w-4 h-4" />
-                  Workflows
-                </div>
-              </button>
-
-              <button
-                onClick={() => setVisaoAtiva('notificacoes')}
-                className={`py-4 px-3 border-b-2 font-medium text-sm transition-colors flex-shrink-0 ${
-                  visaoAtiva === 'notificacoes'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Bell className="w-4 h-4" />
-                  Notificações
-                </div>
-              </button>
-
-              <button
-                onClick={() => setVisaoAtiva('backup')}
-                className={`py-4 px-3 border-b-2 font-medium text-sm transition-colors flex-shrink-0 ${
-                  visaoAtiva === 'backup'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4" />
-                  Backup & Recuperação
-                </div>
-              </button>
-            </nav>
-          </div>
-        </div>
-
-        {/* Conteúdo baseado na visão ativa */}
         {visaoAtiva === 'dashboard' && (
-          <div>
-            {/* Cards do Dashboard (KPI Cards - Padrão Crevasse) */}
-            <div className={`grid gap-6 mb-8 ${obterClasseGrid(cardsConfigurados.length)}`}>
-              {carregando
-                ? // Skeleton para cards do dashboard
-                  Array.from({ length: 6 }).map((_, index) => <SkeletonCard key={index} />)
-                : obterTodasConfiguracoesCards()
-                    .filter((card) => card.isActive)
-                    .map((card) => {
-                      const IconComponent = card.icon;
-                      const numeroCards = cardsConfigurados.length;
-                      return (
-                        <div
-                          key={card.id}
-                          className={`p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF] ${obterClassesCard(numeroCards)}`}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                                {card.title}
-                              </p>
-                              <p
-                                className={`${numeroCards <= 2 ? 'text-4xl' : 'text-3xl'} font-bold mt-2 text-[#002333]`}
-                              >
-                                {card.value}
-                              </p>
-                              <p className="text-sm text-[#002333]/70 mt-3">
-                                {card.description.replace(/[📊✅⚠️⏳💰📅]/g, '').trim()}
-                              </p>
-                            </div>
-                            <div
-                              className={`${numeroCards <= 2 ? 'h-14 w-14' : 'h-12 w-12'} rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm flex-shrink-0`}
-                            >
-                              <IconComponent
-                                className={`${numeroCards <= 2 ? 'h-7 w-7' : 'h-6 w-6'} text-[#159A9C]`}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-            </div>
+          <div className="pt-1">
+            {renderFiltrosDashboard()}
+          </div>
+        )}
+      </SectionCard>
 
-            {/* Filtros e Busca */}
-            <div className="bg-white rounded-lg shadow-sm border p-4 mb-3">
-              <div className="flex flex-col sm:flex-row gap-4 items-end">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Buscar Faturas
-                  </label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    <input
-                      type="text"
-                      placeholder="Buscar por número, cliente ou observações..."
-                      value={busca}
-                      onChange={(e) => setBusca(e.target.value)}
-                      onKeyDown={handleSearch}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors"
-                    />
-                  </div>
-                </div>
 
-                <div className="flex gap-2">
+
+      {/* Conteudo baseado na visao ativa */}
+      {visaoAtiva === 'fila' && renderFilaFaturamento()}
+
+      {(visaoAtiva === 'dashboard' || visaoAtiva === 'prontidao') && (
+        <div className="space-y-4">
+            {visaoAtiva === 'prontidao' && (
+              <SectionCard className="p-4 sm:p-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                    <select
-                      value={filtros.status || ''}
-                      onChange={(e) =>
-                        setFiltros((prev) => ({
-                          ...prev,
-                          status: (e.target.value as StatusFatura) || undefined,
-                        }))
-                      }
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                    >
-                      <option value="">Todos os Status</option>
-                      <option value={StatusFatura.PENDENTE}>⏳ Pendente</option>
-                      <option value={StatusFatura.ENVIADA}>📤 Enviada</option>
-                      <option value={StatusFatura.PAGA}>✅ Paga</option>
-                      <option value={StatusFatura.VENCIDA}>⚠️ Vencida</option>
-                      <option value={StatusFatura.CANCELADA}>❌ Cancelada</option>
-                    </select>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#476776]">Prontidao do fluxo</p>
+                    <h3 className="mt-1 text-lg font-semibold text-[#173A4D]">Checklist operacional de faturamento</h3>
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Tipo</label>
-                    <select
-                      value={filtros.tipo || ''}
-                      onChange={(e) =>
-                        setFiltros((prev) => ({
-                          ...prev,
-                          tipo: (e.target.value as TipoFatura) || undefined,
-                        }))
-                      }
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                    >
-                      <option value="">Todos os Tipos</option>
-                      <option value={TipoFatura.UNICA}>📄 Única</option>
-                      <option value={TipoFatura.RECORRENTE}>🔄 Recorrente</option>
-                      <option value={TipoFatura.PARCELA}>📊 Parcela</option>
-                      <option value={TipoFatura.ADICIONAL}>➕ Adicional</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Ordenar por
-                    </label>
-                    <select
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                    >
-                      <option value="dataVencimento">Vencimento</option>
-                      <option value="dataEmissao">Emissão</option>
-                      <option value="valorTotal">Valor</option>
-                      <option value="status">Status</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Ordem</label>
-                    <select
-                      value={sortOrder}
-                      onChange={(e) => setSortOrder(e.target.value as 'ASC' | 'DESC')}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                    >
-                      <option value="DESC">Desc</option>
-                      <option value="ASC">Asc</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Ações</label>
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
-                      onClick={buscarFaturas}
-                      className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] flex items-center gap-2 transition-colors"
-                      aria-label="Buscar"
+                      onClick={() => void carregarProntidaoCobranca()}
+                      disabled={carregandoProntidaoCobranca}
+                      className="inline-flex h-8 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-xs font-semibold text-[#355563] transition hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      <Search className="w-4 h-4" />
-                      Buscar
+                      {carregandoProntidaoCobranca ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          Atualizando...
+                        </>
+                      ) : (
+                        <>
+                          <Activity className="h-3.5 w-3.5" />
+                          Atualizar prontidao
+                        </>
+                      )}
                     </button>
+                    {painelProntidao.bloqueios > 0 && (
+                      <span className="inline-flex w-fit items-center rounded-full border border-[#F2CACA] bg-[#FFF5F5] px-3 py-1 text-xs font-semibold text-[#A12D2D]">
+                        {painelProntidao.bloqueios} bloqueio(s)
+                      </span>
+                    )}
+                    {painelProntidao.alertas > 0 && (
+                      <span className="inline-flex w-fit items-center rounded-full border border-[#F6D7B2] bg-[#FFF8EE] px-3 py-1 text-xs font-semibold text-[#9B5A00]">
+                        {painelProntidao.alertas} alerta(s)
+                      </span>
+                    )}
+                    <span
+                      className={`inline-flex w-fit items-center rounded-full border px-3 py-1 text-xs font-semibold ${
+                        estilosStatusProntidao[painelProntidao.statusGeral]
+                      }`}
+                    >
+                      {painelProntidao.prontoParaFechamento ? 'Pronto para fechamento' : 'Requer ajustes'}
+                    </span>
                   </div>
                 </div>
-              </div>
-              {/* Chips de filtros aplicados */}
-              {(busca ||
-                filtros.status ||
-                filtros.tipo ||
-                sortBy !== 'dataVencimento' ||
-                sortOrder !== 'DESC') && (
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  {busca && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-gray-100 text-gray-700 border">
-                      Busca: "{busca}"
-                      <button
-                        className="ml-1 hover:text-red-600"
-                        onClick={() => setBusca('')}
-                        aria-label="Limpar busca"
+
+                {erroProntidaoCobranca && (
+                  <div className="mt-4 rounded-xl border border-[#F6D7B2] bg-[#FFF8EE] p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#9B5A00]">
+                      Prontidao parcial
+                    </p>
+                    <p className="mt-1 text-sm text-[#7A4B00]">
+                      {erroProntidaoCobranca}
+                    </p>
+                  </div>
+                )}
+                <div className="mt-4 space-y-2 rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                  {painelProntidao.itens.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex flex-col gap-2 rounded-lg border border-[#E6EEF2] bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-[#173A4D]">{item.titulo}</p>
+                        <p className="text-xs text-[#5D7A88]">{item.detalhe}</p>
+                      </div>
+                      <span
+                        className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                          estilosStatusProntidao[item.status]
+                        }`}
                       >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  )}
-                  {filtros.status && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-gray-100 text-gray-700 border">
-                      Status: {faturamentoService.formatarStatusFatura(filtros.status as any)}
-                      <button
-                        className="ml-1 hover:text-red-600"
-                        onClick={() => setFiltros((prev) => ({ ...prev, status: undefined }))}
-                        aria-label="Limpar filtro de status"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  )}
-                  {filtros.tipo && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-gray-100 text-gray-700 border">
-                      Tipo: {faturamentoService.formatarTipoFatura(filtros.tipo as any)}
-                      <button
-                        className="ml-1 hover:text-red-600"
-                        onClick={() => setFiltros((prev) => ({ ...prev, tipo: undefined }))}
-                        aria-label="Limpar filtro de tipo"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  )}
-                  {(sortBy !== 'dataVencimento' || sortOrder !== 'DESC') && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-gray-100 text-gray-700 border">
-                      Ordenação: {sortBy} {sortOrder === 'DESC' ? '↓' : '↑'}
-                      <button
-                        className="ml-1 hover:text-red-600"
-                        onClick={() => {
-                          setSortBy('dataVencimento');
-                          setSortOrder('DESC');
-                        }}
-                        aria-label="Resetar ordenação"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  )}
-                  <button
-                    className="ml-auto text-sm text-blue-600 hover:text-blue-800 underline"
-                    onClick={() => {
-                      setBusca('');
-                      setFiltros({});
-                      setSortBy('dataVencimento');
-                      setSortOrder('DESC');
-                      setPage(1);
-                      refetch();
-                    }}
-                  >
-                    Limpar tudo
-                  </button>
+                        {rotulosStatusProntidao[item.status]}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              )}
-            </div>
+
+                {!cobrancaOnlineOperacional && (
+                  <div className="mt-4 rounded-xl border border-[#F6D7B2] bg-[#FFF8EE] p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#9B5A00]">
+                      Operacao recomendada neste ambiente
+                    </p>
+                    <p className="mt-1 text-sm text-[#7A4B00]">{fallbackOperacionalCobranca}</p>
+                  </div>
+                )}
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-[#5D7A88]">
+                      Itens x total da fatura
+                    </p>
+                    <p className="mt-2 text-2xl font-bold text-[#173A4D]">{painelDivergencias.itensVsTotal}</p>
+                    <p className="mt-1 text-xs text-[#5D7A88]">Validacao de subtotal + desconto + impostos.</p>
+                  </div>
+
+                  <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-[#5D7A88]">
+                      Estorno pendente de conciliacao
+                    </p>
+                    <p className="mt-2 text-2xl font-bold text-[#173A4D]">
+                      {painelDivergencias.estornosPendentesConciliacao}
+                    </p>
+                    <p className="mt-1 text-xs text-[#5D7A88]">
+                      Pagamentos de estorno para revisao no fluxo bancario.
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-[#5D7A88]">
+                      Parcial sem baixa final
+                    </p>
+                    <p className="mt-2 text-2xl font-bold text-[#173A4D]">
+                      {painelDivergencias.parciaisSemBaixaFinal}
+                    </p>
+                    <p className="mt-1 text-xs text-[#5D7A88]">
+                      Faturas com recebimento parcial ainda abertas.
+                    </p>
+                  </div>
+                </div>
+
+                {painelDivergencias.primeiraDivergenciaItens && (
+                  <p className="mt-3 text-xs text-[#8A3C00]">
+                    Exemplo: fatura {painelDivergencias.primeiraDivergenciaItens.numero} com diferenca de{' '}
+                    {formatCurrency(painelDivergencias.primeiraDivergenciaItens.diferenca)} no fechamento.
+                  </p>
+                )}
+
+                <p className="mt-2 text-xs text-[#5D7A88]">
+                  Analise baseada nas faturas carregadas na tela atual.
+                </p>
+              </SectionCard>
+            )}
+
 
             {/* Barra de Ações em Massa */}
             {mostrarAcoesMassa && (
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-3 mb-4">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                        <CheckCircle className="w-4 h-4 text-white" />
-                      </div>
-                      <span className="text-sm font-medium text-blue-900">
+              <div className="mb-4 rounded-xl border border-[#D4E2E7] bg-white p-3 sm:p-4">
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="inline-flex items-center gap-2 rounded-full border border-[#D4E2E7] bg-[#F6FAFB] px-3 py-1 text-sm font-medium text-[#244455]">
+                        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#159A9C] text-white">
+                          <CheckCircle className="h-3.5 w-3.5" />
+                        </span>
                         {faturasSelecionadas.length} fatura(s) selecionada(s)
                       </span>
+                      <button
+                        onClick={() => setFaturasSelecionadas([])}
+                        className="text-sm font-medium text-[#1A9E87] underline underline-offset-2 transition-colors hover:text-[#127A6B]"
+                      >
+                        Desmarcar todas
+                      </button>
                     </div>
-                    <button
-                      onClick={() => setFaturasSelecionadas([])}
-                      className="text-sm text-blue-600 hover:text-blue-800 underline transition-colors"
-                    >
-                      Desmarcar todas
-                    </button>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => handleAcaoMassa('enviar-email')}
+                        disabled={processandoAcaoMassa}
+                        className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Send className="h-4 w-4" />
+                        Enviar por Email
+                      </button>
+                      <button
+                        onClick={() => handleAcaoMassa('baixar-pdfs')}
+                        disabled={processandoAcaoMassa || !pdfDownloadHabilitado}
+                        title={
+                          !pdfDownloadHabilitado
+                            ? 'Download de PDF indisponivel neste ambiente'
+                            : 'Baixar PDFs'
+                        }
+                        className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Download className="h-4 w-4" />
+                        {pdfDownloadHabilitado ? 'Baixar PDFs' : 'Baixar PDFs (off)'}
+                      </button>
+                      <button
+                        onClick={() => handleAcaoMassa('gerar-cobranca')}
+                        disabled={processandoAcaoMassa}
+                        className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <AlertCircle className="h-4 w-4" />
+                        Gerar Cobrança
+                      </button>
+                      <button
+                        onClick={() => handleAcaoMassa('exportar')}
+                        disabled={processandoAcaoMassa}
+                        className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition-colors hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <FileText className="h-4 w-4" />
+                        Exportar
+                      </button>
+                      <button
+                        onClick={() => handleAcaoMassa('excluir')}
+                        disabled={processandoAcaoMassa}
+                        className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#D92D20] px-3 text-sm font-medium text-white transition-colors hover:bg-[#B42318] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Excluir
+                      </button>
+                    </div>
                   </div>
 
                   {processandoAcaoMassa && (
-                    <div className="w-full mb-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                        <span className="text-sm text-blue-700">Processando ação...</span>
+                    <div className="rounded-lg border border-[#D4E2E7] bg-[#F6FAFB] p-3">
+                      <div className="mb-2 flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-[#1A9E87]" />
+                        <span className="text-sm font-medium text-[#446675]">Processando ação...</span>
                       </div>
-                      <div className="w-full bg-blue-200 rounded-full h-2">
+                      <div className="h-2 w-full rounded-full bg-[#DCECF0]">
                         <div
-                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          className="h-2 rounded-full bg-[#159A9C] transition-all duration-300"
                           style={{ width: `${progressoAcaoMassa}%` }}
                         />
                       </div>
                     </div>
                   )}
-
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <button
-                      onClick={() => handleAcaoMassa('enviar-email')}
-                      disabled={processandoAcaoMassa}
-                      className="px-4 py-2 bg-[#159A9C] text-white rounded-lg text-sm hover:bg-[#0F7B7D] flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                    >
-                      <Send className="w-4 h-4" />
-                      Enviar por Email
-                    </button>
-                    <button
-                      onClick={() => handleAcaoMassa('baixar-pdfs')}
-                      disabled={processandoAcaoMassa}
-                      className="px-4 py-2 bg-[#159A9C] text-white rounded-lg text-sm hover:bg-[#0F7B7D] flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                    >
-                      <Download className="w-4 h-4" />
-                      Baixar PDFs
-                    </button>
-                    <button
-                      onClick={() => handleAcaoMassa('gerar-cobranca')}
-                      disabled={processandoAcaoMassa}
-                      className="px-4 py-2 bg-[#159A9C] text-white rounded-lg text-sm hover:bg-[#0F7B7D] flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                    >
-                      <AlertCircle className="w-4 h-4" />
-                      Gerar Cobrança
-                    </button>
-                    <button
-                      onClick={() => handleAcaoMassa('exportar')}
-                      disabled={processandoAcaoMassa}
-                      className="px-4 py-2 bg-[#159A9C] text-white rounded-lg text-sm hover:bg-[#0F7B7D] flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                    >
-                      <FileText className="w-4 h-4" />
-                      Exportar
-                    </button>
-                    <button
-                      onClick={() => handleAcaoMassa('excluir')}
-                      disabled={processandoAcaoMassa}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Excluir
-                    </button>
-                  </div>
                 </div>
               </div>
             )}
 
             {/* Lista de Faturas */}
-            <div className="bg-white rounded-lg shadow-sm border">
-              <div className="px-4 py-3 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Lista de Faturas</h2>
+            <DataTableCard className="border-[#CBDCE4] bg-white shadow-[0_22px_40px_-32px_rgba(16,57,74,0.34)]">
+              <div className="flex flex-col gap-3 border-b border-[#E1EAEE] bg-[#F8FBFC] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                <div>
+                  <h2 className="text-base font-semibold text-[#173A4D]">Lista de Faturas</h2>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[#5F7B89]">
+                    <span>
+                      Exibindo {faturasFiltradas.length} de {total} fatura(s)
+                    </span>
+                    {hasActiveListFilters ? (
+                      <span className="rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-2 py-0.5 text-[11px] font-medium text-[#0F7B7D]">
+                        filtros ativos
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="text-xs text-[#5F7B89]">
+                  Página {page} de {totalPages}
+                </div>
               </div>
 
               {carregando ? (
@@ -1351,35 +3181,37 @@ export default function FaturamentoPage() {
                 <div className="overflow-hidden">
                   {/* Versão desktop - Grid moderno */}
                   <div className="hidden lg:block">
-                    <div className="h-[calc(100vh-340px)] overflow-y-auto">
+                    <div className="max-h-[calc(100vh-340px)] overflow-y-auto">
                       {/* Header do Grid */}
-                      <div className="sticky top-0 z-10 bg-gradient-to-r from-slate-50 via-blue-50 to-indigo-50 border-b border-gray-200 shadow-sm">
-                        <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      <div className="sticky top-0 z-10 border-b border-[#E1EAEE] bg-[#FBFDFE]">
+                        <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs font-semibold text-[#516F7D] uppercase tracking-wider">
                           <div className="col-span-1 flex items-center justify-center">
                             <input
                               type="checkbox"
                               checked={
-                                faturasSelecionadas.length === faturasFiltradas.length &&
-                                faturasFiltradas.length > 0
+                                faturasFiltradas.length > 0 &&
+                                faturasFiltradas.every((fatura) =>
+                                  faturasSelecionadas.includes(fatura.id),
+                                )
                               }
                               onChange={toggleSelecaoTodas}
                               className="w-4 h-4 text-[#159A9C] bg-white border-gray-300 rounded shadow-sm focus:ring-[#159A9C] focus:ring-2 transition-all"
                             />
                           </div>
                           <div className="col-span-2 flex items-center gap-1">
-                            <FileText className="w-3 h-3 text-blue-600" />
+                            <FileText className="w-3 h-3 text-[#159A9C]" />
                             <span>Fatura</span>
                           </div>
                           <div className="col-span-2 flex items-center gap-1">
-                            <Building2 className="w-3 h-3 text-blue-600" />
+                            <Building2 className="w-3 h-3 text-[#159A9C]" />
                             <span>Cliente</span>
                           </div>
                           <div className="col-span-2 flex items-center gap-1">
-                            <Activity className="w-3 h-3 text-blue-600" />
+                            <Activity className="w-3 h-3 text-[#159A9C]" />
                             <span>Status</span>
                           </div>
                           <div
-                            className="col-span-2 flex items-center gap-1 cursor-pointer hover:text-blue-600 transition-colors"
+                            className="col-span-2 flex items-center gap-1 cursor-pointer transition-colors hover:text-[#0F7B7D]"
                             onClick={() => {
                               if (sortBy === 'dataVencimento') {
                                 setSortOrder((prev) => (prev === 'DESC' ? 'ASC' : 'DESC'));
@@ -1392,7 +3224,7 @@ export default function FaturamentoPage() {
                             }}
                             title="Ordenar por vencimento"
                           >
-                            <Calendar className="w-3 h-3 text-blue-600" />
+                            <Calendar className="w-3 h-3 text-[#159A9C]" />
                             <span>Vencimento</span>
                             {sortBy === 'dataVencimento' &&
                               (sortOrder === 'DESC' ? (
@@ -1402,7 +3234,7 @@ export default function FaturamentoPage() {
                               ))}
                           </div>
                           <div
-                            className="col-span-2 flex items-center justify-end gap-1 cursor-pointer hover:text-blue-600 transition-colors pr-8"
+                            className="col-span-2 flex items-center justify-end gap-1 cursor-pointer pr-8 transition-colors hover:text-[#0F7B7D]"
                             onClick={() => {
                               if (sortBy === 'valorTotal') {
                                 setSortOrder((prev) => (prev === 'DESC' ? 'ASC' : 'DESC'));
@@ -1415,7 +3247,7 @@ export default function FaturamentoPage() {
                             }}
                             title="Ordenar por valor"
                           >
-                            <DollarSign className="w-3 h-3 text-blue-600" />
+                            <DollarSign className="w-3 h-3 text-[#159A9C]" />
                             <span>Valor</span>
                             {sortBy === 'valorTotal' &&
                               (sortOrder === 'DESC' ? (
@@ -1425,7 +3257,7 @@ export default function FaturamentoPage() {
                               ))}
                           </div>
                           <div className="col-span-1 flex items-center justify-center gap-1">
-                            <Settings className="w-3 h-3 text-blue-600" />
+                            <Settings className="w-3 h-3 text-[#159A9C]" />
                             <span>Ações</span>
                           </div>
                         </div>
@@ -1433,7 +3265,7 @@ export default function FaturamentoPage() {
 
                       {/* Body do Grid */}
                       <div className="divide-y divide-gray-100">
-                        {faturasFiltradas.map((fatura, index) => {
+                        {faturasFiltradas.map((fatura) => {
                           const isVencida = faturamentoService.verificarVencimento(
                             fatura.dataVencimento,
                           );
@@ -1446,32 +3278,47 @@ export default function FaturamentoPage() {
                           );
 
                           // Definir classes de estilo baseado no status
-                          let rowClass = `grid grid-cols-12 gap-4 px-4 py-3 hover:bg-gradient-to-r hover:from-blue-25 hover:to-indigo-25 transition-all duration-200 group ${
-                            isSelected
-                              ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 shadow-sm'
-                              : ''
+                          let rowClass = `grid grid-cols-12 gap-4 px-4 py-3 transition-colors duration-150 group hover:bg-[#F6FAFB] ${
+                            isSelected ? 'bg-[#ECF7F3] border-l-4 border-[#1A9E87]' : ''
                           }`;
 
                           if (isVencida && fatura.status === StatusFatura.PENDENTE) {
-                            rowClass +=
-                              ' bg-gradient-to-r from-red-25 to-red-50 border-l-4 border-red-400';
+                            rowClass += ' bg-[#FEF3F2] border-l-4 border-[#F04438]';
                           } else if (
                             diasVencimento <= 7 &&
                             diasVencimento > 0 &&
                             fatura.status === StatusFatura.PENDENTE
                           ) {
-                            rowClass +=
-                              ' bg-gradient-to-r from-yellow-25 to-yellow-50 border-l-4 border-yellow-400';
+                            rowClass += ' bg-[#FFFAEB] border-l-4 border-[#F79009]';
                           }
 
                           return (
-                            <div key={fatura.id} className={rowClass}>
+                            <div
+                              key={fatura.id}
+                              className={`${rowClass} cursor-pointer`}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => abrirModalDetalhes(fatura)}
+                              onKeyDown={(event) => {
+                                if (event.target !== event.currentTarget) {
+                                  return;
+                                }
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault();
+                                  abrirModalDetalhes(fatura);
+                                }
+                              }}
+                            >
                               {/* Checkbox */}
-                              <div className="col-span-1 flex items-center justify-center">
+                              <div
+                                className="col-span-1 flex items-center justify-center"
+                                onClick={(event) => event.stopPropagation()}
+                              >
                                 <input
                                   type="checkbox"
                                   checked={isSelected}
                                   onChange={() => toggleSelecaoFatura(fatura.id)}
+                                  onClick={(event) => event.stopPropagation()}
                                   className="w-4 h-4 text-[#159A9C] bg-white border-gray-300 rounded shadow-sm focus:ring-[#159A9C] focus:ring-2 transition-all"
                                 />
                               </div>
@@ -1498,7 +3345,7 @@ export default function FaturamentoPage() {
                                   />
                                 </div>
                                 <div>
-                                  <div className="text-sm font-semibold text-gray-900 group-hover:text-blue-700 transition-colors">
+                                  <div className="text-sm font-semibold text-gray-900 group-hover:text-[#0F7B7D] transition-colors">
                                     #{faturamentoService.formatarNumeroFatura(fatura.numero)}
                                   </div>
                                   <div className="text-xs text-gray-500 hidden sm:block">
@@ -1513,7 +3360,7 @@ export default function FaturamentoPage() {
                                   <Building2 className="w-3 h-3 text-indigo-600" />
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                  <div className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-700 transition-colors">
+                                  <div className="text-sm font-medium text-gray-900 truncate group-hover:text-[#0F7B7D] transition-colors">
                                     {obterNomeCliente(fatura.cliente, fatura.clienteId)}
                                   </div>
                                   {obterEmailCliente(fatura.cliente) && (
@@ -1570,7 +3417,7 @@ export default function FaturamentoPage() {
                                             fatura.status === StatusFatura.PENDENTE
                                           ? 'text-yellow-600'
                                           : 'text-gray-900'
-                                    } group-hover:text-blue-700 transition-colors`}
+                                    } group-hover:text-[#0F7B7D] transition-colors`}
                                   >
                                     {dataVencimento.toLocaleDateString('pt-BR', {
                                       day: '2-digit',
@@ -1591,7 +3438,7 @@ export default function FaturamentoPage() {
                               {/* Valor */}
                               <div className="col-span-2 flex items-center justify-end pr-8">
                                 <div className="text-right min-w-[140px]">
-                                  <div className="text-sm font-bold text-gray-900 group-hover:text-blue-700 transition-colors tabular-nums whitespace-nowrap">
+                                  <div className="text-sm font-bold text-gray-900 group-hover:text-[#0F7B7D] transition-colors tabular-nums whitespace-nowrap">
                                     <span className="text-gray-500 mr-1 font-normal">R$</span>
                                     {Number(fatura.valorTotal).toLocaleString('pt-BR', {
                                       minimumFractionDigits: 2,
@@ -1615,21 +3462,19 @@ export default function FaturamentoPage() {
                               </div>
 
                               {/* Ações */}
-                              <div className="col-span-1 flex items-center justify-center min-w-[120px]">
+                              <div
+                                className="col-span-1 flex items-center justify-center min-w-[120px]"
+                                onClick={(event) => event.stopPropagation()}
+                              >
                                 <div className="flex items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
                                   {/* Ações principais sempre visíveis */}
-                                  <button
-                                    onClick={() => abrirModalDetalhes(fatura)}
-                                    className="p-2 text-[#159A9C] hover:text-[#0F7B7D] hover:bg-[#159A9C]/10 rounded-lg transition-all duration-200 border border-[#159A9C] hover:border-[#0F7B7D] shadow-sm hover:shadow-md"
-                                    title="Ver Detalhes"
-                                  >
-                                    <Eye className="w-3 h-3" />
-                                  </button>
-
                                   {fatura.status !== StatusFatura.PAGA &&
                                     fatura.status !== StatusFatura.CANCELADA && (
                                       <button
-                                        onClick={() => abrirModalEdicao(fatura)}
+                                        onClick={() => {
+                                          fecharMenuAcoes();
+                                          abrirModalEdicao(fatura);
+                                        }}
                                         className="p-2 text-[#159A9C] hover:text-[#0F7B7D] hover:bg-[#159A9C]/10 rounded-lg transition-all duration-200 border border-[#159A9C] hover:border-[#0F7B7D] shadow-sm hover:shadow-md"
                                         title="Editar Fatura"
                                       >
@@ -1638,55 +3483,139 @@ export default function FaturamentoPage() {
                                     )}
 
                                   {/* Menu dropdown para ações secundárias */}
-                                  <div className="relative group/menu">
+                                  <div
+                                    className="relative"
+                                    data-menu-acoes-root="true"
+                                    onClick={(event) => event.stopPropagation()}
+                                  >
                                     <button
-                                      className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-lg transition-all duration-200 border border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md"
+                                      onClick={(event) => alternarMenuAcoes(event, fatura.id)}
+                                      aria-haspopup="menu"
+                                      aria-expanded={menuAcoesAbertoId === fatura.id}
+                                      className={`p-2 rounded-lg transition-all duration-200 border shadow-sm hover:shadow-md ${
+                                        menuAcoesAbertoId === fatura.id
+                                          ? 'text-gray-800 bg-gray-100 border-gray-300'
+                                          : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50 border-gray-200 hover:border-gray-300'
+                                      }`}
                                       title="Mais ações"
                                     >
                                       <MoreVertical className="w-3 h-3" />
                                     </button>
 
                                     {/* Dropdown menu compacto */}
-                                    <div className="absolute right-0 top-full mt-2 w-44 bg-white rounded-lg shadow-xl border border-gray-200 opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all duration-200 z-50 overflow-hidden">
+                                    <div
+                                      className={`absolute right-0 top-full mt-2 w-44 bg-white rounded-lg shadow-xl border border-gray-200 transition-all duration-200 z-50 overflow-hidden ${
+                                        menuAcoesAbertoId === fatura.id
+                                          ? 'opacity-100 visible translate-y-0'
+                                          : 'opacity-0 invisible pointer-events-none -translate-y-1'
+                                      }`}
+                                    >
                                       <div className="py-1">
-                                        {fatura.status !== StatusFatura.PAGA && (
+                                        {statusPermiteAcoesFinanceiras(fatura.status) && (
                                           <>
                                             <button
-                                              onClick={() => enviarPorEmail(fatura.id)}
+                                              onClick={() => {
+                                                fecharMenuAcoes();
+                                                enviarPorEmail(fatura.id);
+                                              }}
                                               className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-purple-50 hover:text-purple-700 flex items-center gap-2 transition-colors"
                                             >
                                               <Send className="w-3 h-3" />
                                               Enviar Email
                                             </button>
                                             <button
-                                              onClick={() => abrirModalPagamentos(fatura)}
+                                              onClick={() => {
+                                                fecharMenuAcoes();
+                                                abrirModalPagamentos(fatura);
+                                              }}
                                               className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-green-50 hover:text-green-700 flex items-center gap-2 transition-colors"
                                             >
                                               <DollarSign className="w-3 h-3" />
                                               Registrar Pgto
                                             </button>
                                             <button
-                                              onClick={() => gerarLinkPagamento(fatura.id)}
-                                              className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-orange-50 hover:text-orange-700 flex items-center gap-2 transition-colors"
+                                              onClick={() => {
+                                                fecharMenuAcoes();
+                                                gerarLinkPagamento(fatura.id);
+                                              }}
+                                              disabled={!linkPagamentoHabilitado}
+                                              title={
+                                                !linkPagamentoHabilitado
+                                                  ? motivoBloqueioGateway
+                                                  : 'Gerar link de pagamento'
+                                              }
+                                              className={`w-full px-3 py-2 text-left text-xs flex items-center gap-2 transition-colors ${
+                                                linkPagamentoHabilitado
+                                                  ? 'text-gray-700 hover:bg-orange-50 hover:text-orange-700'
+                                                  : 'text-gray-400 cursor-not-allowed bg-gray-50'
+                                              }`}
                                             >
                                               <Link2 className="w-3 h-3" />
-                                              Gerar Link
+                                              {linkPagamentoHabilitado ? 'Gerar Link' : 'Gerar Link (off)'}
+                                            </button>
+                                            <button
+                                              onClick={() => {
+                                                fecharMenuAcoes();
+                                                abrirBoleto(fatura);
+                                              }}
+                                              className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-cyan-50 hover:text-cyan-700 flex items-center gap-2 transition-colors"
+                                            >
+                                              <ExternalLink className="w-3 h-3" />
+                                              Abrir Boleto
+                                            </button>
+                                            {resolverFormaPagamentoFatura(fatura) === FormaPagamento.BOLETO && (
+                                              <button
+                                                onClick={() => {
+                                                  fecharMenuAcoes();
+                                                  baixarBoletoPdf(fatura);
+                                                }}
+                                                className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-teal-50 hover:text-teal-700 flex items-center gap-2 transition-colors"
+                                              >
+                                                <Download className="w-3 h-3" />
+                                                Baixar Boleto PDF
+                                              </button>
+                                            )}
+                                            <button
+                                              onClick={() => {
+                                                fecharMenuAcoes();
+                                                void copiarLinkBoleto(fatura);
+                                              }}
+                                              className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2 transition-colors"
+                                            >
+                                              <Copy className="w-3 h-3" />
+                                              Copiar Link
                                             </button>
                                           </>
                                         )}
 
                                         <button
-                                          onClick={() => baixarPDF(fatura.id)}
-                                          className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 transition-colors"
+                                          onClick={() => {
+                                            fecharMenuAcoes();
+                                            baixarPDF(fatura.id);
+                                          }}
+                                          disabled={!pdfDownloadHabilitado}
+                                          title={
+                                            !pdfDownloadHabilitado
+                                              ? 'Download de PDF indisponivel neste ambiente'
+                                              : 'Baixar PDF'
+                                          }
+                                          className={`w-full px-3 py-2 text-left text-xs flex items-center gap-2 transition-colors ${
+                                            pdfDownloadHabilitado
+                                              ? 'text-gray-700 hover:bg-blue-50 hover:text-blue-700'
+                                              : 'text-gray-400 cursor-not-allowed bg-gray-50'
+                                          }`}
                                         >
                                           <Download className="w-3 h-3" />
-                                          Baixar PDF
+                                          {pdfDownloadHabilitado ? 'Baixar PDF' : 'Baixar PDF (off)'}
                                         </button>
 
                                         <div className="border-t border-gray-100 my-1"></div>
 
                                         <button
-                                          onClick={() => excluirFatura(fatura.id)}
+                                          onClick={() => {
+                                            fecharMenuAcoes();
+                                            excluirFatura(fatura.id);
+                                          }}
                                           className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center gap-2 transition-colors"
                                         >
                                           <Trash2 className="w-3 h-3" />
@@ -1721,7 +3650,7 @@ export default function FaturamentoPage() {
                       return (
                         <div
                           key={fatura.id}
-                          className={`bg-white rounded-xl border-2 p-5 transition-all shadow-sm hover:shadow-md ${
+                          className={`bg-white rounded-xl border-2 p-5 transition-all shadow-sm hover:shadow-md cursor-pointer ${
                             isSelected
                               ? 'border-blue-500 bg-blue-50 shadow-blue-100'
                               : isVencida && fatura.status === StatusFatura.PENDENTE
@@ -1732,14 +3661,30 @@ export default function FaturamentoPage() {
                                   ? 'border-yellow-400 bg-yellow-50 shadow-yellow-100'
                                   : 'border-gray-200 hover:border-gray-300'
                           }`}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => abrirModalDetalhes(fatura)}
+                          onKeyDown={(event) => {
+                            if (event.target !== event.currentTarget) {
+                              return;
+                            }
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              abrirModalDetalhes(fatura);
+                            }
+                          }}
                         >
                           {/* Header do card aprimorado */}
                           <div className="flex items-start justify-between mb-4">
-                            <div className="flex items-center gap-3">
+                            <div
+                              className="flex items-center gap-3"
+                              onClick={(event) => event.stopPropagation()}
+                            >
                               <input
                                 type="checkbox"
                                 checked={isSelected}
                                 onChange={() => toggleSelecaoFatura(fatura.id)}
+                                onClick={(event) => event.stopPropagation()}
                                 className="w-4 h-4 text-[#159A9C] bg-gray-100 border-gray-300 rounded focus:ring-[#159A9C] focus:ring-2"
                               />
                               <div
@@ -1896,28 +3841,30 @@ export default function FaturamentoPage() {
                           </div>
 
                           {/* Ações aprimoradas */}
-                          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                          <div
+                            className="flex items-center justify-between pt-4 border-t border-gray-200"
+                            onClick={(event) => event.stopPropagation()}
+                          >
                             <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => abrirModalDetalhes(fatura)}
-                                className="px-4 py-2 text-sm text-[#159A9C] hover:text-[#0F7B7D] hover:bg-[#159A9C]/10 rounded-lg transition-all duration-200 flex items-center gap-2 border border-[#159A9C] hover:border-[#0F7B7D] shadow-sm hover:shadow-md font-medium"
-                              >
-                                <Eye className="w-4 h-4" />
-                                Ver
-                              </button>
                               {fatura.status !== StatusFatura.PAGA &&
                                 fatura.status !== StatusFatura.CANCELADA && (
                                   <button
-                                    onClick={() => abrirModalEdicao(fatura)}
+                                    onClick={() => {
+                                      fecharMenuAcoes();
+                                      abrirModalEdicao(fatura);
+                                    }}
                                     className="px-4 py-2 text-sm text-[#159A9C] hover:text-[#0F7B7D] hover:bg-[#159A9C]/10 rounded-lg transition-all duration-200 flex items-center gap-2 border border-[#159A9C] hover:border-[#0F7B7D] shadow-sm hover:shadow-md font-medium"
                                   >
                                     <Edit3 className="w-4 h-4" />
                                     Editar
                                   </button>
                                 )}
-                              {fatura.status !== StatusFatura.PAGA && (
+                              {statusPermiteAcoesFinanceiras(fatura.status) && (
                                 <button
-                                  onClick={() => abrirModalPagamentos(fatura)}
+                                  onClick={() => {
+                                    fecharMenuAcoes();
+                                    abrirModalPagamentos(fatura);
+                                  }}
                                   className="px-4 py-2 text-sm bg-[#159A9C] hover:bg-[#0F7B7D] text-white rounded-lg transition-all duration-200 flex items-center gap-2 shadow-sm hover:shadow-md font-medium"
                                 >
                                   <DollarSign className="w-4 h-4" />
@@ -1927,55 +3874,114 @@ export default function FaturamentoPage() {
                             </div>
 
                             {/* Menu dropdown mobile aprimorado */}
-                            <div className="relative group">
-                              <button className="p-2.5 text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-lg transition-all duration-200 border border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md">
+                            <div
+                              className="relative"
+                              data-menu-acoes-root="true"
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              <button
+                                onClick={(event) => alternarMenuAcoes(event, fatura.id)}
+                                aria-haspopup="menu"
+                                aria-expanded={menuAcoesAbertoId === fatura.id}
+                                className={`p-2.5 rounded-lg transition-all duration-200 border shadow-sm hover:shadow-md ${
+                                  menuAcoesAbertoId === fatura.id
+                                    ? 'text-gray-800 bg-gray-100 border-gray-300'
+                                    : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50 border-gray-200 hover:border-gray-300'
+                                }`}
+                              >
                                 <MoreVertical className="w-4 h-4" />
                               </button>
 
-                              <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-xl shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 overflow-hidden">
+                              <div
+                                className={`absolute right-0 top-full mt-2 w-52 bg-white rounded-xl shadow-lg border border-gray-200 transition-all duration-200 z-50 overflow-hidden ${
+                                  menuAcoesAbertoId === fatura.id
+                                    ? 'opacity-100 visible translate-y-0'
+                                    : 'opacity-0 invisible pointer-events-none -translate-y-1'
+                                }`}
+                              >
                                 <div className="py-2">
                                   <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-100">
                                     Mais Ações
                                   </div>
 
-                                  {fatura.status !== StatusFatura.PAGA && (
+                                  {statusPermiteCobranca(fatura.status) && (
                                     <button
-                                      onClick={() => abrirModalGateway(fatura)}
-                                      className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-3 transition-colors"
+                                      onClick={() => {
+                                        fecharMenuAcoes();
+                                        abrirModalGateway(fatura);
+                                      }}
+                                      disabled={!gatewayUiHabilitada}
+                                      title={
+                                        !gatewayUiHabilitada
+                                          ? motivoBloqueioGateway
+                                          : 'Abrir pagamento online'
+                                      }
+                                      className={`w-full px-4 py-3 text-left text-sm flex items-center gap-3 transition-colors ${
+                                        gatewayUiHabilitada
+                                          ? 'text-gray-700 hover:bg-blue-50 hover:text-blue-700'
+                                          : 'text-gray-400 bg-gray-50 cursor-not-allowed'
+                                      }`}
                                     >
                                       <CreditCard className="w-4 h-4" />
                                       <div>
-                                        <div className="font-medium">Pagar Online</div>
-                                        <div className="text-xs text-gray-500">Gateway</div>
+                                        <div className="font-medium">
+                                          {gatewayUiHabilitada ? 'Pagar Online' : 'Pagar Online (off)'}
+                                        </div>
+                                        <div className="text-xs text-gray-500">
+                                          {gatewayUiHabilitada ? 'Gateway' : 'Gateway indisponível'}
+                                        </div>
                                       </div>
                                     </button>
                                   )}
 
                                   <button
-                                    onClick={() => baixarPDF(fatura.id)}
-                                    className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 flex items-center gap-3 transition-colors"
+                                    onClick={() => {
+                                      fecharMenuAcoes();
+                                      baixarPDF(fatura.id);
+                                    }}
+                                    disabled={!pdfDownloadHabilitado}
+                                    title={
+                                      !pdfDownloadHabilitado
+                                        ? 'Download de PDF indisponivel neste ambiente'
+                                        : 'Baixar PDF'
+                                    }
+                                    className={`w-full px-4 py-3 text-left text-sm flex items-center gap-3 transition-colors ${
+                                      pdfDownloadHabilitado
+                                        ? 'text-gray-700 hover:bg-purple-50 hover:text-purple-700'
+                                        : 'text-gray-400 bg-gray-50 cursor-not-allowed'
+                                    }`}
                                   >
                                     <Download className="w-4 h-4" />
                                     <div>
-                                      <div className="font-medium">Baixar PDF</div>
+                                      <div className="font-medium">
+                                        {pdfDownloadHabilitado ? 'Baixar PDF' : 'Baixar PDF (off)'}
+                                      </div>
                                       <div className="text-xs text-gray-500">Documento</div>
                                     </div>
                                   </button>
 
-                                  <button
-                                    onClick={() => enviarPorEmail(fatura.id)}
-                                    className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-3 transition-colors"
-                                  >
+                                  {statusPermiteCobranca(fatura.status) && (
+                                    <button
+                                      onClick={() => {
+                                        fecharMenuAcoes();
+                                        enviarPorEmail(fatura.id);
+                                      }}
+                                      className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-3 transition-colors"
+                                    >
                                     <Send className="w-4 h-4" />
                                     <div>
                                       <div className="font-medium">Enviar Email</div>
                                       <div className="text-xs text-gray-500">Cobrança</div>
                                     </div>
-                                  </button>
+                                    </button>
+                                  )}
 
-                                  {fatura.status !== StatusFatura.PAGA && (
+                                  {statusPermiteCobranca(fatura.status) && (
                                     <button
-                                      onClick={() => gerarLinkPagamento(fatura.id)}
+                                      onClick={() => {
+                                        fecharMenuAcoes();
+                                        gerarLinkPagamento(fatura.id);
+                                      }}
                                       className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 flex items-center gap-3 transition-colors"
                                     >
                                       <Link2 className="w-4 h-4" />
@@ -1986,10 +3992,62 @@ export default function FaturamentoPage() {
                                     </button>
                                   )}
 
+                                  {statusPermiteCobranca(fatura.status) && (
+                                    <button
+                                      onClick={() => {
+                                        fecharMenuAcoes();
+                                        abrirBoleto(fatura);
+                                      }}
+                                      className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-cyan-50 hover:text-cyan-700 flex items-center gap-3 transition-colors"
+                                    >
+                                      <ExternalLink className="w-4 h-4" />
+                                      <div>
+                                        <div className="font-medium">Abrir Boleto</div>
+                                        <div className="text-xs text-gray-500">Checkout</div>
+                                      </div>
+                                    </button>
+                                  )}
+
+                                  {statusPermiteCobranca(fatura.status) &&
+                                    resolverFormaPagamentoFatura(fatura) === FormaPagamento.BOLETO && (
+                                      <button
+                                        onClick={() => {
+                                          fecharMenuAcoes();
+                                          baixarBoletoPdf(fatura);
+                                        }}
+                                        className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-teal-50 hover:text-teal-700 flex items-center gap-3 transition-colors"
+                                      >
+                                        <Download className="w-4 h-4" />
+                                        <div>
+                                          <div className="font-medium">Baixar Boleto PDF</div>
+                                          <div className="text-xs text-gray-500">Impressao/envio</div>
+                                        </div>
+                                      </button>
+                                    )}
+
+                                  {statusPermiteCobranca(fatura.status) && (
+                                    <button
+                                      onClick={() => {
+                                        fecharMenuAcoes();
+                                        void copiarLinkBoleto(fatura);
+                                      }}
+                                      className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-3 transition-colors"
+                                    >
+                                      <Copy className="w-4 h-4" />
+                                      <div>
+                                        <div className="font-medium">Copiar Link</div>
+                                        <div className="text-xs text-gray-500">Pagamento</div>
+                                      </div>
+                                    </button>
+                                  )}
+
                                   <div className="border-t border-gray-100 my-1"></div>
 
                                   <button
-                                    onClick={() => excluirFatura(fatura.id)}
+                                    onClick={() => {
+                                      fecharMenuAcoes();
+                                      excluirFatura(fatura.id);
+                                    }}
                                     className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center gap-3 transition-colors"
                                   >
                                     <Trash2 className="w-4 h-4" />
@@ -2007,127 +4065,81 @@ export default function FaturamentoPage() {
                     })}
                   </div>
 
-                  {/* Barra de estatísticas otimizada */}
-                  <div className="px-4 py-3 border-t bg-gradient-to-r from-slate-50 via-blue-50 to-indigo-50">
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 text-xs">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                        <span className="text-gray-600">Página atual:</span>
-                        <span className="font-bold text-blue-700 tabular-nums whitespace-nowrap">
-                          <span className="text-gray-500 mr-1 font-normal">R$</span>
-                          {faturasFiltradas
-                            .reduce((acc, f) => acc + Number(f.valorTotal || 0), 0)
-                            .toLocaleString('pt-BR', {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
+                  <div className="flex flex-col items-stretch justify-between gap-3 border-t border-[#E1EAEE] bg-[#FBFDFE] px-4 py-3 sm:flex-row sm:items-center sm:px-5">
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-[#5F7B89]">
+                      <span>
+                        Mostrando{' '}
+                        <span className="font-semibold tabular-nums text-[#173A4D]">
+                          {(page - 1) * pageSize + 1}
+                        </span>{' '}
+                        -{' '}
+                        <span className="font-semibold tabular-nums text-[#173A4D]">
+                          {Math.min(page * pageSize, total)}
+                        </span>{' '}
+                        de{' '}
+                        <span className="font-semibold tabular-nums text-[#173A4D]">{total}</span>{' '}
+                        fatura(s)
+                      </span>
+
+                      <span className="hidden h-4 w-px bg-[#D4E2E7] sm:inline-block" />
+
+                      <span className="font-medium text-[#173A4D]">
+                        Total da página:{' '}
+                        <span className="tabular-nums">
+                          {formatCurrency(
+                            faturasFiltradas.reduce((acc, f) => acc + Number(f.valorTotal || 0), 0),
+                          )}
                         </span>
-                        <span className="text-gray-500">({faturasFiltradas.length} itens)</span>
-                      </div>
+                      </span>
 
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span className="text-gray-600">Recebido:</span>
-                        <span className="font-bold text-green-700 tabular-nums whitespace-nowrap">
-                          <span className="text-gray-500 mr-1 font-normal">R$</span>
-                          {Number(aggregates?.valorRecebido ?? 0).toLocaleString('pt-BR', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
+                      <span className="font-medium text-[#0F6C38]">
+                        Recebido:{' '}
+                        <span className="tabular-nums">
+                          {formatCurrency(Number(aggregates?.valorRecebido ?? 0))}
                         </span>
-                      </div>
+                      </span>
 
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                        <span className="text-gray-600">Em aberto:</span>
-                        <span className="font-bold text-orange-700 tabular-nums whitespace-nowrap">
-                          <span className="text-gray-500 mr-1 font-normal">R$</span>
-                          {Number(aggregates?.valorEmAberto ?? 0).toLocaleString('pt-BR', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
+                      <span className="font-medium text-[#9B5A00]">
+                        Em aberto:{' '}
+                        <span className="tabular-nums">
+                          {formatCurrency(Number(aggregates?.valorEmAberto ?? 0))}
                         </span>
-                      </div>
-
-                      <div className="flex items-center gap-2 justify-end">
-                        <div className="flex items-center gap-0.5">
-                          <div className="w-1 h-1 bg-purple-500 rounded-full"></div>
-                          <div className="w-1 h-1 bg-blue-500 rounded-full"></div>
-                          <div className="w-1 h-1 bg-green-500 rounded-full"></div>
-                        </div>
-                        <span className="text-gray-600">Grid:</span>
-                        <span className="font-bold text-purple-700">Otimizado</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Paginação aprimorada */}
-                  <div className="flex flex-col lg:flex-row items-center justify-between gap-4 px-6 py-4 border-t bg-white">
-                    <div className="text-sm text-gray-600 flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-gray-400" />
-                      Mostrando{' '}
-                      <span className="font-semibold tabular-nums">
-                        {(page - 1) * pageSize + 1}
-                      </span>{' '}
-                      -{' '}
-                      <span className="font-semibold tabular-nums">
-                        {Math.min(page * pageSize, total)}
-                      </span>{' '}
-                      de <span className="font-semibold tabular-nums">{total}</span> faturas
+                      </span>
                     </div>
 
-                    <div className="flex items-center gap-4">
-                      {/* Controles de navegação */}
+                    <div className="flex flex-wrap items-center justify-end gap-3">
                       <div className="flex items-center gap-2">
                         <button
-                          className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                          onClick={() => setPage((p) => Math.max(1, p - 1))}
-                          disabled={page === 1}
+                          type="button"
+                          onClick={() => setPage((current) => Math.max(current - 1, 1))}
+                          disabled={page <= 1}
+                          className={btnSecondary}
                         >
-                          <ChevronUp className="w-4 h-4 rotate-[-90deg]" />
+                          <ChevronLeft className="h-4 w-4" />
                           Anterior
                         </button>
-
-                        <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg">
-                          <span className="text-sm text-gray-600">Página</span>
-                          <input
-                            type="number"
-                            min={1}
-                            max={Math.max(1, Math.ceil(total / pageSize))}
-                            value={page}
-                            onChange={(e) => {
-                              const alvo = Number(e.target.value || '1');
-                              const max = Math.max(1, Math.ceil(total / pageSize));
-                              const pagina = Math.min(Math.max(1, alvo), max);
-                              setPage(pagina);
-                            }}
-                            className="w-16 px-2 py-1 border border-gray-300 rounded text-center focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                            aria-label="Número da página"
-                          />
-                          <span className="text-sm text-gray-600">
-                            de {Math.max(1, Math.ceil(total / pageSize))}
-                          </span>
-                        </div>
-
+                        <span className="rounded-lg border border-[#D4E2E7] bg-white px-3 py-2 text-sm text-[#244455]">
+                          {page}/{totalPages}
+                        </span>
                         <button
-                          className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                          onClick={() => setPage((p) => (p * pageSize < total ? p + 1 : p))}
-                          disabled={page * pageSize >= total}
+                          type="button"
+                          onClick={() => setPage((current) => Math.min(current + 1, totalPages))}
+                          disabled={page >= totalPages}
+                          className={btnSecondary}
                         >
                           Próxima
-                          <ChevronUp className="w-4 h-4 rotate-90" />
+                          <ChevronRight className="h-4 w-4" />
                         </button>
                       </div>
 
-                      {/* Seletor de itens por página */}
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-600">Itens por página:</span>
+                        <span className="text-xs text-[#5F7B89]">Itens por página:</span>
                         <select
-                          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                          className="h-9 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
                           value={pageSize}
-                          onChange={(e) => {
+                          onChange={(event) => {
                             setPage(1);
-                            setPageSize(parseInt(e.target.value, 10));
+                            setPageSize(parseInt(event.target.value, 10));
                           }}
                         >
                           <option value={10}>10</option>
@@ -2140,13 +4152,8 @@ export default function FaturamentoPage() {
                   </div>
                 </div>
               )}
-            </div>
+            </DataTableCard>
           </div>
-        )}
-
-        {/* Visão de Dashboard IA */}
-        {visaoAtiva === 'ia' && (
-          <DashboardIA faturas={faturas} onExecutarAcao={handleAcaoNotificacao} />
         )}
 
         {/* Visão de Relatórios Avançados */}
@@ -2154,7 +4161,7 @@ export default function FaturamentoPage() {
           <RelatoriosAvancados faturas={faturas} onExportar={handleExportarRelatorio} />
         )}
 
-        {/* Visão de Automação de Emails */}
+        {/* Visão de Automação de E-mails */}
         {visaoAtiva === 'email' && (
           <EmailAutomacao faturas={faturas} onEnviarEmail={handleEnviarEmail} />
         )}
@@ -2163,27 +4170,13 @@ export default function FaturamentoPage() {
         {visaoAtiva === 'workflows' && (
           <WorkflowAutomacao faturas={faturas} onExecutarAcao={handleExecutarWorkflow} />
         )}
-
-        {/* Visão de Notificações */}
-        {visaoAtiva === 'notificacoes' && (
-          <NotificacoesInteligentes faturas={faturas} onAcaoNotificacao={handleAcaoNotificacao} />
-        )}
-
-        {/* Visão de Backup e Recuperação */}
-        {visaoAtiva === 'backup' && (
-          <BackupRecuperacao
-            onExecutarBackup={handleExecutarBackup}
-            onRestaurarBackup={handleRestaurarBackup}
-          />
-        )}
-      </div>
-
       {/* Modais */}
       <ModalFatura
         isOpen={modalAberto}
         onClose={fecharModal}
         onSave={handleSalvarFatura}
         fatura={faturaEdicao}
+        draft={rascunhoFaturaModal}
       />
 
       {faturaDetalhes && (
@@ -2191,22 +4184,16 @@ export default function FaturamentoPage() {
           isOpen={modalDetalhesAberto}
           onClose={fecharModalDetalhes}
           fatura={faturaDetalhes}
+          onEstornarPagamento={estornarPagamento}
           onEdit={() => {
             abrirModalEdicao(faturaDetalhes);
             fecharModalDetalhes();
           }}
           onGeneratePaymentLink={gerarLinkPagamento}
           onSendEmail={enviarPorEmail}
-          onDownloadPDF={baixarPDF}
+          onDownloadPDF={pdfDownloadHabilitado ? baixarPDF : undefined}
         />
       )}
-
-      <ModalConfigurarCards
-        isOpen={modalConfigurarCardsAberto}
-        onClose={() => setModalConfigurarCardsAberto(false)}
-        cardsDisponiveis={obterTodasConfiguracoesCards()}
-        onSave={salvarConfiguracaoCards}
-      />
 
       {faturaPagamentos && (
         <ModalPagamentos
@@ -2214,6 +4201,7 @@ export default function FaturamentoPage() {
           onClose={fecharModalPagamentos}
           fatura={faturaPagamentos}
           onRegistrarPagamento={registrarPagamento}
+          onEstornarPagamento={estornarPagamento}
         />
       )}
 
@@ -2222,6 +4210,7 @@ export default function FaturamentoPage() {
         <GatewayPagamento
           fatura={faturaGateway}
           onPagamentoConcluido={handlePagamentoConcluido}
+          onSolicitarLinkPagamento={gerarLinkPagamento}
           onFechar={fecharModalGateway}
         />
       )}
@@ -2255,3 +4244,7 @@ export default function FaturamentoPage() {
     </div>
   );
 }
+
+
+
+

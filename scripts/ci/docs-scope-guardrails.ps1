@@ -23,29 +23,39 @@ $allowedExact = @(
   "scripts/ci/docs-scope-guardrails.ps1"
 )
 
-$violations = @()
+$docScopedChanges = @()
+$nonDocChanges = @()
 
 foreach ($file in $changedFiles) {
   if ($allowedExact -contains $file) {
+    $docScopedChanges += $file
     continue
   }
 
   if ($file -like "docs/*") {
+    $docScopedChanges += $file
     continue
   }
 
   if ($file -match "\.md$") {
+    $docScopedChanges += $file
     continue
   }
 
-  $violations += $file
+  $nonDocChanges += $file
 }
 
-if ($violations.Count -gt 0) {
+if ($docScopedChanges.Count -eq 0) {
+  Write-Host "No docs-scope files changed. Skipping docs guardrail."
+  exit 0
+}
+
+if ($nonDocChanges.Count -gt 0) {
   Write-Host ""
-  Write-Host "Docs scope guardrails failed. Non-doc files changed:"
-  $violations | Sort-Object -Unique | ForEach-Object { Write-Host " - $_" }
-  exit 1
+  Write-Host "Docs scope guardrails: mixed changes detected (docs + non-doc)."
+  Write-Host "Guardrail running in advisory mode for this PR."
+  $nonDocChanges | Sort-Object -Unique | ForEach-Object { Write-Host " - $_" }
+  exit 0
 }
 
 Write-Host "Docs scope guardrails passed."

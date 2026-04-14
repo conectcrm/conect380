@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsDateString,
   IsArray,
+  IsNotEmpty,
   Min,
   Max,
   IsUUID,
@@ -12,6 +13,7 @@ import {
   MinLength,
   IsEmail,
   Matches,
+  IsBoolean,
   ValidatorConstraint,
   ValidatorConstraintInterface,
   ValidationArguments,
@@ -21,18 +23,24 @@ import {
   EstagioOportunidade,
   PrioridadeOportunidade,
   OrigemOportunidade,
+  MotivoPerdaOportunidade,
+  LifecycleStatusOportunidade,
 } from '../oportunidade.entity';
 
 // ✅ Validação customizada: Exige cliente_id OU nomeContato
 @ValidatorConstraint({ name: 'RequireClienteOuContato', async: false })
 export class RequireClienteOuContatoConstraint implements ValidatorConstraintInterface {
-  validate(value: any, args: ValidationArguments) {
-    const dto = args.object as CreateOportunidadeDto;
-    // Válido se tem cliente_id OU nomeContato preenchido
-    return !!(dto.cliente_id || (dto.nomeContato && dto.nomeContato.trim()));
+  validate(_value: unknown, args: ValidationArguments) {
+    const dto = args.object as {
+      cliente_id?: string | null;
+      nomeContato?: string | null;
+    };
+    const clienteId = typeof dto.cliente_id === 'string' ? dto.cliente_id.trim() : '';
+    const nomeContato = typeof dto.nomeContato === 'string' ? dto.nomeContato.trim() : '';
+    return Boolean(clienteId || nomeContato);
   }
 
-  defaultMessage(args: ValidationArguments) {
+  defaultMessage(_args: ValidationArguments) {
     return 'Informe um cliente (cliente_id) ou pelo menos o nome do contato (nomeContato)';
   }
 }
@@ -86,7 +94,6 @@ export class CreateOportunidadeDto {
 
   @IsOptional()
   @IsUUID('4', { message: 'ID do cliente inválido (deve ser UUID v4)' })
-  @Validate(RequireClienteOuContatoConstraint) // ✅ Validação customizada
   cliente_id?: string;
 
   // Campos de contato (quando não há cliente)
@@ -94,7 +101,6 @@ export class CreateOportunidadeDto {
   @IsString({ message: 'Nome do contato deve ser uma string' })
   @MinLength(3, { message: 'Nome do contato deve ter pelo menos 3 caracteres' })
   @MaxLength(255, { message: 'Nome do contato muito longo (máximo 255 caracteres)' })
-  @Validate(RequireClienteOuContatoConstraint) // ✅ Validação customizada
   nomeContato?: string;
 
   @IsOptional()
@@ -114,6 +120,10 @@ export class CreateOportunidadeDto {
   @IsString({ message: 'Empresa do contato deve ser uma string' })
   @MaxLength(255, { message: 'Empresa do contato muito longa (máximo 255 caracteres)' })
   empresaContato?: string;
+
+  // Executa validacao cruzada mesmo com campos opcionais omitidos.
+  @Validate(RequireClienteOuContatoConstraint)
+  private readonly _clienteOuContatoRule!: boolean;
 }
 
 export class UpdateOportunidadeDto {
@@ -166,19 +176,27 @@ export class UpdateOportunidadeDto {
   cliente_id?: string;
 
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'Nome do contato deve ser uma string' })
+  @MinLength(3, { message: 'Nome do contato deve ter pelo menos 3 caracteres' })
+  @MaxLength(255, { message: 'Nome do contato muito longo (maximo 255 caracteres)' })
   nomeContato?: string;
 
   @IsOptional()
-  @IsString()
+  @IsEmail({}, { message: 'E-mail do contato invalido' })
+  @MaxLength(255, { message: 'E-mail do contato muito longo (maximo 255 caracteres)' })
   emailContato?: string;
 
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'Telefone do contato deve ser uma string' })
+  @MaxLength(20, { message: 'Telefone do contato muito longo (maximo 20 caracteres)' })
+  @Matches(/^[0-9+\-() ]+$/, {
+    message: 'Telefone do contato invalido (apenas numeros e simbolos)',
+  })
   telefoneContato?: string;
 
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'Empresa do contato deve ser uma string' })
+  @MaxLength(255, { message: 'Empresa do contato muito longa (maximo 255 caracteres)' })
   empresaContato?: string;
 }
 
@@ -187,8 +205,153 @@ export class UpdateEstagioDto {
   estagio: EstagioOportunidade;
 
   @IsOptional()
+  @IsBoolean()
+  forcarTransicao?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  justificativaForcamento?: string;
+
+  @IsOptional()
   @IsDateString()
   dataFechamentoReal?: string;
+
+  @IsOptional()
+  @IsEnum(MotivoPerdaOportunidade)
+  motivoPerda?: MotivoPerdaOportunidade;
+
+  @IsOptional()
+  @IsString()
+  motivoPerdaDetalhes?: string;
+
+  @IsOptional()
+  @IsString()
+  concorrenteNome?: string;
+
+  @IsOptional()
+  @IsDateString()
+  dataRevisao?: string;
+}
+
+export class CreateOportunidadeItemPreliminarDto {
+  @IsOptional()
+  @IsUUID('4')
+  produto_id?: string | null;
+
+  @IsOptional()
+  @IsUUID('4')
+  catalog_item_id?: string | null;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  nome_snapshot: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  sku_snapshot?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  descricao_snapshot?: string;
+
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  preco_unitario_estimado: number;
+
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0.001)
+  quantidade_estimada: number;
+
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(100)
+  desconto_percentual?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  origem?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  ordem?: number;
+}
+
+export class UpdateOportunidadeItemPreliminarDto {
+  @IsOptional()
+  @IsUUID('4')
+  produto_id?: string | null;
+
+  @IsOptional()
+  @IsUUID('4')
+  catalog_item_id?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  nome_snapshot?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  sku_snapshot?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  descricao_snapshot?: string | null;
+
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  preco_unitario_estimado?: number;
+
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0.001)
+  quantidade_estimada?: number;
+
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(100)
+  desconto_percentual?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  origem?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  ordem?: number;
+}
+
+export class AddOportunidadeVendedorEnvolvidoDto {
+  @IsUUID('4', { message: 'ID do vendedor invalido (deve ser UUID v4)' })
+  vendedor_id: string;
+
+  @IsOptional()
+  @IsString({ message: 'Papel do vendedor deve ser uma string' })
+  @MaxLength(40, { message: 'Papel do vendedor muito longo (maximo 40 caracteres)' })
+  papel?: string;
+}
+
+export enum LifecycleViewOportunidade {
+  OPEN = 'open',
+  CLOSED = 'closed',
+  ARCHIVED = 'archived',
+  DELETED = 'deleted',
+  ALL_ACTIVE = 'all_active',
+  ALL = 'all',
 }
 
 export class MetricasQueryDto {
@@ -199,4 +362,144 @@ export class MetricasQueryDto {
   @IsOptional()
   @IsDateString()
   dataFim?: string;
+
+  @IsOptional()
+  @IsEnum(LifecycleStatusOportunidade)
+  lifecycle_status?: LifecycleStatusOportunidade;
+
+  @IsOptional()
+  @IsEnum(LifecycleViewOportunidade)
+  lifecycle_view?: LifecycleViewOportunidade;
+
+  @IsOptional()
+  @IsString()
+  include_deleted?: string | boolean;
 }
+
+export class OportunidadesListQueryDto {
+  @IsOptional()
+  @IsEnum(EstagioOportunidade)
+  estagio?: EstagioOportunidade;
+
+  @IsOptional()
+  @IsString()
+  responsavel_id?: string;
+
+  @IsOptional()
+  @IsString()
+  cliente_id?: string;
+
+  @IsOptional()
+  @IsDateString()
+  dataInicio?: string;
+
+  @IsOptional()
+  @IsDateString()
+  dataFim?: string;
+
+  @IsOptional()
+  @IsEnum(LifecycleStatusOportunidade)
+  lifecycle_status?: LifecycleStatusOportunidade;
+
+  @IsOptional()
+  @IsEnum(LifecycleViewOportunidade)
+  lifecycle_view?: LifecycleViewOportunidade;
+
+  @IsOptional()
+  @IsString()
+  include_deleted?: string | boolean;
+}
+
+export class LifecycleTransitionDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  motivo?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1200)
+  comentario?: string;
+}
+
+export class UpdateLifecycleFeatureFlagDto {
+  @IsBoolean()
+  enabled: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  rolloutPercentage?: number;
+}
+
+export class StaleDealsQueryDto {
+  @IsOptional()
+  @IsString()
+  threshold_days?: string;
+
+  @IsOptional()
+  @IsString()
+  limit?: string;
+}
+
+export class UpdateStalePolicyDto {
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(7)
+  @Max(120)
+  thresholdDays?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  autoArchiveEnabled?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(7)
+  @Max(365)
+  autoArchiveAfterDays?: number;
+}
+
+export class UpdateEngagementPolicyDto {
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  hotMinProbability?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(90)
+  hotCloseWindowDays?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(30)
+  nextActionDueSoonDays?: number;
+}
+
+export class UpdateSalesFeatureFlagsDto {
+  @IsOptional()
+  @IsBoolean()
+  pipelineDraftWithoutPlaceholder?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  opportunityPreliminaryItems?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  strictPropostaTransitions?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  discountPolicyPerTenant?: boolean;
+}
+

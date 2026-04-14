@@ -4,6 +4,9 @@ export class CreateAtendimentoTables1728518400000 implements MigrationInterface 
   name = 'CreateAtendimentoTables1728518400000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // NecessÃ¡rio para `gen_random_uuid()` (Postgres)
+    await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`);
+
     // 1. Tabela de Canais de Atendimento
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS atendimento_canais (

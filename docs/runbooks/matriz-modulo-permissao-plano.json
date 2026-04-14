@@ -1,0 +1,209 @@
+{
+  "generatedAt": "2026-03-29T22:12:56.366Z",
+  "sources": {
+    "permissions": "backend/src/common/permissions/permissions.constants.ts",
+    "plans": "backend/src/modules/planos/planos.defaults.ts"
+  },
+  "modules": [
+    {
+      "code": "CRM",
+      "name": "CRM",
+      "essential": true
+    },
+    {
+      "code": "ATENDIMENTO",
+      "name": "Atendimento",
+      "essential": false
+    },
+    {
+      "code": "VENDAS",
+      "name": "Vendas",
+      "essential": false
+    },
+    {
+      "code": "FINANCEIRO",
+      "name": "Financeiro",
+      "essential": false
+    },
+    {
+      "code": "COMPRAS",
+      "name": "Compras",
+      "essential": false
+    },
+    {
+      "code": "BILLING",
+      "name": "Billing",
+      "essential": true
+    },
+    {
+      "code": "ADMINISTRACAO",
+      "name": "Administracao",
+      "essential": false
+    }
+  ],
+  "plans": [
+    {
+      "code": "starter",
+      "name": "Starter",
+      "moduleCodes": [
+        "CRM",
+        "ATENDIMENTO",
+        "BILLING"
+      ]
+    },
+    {
+      "code": "business",
+      "name": "Business",
+      "moduleCodes": [
+        "CRM",
+        "ATENDIMENTO",
+        "VENDAS",
+        "COMPRAS",
+        "FINANCEIRO",
+        "BILLING"
+      ]
+    },
+    {
+      "code": "enterprise",
+      "name": "Enterprise",
+      "moduleCodes": [
+        "CRM",
+        "ATENDIMENTO",
+        "VENDAS",
+        "COMPRAS",
+        "FINANCEIRO",
+        "BILLING",
+        "ADMINISTRACAO"
+      ]
+    }
+  ],
+  "modulePermissionMatrix": {
+    "CRM": [
+      "crm.agenda.create",
+      "crm.agenda.delete",
+      "crm.agenda.read",
+      "crm.agenda.update",
+      "crm.clientes.create",
+      "crm.clientes.delete",
+      "crm.clientes.read",
+      "crm.clientes.update",
+      "crm.leads.create",
+      "crm.leads.delete",
+      "crm.leads.read",
+      "crm.leads.update",
+      "crm.oportunidades.create",
+      "crm.oportunidades.delete",
+      "crm.oportunidades.read",
+      "crm.oportunidades.update",
+      "crm.produtos.create",
+      "crm.produtos.delete",
+      "crm.produtos.read",
+      "crm.produtos.update"
+    ],
+    "ATENDIMENTO": [
+      "atendimento.chats.read",
+      "atendimento.chats.reply",
+      "atendimento.dlq.manage",
+      "atendimento.filas.manage",
+      "atendimento.sla.manage",
+      "atendimento.tickets.assign",
+      "atendimento.tickets.close",
+      "atendimento.tickets.create",
+      "atendimento.tickets.read",
+      "atendimento.tickets.update"
+    ],
+    "VENDAS": [
+      "comercial.propostas.approve.override",
+      "comercial.propostas.create",
+      "comercial.propostas.delete",
+      "comercial.propostas.read",
+      "comercial.propostas.send",
+      "comercial.propostas.update"
+    ],
+    "FINANCEIRO": [
+      "financeiro.alertas.manage",
+      "financeiro.alertas.read",
+      "financeiro.aprovacoes.manage",
+      "financeiro.aprovacoes.read",
+      "financeiro.centro-custos.manage",
+      "financeiro.centro-custos.read",
+      "financeiro.conciliacao.manage",
+      "financeiro.conciliacao.read",
+      "financeiro.contas-bancarias.manage",
+      "financeiro.contas-bancarias.read",
+      "financeiro.contas-pagar.manage",
+      "financeiro.contas-pagar.read",
+      "financeiro.faturamento.manage",
+      "financeiro.faturamento.read",
+      "financeiro.fornecedores.manage",
+      "financeiro.fornecedores.read",
+      "financeiro.pagamentos.manage",
+      "financeiro.pagamentos.read"
+    ],
+    "COMPRAS": [
+      "compras.aprovacoes.manage",
+      "compras.aprovacoes.read",
+      "compras.cotacoes.manage",
+      "compras.cotacoes.read"
+    ],
+    "BILLING": [],
+    "ADMINISTRACAO": [
+      "admin.empresas.manage",
+      "config.automacoes.manage",
+      "config.empresa.read",
+      "config.empresa.update",
+      "config.integracoes.manage",
+      "dashboard.read",
+      "planos.manage",
+      "relatorios.read",
+      "users.bulk.update",
+      "users.create",
+      "users.profile.update",
+      "users.read",
+      "users.reset-password",
+      "users.status.update",
+      "users.update"
+    ]
+  },
+  "planModuleTable": [
+    {
+      "code": "starter",
+      "name": "Starter",
+      "modules": {
+        "CRM": true,
+        "ATENDIMENTO": true,
+        "VENDAS": false,
+        "FINANCEIRO": false,
+        "COMPRAS": false,
+        "BILLING": true,
+        "ADMINISTRACAO": false
+      }
+    },
+    {
+      "code": "business",
+      "name": "Business",
+      "modules": {
+        "CRM": true,
+        "ATENDIMENTO": true,
+        "VENDAS": true,
+        "FINANCEIRO": true,
+        "COMPRAS": true,
+        "BILLING": true,
+        "ADMINISTRACAO": false
+      }
+    },
+    {
+      "code": "enterprise",
+      "name": "Enterprise",
+      "modules": {
+        "CRM": true,
+        "ATENDIMENTO": true,
+        "VENDAS": true,
+        "FINANCEIRO": true,
+        "COMPRAS": true,
+        "BILLING": true,
+        "ADMINISTRACAO": true
+      }
+    }
+  ]
+}

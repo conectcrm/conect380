@@ -14,26 +14,25 @@ const MVP_MODE_ENABLED = process.env.REACT_APP_MVP_MODE === 'true';
 
 const MVP_ALLOWED_TOP_LEVEL_MENU_IDS = new Set<string>([
   'dashboard',
-  'atendimento',
   'comercial',
+  'compras',
+  'financeiro',
   'configuracoes',
   'administracao',
 ]);
 
 const MVP_ALLOWED_CHILD_MENU_IDS = new Set<string>([
-  'atendimento-inbox',
-  'atendimento-tickets',
-  'atendimento-automacoes',
-  'atendimento-equipe',
-  'atendimento-configuracoes',
   'comercial-leads',
   'comercial-pipeline',
   'comercial-propostas',
+  'comercial-contratos',
+  'comercial-analytics',
   'comercial-produtos',
-  'configuracoes-sistema',
+  'comercial-veiculos',
+  'comercial-cotacoes',
+  'comercial-aprovacoes',
   'configuracoes-empresa',
   'configuracoes-usuarios',
-  'admin-console',
   'admin-empresas',
   'admin-usuarios',
   'admin-sistema',
@@ -47,7 +46,7 @@ const BLOCKED_COMMERCIAL_INFO: MvpBlockedRouteInfo = {
   features: [
     'Cotacoes avancadas',
     'Aprovacoes comerciais',
-    'Gestao de combos',
+    'Fluxo legado de catalogo',
     'Agenda comercial expandida',
   ],
 };
@@ -66,24 +65,39 @@ const BLOCKED_RELATIONSHIP_INFO: MvpBlockedRouteInfo = {
 };
 
 const BLOCKED_FINANCE_INFO: MvpBlockedRouteInfo = {
-  moduleName: 'Financeiro e Billing',
+  moduleName: 'Billing e Fiscal',
   description:
-    'Financeiro, cobrancas e faturamento estao fora do MVP comercial desta release.',
+    'Fluxos de billing e emissao fiscal seguem fora do MVP atual.',
   estimatedCompletion: 'Pos-MVP',
   features: [
-    'Fluxo financeiro completo',
     'Assinaturas e billing',
-    'Faturamento e cobrancas',
-    'Relatorios financeiros avancados',
+    'Emissao fiscal (NF-e/NFS-e)',
+    'Faturamento de assinaturas',
+    'Cobertura fiscal avancada',
+  ],
+};
+
+const BLOCKED_SUPPORT_INFO: MvpBlockedRouteInfo = {
+  moduleName: 'Atendimento (Omnichannel)',
+  description:
+    'Este modulo foi removido do MVP inicial para reduzir risco operacional enquanto passa por estabilizacao e ajustes de UX.',
+  estimatedCompletion: 'Pos-MVP',
+  features: [
+    'Inbox/Chat omnichannel',
+    'Tickets + fluxo de triagem completo',
+    'Distribuicao automatica e capacidade por atendente',
+    'SLA tracking e automacoes completas',
   ],
 };
 
 const BLOCKED_ROUTE_RULES: MvpBlockedRouteRule[] = [
+  { prefix: '/atendimento', info: BLOCKED_SUPPORT_INFO },
+  { prefix: '/nuclei/atendimento', info: BLOCKED_SUPPORT_INFO },
   { prefix: '/billing', info: BLOCKED_FINANCE_INFO },
   { prefix: '/assinaturas', info: BLOCKED_FINANCE_INFO },
   { prefix: '/faturamento', info: BLOCKED_FINANCE_INFO },
-  { prefix: '/financeiro', info: BLOCKED_FINANCE_INFO },
-  { prefix: '/nuclei/financeiro', info: BLOCKED_FINANCE_INFO },
+  { prefix: '/financeiro/fiscal', info: BLOCKED_FINANCE_INFO },
+  { prefix: '/financeiro/notas-fiscais', info: BLOCKED_FINANCE_INFO },
   { prefix: '/contratos', info: BLOCKED_FINANCE_INFO },
   { prefix: '/clientes', info: BLOCKED_RELATIONSHIP_INFO },
   { prefix: '/contatos', info: BLOCKED_RELATIONSHIP_INFO },
@@ -93,13 +107,23 @@ const BLOCKED_ROUTE_RULES: MvpBlockedRouteRule[] = [
   { prefix: '/crm/interacoes', info: BLOCKED_RELATIONSHIP_INFO },
   { prefix: '/agenda', info: BLOCKED_RELATIONSHIP_INFO },
   { prefix: '/crm/agenda', info: BLOCKED_RELATIONSHIP_INFO },
+  { prefix: '/compras', info: BLOCKED_COMMERCIAL_INFO },
   { prefix: '/cotacoes', info: BLOCKED_COMMERCIAL_INFO },
-  { prefix: '/vendas/cotacoes', info: BLOCKED_COMMERCIAL_INFO },
+  { prefix: '/financeiro/cotacoes', info: BLOCKED_COMMERCIAL_INFO },
   { prefix: '/orcamentos', info: BLOCKED_COMMERCIAL_INFO },
   { prefix: '/aprovacoes/pendentes', info: BLOCKED_COMMERCIAL_INFO },
-  { prefix: '/vendas/aprovacoes', info: BLOCKED_COMMERCIAL_INFO },
-  { prefix: '/combos', info: BLOCKED_COMMERCIAL_INFO },
-  { prefix: '/vendas/combos', info: BLOCKED_COMMERCIAL_INFO },
+  { prefix: '/financeiro/compras/aprovacoes', info: BLOCKED_COMMERCIAL_INFO },
+];
+
+const MVP_ALLOWED_ROUTE_PREFIXES: string[] = [
+  '/compras/cotacoes',
+  '/compras/aprovacoes',
+  '/cotacoes',
+  '/financeiro/cotacoes',
+  '/orcamentos',
+  '/aprovacoes/pendentes',
+  '/financeiro/compras/aprovacoes',
+  '/contratos',
 ];
 
 const normalizePath = (pathname: string): string => {
@@ -138,6 +162,14 @@ export const getMvpBlockedRouteInfo = (pathname: string): MvpBlockedRouteInfo | 
   }
 
   const normalizedPath = normalizePath(pathname);
+  const isAllowedInMvp = MVP_ALLOWED_ROUTE_PREFIXES.some((prefix) =>
+    matchesPrefix(normalizedPath, prefix),
+  );
+
+  if (isAllowedInMvp) {
+    return null;
+  }
+
   const matchedRule = BLOCKED_ROUTE_RULES.find((rule) => matchesPrefix(normalizedPath, rule.prefix));
   return matchedRule?.info ?? null;
 };

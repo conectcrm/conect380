@@ -64,6 +64,23 @@ Se escolheu layout especifico, explique o motivo:
 - [ ] Nao inclui dados sensiveis
 - [ ] Nao introduzi warnings novos relevantes
 
+## Contrato de Arquitetura e Logica de Negocio (Obrigatorio)
+
+- [ ] Houve alteracao de regra de negocio neste PR
+- [ ] Nao houve alteracao de regra de negocio (N/A)
+- [ ] Regras implementadas em `service/domain` (sem regra em controller/dto/componente)
+- [ ] Controller apenas orquestra request/response
+- [ ] Frontend sem acesso direto a API fora de `frontend-web/src/services/**`
+- [ ] Teste cobrindo regra de negocio adicionado/atualizado
+
+### Mapa Regra -> Implementacao -> Testes
+
+| Regra | Arquivo(s) | Teste(s) |
+| --- | --- | --- |
+| Ex: aprovacao financeira por alcada | backend/src/modules/financeiro/services/conta-pagar.service.ts | backend/src/modules/financeiro/services/conta-pagar.service.spec.ts |
+
+> Preencha pelo menos uma linha real quando marcar "Houve alteracao de regra de negocio neste PR".
+
 ## Multi-tenant e Seguranca (Obrigatorio quando aplicavel)
 
 - [ ] Nenhuma mudanca multi-tenant

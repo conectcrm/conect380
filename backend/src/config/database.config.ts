@@ -1,7 +1,10 @@
-import { Injectable } from '@nestjs/common';
+﻿import { Injectable } from '@nestjs/common';
 import { TypeOrmOptionsFactory, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { User } from '../modules/users/user.entity';
+import { UserActivity } from '../modules/users/entities/user-activity.entity';
+import { UserAccessChangeRequest } from '../modules/users/entities/user-access-change-request.entity';
+import { AdminBreakGlassAccess } from '../modules/users/entities/admin-break-glass-access.entity';
 import { Empresa } from '../empresas/entities/empresa.entity';
 import { Cliente } from '../modules/clientes/cliente.entity';
 import { ClienteAnexo } from '../modules/clientes/cliente-anexo.entity';
@@ -9,17 +12,36 @@ import { Contato } from '../modules/clientes/contato.entity';
 import { Produto } from '../modules/produtos/produto.entity';
 import { Oportunidade } from '../modules/oportunidades/oportunidade.entity';
 import { Atividade } from '../modules/oportunidades/atividade.entity';
+import { OportunidadeStageEvent } from '../modules/oportunidades/oportunidade-stage-event.entity';
+import { OportunidadeItemPreliminar } from '../modules/oportunidades/oportunidade-item-preliminar.entity';
 import { Proposta } from '../modules/propostas/proposta.entity';
+import { PropostaPortalToken } from '../modules/propostas/proposta-portal-token.entity';
+import { DashboardPipelineSnapshotDaily } from '../modules/dashboard-v2/entities/dashboard-pipeline-snapshot-daily.entity';
+import { DashboardFunnelMetricsDaily } from '../modules/dashboard-v2/entities/dashboard-funnel-metrics-daily.entity';
+import { DashboardAgingStageDaily } from '../modules/dashboard-v2/entities/dashboard-aging-stage-daily.entity';
+import { DashboardRevenueMetricsDaily } from '../modules/dashboard-v2/entities/dashboard-revenue-metrics-daily.entity';
+import { FeatureFlagTenant } from '../modules/dashboard-v2/entities/feature-flag-tenant.entity';
+import { DashboardV2MetricDivergence } from '../modules/dashboard-v2/entities/dashboard-v2-metric-divergence.entity';
 import { Plano } from '../modules/planos/entities/plano.entity';
 import { ModuloSistema } from '../modules/planos/entities/modulo-sistema.entity';
 import { PlanoModulo } from '../modules/planos/entities/plano-modulo.entity';
 import { AssinaturaEmpresa } from '../modules/planos/entities/assinatura-empresa.entity';
 import { Evento } from '../modules/eventos/evento.entity';
+import { AgendaEvento } from '../modules/agenda/agenda-evento.entity';
+import { Interacao } from '../modules/interacoes/interacao.entity';
 import { Fornecedor } from '../modules/financeiro/entities/fornecedor.entity';
+import { ContaPagar } from '../modules/financeiro/entities/conta-pagar.entity';
+import { ContaBancaria } from '../modules/financeiro/entities/conta-bancaria.entity';
+import { CentroCusto } from '../modules/financeiro/entities/centro-custo.entity';
+import { AlertaOperacionalFinanceiro } from '../modules/financeiro/entities/alerta-operacional-financeiro.entity';
+import { ContaPagarExportacao } from '../modules/financeiro/entities/conta-pagar-exportacao.entity';
+import { ExtratoBancarioImportacao } from '../modules/financeiro/entities/extrato-bancario-importacao.entity';
+import { ExtratoBancarioItem } from '../modules/financeiro/entities/extrato-bancario-item.entity';
 import { Fatura } from '../modules/faturamento/entities/fatura.entity';
 import { ItemFatura } from '../modules/faturamento/entities/item-fatura.entity';
 import { Pagamento } from '../modules/faturamento/entities/pagamento.entity';
 import { PlanoCobranca } from '../modules/faturamento/entities/plano-cobranca.entity';
+import { BillingEvent } from '../modules/faturamento/entities/billing-event.entity';
 import { Contrato } from '../modules/contratos/entities/contrato.entity';
 import { AssinaturaContrato } from '../modules/contratos/entities/assinatura-contrato.entity';
 import { Canal } from '../modules/atendimento/entities/canal.entity';
@@ -50,13 +72,29 @@ import { TriagemLog } from '../modules/triagem/entities/triagem-log.entity';
 import { EmpresaModulo } from '../modules/empresas/entities/empresa-modulo.entity'; // ✅ Sistema de licenciamento modular
 import { EmpresaConfig } from '../modules/empresas/entities/empresa-config.entity'; // ✅ Configurações de empresa
 import { PasswordResetToken } from '../modules/auth/entities/password-reset-token.entity'; // ✅ Tokens de recuperação de senha
+import { AuthLoginAttempt } from '../modules/auth/entities/auth-login-attempt.entity';
+import { MfaLoginChallenge } from '../modules/auth/entities/mfa-login-challenge.entity';
+import { AuthRefreshToken } from '../modules/auth/entities/auth-refresh-token.entity';
+import { CoreAdminCriticalAudit } from '../modules/core-admin/entities/core-admin-critical-audit.entity';
+import { CoreAdminPolicySnapshot } from '../modules/core-admin/entities/core-admin-policy-snapshot.entity';
 import { Lead } from '../modules/leads/lead.entity'; // ✅ Módulo de Leads CRM
+import { Meta } from '../modules/metas/entities/meta.entity';
 import { ConfiguracaoGateway } from '../modules/pagamentos/entities/configuracao-gateway.entity';
 import { TransacaoGateway } from '../modules/pagamentos/entities/transacao-gateway.entity';
+import { GatewayWebhookEvento } from '../modules/pagamentos/entities/gateway-webhook-evento.entity';
 import { Cotacao } from '../cotacao/entities/cotacao.entity';
 import { ItemCotacao } from '../cotacao/entities/item-cotacao.entity';
 import { AnexoCotacao } from '../cotacao/entities/anexo-cotacao.entity';
 import { Notification } from '../notifications/entities/notification.entity';
+import { SystemBranding } from '../modules/system-branding/entities/system-branding.entity';
+import { CategoriaProduto } from '../modules/categorias-produtos/entities/categoria-produto.entity';
+import { SubcategoriaProduto } from '../modules/categorias-produtos/entities/subcategoria-produto.entity';
+import { ConfiguracaoProduto } from '../modules/categorias-produtos/entities/configuracao-produto.entity';
+import { CatalogItem } from '../modules/catalogo/entities/catalog-item.entity';
+import { CatalogItemComponent } from '../modules/catalogo/entities/catalog-item-component.entity';
+import { CatalogTemplate } from '../modules/catalogo/entities/catalog-template.entity';
+import { CatalogTemplateField } from '../modules/catalogo/entities/catalog-template-field.entity';
+import { VehicleInventoryItem } from '../modules/vehicle-inventory/entities/vehicle-inventory-item.entity';
 
 @Injectable()
 export class DatabaseConfig implements TypeOrmOptionsFactory {
@@ -74,6 +112,9 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
       database: this.configService.get('DATABASE_NAME', 'conectcrm'),
       entities: [
         User,
+        UserActivity,
+        UserAccessChangeRequest,
+        AdminBreakGlassAccess,
         Empresa,
         Cliente,
         ClienteAnexo,
@@ -81,17 +122,36 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         Produto,
         Oportunidade,
         Atividade,
+        OportunidadeStageEvent,
+        OportunidadeItemPreliminar,
         Proposta,
+        PropostaPortalToken,
+        DashboardPipelineSnapshotDaily,
+        DashboardFunnelMetricsDaily,
+        DashboardAgingStageDaily,
+        DashboardRevenueMetricsDaily,
+        FeatureFlagTenant,
+        DashboardV2MetricDivergence,
         Plano,
         ModuloSistema,
         PlanoModulo,
         AssinaturaEmpresa,
         Evento,
+        AgendaEvento,
+        Interacao,
         Fornecedor,
+        ContaPagar,
+        ContaBancaria,
+        CentroCusto,
+        AlertaOperacionalFinanceiro,
+        ContaPagarExportacao,
+        ExtratoBancarioImportacao,
+        ExtratoBancarioItem,
         Fatura,
         ItemFatura,
         Pagamento,
         PlanoCobranca,
+        BillingEvent,
         Contrato,
         AssinaturaContrato,
         Canal, // Módulo omnichannel
@@ -113,6 +173,7 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         SlaEventLog, // ✅ SLA Tracking - Logs de eventos SLA
         ConfiguracaoGateway,
         TransacaoGateway,
+        GatewayWebhookEvento,
         Cotacao,
         ItemCotacao,
         AnexoCotacao,
@@ -129,8 +190,24 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         EmpresaModulo, // ✅ Sistema de licenciamento modular
         EmpresaConfig, // ✅ Configurações de empresa
         PasswordResetToken, // ✅ Tokens de recuperação de senha
+        AuthLoginAttempt,
+        MfaLoginChallenge,
+        AuthRefreshToken,
+        CoreAdminCriticalAudit,
+        CoreAdminPolicySnapshot,
         Lead, // ✅ Módulo de Leads CRM
+        Meta, // ✅ Metas comerciais
+        SystemBranding, // ✅ Branding global do sistema
+        CategoriaProduto, // ✅ Catálogo: categorias de produtos
+        SubcategoriaProduto, // ✅ Catálogo: subcategorias de produtos
+        ConfiguracaoProduto, // ✅ Catálogo: configurações de subcategoria
+        CatalogItem, // ✅ Catálogo flexível: item base
+        CatalogItemComponent, // ✅ Catálogo flexível: composição de itens
+        CatalogTemplate, // ✅ Catálogo flexível: templates de cadastro
+        CatalogTemplateField, // ✅ Catálogo flexível: campos dinâmicos
+        VehicleInventoryItem, // ✅ Estoque especializado para loja de veiculos
       ],
+      autoLoadEntities: true,
       synchronize: false, // ✅ DESABILITADO - usar migrations para segurança
       logging: this.configService.get('APP_ENV') === 'development',
       cache: false, // ⚡ CRITICAL: Desabilita cache do TypeORM para evitar dados obsoletos
@@ -143,16 +220,23 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
           : false,
     };
 
-    // Debug log
-    console.log('📊 Database Config:', {
-      host: config.host,
-      port: config.port,
-      username: config.username,
-      password: config.password?.substr(0, 3) + '***',
-      database: config.database,
-      entitiesCount: config.entities.length, // ✅ Quantas entities carregadas
-      synchronize: config.synchronize, // ✅ Confirmar se está true
-    });
+    const shouldLogDbConfig =
+      this.configService.get('DATABASE_CONFIG_DEBUG') === 'true' ||
+      (this.configService.get('APP_ENV') === 'development' &&
+        this.configService.get('NODE_ENV') !== 'test');
+
+    if (shouldLogDbConfig) {
+      // Debug log
+      console.log('📊 Database Config:', {
+        host: config.host,
+        port: config.port,
+        username: config.username,
+        password: config.password?.substr(0, 3) + '***',
+        database: config.database,
+        entitiesCount: config.entities.length, // ✅ Quantas entities carregadas
+        synchronize: config.synchronize, // ✅ Confirmar se está true
+      });
+    }
 
     return config as TypeOrmModuleOptions;
   }

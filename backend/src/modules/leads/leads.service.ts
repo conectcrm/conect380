@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -24,16 +25,101 @@ import {
   OrigemOportunidade,
   PrioridadeOportunidade,
 } from '../oportunidades/oportunidade.entity';
+import { OportunidadesService } from '../oportunidades/oportunidades.service';
+import { Empresa } from '../../empresas/entities/empresa.entity';
 import * as Papa from 'papaparse';
+
+const LEADS_UNASSIGNED_RESPONSAVEL_FILTER = '__sem_responsavel__';
+const LEADS_LEGACY_UNASSIGNED_RESPONSAVEL_FILTER = 'sem_responsavel';
 
 @Injectable()
 export class LeadsService {
+  private readonly logger = new Logger(LeadsService.name);
+  private readonly leadColumnEnumCache = new Map<string, Set<string> | null>();
+
   constructor(
     @InjectRepository(Lead)
     private readonly leadsRepository: Repository<Lead>,
-    @InjectRepository(Oportunidade)
-    private readonly oportunidadesRepository: Repository<Oportunidade>,
+    @InjectRepository(Empresa)
+    private readonly empresaRepository: Repository<Empresa>,
+    private readonly oportunidadesService: OportunidadesService,
   ) {}
+
+
+  private maskEmail(email?: string | null): string | null {
+    if (!email || typeof email !== 'string') return null;
+    const [localPart, domain] = email.split('@');
+    if (!localPart || !domain) return '[email]';
+    const prefix = localPart.slice(0, 2);
+    return `${prefix}${'*'.repeat(Math.max(localPart.length - 2, 2))}@${domain}`;
+  }
+
+  private maskPhone(phone?: string | null): string | null {
+    if (!phone || typeof phone !== 'string') return null;
+    const digits = phone.replace(/\D/g, '');
+    if (!digits) return '[telefone]';
+    const suffix = digits.slice(-4);
+    return `${'*'.repeat(Math.max(digits.length - 4, 4))}${suffix}`;
+  }
+
+  private summarizeText(value?: string | null, max: number = 60): string | null {
+    if (!value || typeof value !== 'string') return null;
+    const normalized = value.replace(/\s+/g, ' ').trim();
+    if (!normalized) return null;
+    return normalized.length > max ? `${normalized.slice(0, max)}...` : normalized;
+  }
+
+  private buildLeadPayloadLogMeta(payload: Partial<CreateLeadDto> | Partial<UpdateLeadDto>) {
+    const p = payload as any;
+
+    return {
+      nome: this.summarizeText(payload.nome, 40),
+      email: this.maskEmail(payload.email),
+      telefone: this.maskPhone(payload.telefone),
+      empresaNome: this.summarizeText(payload.empresa_nome, 40),
+      origem: p.origem || null,
+      status: p.status || null,
+      responsavelId: payload.responsavel_id || null,
+      observacoesResumo: this.summarizeText(payload.observacoes, 80),
+    };
+  }
+
+  private buildLeadEntityLogMeta(lead: Lead) {
+    return {
+      id: lead.id || null,
+      nome: this.summarizeText(lead.nome, 40),
+      email: this.maskEmail(lead.email),
+      telefone: this.maskPhone(lead.telefone),
+      empresaId: lead.empresaId,
+      status: lead.status,
+      origem: lead.origem,
+      score: lead.score,
+    };
+  }
+
+  private buildFiltrosLogMeta(empresaId: string, filtros?: LeadFiltros) {
+    return {
+      empresaId,
+      page: filtros?.page || 1,
+      limit: filtros?.limit || 50,
+      status: filtros?.status || null,
+      origem: filtros?.origem || null,
+      responsavelId: filtros?.responsavel_id || null,
+      busca: this.summarizeText(filtros?.busca, 40),
+      dataInicio: filtros?.dataInicio || null,
+      dataFim: filtros?.dataFim || null,
+    };
+  }
+
+  private logError(context: string, error: unknown): void {
+    const err = error as any;
+    const message = err?.message || 'Erro desconhecido';
+    const detail = err?.detail || null;
+    const code = err?.code || null;
+    const stack = err instanceof Error ? err.stack : undefined;
+
+    this.logger.error(`${context} message=${message} code=${code} detail=${detail}`, stack);
+  }
 
   private sanitizeLeadInput<T extends Partial<CreateLeadDto> | Partial<UpdateLeadDto>>(
     payload: T,
@@ -78,12 +164,196 @@ export class LeadsService {
     return EstagioOportunidade.LEADS;
   }
 
-  private mapearOrigemParaBanco(origem?: string): OrigemOportunidade {
-    if (!origem) {
-      return OrigemOportunidade.WEBSITE;
+  private async getLeadColumnEnumValues(columnName: string): Promise<Set<string> | null> {
+    if (this.leadColumnEnumCache.has(columnName)) {
+      return this.leadColumnEnumCache.get(columnName) || null;
     }
 
-    switch (origem) {
+    const metadataRows = await this.leadsRepository.query(
+      `
+        SELECT data_type, udt_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'leads'
+          AND column_name = $1
+        LIMIT 1
+      `,
+      [columnName],
+    );
+
+    const metadata = metadataRows?.[0] || null;
+    if (!metadata || metadata.data_type !== 'USER-DEFINED' || !metadata.udt_name) {
+      this.leadColumnEnumCache.set(columnName, null);
+      return null;
+    }
+
+    const enumRows = await this.leadsRepository.query(
+      `
+        SELECT e.enumlabel
+        FROM pg_type t
+        INNER JOIN pg_namespace n ON n.oid = t.typnamespace
+        INNER JOIN pg_enum e ON e.enumtypid = t.oid
+        WHERE n.nspname = 'public'
+          AND t.typname = $1
+        ORDER BY e.enumsortorder
+      `,
+      [metadata.udt_name],
+    );
+
+    const values = new Set<string>(
+      (enumRows || [])
+        .map((row: { enumlabel?: string }) => (row.enumlabel || '').toString().trim().toLowerCase())
+        .filter((value: string) => value.length > 0),
+    );
+
+    const resolved = values.size > 0 ? values : null;
+    this.leadColumnEnumCache.set(columnName, resolved);
+    return resolved;
+  }
+
+  private normalizarStatusLead(status?: string | null): StatusLead {
+    const normalized = (status || '').toString().trim().toLowerCase();
+    switch (normalized) {
+      case StatusLead.NOVO:
+      case 'novo':
+        return StatusLead.NOVO;
+      case StatusLead.CONTATADO:
+      case 'contatado':
+        return StatusLead.CONTATADO;
+      case StatusLead.QUALIFICADO:
+      case 'qualificado':
+        return StatusLead.QUALIFICADO;
+      case StatusLead.CONVERTIDO:
+      case 'convertido':
+        return StatusLead.CONVERTIDO;
+      case StatusLead.DESQUALIFICADO:
+      case 'desqualificado':
+      case 'perdido':
+        return StatusLead.DESQUALIFICADO;
+      default:
+        return StatusLead.NOVO;
+    }
+  }
+
+  private async mapearStatusLeadParaBanco(status?: string | null): Promise<string> {
+    const normalized = this.normalizarStatusLead(status);
+    const enumValues = await this.getLeadColumnEnumValues('status');
+
+    if (!enumValues) {
+      return normalized;
+    }
+
+    if (enumValues.has(normalized)) {
+      return normalized;
+    }
+
+    if (normalized === StatusLead.DESQUALIFICADO && enumValues.has('perdido')) {
+      return 'perdido';
+    }
+
+    if (enumValues.has(StatusLead.NOVO)) {
+      return StatusLead.NOVO;
+    }
+
+    return Array.from(enumValues.values())[0] || normalized;
+  }
+
+  private normalizarOrigemLead(origem?: string): OrigemLead {
+    if (!origem) {
+      return OrigemLead.MANUAL;
+    }
+
+    const normalized = origem.trim().toLowerCase();
+    if (!normalized) {
+      return OrigemLead.MANUAL;
+    }
+
+    if (Object.values(OrigemLead).includes(normalized as OrigemLead)) {
+      return normalized as OrigemLead;
+    }
+
+    switch (normalized) {
+      case 'site':
+      case 'website':
+      case 'landing_page':
+      case 'landing-page':
+      case 'landing':
+        return OrigemLead.FORMULARIO;
+      case 'csv':
+      case 'campanha':
+      case 'publicidade':
+      case 'ads':
+        return OrigemLead.IMPORTACAO;
+      case 'telefone':
+      case 'email':
+        return OrigemLead.MANUAL;
+      case 'redes_sociais':
+      case 'midia_social':
+      case 'social':
+      case 'social_media':
+      case 'chat':
+      case 'webchat':
+      case 'instagram':
+      case 'facebook':
+      case 'linkedin':
+        return OrigemLead.WHATSAPP;
+      case 'parceiro':
+        return OrigemLead.INDICACAO;
+      case 'evento':
+      case 'outros':
+      case 'unknown':
+        return OrigemLead.OUTRO;
+      default:
+        return OrigemLead.OUTRO;
+    }
+  }
+
+  private async mapearOrigemLeadParaBanco(origem?: string): Promise<string> {
+    const normalized = this.normalizarOrigemLead(origem);
+    const enumValues = await this.getLeadColumnEnumValues('origem');
+
+    if (!enumValues) {
+      return normalized;
+    }
+
+    if (enumValues.has(normalized)) {
+      return normalized;
+    }
+
+    const candidatesByOrigin: Record<OrigemLead, string[]> = {
+      [OrigemLead.FORMULARIO]: ['formulario', 'site', 'website', 'outros'],
+      [OrigemLead.IMPORTACAO]: ['importacao', 'campanha', 'outros'],
+      [OrigemLead.API]: ['api', 'outros'],
+      [OrigemLead.WHATSAPP]: ['whatsapp', 'chat', 'redes_sociais', 'outros'],
+      [OrigemLead.MANUAL]: ['manual', 'outros'],
+      [OrigemLead.INDICACAO]: ['indicacao', 'outros'],
+      [OrigemLead.OUTRO]: ['outro', 'outros'],
+    };
+
+    for (const candidate of candidatesByOrigin[normalized] || []) {
+      if (enumValues.has(candidate)) {
+        return candidate;
+      }
+    }
+
+    return Array.from(enumValues.values())[0] || normalized;
+  }
+
+  private normalizarLeadDoBanco(lead: Lead): Lead {
+    const normalizedStatus = this.normalizarStatusLead(lead.status as unknown as string);
+    const normalizedOrigem = lead.origem
+      ? this.normalizarOrigemLead(lead.origem as unknown as string)
+      : undefined;
+
+    return {
+      ...lead,
+      status: normalizedStatus,
+      origem: normalizedOrigem,
+    } as Lead;
+  }
+
+  private mapearOrigemLeadParaOportunidade(origem?: string): OrigemOportunidade {
+    switch (this.normalizarOrigemLead(origem)) {
       case OrigemLead.FORMULARIO:
         return OrigemOportunidade.WEBSITE;
       case OrigemLead.IMPORTACAO:
@@ -96,79 +366,222 @@ export class LeadsService {
       case OrigemLead.INDICACAO:
         return OrigemOportunidade.INDICACAO;
       case OrigemLead.OUTRO:
-        return OrigemOportunidade.PARCEIRO;
-      case 'website':
-        return OrigemOportunidade.WEBSITE;
-      case 'indicacao':
-        return OrigemOportunidade.INDICACAO;
-      case 'evento':
-        return OrigemOportunidade.EVENTO;
-      case 'telefone':
-        return OrigemOportunidade.TELEFONE;
-      case 'email':
-        return OrigemOportunidade.EMAIL;
-      case 'redes_sociais':
-      case 'midia_social':
-        return OrigemOportunidade.REDES_SOCIAIS;
-      case 'campanha':
-      case 'publicidade':
-        return OrigemOportunidade.CAMPANHA;
-      case 'parceiro':
-      case 'outro':
-        return OrigemOportunidade.PARCEIRO;
       default:
-        return OrigemOportunidade.WEBSITE;
+        return OrigemOportunidade.PARCEIRO;
+    }
+  }
+
+  private normalizeIdentifier(value?: string | null): string | undefined {
+    if (!value || typeof value !== 'string') {
+      return undefined;
+    }
+    const normalized = value.trim();
+    return normalized === '' ? undefined : normalized;
+  }
+
+  private async validarResponsavelAtivoDaEmpresa(
+    responsavelId: string,
+    empresaId: string,
+  ): Promise<string> {
+    const normalizedResponsavelId = this.normalizeIdentifier(responsavelId);
+    if (!normalizedResponsavelId) {
+      throw new BadRequestException('Responsavel invalido para atribuicao do lead.');
+    }
+
+    const responsavelValido = await this.leadsRepository.manager.findOne(User, {
+      where: {
+        id: normalizedResponsavelId,
+        empresa_id: empresaId,
+        ativo: true,
+      },
+      select: ['id'],
+    });
+
+    if (!responsavelValido) {
+      throw new BadRequestException('Responsavel invalido ou nao pertence a empresa do lead.');
+    }
+
+    return responsavelValido.id;
+  }
+
+  private extractSubdominioFromHost(host?: string): string | undefined {
+    const hostRaw = this.normalizeIdentifier(host);
+    if (!hostRaw) {
+      return undefined;
+    }
+
+    const firstHost = hostRaw.split(',')[0]?.trim().toLowerCase();
+    if (!firstHost) {
+      return undefined;
+    }
+
+    const withoutPort = firstHost.split(':')[0];
+    if (!withoutPort || withoutPort === 'localhost' || withoutPort === '127.0.0.1') {
+      return undefined;
+    }
+
+    const parts = withoutPort.split('.').filter(Boolean);
+    if (parts.length < 3) {
+      return undefined;
+    }
+
+    const subdominio = parts[0];
+    if (!subdominio || subdominio === 'www') {
+      return undefined;
+    }
+
+    return subdominio;
+  }
+
+  private async resolveEmpresaIdForPublicCapture(
+    dto: CaptureLeadDto,
+    context?: {
+      host?: string;
+      query?: Record<string, unknown>;
+    },
+  ): Promise<string> {
+    const query = context?.query || {};
+    const queryValue = (keys: string[]): string | undefined => {
+      for (const key of keys) {
+        const raw = query[key];
+        if (typeof raw === 'string' && raw.trim() !== '') {
+          return raw.trim();
+        }
+      }
+      return undefined;
+    };
+
+    const empresaId = this.normalizeIdentifier(
+      dto.empresa_id ||
+        queryValue(['empresa_id', 'empresaId', 'tenant', 'tenant_id', 'tenantId']),
+    );
+    if (empresaId) {
+      const empresa = await this.empresaRepository.findOne({
+        where: { id: empresaId, ativo: true },
+        select: ['id'],
+      });
+      if (empresa?.id) {
+        return empresa.id;
+      }
+    }
+
+    const empresaSlug = this.normalizeIdentifier(
+      dto.empresa_slug || queryValue(['empresa_slug', 'empresaSlug', 'slug', 'empresa']),
+    );
+    if (empresaSlug) {
+      const empresa = await this.empresaRepository.findOne({
+        where: { slug: empresaSlug, ativo: true },
+        select: ['id'],
+      });
+      if (empresa?.id) {
+        return empresa.id;
+      }
+    }
+
+    const empresaSubdominio = this.normalizeIdentifier(
+      dto.empresa_subdominio ||
+        queryValue(['empresa_subdominio', 'empresaSubdominio', 'subdominio']) ||
+        this.extractSubdominioFromHost(context?.host),
+    );
+    if (empresaSubdominio) {
+      const empresa = await this.empresaRepository.findOne({
+        where: { subdominio: empresaSubdominio, ativo: true },
+        select: ['id'],
+      });
+      if (empresa?.id) {
+        return empresa.id;
+      }
+    }
+
+    throw new BadRequestException(
+      'Captura publica de lead requer identificacao da empresa (empresa_id, slug ou subdominio).',
+    );
+  }
+
+  /**
+   * Capturar lead de formulario publico (sem autenticacao)
+   */
+  async captureFromPublic(
+    dto: CaptureLeadDto,
+    context?: {
+      host?: string;
+      query?: Record<string, unknown>;
+    },
+  ): Promise<Lead> {
+    try {
+      const empresaId = await this.resolveEmpresaIdForPublicCapture(dto, context);
+      return await this.create(
+        {
+          nome: dto.nome,
+          email: dto.email,
+          telefone: dto.telefone,
+          empresa_nome: dto.empresa_nome,
+          observacoes: dto.mensagem,
+          origem: OrigemLead.FORMULARIO,
+        },
+        empresaId,
+      );
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logError('[LeadsService.captureFromPublic] erro ao capturar lead publico', error);
+      throw new InternalServerErrorException('Erro ao capturar lead', error.message);
     }
   }
 
   /**
    * Criar novo lead
    */
-  async create(dto: CreateLeadDto, empresaId: string): Promise<Lead> {
+  async create(dto: CreateLeadDto, empresaId: string, actorUserId?: string): Promise<Lead> {
     try {
-      // Debug: verificar empresa_id
-      console.log('🔍 [LeadsService.create] Empresa ID:', empresaId);
+      this.logger.debug(`[LeadsService.create] empresaId=${empresaId}`);
 
       const sanitizedDto = this.sanitizeLeadInput(dto);
+      const responsavelPayloadId = this.normalizeIdentifier(sanitizedDto.responsavel_id);
+      const responsavelActorId = this.normalizeIdentifier(actorUserId);
+      let responsavelIdToPersist: string | undefined;
 
-      console.log('🔍 [LeadsService.create] DTO sanitizado:', sanitizedDto);
+      if (responsavelPayloadId) {
+        responsavelIdToPersist = await this.validarResponsavelAtivoDaEmpresa(
+          responsavelPayloadId,
+          empresaId,
+        );
+      } else if (responsavelActorId) {
+        // Regra de negocio: lead criado manualmente fica atribuido ao usuario autenticado.
+        responsavelIdToPersist = responsavelActorId;
+      }
+
+      if (responsavelIdToPersist) {
+        sanitizedDto.responsavel_id = responsavelIdToPersist;
+      } else {
+        delete (sanitizedDto as any).responsavel_id;
+      }
+      this.logger.debug(`[LeadsService.create] payload=${JSON.stringify(this.buildLeadPayloadLogMeta(sanitizedDto))}`);
+      const origemBanco = await this.mapearOrigemLeadParaBanco(sanitizedDto.origem as string);
+      const statusBanco = await this.mapearStatusLeadParaBanco(sanitizedDto.status as string);
 
       const lead = this.leadsRepository.create({
         ...sanitizedDto,
         empresaId,
-        status: sanitizedDto.status || StatusLead.NOVO,
-        origem: (this.mapearOrigemParaBanco(sanitizedDto.origem as string) || 'website') as OrigemLead,
+        status: statusBanco as any,
+        origem: origemBanco as any,
       });
-
-      console.log('🔍 [LeadsService.create] Lead criado (antes do save):', {
-        nome: lead.nome,
-        email: lead.email,
-        empresa_id: lead.empresaId,
-        status: lead.status,
-        origem: lead.origem,
-        score: lead.score,
-      });
+      this.logger.debug(`[LeadsService.create] lead-before-save=${JSON.stringify(this.buildLeadEntityLogMeta(lead))}`);
 
       // Calcular score inicial
       lead.score = this.calcularScore(lead);
 
       const savedLead = await this.leadsRepository.save(lead);
-
-      console.log('✅ [LeadsService.create] Lead salvo com sucesso:', savedLead.id);
+      this.logger.log(`[LeadsService.create] lead salvo id=${savedLead.id}`);
 
       // Buscar com relacionamentos
       return await this.findOne(savedLead.id, empresaId);
     } catch (error) {
       const detail = (error as any)?.detail || (error as Error).message;
-      console.error('❌ [LeadsService.create] Erro ao criar lead:', {
-        message: (error as any)?.message,
-        code: (error as any)?.code,
-        detail: (error as any)?.detail,
-        stack: (error as any)?.stack,
-        name: (error as any)?.name,
-      });
+      this.logError('[LeadsService.create] erro ao criar lead', error);
 
-      // Se for erro de validação do BadRequestException, propagar
+      // Se for erro de validacao do BadRequestException, propagar
       if (error instanceof BadRequestException) {
         throw error;
       }
@@ -180,31 +593,11 @@ export class LeadsService {
   }
 
   /**
-   * Capturar lead de formulário público (sem autenticação)
-   */
-  async captureFromPublic(dto: CaptureLeadDto): Promise<Lead> {
-    try {
-      throw new BadRequestException(
-        'Captura pública de lead requer identificação da empresa (roteamento por subdomínio/parâmetro).',
-      );
-    } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      console.error('Erro ao capturar lead público:', error);
-      throw new InternalServerErrorException('Erro ao capturar lead', error.message);
-    }
-  }
-
-  /**
    * Listar todos os leads com filtros
    */
   async findAll(empresaId: string, filtros?: LeadFiltros): Promise<any> {
     try {
-      console.log('🔍 [LeadsService.findAll] Buscando leads:', {
-        empresa_id: empresaId,
-        filtros,
-      });
+      this.logger.debug(`[LeadsService.findAll] filtros=${JSON.stringify(this.buildFiltrosLogMeta(empresaId, filtros))}`);
 
       const page = filtros?.page || 1;
       const limit = filtros?.limit || 50;
@@ -217,24 +610,53 @@ export class LeadsService {
 
       // Filtros
       if (filtros?.status) {
-        query.andWhere('lead.status = :status', { status: filtros.status });
+        const statusFiltro = filtros.status.toString().trim().toLowerCase();
+        if (statusFiltro === 'operacionais' || statusFiltro === 'abertos') {
+          query.andWhere('lead.status NOT IN (:...statusOperacionaisExcluidos)', {
+            statusOperacionaisExcluidos: [
+              await this.mapearStatusLeadParaBanco(StatusLead.CONVERTIDO),
+              await this.mapearStatusLeadParaBanco(StatusLead.DESQUALIFICADO),
+            ],
+          });
+        } else {
+          query.andWhere('lead.status = :status', {
+            status: await this.mapearStatusLeadParaBanco(statusFiltro),
+          });
+        }
       }
 
       if (filtros?.origem) {
         query.andWhere('lead.origem = :origem', {
-          origem: this.mapearOrigemParaBanco(filtros.origem as string),
+          origem: await this.mapearOrigemLeadParaBanco(filtros.origem as string),
         });
       }
 
       if (filtros?.responsavel_id) {
-        query.andWhere('lead.responsavel_id = :responsavel_id', {
-          responsavel_id: filtros.responsavel_id,
-        });
+        const responsavelFiltroNormalizado = String(filtros.responsavel_id).trim();
+
+        if (
+          responsavelFiltroNormalizado === LEADS_UNASSIGNED_RESPONSAVEL_FILTER ||
+          responsavelFiltroNormalizado === LEADS_LEGACY_UNASSIGNED_RESPONSAVEL_FILTER
+        ) {
+          query.andWhere('lead.responsavel_id IS NULL');
+        } else {
+          query.andWhere('lead.responsavel_id = :responsavel_id', {
+            responsavel_id: responsavelFiltroNormalizado,
+          });
+        }
       }
 
       if (filtros?.dataInicio && filtros?.dataFim) {
         query.andWhere('lead.created_at BETWEEN :dataInicio AND :dataFim', {
           dataInicio: filtros.dataInicio,
+          dataFim: filtros.dataFim,
+        });
+      } else if (filtros?.dataInicio) {
+        query.andWhere('lead.created_at >= :dataInicio', {
+          dataInicio: filtros.dataInicio,
+        });
+      } else if (filtros?.dataFim) {
+        query.andWhere('lead.created_at <= :dataFim', {
           dataFim: filtros.dataFim,
         });
       }
@@ -247,30 +669,56 @@ export class LeadsService {
         );
       }
 
-      // Aplicar paginação
+      // Aplicar paginacao
       query.skip(skip).take(limit);
-      query.orderBy('lead.created_at', 'DESC');
+
+      const statusQualificado = await this.mapearStatusLeadParaBanco(StatusLead.QUALIFICADO);
+      const statusContatado = await this.mapearStatusLeadParaBanco(StatusLead.CONTATADO);
+      const statusNovo = await this.mapearStatusLeadParaBanco(StatusLead.NOVO);
+      const statusDesqualificado = await this.mapearStatusLeadParaBanco(
+        StatusLead.DESQUALIFICADO,
+      );
+      const statusConvertido = await this.mapearStatusLeadParaBanco(StatusLead.CONVERTIDO);
+
+      query
+        .addSelect(
+          `
+            CASE
+              WHEN lead.status = :statusQualificado THEN 0
+              WHEN lead.status = :statusContatado THEN 1
+              WHEN lead.status = :statusNovo THEN 2
+              WHEN lead.status = :statusDesqualificado THEN 3
+              WHEN lead.status = :statusConvertido THEN 4
+              ELSE 5
+            END
+          `,
+          'lead_status_prioridade',
+        )
+        .orderBy('lead.responsavel_id', 'ASC', 'NULLS FIRST')
+        .addOrderBy('lead_status_prioridade', 'ASC')
+        .addOrderBy('lead.score', 'DESC')
+        .addOrderBy('lead.updated_at', 'DESC')
+        .addOrderBy('lead.created_at', 'DESC')
+        .setParameters({
+          statusQualificado,
+          statusContatado,
+          statusNovo,
+          statusDesqualificado,
+          statusConvertido,
+        });
 
       const [leads, total] = await query.getManyAndCount();
-
-      console.log('✅ [LeadsService.findAll] Leads encontrados:', {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-        retornados: leads.length,
-        ids: leads.map((l) => l.id),
-      });
+      const leadsNormalizados = leads.map((lead) => this.normalizarLeadDoBanco(lead));
+      this.logger.debug(`[LeadsService.findAll] resultado=${JSON.stringify({ total, page, limit, totalPages: Math.ceil(total / limit), retornados: leadsNormalizados.length, ids: leadsNormalizados.map((l) => l.id) })}`);
 
       return {
-        data: leads,
+        data: leadsNormalizados,
         total,
         page,
         limit,
         totalPages: Math.ceil(total / limit),
       };
-    } catch (error) {
-      console.error('❌ [LeadsService.findAll] Erro ao listar leads:', error);
+    } catch (error) {      this.logError('[LeadsService.findAll] erro ao listar leads', error);
       throw new InternalServerErrorException('Erro ao listar leads', error.message);
     }
   }
@@ -278,7 +726,7 @@ export class LeadsService {
   /**
    * Buscar lead por ID
    */
-  async findOne(id: string, empresaId: string): Promise<Lead> {
+  async findOne(id: string, empresaId: string, normalizeResponse: boolean = true): Promise<Lead> {
     try {
       const lead = await this.leadsRepository.findOne({
         where: {
@@ -289,15 +737,15 @@ export class LeadsService {
       });
 
       if (!lead) {
-        throw new NotFoundException(`Lead com ID ${id} não encontrado`);
+        throw new NotFoundException(`Lead com ID ${id} nao encontrado`);
       }
 
-      return lead;
+      return normalizeResponse ? this.normalizarLeadDoBanco(lead) : lead;
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      console.error('Erro ao buscar lead:', error);
+      this.logError('[LeadsService.findOne] erro ao buscar lead', error);
       throw new InternalServerErrorException('Erro ao buscar lead', error.message);
     }
   }
@@ -307,9 +755,80 @@ export class LeadsService {
    */
   async update(id: string, dto: UpdateLeadDto, empresaId: string): Promise<Lead> {
     try {
-      const lead = await this.findOne(id, empresaId);
+      const lead = await this.findOne(id, empresaId, false);
+      const statusAtualNormalizado = this.normalizarStatusLead(lead.status as unknown as string);
+      const previousResponsavelId =
+        typeof lead.responsavel_id === 'string' && lead.responsavel_id.trim().length > 0
+          ? lead.responsavel_id.trim()
+          : null;
 
       const sanitizedDto = this.sanitizeLeadInput(dto);
+      const hasResponsavelPayload = Object.prototype.hasOwnProperty.call(dto, 'responsavel_id');
+      this.logger.debug(
+        `[LeadsService.update] leadId=${id} empresaId=${empresaId} payload=${JSON.stringify({
+          hasResponsavelPayload,
+          responsavel_id:
+            hasResponsavelPayload && typeof (dto as any).responsavel_id !== 'undefined'
+              ? (dto as any).responsavel_id
+              : '__absent__',
+          status: dto.status ?? null,
+          origem: dto.origem ?? null,
+        })}`,
+      );
+
+      // Tratar troca de responsavel de forma explicita para evitar persistencia do vinculo antigo
+      // quando a relacao "responsavel" ja veio carregada no entity.
+      if (hasResponsavelPayload) {
+        const responsavelPayload = (dto as any).responsavel_id;
+        let normalizedResponsavelId =
+          typeof responsavelPayload === 'string' && responsavelPayload.trim().length > 0
+            ? responsavelPayload.trim()
+            : null;
+
+        if (normalizedResponsavelId) {
+          normalizedResponsavelId = await this.validarResponsavelAtivoDaEmpresa(
+            normalizedResponsavelId,
+            empresaId,
+          );
+        }
+
+        lead.responsavel_id = normalizedResponsavelId;
+        lead.responsavel = normalizedResponsavelId
+          ? ({ id: normalizedResponsavelId } as User)
+          : null;
+        delete (sanitizedDto as any).responsavel_id;
+      }
+
+      if (sanitizedDto.status !== undefined) {
+        const statusAlvoNormalizado = this.normalizarStatusLead(sanitizedDto.status as string);
+
+        if (
+          statusAtualNormalizado === StatusLead.CONVERTIDO &&
+          statusAlvoNormalizado !== StatusLead.CONVERTIDO
+        ) {
+          throw new BadRequestException(
+            'Lead convertido nao pode retornar para etapas anteriores.',
+          );
+        }
+
+        if (
+          statusAtualNormalizado !== StatusLead.CONVERTIDO &&
+          statusAlvoNormalizado === StatusLead.CONVERTIDO
+        ) {
+          throw new BadRequestException(
+            'Use a acao de conversao para converter um lead em oportunidade.',
+          );
+        }
+
+        sanitizedDto.status = (await this.mapearStatusLeadParaBanco(
+          sanitizedDto.status as string,
+        )) as any;
+      }
+      if (sanitizedDto.origem !== undefined) {
+        sanitizedDto.origem = (await this.mapearOrigemLeadParaBanco(
+          sanitizedDto.origem as string,
+        )) as any;
+      }
       Object.assign(lead, sanitizedDto);
 
       // Recalcular score se campos relevantes mudaram
@@ -323,12 +842,21 @@ export class LeadsService {
 
       await this.leadsRepository.save(lead);
 
-      return await this.findOne(id, empresaId);
+      const updatedLead = await this.findOne(id, empresaId);
+      const persistedResponsavelId =
+        typeof updatedLead.responsavel_id === 'string' && updatedLead.responsavel_id.trim().length > 0
+          ? updatedLead.responsavel_id.trim()
+          : null;
+      this.logger.debug(
+        `[LeadsService.update] leadId=${id} responsavel(before=${previousResponsavelId}, after=${persistedResponsavelId})`,
+      );
+
+      return updatedLead;
     } catch (error) {
-      if (error instanceof NotFoundException) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
       }
-      console.error('Erro ao atualizar lead:', error);
+      this.logError('[LeadsService.update] erro ao atualizar lead', error);
       throw new InternalServerErrorException('Erro ao atualizar lead', error.message);
     }
   }
@@ -338,10 +866,10 @@ export class LeadsService {
    */
   async remove(id: string, empresaId: string): Promise<void> {
     try {
-      const lead = await this.findOne(id, empresaId);
+      const lead = await this.findOne(id, empresaId, false);
 
       if (lead.status === StatusLead.CONVERTIDO) {
-        throw new BadRequestException('Não é possível deletar um lead já convertido');
+        throw new BadRequestException('Nao e possivel deletar um lead ja convertido');
       }
 
       await this.leadsRepository.remove(lead);
@@ -349,7 +877,7 @@ export class LeadsService {
       if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
       }
-      console.error('Erro ao remover lead:', error);
+      this.logError('[LeadsService.remove] erro ao remover lead', error);
       throw new InternalServerErrorException('Erro ao remover lead', error.message);
     }
   }
@@ -361,34 +889,71 @@ export class LeadsService {
     leadId: string,
     dto: ConvertLeadDto,
     empresaId: string,
+    actorUserId?: string,
   ): Promise<Oportunidade> {
     try {
-      const lead = await this.findOne(leadId, empresaId);
+      const lead = await this.findOne(leadId, empresaId, false);
 
       if (lead.status === StatusLead.CONVERTIDO) {
-        throw new BadRequestException('Lead já foi convertido anteriormente');
+        throw new BadRequestException('Lead ja foi convertido anteriormente');
       }
 
-      // Criar oportunidade
-      const oportunidade = this.oportunidadesRepository.create({
-        titulo: `${lead.nome}${lead.empresa_nome ? ` - ${lead.empresa_nome}` : ''}`,
-        descricao: dto.descricao || lead.observacoes || `Lead convertido: ${lead.nome}`,
-        valor: dto.valor || 0,
-        estagio: this.mapearEstagioParaBanco((dto.estagio as EstagioOportunidade) || EstagioOportunidade.LEADS),
-        prioridade: PrioridadeOportunidade.MEDIA,
-        origem: this.mapearOrigemParaBanco(lead.origem),
-        empresa_id: empresaId,
-        responsavel_id: lead.responsavel_id,
-        probabilidade: 20, // Probabilidade inicial baixa
-        nomeContato: lead.nome,
-        emailContato: lead.email,
-        telefoneContato: lead.telefone,
-        empresaContato: lead.empresa_nome,
-      });
+      const tituloOportunidade =
+        this.normalizeIdentifier(dto.titulo) ||
+        this.normalizeIdentifier(dto.titulo_oportunidade) ||
+        `${lead.nome}${lead.empresa_nome ? ` - ${lead.empresa_nome}` : ''}`;
 
-      const savedOportunidade = await this.oportunidadesRepository.save(oportunidade);
+      const descricaoOportunidade =
+        this.normalizeIdentifier(dto.descricao) ||
+        this.normalizeIdentifier(dto.observacoes) ||
+        this.normalizeIdentifier(lead.observacoes) ||
+        `Lead convertido: ${lead.nome}`;
+
+      const dataFechamentoEsperado =
+        this.normalizeIdentifier(dto.dataFechamentoEsperado) ||
+        this.normalizeIdentifier(dto.data_fechamento_prevista);
+
+      const valorOportunidade =
+        dto.valor !== undefined && dto.valor !== null
+          ? dto.valor
+          : dto.valor_estimado !== undefined && dto.valor_estimado !== null
+            ? dto.valor_estimado
+            : 0;
+      const responsavelConversao =
+        this.normalizeIdentifier((dto as any).responsavel_id) ||
+        this.normalizeIdentifier(lead.responsavel_id) ||
+        this.normalizeIdentifier(actorUserId);
+
+      if (!responsavelConversao) {
+        throw new BadRequestException(
+          'Nao foi possivel converter o lead sem usuario responsavel definido.',
+        );
+      }
+
+      // Criar oportunidade usando OportunidadesService (schema-aware e compativel com bancos legados)
+      const savedOportunidade = await this.oportunidadesService.create(
+        {
+          titulo: tituloOportunidade,
+          descricao: descricaoOportunidade,
+          valor: valorOportunidade,
+          probabilidade: 20,
+          estagio: this.mapearEstagioParaBanco(
+            (dto.estagio as EstagioOportunidade) || EstagioOportunidade.LEADS,
+          ),
+          prioridade: PrioridadeOportunidade.MEDIA,
+          origem: this.mapearOrigemLeadParaOportunidade(lead.origem),
+          responsavel_id: responsavelConversao as any,
+          nomeContato: lead.nome,
+          emailContato: lead.email,
+          telefoneContato: lead.telefone,
+          empresaContato: lead.empresa_nome,
+          dataFechamentoEsperado,
+        } as any,
+        empresaId,
+      );
 
       // Atualizar lead
+      lead.responsavel_id = lead.responsavel_id || responsavelConversao;
       lead.status = StatusLead.CONVERTIDO;
       lead.oportunidade_id = savedOportunidade.id.toString();
       lead.convertido_em = new Date();
@@ -399,26 +964,22 @@ export class LeadsService {
       if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
       }
-      console.error('Erro ao converter lead:', error);
+      this.logError('[LeadsService.converterParaOportunidade] erro ao converter lead', error);
       throw new InternalServerErrorException('Erro ao converter lead', error.message);
     }
   }
 
   /**
-   * Obter estatísticas de leads
+   * Obter estatisticas de leads
    */
   async getEstatisticas(empresaId: string): Promise<LeadEstatisticas> {
     try {
-      console.log(
-        '🔍 [LeadsService.getEstatisticas] Calculando estatísticas para empresa:',
-        empresaId,
-      );
+      this.logger.debug(`[LeadsService.getEstatisticas] empresaId=${empresaId}`);
 
-      // Buscar todos os leads (sem paginação para estatísticas)
+      // Buscar todos os leads (sem paginacao para estatisticas)
       const result = await this.findAll(empresaId, { limit: 10000 }); // Limite alto para pegar todos
       const leads = result.data;
-
-      console.log('🔍 [LeadsService.getEstatisticas] Leads encontrados:', leads.length);
+      this.logger.debug(`[LeadsService.getEstatisticas] leads encontrados=${leads.length}`);
 
       const total = leads.length;
       const novos = leads.filter((l) => l.status === StatusLead.NOVO).length;
@@ -426,6 +987,8 @@ export class LeadsService {
       const qualificados = leads.filter((l) => l.status === StatusLead.QUALIFICADO).length;
       const desqualificados = leads.filter((l) => l.status === StatusLead.DESQUALIFICADO).length;
       const convertidos = leads.filter((l) => l.status === StatusLead.CONVERTIDO).length;
+      const semResponsavel = leads.filter((l) => !l.responsavel_id).length;
+      const semContato = leads.filter((l) => !l.email && !l.telefone).length;
 
       const taxaConversao = total > 0 ? (convertidos / total) * 100 : 0;
 
@@ -443,7 +1006,7 @@ export class LeadsService {
         quantidade,
       }));
 
-      // Agrupamento por responsável
+      // Agrupamento por responsavel
       const responsavelMap = new Map<string, { nome: string; quantidade: number }>();
       leads.forEach((lead) => {
         if (lead.responsavel_id) {
@@ -472,29 +1035,29 @@ export class LeadsService {
         qualificados,
         desqualificados,
         convertidos,
+        semResponsavel,
+        semContato,
         taxaConversao,
         scoreMedio,
         porOrigem,
         porResponsavel,
-      };
-
-      console.log('✅ [LeadsService.getEstatisticas] Estatísticas calculadas:', estatisticas);
+      };      this.logger.debug(`[LeadsService.getEstatisticas] estatisticas=${JSON.stringify(estatisticas)}`);
 
       return estatisticas;
     } catch (error) {
-      console.error('❌ [LeadsService.getEstatisticas] Erro ao obter estatísticas:', error);
-      throw new InternalServerErrorException('Erro ao obter estatísticas', error.message);
+      this.logError('[LeadsService.getEstatisticas] erro ao obter estatisticas', error);
+      throw new InternalServerErrorException('Erro ao obter estatisticas', error.message);
     }
   }
 
   /**
-   * Calcular score de qualificação do lead (0-100)
+   * Calcular score de qualificacao do lead (0-100)
    * Algoritmo simples baseado em completude de dados
    */
   private calcularScore(lead: Lead): number {
     let score = 0;
 
-    // Nome é obrigatório, mas não conta no score
+    // Nome e obrigatorio, mas nao conta no score
     if (lead.email) score += 25;
     if (lead.telefone) score += 25;
     if (lead.empresa_nome) score += 20;
@@ -531,28 +1094,33 @@ export class LeadsService {
 
       const rows = parseResult.data;
       result.total = rows.length;
+      const statusNovoBanco = await this.mapearStatusLeadParaBanco(StatusLead.NOVO);
+      const origemImportacaoBanco = await this.mapearOrigemLeadParaBanco(OrigemLead.IMPORTACAO);
 
       // Processar cada linha
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
-        const linha = i + 2; // +2 porque linha 1 é header e index começa em 0
+        const linha = i + 2; // +2 porque linha 1 e header e index comeca em 0
 
         try {
-          // Validação básica
+          // Validacao basica
           if (!row.nome || row.nome.trim().length === 0) {
-            throw new Error('Nome é obrigatório');
+            throw new Error('Nome e obrigatorio');
+          }
+
+          const emailNormalizado = row.email?.trim() || undefined;
+          const telefoneNormalizado = row.telefone?.trim() || undefined;
+
+          if (!emailNormalizado && !telefoneNormalizado) {
+            throw new Error('Informe pelo menos um contato: email ou telefone');
           }
 
           // Validar origem se fornecida
-          let origem = OrigemLead.IMPORTACAO;
-          if (row.origem) {
-            const origemUpper = row.origem.toUpperCase();
-            if (Object.values(OrigemLead).includes(origemUpper as OrigemLead)) {
-              origem = origemUpper as OrigemLead;
-            }
-          }
+          const origem = row.origem
+            ? await this.mapearOrigemLeadParaBanco(row.origem)
+            : origemImportacaoBanco;
 
-          // Buscar responsável por email se fornecido
+          // Buscar responsavel por email se fornecido
           let responsavel_id: string | undefined;
           if (row.responsavel_email) {
             const responsavel = await this.leadsRepository.manager.findOne(User, {
@@ -569,14 +1137,14 @@ export class LeadsService {
           // Criar lead
           const lead = this.leadsRepository.create({
             nome: row.nome.trim(),
-            email: row.email?.trim() || undefined,
-            telefone: row.telefone?.trim() || undefined,
+            email: emailNormalizado,
+            telefone: telefoneNormalizado,
             empresa_nome: row.empresa_nome?.trim() || undefined,
-            origem,
+            origem: origem as any,
             observacoes: row.observacoes?.trim() || undefined,
             responsavel_id,
             empresaId,
-            status: StatusLead.NOVO,
+            status: statusNovoBanco as any,
           });
 
           // Calcular score
@@ -597,7 +1165,7 @@ export class LeadsService {
 
       return result;
     } catch (error) {
-      console.error('Erro geral no import CSV:', error);
+      this.logError('[LeadsService.importFromCsv] erro geral no import CSV', error);
       throw new InternalServerErrorException(
         'Erro ao importar leads',
         error instanceof Error ? error.message : 'Erro desconhecido',
@@ -605,3 +1173,4 @@ export class LeadsService {
     }
   }
 }
+

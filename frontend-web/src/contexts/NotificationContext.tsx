@@ -1,6 +1,17 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+﻿import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+  useRef,
+  useCallback,
+} from 'react';
 import toast from 'react-hot-toast';
+import { AlertTriangle, Bell, Info } from 'lucide-react';
 import { api } from '../services/api';
+import { useAuth } from '../hooks/useAuth';
+import { buildScopedStorageKey } from '../utils/storageScope';
 
 export interface Notification {
   id: string;
@@ -13,8 +24,9 @@ export interface Notification {
     label: string;
     onClick: () => void;
   };
-  entityType?: 'cliente' | 'proposta' | 'tarefa' | 'agenda';
+  entityType?: 'cliente' | 'proposta' | 'tarefa' | 'agenda' | 'oportunidade' | 'cotacao';
   entityId?: string;
+  data?: Record<string, unknown> | null;
   priority: 'low' | 'medium' | 'high' | 'urgent';
   autoClose?: boolean;
   duration?: number;
@@ -37,10 +49,11 @@ export interface NotificationReminder {
 }
 
 export interface NotificationReminderInput {
+  id?: string;
   title: string;
   message?: string;
   scheduledFor: Date | string | number;
-  entityType?: ReminderEntityType | 'client' | 'reunião' | 'reuniao';
+  entityType?: ReminderEntityType | 'client' | 'reuniao' | 'reuniao';
   entityId?: string;
   recurring?: {
     type: 'daily' | 'weekly' | 'monthly';
@@ -50,7 +63,7 @@ export interface NotificationReminderInput {
 }
 
 interface NotificationContextData {
-  // Notificações
+  // Notificacoes
   notifications: Notification[];
   unreadCount: number;
   addNotification: (notification: AddNotificationInput) => void;
@@ -65,7 +78,7 @@ interface NotificationContextData {
   updateReminder: (id: string, updates: Partial<NotificationReminder>) => void;
   removeReminder: (id: string) => void;
 
-  // Configurações
+  // Configuracoes
   settings: {
     soundEnabled: boolean;
     browserNotifications: boolean;
@@ -74,7 +87,7 @@ interface NotificationContextData {
   };
   updateSettings: (settings: Partial<NotificationContextData['settings']>) => void;
 
-  // Métodos de conveniência
+  // Metodos de conveniencia
   showSuccess: (title: string, message: string, action?: Notification['action']) => void;
   showError: (title: string, message: string, action?: Notification['action']) => void;
   showWarning: (title: string, message: string, action?: Notification['action']) => void;
@@ -90,7 +103,82 @@ interface NotificationContextData {
 const NotificationContext = createContext<NotificationContextData | undefined>(undefined);
 
 type AddNotificationInput = Omit<Notification, 'id' | 'timestamp' | 'read' | 'priority'> &
-  Partial<Pick<Notification, 'id' | 'priority'>>;
+  Partial<Pick<Notification, 'id' | 'timestamp' | 'read' | 'priority'>> & {
+    silent?: boolean;
+    browser?: boolean;
+  };
+
+const normalizeBrowserText = (value: unknown): string =>
+  String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const LEGACY_NOTIFICATION_SETTINGS_STORAGE_KEY = 'conect-notification-settings';
+const NOTIFICATION_SETTINGS_STORAGE_KEY_BASE = 'conect-notification-settings:v2';
+const LEGACY_USER_REMINDERS_STORAGE_KEY_BASE = 'conect-reminders';
+const REMINDERS_STORAGE_KEY_BASE = 'conect-reminders:v2';
+const DEFAULT_NOTIFICATION_SETTINGS: NotificationContextData['settings'] = {
+  soundEnabled: true,
+  browserNotifications: true,
+  emailNotifications: false,
+  reminderInterval: 15,
+};
+
+const isPersistedNotificationId = (value?: string | null): boolean => {
+  if (typeof value !== 'string') return false;
+  return UUID_REGEX.test(value.trim());
+};
+
+const shouldAutoShowBrowserNotification = (notification: Notification): boolean => {
+  if (notification.type === 'reminder') {
+    return notification.priority === 'high' || notification.priority === 'urgent';
+  }
+
+  const normalizedContent = normalizeBrowserText(`${notification.title} ${notification.message}`);
+  const omnichannelTextHints = [
+    'omnichannel',
+    'chat',
+    'inbox',
+    'nova mensagem',
+    'mensagem recebida',
+  ];
+  const isOmnichannelByText = omnichannelTextHints.some((hint) =>
+    normalizedContent.includes(hint),
+  );
+
+  let isOmnichannelByData = false;
+  if (isRecord(notification.data)) {
+    const normalizedData = [
+      notification.data.modulo,
+      notification.data.module,
+      notification.data.channel,
+      notification.data.canal,
+      notification.data.context,
+      notification.data.contexto,
+      notification.data.feature,
+      notification.data.origin,
+      notification.data.origem,
+    ]
+      .map((value) => normalizeBrowserText(value))
+      .join(' ');
+
+    isOmnichannelByData =
+      normalizedData.includes('omnichannel') ||
+      normalizedData.includes('chat') ||
+      normalizedData.includes('inbox');
+  }
+
+  const isUrgentOperationalAlert =
+    notification.priority === 'urgent' &&
+    (notification.type === 'error' || notification.type === 'warning');
+
+  return isOmnichannelByText || isOmnichannelByData || isUrgentOperationalAlert;
+};
 
 export const useNotifications = () => {
   const context = useContext(NotificationContext);
@@ -105,15 +193,38 @@ interface NotificationProviderProps {
 }
 
 export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children }) => {
-  // ✅ Garantir que estados iniciais sejam arrays válidos
+  const { isAuthenticated, user } = useAuth();
+  //  Garantir que estados iniciais sejam arrays validos
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const notificationsRef = useRef<Notification[]>([]);
   const [reminders, setReminders] = useState<NotificationReminder[]>([]);
-  const [settings, setSettings] = useState({
-    soundEnabled: true,
-    browserNotifications: true,
-    emailNotifications: false,
-    reminderInterval: 15, // 15 minutos antes
-  });
+  const [settings, setSettings] = useState<NotificationContextData['settings']>(
+    DEFAULT_NOTIFICATION_SETTINGS,
+  );
+  const [loadedReminderScopeKey, setLoadedReminderScopeKey] = useState<string | null>(null);
+  const [loadedSettingsScopeKey, setLoadedSettingsScopeKey] = useState<string | null>(null);
+  const resolvedEmpresaId = user?.empresa?.id ?? null;
+  const settingsStorageKey =
+    isAuthenticated && user?.id
+      ? buildScopedStorageKey(NOTIFICATION_SETTINGS_STORAGE_KEY_BASE, {
+          includeEmpresa: true,
+          includeUser: true,
+          fallbackEmpresaId: resolvedEmpresaId,
+          fallbackUserId: user.id,
+        })
+      : LEGACY_NOTIFICATION_SETTINGS_STORAGE_KEY;
+  const remindersStorageKey =
+    isAuthenticated && user?.id
+      ? buildScopedStorageKey(REMINDERS_STORAGE_KEY_BASE, {
+          includeEmpresa: true,
+          includeUser: true,
+          fallbackEmpresaId: resolvedEmpresaId,
+          fallbackUserId: user.id,
+        })
+      : null;
+  const legacyUserRemindersStorageKey = user?.id
+    ? `${LEGACY_USER_REMINDERS_STORAGE_KEY_BASE}:${user.id}`
+    : null;
 
   const generateId = () => `notification-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -128,7 +239,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       switch (entityType) {
         case 'client':
           return 'cliente';
-        case 'reunião':
+        case 'reuniao':
         case 'reuniao':
           return 'agenda';
         case 'proposta':
@@ -149,7 +260,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     const scheduledFor = Number.isNaN(scheduledForValue.getTime()) ? new Date() : scheduledForValue;
 
     return {
-      id: existingId ?? generateId(),
+      id: reminder.id ?? existingId ?? generateId(),
       title: reminder.title,
       message: reminder.message ?? '',
       scheduledFor,
@@ -160,110 +271,183 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     };
   };
 
-  // Carregar dados do localStorage na inicialização
+  // Carregar dados do localStorage.
+  // Notificacoes nao sao persistidas; lembretes sao persistidos por usuario autenticado.
   useEffect(() => {
-    // ❌ REMOVIDO: Não persistir notificações no localStorage
-    // Motivo: Notificações são específicas por usuário (via API + JWT)
-    // Persistir causava vazamento entre usuários no mesmo navegador
-
-    // Limpar notificações antigas do localStorage (se existirem)
     localStorage.removeItem('conect-notifications');
 
-    const savedReminders = localStorage.getItem('conect-reminders');
-    const savedSettings = localStorage.getItem('conect-notification-settings');
-
-    if (savedReminders) {
-      try {
-        const parsed = JSON.parse(savedReminders);
-        // ✅ Garantir que parsed é um array válido
-        if (!Array.isArray(parsed)) {
-          console.warn('⚠️ savedReminders não é um array, ignorando:', parsed);
-          localStorage.removeItem('conect-reminders');
-          return;
-        }
-        const validReminders = parsed
-          .map((r: any) => {
-            try {
-              return normalizeReminder(
-                {
-                  title: r.title ?? 'Lembrete',
-                  message: r.message,
-                  scheduledFor: r.scheduledFor ?? r.dateTime ?? new Date(),
-                  entityType: r.entityType,
-                  entityId: r.entityId,
-                  recurring: r.recurring,
-                  active: r.active,
-                },
-                r.id,
-              );
-            } catch (innerError) {
-              console.warn('Lembrete inválido ignorado:', innerError);
-              return null;
-            }
-          })
-          .filter(
-            (reminder: NotificationReminder | null): reminder is NotificationReminder =>
-              reminder !== null,
-          );
-        setReminders(validReminders);
-      } catch (error) {
-        console.error('Erro ao carregar lembretes:', error);
-      }
-    }
-
+    const savedSettings = localStorage.getItem(settingsStorageKey);
     if (savedSettings) {
       try {
         const parsed = JSON.parse(savedSettings);
-        setSettings({ ...settings, ...parsed });
+        if (isRecord(parsed)) {
+          setSettings({ ...DEFAULT_NOTIFICATION_SETTINGS, ...parsed });
+        } else {
+          setSettings(DEFAULT_NOTIFICATION_SETTINGS);
+        }
       } catch (error) {
-        console.error('Erro ao carregar configurações:', error);
+        console.error('Erro ao carregar configuraes:', error);
+        setSettings(DEFAULT_NOTIFICATION_SETTINGS);
+      }
+    } else {
+      setSettings(DEFAULT_NOTIFICATION_SETTINGS);
+    }
+    setLoadedSettingsScopeKey(settingsStorageKey);
+
+    if (!isAuthenticated || !remindersStorageKey) {
+      setReminders([]);
+      setLoadedReminderScopeKey(null);
+
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+      return;
+    }
+
+    const savedScopedReminders = localStorage.getItem(remindersStorageKey);
+    const savedLegacyUserReminders = legacyUserRemindersStorageKey
+      ? localStorage.getItem(legacyUserRemindersStorageKey)
+      : null;
+    const sourceRemindersPayload = savedScopedReminders ?? savedLegacyUserReminders;
+
+    if (!sourceRemindersPayload) {
+      setReminders([]);
+      setLoadedReminderScopeKey(remindersStorageKey);
+    } else {
+      try {
+        const parsed = JSON.parse(sourceRemindersPayload);
+        if (!Array.isArray(parsed)) {
+          console.warn('savedReminders nao um array, ignorando:', parsed);
+          localStorage.removeItem(remindersStorageKey);
+          if (savedLegacyUserReminders && legacyUserRemindersStorageKey) {
+            localStorage.removeItem(legacyUserRemindersStorageKey);
+          }
+          setReminders([]);
+          setLoadedReminderScopeKey(remindersStorageKey);
+        } else {
+          const validReminders = parsed
+            .map((r: any) => {
+              try {
+                return normalizeReminder(
+                  {
+                    title: r.title ?? 'Lembrete',
+                    message: r.message,
+                    scheduledFor: r.scheduledFor ?? r.dateTime ?? new Date(),
+                    entityType: r.entityType,
+                    entityId: r.entityId,
+                    recurring: r.recurring,
+                    active: r.active,
+                  },
+                  r.id,
+                );
+              } catch (innerError) {
+                console.warn('Lembrete invalido ignorado:', innerError);
+                return null;
+              }
+            })
+            .filter(
+              (reminder: NotificationReminder | null): reminder is NotificationReminder =>
+                reminder !== null,
+            );
+          setReminders(validReminders);
+          setLoadedReminderScopeKey(remindersStorageKey);
+
+          // Migracao automatica da chave legada para a chave escopada por usuario.
+          if (!savedScopedReminders && savedLegacyUserReminders && legacyUserRemindersStorageKey) {
+            localStorage.setItem(remindersStorageKey, sourceRemindersPayload);
+            localStorage.removeItem(legacyUserRemindersStorageKey);
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao carregar lembretes:', error);
+        setReminders([]);
+        setLoadedReminderScopeKey(remindersStorageKey);
       }
     }
 
-    // Solicitar permissão para notificações do navegador
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
-  }, []);
+  }, [
+    isAuthenticated,
+    legacyUserRemindersStorageKey,
+    remindersStorageKey,
+    settingsStorageKey,
+  ]);
 
-  // ❌ REMOVIDO: Não persistir notificações no localStorage
-  // Motivo: Causava vazamento de notificações entre usuários
-  // As notificações vêm da API com polling e são filtradas por userId no backend
+  //  REMOVIDO: Nao persistir notificacoes nao localStorage
+  // Motivo: Causava vazamento de notificacoes entre usuarios
+  // As notificacoes vem da API com polling e sao filtradas por userId nao backend
 
-  // Salvar lembretes no localStorage
   useEffect(() => {
-    localStorage.setItem('conect-reminders', JSON.stringify(reminders));
-  }, [reminders]);
+    notificationsRef.current = notifications;
+  }, [notifications]);
 
-  // Salvar configurações no localStorage
   useEffect(() => {
-    localStorage.setItem('conect-notification-settings', JSON.stringify(settings));
-  }, [settings]);
+    if (isAuthenticated) {
+      return;
+    }
+
+    notificationsRef.current = [];
+    setNotifications([]);
+    toast.dismiss();
+  }, [isAuthenticated]);
+
+  // Salvar lembretes nao localStorage
+  useEffect(() => {
+    if (!isAuthenticated || !remindersStorageKey) {
+      return;
+    }
+    if (loadedReminderScopeKey !== remindersStorageKey) {
+      return;
+    }
+
+    localStorage.setItem(remindersStorageKey, JSON.stringify(reminders));
+  }, [isAuthenticated, loadedReminderScopeKey, reminders, remindersStorageKey]);
+
+  // Salvar configuraes nao localStorage
+  useEffect(() => {
+    if (loadedSettingsScopeKey !== settingsStorageKey) {
+      return;
+    }
+
+    localStorage.setItem(settingsStorageKey, JSON.stringify(settings));
+  }, [loadedSettingsScopeKey, settings, settingsStorageKey]);
 
   // Verificar lembretes periodicamente
   useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+
     const checkReminders = () => {
-      const now = new Date();
-      const reminderTime = new Date(now.getTime() + settings.reminderInterval * 60000);
+      const now = Date.now();
+      // Tolera atraso de aba inativa sem adiantar lembrete.
+      const reminderGracePeriodMs = 5 * 60 * 1000;
 
       reminders.forEach((reminder) => {
+        const scheduledForMs = reminder.scheduledFor.getTime();
+        const isDueNow =
+          scheduledForMs <= now && scheduledForMs >= now - reminderGracePeriodMs;
+
         if (
           reminder.active &&
-          reminder.scheduledFor <= reminderTime &&
-          reminder.scheduledFor > now
+          isDueNow
         ) {
-          // Criar notificação para o lembrete
+          // Criar notificacao para o lembrete
           addNotification({
+            id: `agenda:runtime-reminder:${reminder.id}:${scheduledForMs}`,
             type: 'reminder',
             title: `Lembrete: ${reminder.title}`,
             message: reminder.message,
             priority: 'high',
             entityType: reminder.entityType,
             entityId: reminder.entityId,
-            autoClose: false,
+            autoClose: true,
+            duration: 8000,
           });
 
-          // Desativar lembrete se não for recorrente
+          // Desativar lembrete se nao for recorrente
           if (!reminder.recurring) {
             updateReminder(reminder.id, { active: false });
           }
@@ -276,84 +460,149 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     checkReminders(); // Verificar imediatamente
 
     return () => clearInterval(interval);
-  }, [reminders, settings.reminderInterval]);
+  }, [isAuthenticated, reminders]);
 
-  const addNotification = (notification: AddNotificationInput) => {
-    // Verificar se já existe uma notificação similar muito recente (últimos 2 minutos para erros)
-    const timeWindow = notification.type === 'error' ? 2 * 60 * 1000 : 5 * 60 * 1000;
+  const addNotification = useCallback((notification: AddNotificationInput) => {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    const { silent = false, browser, ...notificationData } = notification;
+    const currentNotifications = Array.isArray(notificationsRef.current)
+      ? notificationsRef.current
+      : [];
+    const resolvedId = notificationData.id || generateId();
+
+    const parsedTimestamp =
+      notificationData.timestamp instanceof Date
+        ? notificationData.timestamp
+        : notificationData.timestamp
+          ? new Date(notificationData.timestamp)
+          : new Date();
+    const normalizedTimestamp = Number.isNaN(parsedTimestamp.getTime()) ? new Date() : parsedTimestamp;
+
+    const existingIndex = currentNotifications.findIndex((item) => item.id === resolvedId);
+    if (existingIndex >= 0) {
+      const existingNotification = currentNotifications[existingIndex];
+      const updatedNotification: Notification = {
+        ...existingNotification,
+        ...notificationData,
+        id: resolvedId,
+        timestamp: normalizedTimestamp,
+        read: notificationData.read ?? existingNotification.read,
+        priority: notificationData.priority ?? existingNotification.priority ?? 'medium',
+      };
+
+      const hasChanged =
+        existingNotification.type !== updatedNotification.type ||
+        existingNotification.title !== updatedNotification.title ||
+        existingNotification.message !== updatedNotification.message ||
+        existingNotification.read !== updatedNotification.read ||
+        existingNotification.priority !== updatedNotification.priority ||
+        existingNotification.autoClose !== updatedNotification.autoClose ||
+        existingNotification.duration !== updatedNotification.duration ||
+        existingNotification.entityType !== updatedNotification.entityType ||
+        existingNotification.entityId !== updatedNotification.entityId ||
+        JSON.stringify(existingNotification.data ?? null) !==
+          JSON.stringify(updatedNotification.data ?? null) ||
+        existingNotification.timestamp.getTime() !== updatedNotification.timestamp.getTime();
+
+      if (!hasChanged) {
+        return resolvedId;
+      }
+
+      const nextNotifications = [...currentNotifications];
+      nextNotifications[existingIndex] = updatedNotification;
+      notificationsRef.current = nextNotifications;
+      setNotifications(nextNotifications);
+      return resolvedId;
+    }
+
+    // Verificar se ja existe uma notificacao similar muito recente (ultimos 2 minutos para erros)
+    const timeWindow = notificationData.type === 'error' ? 2 * 60 * 1000 : 5 * 60 * 1000;
     const recentTimeAgo = new Date(Date.now() - timeWindow);
-    const recentSimilar = notifications.find(
+    const recentSimilar = currentNotifications.find(
       (existing) =>
-        existing.title === notification.title &&
-        existing.type === notification.type &&
-        existing.message === notification.message &&
-        existing.entityType === notification.entityType &&
+        existing.title === notificationData.title &&
+        existing.type === notificationData.type &&
+        existing.message === notificationData.message &&
+        existing.entityType === notificationData.entityType &&
         existing.timestamp > recentTimeAgo,
     );
 
-    // Se encontrou notificação similar recente, não criar nova
     if (recentSimilar) {
-      // Log silencioso - apenas em debug mode
       if (process.env.NODE_ENV === 'development') {
-        console.debug('Notificação duplicada evitada:', notification.title);
+        console.debug('Notificao duplicada evitada:', notificationData.title);
       }
       return;
     }
 
     const newNotification: Notification = {
-      ...notification,
-      id: notification.id || generateId(), // Usar ID fornecido ou gerar novo
-      timestamp: new Date(),
-      read: false,
-      priority: notification.priority ?? 'medium',
+      ...notificationData,
+      id: resolvedId,
+      timestamp: normalizedTimestamp,
+      read: notificationData.read ?? false,
+      priority: notificationData.priority ?? 'medium',
     };
 
-    setNotifications((prev) => [newNotification, ...prev]);
+    const nextNotifications = [newNotification, ...currentNotifications];
+    notificationsRef.current = nextNotifications;
+    setNotifications(nextNotifications);
+
+    if (silent) {
+      return newNotification.id;
+    }
 
     // Mostrar toast
     const toastOptions = {
-      duration: notification.autoClose !== false ? notification.duration || 4000 : Infinity,
+      id: newNotification.id,
+      duration: notificationData.autoClose !== false ? notificationData.duration || 4000 : Infinity,
       position: 'top-right' as const,
     };
 
-    switch (notification.type) {
+    switch (notificationData.type) {
       case 'success':
-        toast.success(notification.message, toastOptions);
+        toast.success(notificationData.message, toastOptions);
         break;
       case 'error':
-        toast.error(notification.message, toastOptions);
+        toast.error(notificationData.message, toastOptions);
         break;
       case 'warning':
-        toast(notification.message, {
+        toast(notificationData.message, {
           ...toastOptions,
-          icon: '⚠️',
-          style: { borderLeft: '4px solid #f59e0b' },
+          icon: <AlertTriangle className="h-4 w-4 text-amber-500" />,
         });
         break;
       case 'info':
-        toast(notification.message, {
+        toast(notificationData.message, {
           ...toastOptions,
-          icon: 'ℹ️',
-          style: { borderLeft: '4px solid #3b82f6' },
+          icon: <Info className="h-4 w-4 text-[#159A9C]" />,
         });
         break;
       case 'reminder':
-        toast(notification.message, {
+        toast(notificationData.message, {
           ...toastOptions,
-          icon: '🔔',
-          style: { borderLeft: '4px solid #8b5cf6' },
+          icon: <Bell className="h-4 w-4 text-[#159A9C]" />,
         });
         break;
     }
 
-    // Notificação do navegador
+    const shouldShowBrowserNotification =
+      browser === true
+        ? true
+        : browser === false
+          ? false
+          : shouldAutoShowBrowserNotification(newNotification);
+
+    // Notificao do navegador
     if (
+      shouldShowBrowserNotification &&
       settings.browserNotifications &&
       'Notification' in window &&
       Notification.permission === 'granted'
     ) {
-      new Notification(notification.title, {
-        body: notification.message,
+      new Notification(notificationData.title, {
+        body: notificationData.message,
         icon: '/favicon.ico',
         tag: newNotification.id,
       });
@@ -361,33 +610,33 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
     // Som (se habilitado)
     if (settings.soundEnabled) {
-      playNotificationSound(notification.type);
+      playNotificationSound(notificationData.type);
     }
 
     return newNotification.id;
-  };
+  }, [isAuthenticated, settings.browserNotifications, settings.soundEnabled]);
 
   const playNotificationSound = (type: Notification['type']) => {
-    // Som desabilitado por padrão devido à política de autoplay dos navegadores
-    // O AudioContext precisa ser criado após interação do usuário
-    // Para habilitar: usuário deve clicar em algum lugar da página primeiro
+    // Som desabilitado por padro devido  poltica de autoplay dos navegadores
+    // O AudioContext precisa ser criado apos interacao do usuario
+    // Para habilitar: usuario deve clicar em algum lugar da pgina primeiro
     return;
 
-    /* CÓDIGO DE SOM DESABILITADO - Remover comentário após implementar botão de ativação
+    /* CDIGO DE SOM DESABILITADO - Remover comentrio apos implementar boto de ativao
     try {
-      // Verificar se Web Audio API está disponível
+      // Verificar se Web Audio API est disponvel
       if (typeof window === 'undefined' || !('AudioContext' in window || 'webkitAudioContext' in (window as any))) {
-        return; // Navegador não suporta
+        return; // Navegador nao suporta
       }
 
-      // Criar contexto de áudio
+      // Criar contexto de udio
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      
-      // Verificar se AudioContext foi suspenso pela política do navegador
+
+      // Verificar se AudioContext foi suspenso pela poltica do navegador
       if (audioContext.state === 'suspended') {
-        // Tentar resumir (só funciona após interação do usuário)
+        // Tentar resumir (s funciona apos interacao do usuario)
         audioContext.resume().catch(() => {
-          // Silenciosamente ignorar - som não é crítico
+          // Silenciosamente ignorar - som nao critico
         });
         return;
       }
@@ -398,7 +647,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       oscillator.connect(gainNode);
       gainNode.connect(audioContext.destination);
 
-      // Frequências diferentes para cada tipo
+      // Frequncias diferentes para cada tipo
       const frequencies = {
         success: 800,
         error: 400,
@@ -416,7 +665,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.3);
     } catch (error) {
-      // Silenciosamente ignorar - som não é crítico
+      // Silenciosamente ignorar - som nao critico
     }
     */
   };
@@ -425,22 +674,29 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     try {
       // Atualizar estado local imediatamente (UX responsivo)
       setNotifications((prev) => {
-        // ✅ Garantir que prev é um array válido
+        //  Garantir que prev  um array valido
         if (!Array.isArray(prev)) {
-          console.warn('⚠️ notifications não é um array em markAsRead, resetando');
+          console.warn(' notifications nao um array em markAsRead, resetando');
+          notificationsRef.current = [];
           return [];
         }
-        return prev.map((notification) =>
+        const next = prev.map((notification) =>
           notification.id === id ? { ...notification, read: true } : notification,
         );
+        notificationsRef.current = next;
+        return next;
       });
 
-      // Persistir no backend
+      // Persistir nao backend apenas para notificacoes reais (UUID)
+      if (!isPersistedNotificationId(id)) {
+        return;
+      }
+
       const notificationService = await import('../services/notificationService');
       await notificationService.default.marcarComoLida(id);
     } catch (error) {
-      console.error('Erro ao marcar notificação como lida:', error);
-      // Se falhar no backend, estado local já está atualizado para melhor UX
+      console.error('Erro ao marcar notificacao como lida:', error);
+      // Se falhar nao backend, estado local ja est atualizado para melhor UX
     }
   };
 
@@ -448,59 +704,80 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     try {
       // Atualizar estado local imediatamente (UX responsivo)
       setNotifications((prev) => {
-        // ✅ Garantir que prev é um array válido
+        //  Garantir que prev  um array valido
         if (!Array.isArray(prev)) {
-          console.warn('⚠️ notifications não é um array em markAllAsRead, resetando');
+          console.warn(' notifications nao um array em markAllAsRead, resetando');
+          notificationsRef.current = [];
           return [];
         }
-        return prev.map((notification) => ({ ...notification, read: true }));
+        const next = prev.map((notification) => ({ ...notification, read: true }));
+        notificationsRef.current = next;
+        return next;
       });
 
-      // Persistir no backend
+      // Persistir nao backend
       const notificationService = await import('../services/notificationService');
       await notificationService.default.marcarTodasComoLidas();
     } catch (error) {
       console.error('Erro ao marcar todas como lidas:', error);
-      // Se falhar no backend, estado local já está atualizado para melhor UX
+      // Se falhar nao backend, estado local ja est atualizado para melhor UX
     }
   };
 
   const removeNotification = async (id: string) => {
     try {
       // Remover do estado local imediatamente (UX responsivo)
-      setNotifications((prev) => prev.filter((notification) => notification.id !== id));
+      setNotifications((prev) => {
+        const next = prev.filter((notification) => notification.id !== id);
+        notificationsRef.current = next;
+        return next;
+      });
 
-      // Remover do backend
+      // Remover do backend apenas para notificacoes reais (UUID)
+      if (!isPersistedNotificationId(id)) {
+        return;
+      }
+
       await api.delete(`/notifications/${id}`);
     } catch (error) {
-      console.error('Erro ao remover notificação:', error);
-      // Se falhar no backend, não recarregar - usuário já viu a remoção
+      console.error('Erro ao remover notificacao:', error);
+      // Se falhar nao backend, nao recarregar - usuario ja viu a remocao
     }
   };
 
   const clearAll = async () => {
     try {
       // Limpar estado local imediatamente
+      notificationsRef.current = [];
       setNotifications([]);
 
-      // Limpar no backend
+      // Limpar nao backend
       await api.delete('/notifications');
     } catch (error) {
-      console.error('Erro ao limpar notificações:', error);
+      console.error('Erro ao limpar notificacoes:', error);
     }
   };
 
   const addReminder = (reminder: NotificationReminderInput) => {
     const newReminder = normalizeReminder(reminder);
-    setReminders((prev) => [...prev, newReminder]);
+    setReminders((prev) => {
+      const existingIndex = prev.findIndex((item) => item.id === newReminder.id);
+      if (existingIndex === -1) {
+        return [...prev, newReminder];
+      }
+
+      const next = [...prev];
+      next[existingIndex] = newReminder;
+      return next;
+    });
     return newReminder.id;
   };
 
   const updateReminder = (id: string, updates: Partial<NotificationReminder>) => {
     setReminders((prev) => {
-      // ✅ Garantir que prev é um array válido
+      //  Garantir que prev  um array valido
       if (!Array.isArray(prev)) {
-        console.warn('⚠️ reminders não é um array em updateReminder, resetando');
+        console.warn(' reminders nao um array em updateReminder, resetando');
         return [];
       }
       return prev.map((reminder) => (reminder.id === id ? { ...reminder, ...updates } : reminder));
@@ -515,7 +792,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     setSettings((prev) => ({ ...prev, ...newSettings }));
   };
 
-  // Métodos de conveniência
+  // Metodos de conveniencia
   const showSuccess = (title: string, message: string, action?: Notification['action']) => {
     addNotification({ type: 'success', title, message, priority: 'medium', action });
   };
@@ -576,3 +853,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 };
 
 export default NotificationContext;
+
+
+

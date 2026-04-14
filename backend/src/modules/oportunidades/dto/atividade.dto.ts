@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsOptional, IsDateString, IsInt } from 'class-validator';
+import { IsString, IsEnum, IsOptional, IsDateString, IsUUID, MaxLength } from 'class-validator';
 import { TipoAtividade } from '../atividade.entity';
 
 export class CreateAtividadeDto {
@@ -17,6 +17,17 @@ export class CreateAtividadeDto {
   dataAtividade?: string;
 
   @IsOptional()
-  @IsInt()
-  oportunidade_id?: number;
+  @IsUUID('4')
+  responsavel_id?: string;
+
+  @IsOptional()
+  @IsUUID('4')
+  oportunidade_id?: string;
+}
+
+export class ConcluirAtividadeDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  resultadoConclusao?: string;
 }

@@ -20,6 +20,80 @@ import * as Sentry from '@sentry/node';
 import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import { resolveJwtSecret } from './config/jwt.config';
 
+const HTTP_METHOD_KEYS = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head'];
+
+// When this process is spawned from a parent that may close stdout/stderr (e.g. CI runners / detached shells),
+// Node can crash with EPIPE during console writes. Ignore broken pipe errors to keep the API alive.
+const swallowBrokenPipe = (stream: NodeJS.WritableStream | undefined) => {
+  if (!stream || typeof (stream as any).on !== 'function') {
+    return;
+  }
+
+  stream.on('error', (err: any) => {
+    if (err && err.code === 'EPIPE') {
+      return;
+    }
+  });
+};
+
+swallowBrokenPipe(process.stdout);
+swallowBrokenPipe(process.stderr);
+
+const isAdministrativeOpenApiPath = (path: string): boolean => {
+  const normalized = String(path || '').toLowerCase();
+  return (
+    normalized === '/core-admin' ||
+    normalized.startsWith('/core-admin/') ||
+    normalized === 'core-admin' ||
+    normalized.startsWith('core-admin/')
+  );
+};
+
+const filterOpenApiByAdminScope = (
+  document: Record<string, any>,
+  mode: 'exclude_admin' | 'only_admin',
+): Record<string, any> => {
+  const sourcePaths = document?.paths || {};
+  const filteredEntries = Object.entries(sourcePaths).filter(([routePath]) => {
+    const isAdminPath = isAdministrativeOpenApiPath(routePath);
+    return mode === 'exclude_admin' ? !isAdminPath : isAdminPath;
+  });
+
+  const filteredPaths = Object.fromEntries(filteredEntries);
+  const usedTags = new Set<string>();
+
+  Object.values(filteredPaths).forEach((pathItem: any) => {
+    if (!pathItem || typeof pathItem !== 'object') {
+      return;
+    }
+
+    HTTP_METHOD_KEYS.forEach((method) => {
+      const operation = pathItem[method];
+      if (!operation || typeof operation !== 'object') {
+        return;
+      }
+
+      const tags = Array.isArray(operation.tags) ? operation.tags : [];
+      tags.forEach((tag: unknown) => {
+        if (typeof tag === 'string' && tag.trim()) {
+          usedTags.add(tag);
+        }
+      });
+    });
+  });
+
+  const sourceTags = Array.isArray(document?.tags) ? document.tags : [];
+  const filteredTags = sourceTags.filter(
+    (tag: any) => tag && typeof tag.name === 'string' && usedTags.has(tag.name),
+  );
+
+  return {
+    ...document,
+    paths: filteredPaths,
+    tags: filteredTags,
+  };
+};
+
 async function bootstrap() {
   // ============================================================================
   // OPENTELEMETRY (Tracing Distribuído) - TEMPORARIAMENTE DESABILITADO PARA TESTE DE CACHE
@@ -112,9 +186,12 @@ async function bootstrap() {
       }
     }
 
+    const bodySizeLimit = process.env.REQUEST_BODY_LIMIT || '20mb';
+
     const app = await NestFactory.create(AppModule, {
       // logger: customLogger,  // ← Desabilitado temporariamente para debug
       httpsOptions,
+      bodyParser: false, // Permite configurar limite customizado de payload (logos/base64)
     });
     console.log('✅ [NestJS] AppModule criado com sucesso');
 
@@ -133,7 +210,10 @@ async function bootstrap() {
     }
 
     // Disponibilizar diretório de uploads estáticos
-    const uploadsPath = path.join(__dirname, '..', '..', 'uploads');
+    // Usar `process.cwd()` para evitar depender do layout exato do build (dist/main.js vs dist/src/main.js).
+    const uploadsPath = process.env.UPLOADS_PATH?.trim()
+      ? path.resolve(process.env.UPLOADS_PATH.trim())
+      : path.resolve(process.cwd(), 'uploads');
     if (!fs.existsSync(uploadsPath)) {
       fs.mkdirSync(uploadsPath, { recursive: true });
       console.log('📁 [Uploads] Diretório criado:', uploadsPath);
@@ -280,19 +360,66 @@ async function bootstrap() {
     console.log(`🔒 [CORS] Configurado (${isProduction ? 'RESTRITIVO' : 'PERMISSIVO'})`);
     console.log(`   Origens permitidas: ${corsOrigins.join(', ')}`);
 
-    // ⚠️ COMENTADO: NestJS já gerencia body parsing internamente
-    // Adicionar express.json() manualmente pode causar conflitos (stream not readable)
-    // app.use(express.json({ limit: '50mb' }));
-    // app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+    app.use(express.json({ limit: bodySizeLimit }));
+    app.use(express.urlencoded({ extended: true, limit: bodySizeLimit }));
+    console.log(`📦 [BodyParser] Limite de payload configurado para ${bodySizeLimit}`);
 
     const enableRequestDebug = process.env.REQUEST_DEBUG === 'true';
+    const SENSITIVE_REQUEST_KEYS = new Set([
+      'password',
+      'senha',
+      'token',
+      'accessToken',
+      'refreshToken',
+      'secret',
+      'apiKey',
+      'api_key',
+      'authorization',
+      'cookie',
+      'smtpSenha',
+      'smtp_senha',
+      'whatsappApiToken',
+      'whatsapp_api_token',
+      'smsApiKey',
+      'sms_api_key',
+      'pushApiKey',
+      'push_api_key',
+    ]);
+
+    const redactRequestDebugValue = (value: unknown, depth = 0): unknown => {
+      if (value == null) return value;
+      if (typeof value === 'string') {
+        return value.length > 180 ? `${value.slice(0, 180)}...` : value;
+      }
+      if (typeof value !== 'object') return value;
+      if (depth >= 2) return '[depth-limited]';
+      if (Array.isArray(value)) {
+        return {
+          type: 'array',
+          length: value.length,
+          sample: value.slice(0, 3).map((item) => redactRequestDebugValue(item, depth + 1)),
+        };
+      }
+
+      const entries = Object.entries(value as Record<string, unknown>).slice(0, 25);
+      const result: Record<string, unknown> = {};
+      for (const [key, entryValue] of entries) {
+        if (SENSITIVE_REQUEST_KEYS.has(key)) {
+          result[key] = '[redacted]';
+          continue;
+        }
+        result[key] = redactRequestDebugValue(entryValue, depth + 1);
+      }
+      return result;
+    };
 
     if (enableRequestDebug) {
       // Middleware de debug APÓS configuração do body parser
       app.use((req, res, next) => {
+        const requestBodyKeys =
+          req.body && typeof req.body === 'object' ? Object.keys(req.body) : [];
         console.log(
-          `🔍 [REQUEST] ${req.method} ${req.url} - Body:`,
-          req.body ? JSON.stringify(req.body) : 'Empty',
+          `🔍 [REQUEST] ${req.method} ${req.url} - bodyType=${typeof req.body} keys=${requestBodyKeys.join(',') || 'none'}`,
         );
 
         // Log especial para PUT requests em planos
@@ -301,7 +428,10 @@ async function bootstrap() {
           console.log('🔴 [PUT DEBUG] Content-Length:', req.headers['content-length']);
           console.log('🔴 [PUT DEBUG] Body Type:', typeof req.body);
           console.log('🔴 [PUT DEBUG] Body Keys:', Object.keys(req.body || {}));
-          console.log('🔴 [PUT DEBUG] Full Body:', JSON.stringify(req.body, null, 2));
+          console.log(
+            '🔴 [PUT DEBUG] Body Summary:',
+            JSON.stringify(redactRequestDebugValue(req.body), null, 2),
+          );
         }
 
         // Interceptar resposta para log de sucesso
@@ -350,16 +480,83 @@ async function bootstrap() {
       .addBearerAuth()
       .build();
 
-    const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('api-docs', app, document);
+    const fullDocument = SwaggerModule.createDocument(app, config);
+    const publicDocument = filterOpenApiByAdminScope(fullDocument, 'exclude_admin');
+    SwaggerModule.setup('api-docs', app, publicDocument as any);
 
-    // Porta padrão ajustada para 3001 para alinhar com frontend e documentação
+    const adminDocsEnabled = process.env.CORE_ADMIN_DOCS_ENABLED === 'true';
+    const adminDocsUser = process.env.CORE_ADMIN_DOCS_USER?.trim() || '';
+    const adminDocsPassword = process.env.CORE_ADMIN_DOCS_PASSWORD?.trim() || '';
+    const adminDocsPath = (process.env.CORE_ADMIN_DOCS_PATH || 'core-admin-docs').replace(
+      /^\/+|\/+$/g,
+      '',
+    );
+
+    if (adminDocsEnabled) {
+      if (!adminDocsUser || !adminDocsPassword) {
+        console.warn(
+          '⚠️ [Swagger] Core Admin docs habilitado sem credenciais (CORE_ADMIN_DOCS_USER/CORE_ADMIN_DOCS_PASSWORD). Endpoint nao sera publicado.',
+        );
+      } else {
+        const adminDocument = filterOpenApiByAdminScope(fullDocument, 'only_admin');
+
+        app.use(
+          [`/${adminDocsPath}`, `/${adminDocsPath}-json`],
+          (req: any, res: any, next: any) => {
+            const authHeader = String(req.headers?.authorization || '');
+            if (!authHeader.startsWith('Basic ')) {
+              res.setHeader('WWW-Authenticate', 'Basic realm="Core Admin Docs"');
+              return res.status(401).send('Unauthorized');
+            }
+
+            const encoded = authHeader.slice('Basic '.length).trim();
+            let decoded = '';
+            try {
+              decoded = Buffer.from(encoded, 'base64').toString('utf8');
+            } catch {
+              res.setHeader('WWW-Authenticate', 'Basic realm="Core Admin Docs"');
+              return res.status(401).send('Unauthorized');
+            }
+
+            const separatorIndex = decoded.indexOf(':');
+            const username = separatorIndex >= 0 ? decoded.slice(0, separatorIndex) : '';
+            const password = separatorIndex >= 0 ? decoded.slice(separatorIndex + 1) : '';
+
+            if (username !== adminDocsUser || password !== adminDocsPassword) {
+              res.setHeader('WWW-Authenticate', 'Basic realm="Core Admin Docs"');
+              return res.status(401).send('Unauthorized');
+            }
+
+            return next();
+          },
+        );
+
+        SwaggerModule.setup(adminDocsPath, app, adminDocument as any, {
+          customSiteTitle: 'Conect Core Admin API Docs',
+          swaggerOptions: {
+            persistAuthorization: true,
+          },
+        });
+      }
+    }
+
+    // Porta padrão ajustada para 3001 para alinhar com frontend e documentação.
+    //
+    // Em alguns ambientes Windows (principalmente com Docker Desktop / stacks locais),
+    // o bind padrão em IPv6 ("::") pode falhar com EADDRINUSE mesmo quando IPv4 está livre.
+    // Usar host explícito (IPv4) evita esse flake e mantém o serviço acessível em rede.
     const port = process.env.APP_PORT || 3001;
-    await app.listen(port);
+    const host = (process.env.APP_HOST || '0.0.0.0').trim();
+    await app.listen(port, host);
 
     const protocol = sslEnabled && httpsOptions ? 'https' : 'http';
     console.log(`🚀 Conect CRM Backend rodando na porta ${port} (${protocol.toUpperCase()})`);
-    console.log(`📖 Documentação disponível em: ${protocol}://localhost:${port}/api-docs`);
+    console.log(`📖 Documentação pública disponível em: ${protocol}://localhost:${port}/api-docs`);
+    if (adminDocsEnabled && adminDocsUser && adminDocsPassword) {
+      console.log(
+        `🔐 Documentação Core Admin disponível em: ${protocol}://localhost:${port}/${adminDocsPath}`,
+      );
+    }
 
     if (sslEnabled && httpsOptions) {
       console.log(`🔐 Conexão segura HTTPS ativada`);

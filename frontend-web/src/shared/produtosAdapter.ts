@@ -7,8 +7,13 @@ export interface ProdutoPropostaBase {
   nome: string;
   preco: number;
   categoria: string;
+  categoriaId?: string;
   subcategoria?: string;
+  subcategoriaId?: string;
+  configuracao?: string;
+  configuracaoId?: string;
   tipo?: string;
+  tipoItem?: string;
   descricao?: string;
   unidade: string;
   status?: 'ativo' | 'inativo' | 'descontinuado';
@@ -31,8 +36,13 @@ export const adaptProdutoToPropostaBase = (produto: Produto): ProdutoPropostaBas
     nome: produto.nome,
     preco: produto.preco,
     categoria: produto.categoria,
-    subcategoria: undefined, // Pode ser mapeado se disponível
-    tipo: produto.tipoItem,
+    categoriaId: produto.categoriaId || undefined,
+    subcategoria: produto.subcategoriaNome || undefined,
+    subcategoriaId: produto.subcategoriaId || undefined,
+    configuracao: produto.configuracaoNome || undefined,
+    configuracaoId: produto.configuracaoId || undefined,
+    tipo: produto.configuracaoNome || produto.tipoItem,
+    tipoItem: produto.tipoItem,
     descricao: produto.descricao,
     unidade: produto.unidadeMedida,
     status: produto.status as 'ativo' | 'inativo' | 'descontinuado',
@@ -47,8 +57,13 @@ export const adaptPropostaBaseToProduto = (produtoBase: ProdutoPropostaBase): Pa
     id: produtoBase.id,
     nome: produtoBase.nome,
     categoria: produtoBase.categoria,
+    categoriaId: produtoBase.categoriaId,
+    subcategoriaId: produtoBase.subcategoriaId,
+    configuracaoId: produtoBase.configuracaoId,
+    subcategoriaNome: produtoBase.subcategoria,
+    configuracaoNome: produtoBase.configuracao,
     preco: produtoBase.preco,
-    tipoItem: produtoBase.tipo || 'produto',
+    tipoItem: produtoBase.tipoItem || produtoBase.tipo || 'produto',
     unidadeMedida: produtoBase.unidade,
     status: produtoBase.status || 'ativo',
     descricao: produtoBase.descricao,

@@ -1,5 +1,35 @@
 # 📄 Guia de Templates - ConectCRM
 
+> Atualizacao 2026-04
+>
+> Este guia possui exemplos legados. Para padrao oficial de tela, use primeiro:
+> `docs/features/ARQUITETURA_PADRONIZACAO_TELAS.md`
+>
+> Referencias de implementacao atual:
+> - `frontend-web/src/components/layout-v2/components/PageHeader.tsx`
+> - `frontend-web/src/pages/gestao/financeiro/ContasReceberPage.tsx`
+
+## Padrao Atual (Resumo Rapido)
+
+### Header (novo baseline)
+
+- `PageHeader.eyebrow` opcional para contexto do nucleo
+- `title` curto e forte
+- `description` curta e objetiva
+- `actions` no canto direito
+- `inlineDescriptionOnDesktop` quando fizer sentido visual
+
+### Estrutura por contexto
+
+- `LIST`: pode ter KPI cards, mas nao e obrigatorio
+- `SETTINGS`: normalmente sem KPI cards
+- `DASHBOARD`: foco em insight/cards, tabela opcional
+- `FORM`: foco em secoes e CTA, sem forcar listagem
+
+### Regra de ouro
+
+Nao copiar blocos por padrao. Cada tela deve incluir apenas componentes que suportam o objetivo operacional da pagina.
+
 ## 🎯 Qual Template Usar?
 
 O ConectCRM possui **DOIS templates** para criação de páginas:

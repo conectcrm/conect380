@@ -1,252 +1,162 @@
-# 📚 ÍNDICE DE DOCUMENTAÇÃO - Conect360
+﻿# Indice de Documentacao - Conect360
 
-**Atualizado**: 19/12/2025  
-**Versão**: 2.0
+**Atualizado**: 12/03/2026
 
----
+## Leia primeiro
 
-## 🎯 Documentação Principal (LEIA PRIMEIRO)
+Se voce esta entrando agora no projeto, siga esta ordem:
 
-### 1. **VISAO_SISTEMA_2025.md** ⭐ ESSENCIAL
+1. `../VISAO_SISTEMA_2025.md`
+2. `../README.md`
+3. `./README.md`
+4. `./handbook/MATRIZ_COBERTURA_REQUISITOS_2026-03.md`
+5. `./handbook/PLANO_SANEAMENTO_DOCUMENTACAO_2026-03.md`
 
-**Posicionamento oficial do sistema**
+## Fonte de verdade para requisitos
 
-- Definição: Conect360 como Suite All-in-One
-- Concorrentes reais: HubSpot, Zoho CRM, RD Station
-- 8 Módulos principais
-- Diferenciais competitivos
-- Roadmap 2026
-- Mensagem para o time (dev, vendas, product)
+Para decidir o que o sistema deve fazer, priorize:
 
-📖 [Ler documento](../VISAO_SISTEMA_2025.md)
+1. `docs/features/`
+2. `docs/handbook/MATRIZ_COBERTURA_REQUISITOS_2026-03.md`
 
----
+Nessa ordem, procure por:
 
-### 2. **README.md** ⭐ ESSENCIAL
+1. contratos funcionais;
+2. minutas de requisitos;
+3. backlog tecnico refinado;
+4. checklists de QA, rollout e sign-off.
 
-**Documentação técnica completa**
+## Fontes auxiliares
 
-- Overview dos 8 módulos
-- Stack tecnológico (NestJS + React)
-- Guia de instalação
-- Deploy com Docker
-- Variáveis de ambiente
+### Visao oficial do produto
 
-📖 [Ler documento](../README.md)
+1. `../VISAO_SISTEMA_2025.md`
+2. `../README.md`
 
----
+### Governanca documental
 
-## 📊 Análises e Comparativos
+1. `handbook/AUDITORIA_DOCUMENTACAO_ATUAL.md`
+2. `handbook/MAPA_MODULOS_TECNICOS.md`
+3. `handbook/MATRIZ_COBERTURA_REQUISITOS_2026-03.md`
+4. `handbook/PLANO_SANEAMENTO_DOCUMENTACAO_2026-03.md`
+5. `handbook/RELATORIO_FINAL_COBERTURA_REQUISITOS_2026-03.md`
 
-### 3. **ANALISE_COMPARATIVA_CRM_MERCADO.md**
+### Padroes de UI e layout
 
-**Benchmark detalhado vs concorrentes**
+1. `features/ARQUITETURA_PADRONIZACAO_TELAS.md`
+2. `features/CHECKLIST_PADRONIZACAO_TELAS.md`
 
-- Comparação com Salesforce, HubSpot, Pipedrive, Zoho, RD Station
-- Score por categoria (64 funcionalidades)
-- Gaps identificados
-- Pontuação: 34% (básico+)
+### Padroes de homologacao e evidencias
 
-📖 [Ler documento](archive/2025/ANALISE_COMPARATIVA_CRM_MERCADO.md)
+1. `features/GUIA_EVIDENCIAS_HOMOLOGACAO_2026-03.md`
 
----
+### Operacao e validacao
 
-### 4. **ANALISE_DOCUMENTACAO_DESATUALIZADA.md**
+1. `runbooks/`
+2. `features/evidencias/`
 
-**Análise crítica da documentação antiga**
+### Historico e legado
 
-- Identificação de inconsistências
-- Comparação: visão antiga vs real
-- Documentos obsoletos listados
-- Ações de correção tomadas
+1. `archive/`
 
-📖 [Ler documento](../ANALISE_DOCUMENTACAO_DESATUALIZADA.md)
+Esses documentos nao devem ser usados como base primaria de implementacao nova, exceto para contexto historico.
 
----
+## O que evitar
 
-## 🤖 Bot de Triagem
+Nao trate como fonte de verdade primaria:
 
-### 5. **BOT_STATUS_ATUALIZADO.md**
+1. `docs/archive/`
+2. `docs/implementation/`
+3. `docs/features/evidencias/`
+4. indices de subsistemas isolados, como o de Tickets/WhatsApp no backend.
 
-**Status atual do bot de triagem**
+## Areas mais importantes em 2026-03
 
-- Bot está CONFIGURADO e FUNCIONANDO
-- 1 fluxo publicado (Triagem Inteligente v3.0)
-- 3 núcleos visíveis no bot
-- 2 triagens concluídas em 24h
+### Cobertura forte de requisitos
 
-📖 [Ler documento](../BOT_STATUS_ATUALIZADO.md)
+1. Clientes 360
+2. Ciclo de vida de oportunidades
+3. Financeiro operacional e pagamentos
+4. Guardian e backoffice
 
----
+### Cobertura parcial ou em consolidacao
 
-### 6. **BOTOES_INTERATIVOS_WHATSAPP.md**
+1. Atendimento / Omnichannel
+2. Agenda / Calendario
+3. Analytics / Relatorios
+4. Contratos
+5. Catalogo flexivel / Estoque especializado
+6. Automacao / IA
 
-**Implementação de botões no WhatsApp**
+### Lacunas formais ainda abertas
 
-- Reply Buttons (1-3 opções)
-- List Messages (4-10 opções)
-- Fallback automático para texto
-- Estrutura da API
+1. Evidencias de homologacao da sincronizacao externa de calendario
+2. Evidencias de homologacao da fase 1 fiscal (NFSe de servico)
+3. Evidencias operacionais e decisao de provider externo para assinatura eletronica, se adotado
+4. Evidencias de homologacao do canal email omnichannel e decisao de arquitetura operacional de ingestao/provider
+5. Contrato funcional unificado do modulo Analytics/Relatorios
 
-📖 [Ler documento](../BOTOES_INTERATIVOS_WHATSAPP.md)
+### Novos baselines criados em 2026-03
 
----
+1. `features/CRM-030_CONTRATO_FUNCIONAL_AGENDA_2026-03.md`
+2. `features/COM-001_CONTRATO_FUNCIONAL_MODULO_CONTRATOS_2026-03.md`
+3. `features/ATD-EMAIL-001_MINUTA_REQUISITOS_CANAL_EMAIL_OMNICHANNEL_2026-03.md`
+4. `features/FIN-NFE-001_MINUTA_REQUISITOS_NFE_NFSE_2026-03.md`
+5. `features/COM-ASS-001_MINUTA_REQUISITOS_ASSINATURA_ELETRONICA_2026-03.md`
+6. `features/CRM-032_BACKLOG_TECNICO_SINCRONIZACAO_EXTERNA_CALENDARIO_2026-03.md`
+7. `features/COM-003_CONTRATO_INTEGRACAO_CONTRATOS_FINANCEIRO_2026-03.md`
+8. `features/COM-005_CONTRATO_FUNCIONAL_ASSINATURA_ELETRONICA_2026-03.md`
+9. `features/COM-006_CHECKLIST_QA_INTEGRACAO_CONTRATOS_FINANCEIRO_2026-03.md`
+10. `features/ATD-EMAIL-002_CONTRATO_FUNCIONAL_CANAL_EMAIL_OMNICHANNEL_2026-03.md`
+11. `features/COM-007_CHECKLIST_QA_ASSINATURA_ELETRONICA_2026-03.md`
+12. `features/FIN-NFSE-002_CONTRATO_FUNCIONAL_FASE1_NFSE_SERVICO_2026-03.md`
+13. `features/FIN-NFSE-003_CHECKLIST_QA_FASE1_NFSE_SERVICO_2026-03.md`
+14. `features/ATD-EMAIL-003_CHECKLIST_QA_CANAL_EMAIL_OMNICHANNEL_2026-03.md`
+15. `features/ATD-EMAIL-004_BACKLOG_TECNICO_INBOUND_THREADING_EMAIL_2026-03.md`
+16. `features/FIN-NFSE-004_BACKLOG_TECNICO_PROVEDOR_FISCAL_FASE1_2026-03.md`
+17. `features/CRM-033_CONTRATO_FUNCIONAL_SINCRONIZACAO_EXTERNA_CALENDARIO_2026-03.md`
+18. `features/COM-008_BACKLOG_TECNICO_PROVIDER_ASSINATURA_ELETRONICA_2026-03.md`
+19. `features/CRM-034_CHECKLIST_QA_SINCRONIZACAO_EXTERNA_CALENDARIO_2026-03.md`
+20. `features/CRM-035_BACKLOG_TECNICO_SINCRONIZACAO_BIDIRECIONAL_CALENDARIO_2026-03.md`
+21. `features/ATD-EMAIL-005_CONTRATO_FUNCIONAL_INBOUND_THREADING_EMAIL_2026-03.md`
+22. `features/ATD-EMAIL-006_CHECKLIST_QA_INBOUND_THREADING_EMAIL_2026-03.md`
+23. `features/GUIA_EVIDENCIAS_HOMOLOGACAO_2026-03.md`
+24. `features/CRM-LEADS-001_CONTRATO_FUNCIONAL_MODULO_LEADS_2026-03.md`
+25. `features/ANL-001_MINUTA_REQUISITOS_ANALYTICS_RELATORIOS_2026-03.md`
+
+## Atalho por perfil
+
+### Desenvolvimento
+
+1. `../README.md`
+2. `./handbook/MAPA_MODULOS_TECNICOS.md`
+3. `./handbook/MATRIZ_COBERTURA_REQUISITOS_2026-03.md`
+
+### Produto
+
+1. `../VISAO_SISTEMA_2025.md`
+2. `./handbook/MATRIZ_COBERTURA_REQUISITOS_2026-03.md`
+3. `features/`
+
+### Operacao / QA
+
+1. `features/`
+2. `runbooks/`
+3. `features/evidencias/`
+
+## Documentos relacionados
+
+1. `./README.md`
+2. `./handbook/AUDITORIA_DOCUMENTACAO_ATUAL.md`
+3. `./handbook/MATRIZ_COBERTURA_REQUISITOS_2026-03.md`
+4. `./handbook/PLANO_SANEAMENTO_DOCUMENTACAO_2026-03.md`
+5. `./handbook/RELATORIO_FINAL_COBERTURA_REQUISITOS_2026-03.md`
+
+## Revisao futura
+
+Revisar este indice sempre que:
+
+1. um modulo novo ganhar contrato funcional;
+2. um roadmap antigo for descontinuado;
+3. uma promessa do README virar requisito formal vigente.
 
-## 🚀 Implementação e Guias
-
-### 7. **docs/handbook/**
-
-**Guias práticos de implementação**
-
-- INDICE_DOCUMENTACAO.md - Índice do handbook (operação do Copilot)
-- AUDITORIA_DOCUMENTACAO_ATUAL.md - Auditoria: documentação vs código
-- MAPA_MODULOS_TECNICOS.md - Mapa: módulos técnicos vs módulos de produto
-- GUIA_TESTES_TRIAGEM_BOT.md - Como testar o bot
-- GUIA_IMPLEMENTACAO_MELHORIAS_BOT.md - NLP e melhorias
-
-📁 [Ver pasta](handbook/)
-
----
-
-### 8. **docs/runbooks/**
-
-**Procedimentos operacionais**
-
-- Integração bot + núcleos
-- Checklist de testes completo
-- Próximos passos triagem
-
-📁 [Ver pasta](runbooks/)
-
----
-
-## 🗂️ Documentação Arquivada
-
-### 9. **docs/archive/2025/deprecated-omnichannel/**
-
-⚠️ **DOCUMENTAÇÃO OBSOLETA - NÃO USAR**
-
-**Arquivamento 1** (deprecated-omnichannel/):
-
-- ❌ OMNICHANNEL_RESUMO_EXECUTIVO.md
-- ❌ TODO_OMNICHANNEL.md
-- ❌ OMNICHANNEL_ANALISE_MANTER_VS_REMOVER.md
-
-**Arquivamento 2** (deprecated-omnichannel-old/):
-
-- ❌ OMNICHANNEL_INDICE.md
-- ❌ OMNICHANNEL_ROADMAP_MELHORIAS.md
-- ❌ OMNICHANNEL_GUIA_VISUAL.md
-- ❌ OMNICHANNEL_O_QUE_REMOVER.md
-- ❌ MELHORIAS_CHAT_OMNICHANNEL.md
-- ❌ RESUMO_MELHORIAS_CONFIGURACOES.md
-- ❌ ANALISE_ESTAGIOS_OMNICHANNEL_TEMPO_REAL.md
-- ❌ APRESENTACAO_EXECUTIVA_5MIN.md
-- ❌ ANTES_DEPOIS_UX_BOT.md
-- ❌ VALIDACAO_CONFIGURACOES_VS_MERCADO.md
-- ❌ MVP_TRIAGEM_CONCLUIDO.md
-- ❌ PROPOSTA_SIMPLIFICACAO_ESTAGIOS_ATENDIMENTO.md
-
-**Por que foram arquivados:**
-
-- Tratavam ConectCRM como "sistema de atendimento" (ERRADO: é suite all-in-one)
-- Comparavam apenas com Zendesk/Intercom (ERRADO: competimos com HubSpot/Zoho)
-- Propunham remover Pipeline/Financeiro (ERRADO: são diferenciais)
-- Focavam 80%+ em omnichannel, ignorando outros 6 módulos
-
-📖 [Ver README do arquivo 1](archive/2025/deprecated-omnichannel/README_ARQUIVADO.md)  
-📖 [Ver README do arquivo 2](archive/2025/deprecated-omnichannel-old/README_ARQUIVADO.md)
-
----
-
-## 📋 Outros Documentos Importantes
-
-### Pitch e Apresentações
-
-- ConectCRM_Pitch_Deck.html - Apresentação para investidores
-
-### Design System
-
-- DESIGN_GUIDELINES.md - Tema Crevasse (paleta de cores)
-- COMPONENTS_GUIDE.md - Guia de componentes
-
-### Histórico de Implementações
-
-- docs/archive/2025/ - Documentos históricos de implementação
-
----
-
-## 🎯 Guia Rápido por Perfil
-
-### Para Desenvolvedores:
-
-1. ✅ Ler [VISAO_SISTEMA_2025.md](../VISAO_SISTEMA_2025.md) - Entender escopo
-2. ✅ Ler [README.md](../README.md) - Setup técnico
-3. ✅ Ler [DIFERENCIAL_INTEGRACAO_NATIVA.md](../DIFERENCIAL_INTEGRACAO_NATIVA.md) - Backend único (arquitetura)
-4. ✅ Ler [ANALISE_COMPARATIVA_CRM_MERCADO.md](archive/2025/ANALISE_COMPARATIVA_CRM_MERCADO.md) - Features vs mercado
-5. ❌ **NÃO** ler documentação em deprecated-omnichannel/ ou deprecated-omnichannel-old/
-
-### Para Product Managers:
-
-1. ✅ Ler [VISAO_SISTEMA_2025.md](../VISAO_SISTEMA_2025.md) - Posicionamento e roadmap
-2. ✅ Ler [DIFERENCIAL_INTEGRACAO_NATIVA.md](../DIFERENCIAL_INTEGRACAO_NATIVA.md) - DIFERENCIAL #1 vs Zoho/HubSpot
-3. ✅ Ler [ANALISE_COMPARATIVA_CRM_MERCADO.md](archive/2025/ANALISE_COMPARATIVA_CRM_MERCADO.md) - Gaps vs concorrentes
-4. ✅ Ler [ANALISE_DOCUMENTACAO_DESATUALIZADA.md](../ANALISE_DOCUMENTACAO_DESATUALIZADA.md) - Entender correções
-
-### Para Vendas:
-
-1. ✅ Ler [KIT_VENDAS_CONECTCRM.md](../KIT_VENDAS_CONECTCRM.md) - Scripts prontos, objeções, comparativos
-2. ✅ Ler [DIFERENCIAL_INTEGRACAO_NATIVA.md](../DIFERENCIAL_INTEGRACAO_NATIVA.md) - Frases, casos, ROI (R$148k/ano)
-3. ✅ Ler [VISAO_SISTEMA_2025.md](../VISAO_SISTEMA_2025.md) - Seção "Mensagem para Vendas"
-4. ✅ Ver [ConectCRM_Pitch_Deck.html](../ConectCRM_Pitch_Deck.html) - Apresentação pronta
-5. ✅ Memorizar: "Um único sistema que faz tudo - não produtos separados como Zoho"
-
-### Para Investidores:
-
-1. ✅ Ler [PITCH_DECK_INVESTIDORES.md](../PITCH_DECK_INVESTIDORES.md) - 7 seções (problema, solução, mercado, tração, roadmap, time, ask)
-2. ✅ Ler [VISAO_SISTEMA_2025.md](../VISAO_SISTEMA_2025.md) - Seções "Posicionamento" e "Métricas"
-3. ✅ Ver [ConectCRM_Pitch_Deck.html](../ConectCRM_Pitch_Deck.html) - Apresentação visual
-
----
-
-## ⚠️ AVISO IMPORTANTE
-
-### ❌ Documentos que NÃO devem ser usados:
-
-- Qualquer documento em **docs/archive/2025/deprecated-omnichannel/** (3 arquivos)
-- Qualquer documento em **docs/archive/2025/deprecated-omnichannel-old/** (12 arquivos)
-- Qualquer documento que compare ConectCRM apenas com Zendesk/Intercom
-- Qualquer documento que trate sistema como "apenas atendimento"
-- Qualquer roadmap que proponha remover Pipeline ou Financeiro
-
-**Por que foram arquivados:**
-
-- Visão ERRADA: tratavam ConectCRM como "clone do Zendesk"
-- Competidores ERRADOS: ignoravam HubSpot/Zoho (verdadeiros concorrentes)
-- Escopo ERRADO: focavam 80%+ em omnichannel, ignorando outros 6 módulos
-- Roadmap ERRADO: propunham integrar Discord/Slack em vez de Email/Templates
-- Diferencial IGNORADO: não mencionavam backend único (R$148k/ano de economia)
-
-### ✅ Documentos oficiais atualizados (use ESTES):
-
-- **VISAO_SISTEMA_2025.md** - Posicionamento, escopo, roadmap
-- **README.md** - Setup técnico, comandos
-- **KIT_VENDAS_CONECTCRM.md** - Scripts, objeções, comparativos (42 páginas)
-- **DIFERENCIAL_INTEGRACAO_NATIVA.md** - Backend único vs Zoho/HubSpot (40+ páginas, ROI R$148k/ano)
-- **PITCH_DECK_INVESTIDORES.md** - 7 seções para investidores
-- **ANALISE_COMPARATIVA_CRM_MERCADO.md** - Benchmark features vs mercado
-
----
-
-## 🔄 Histórico de Atualizações
-
-| Data       | Versão | Mudanças                                                                                                                                                              |
-| ---------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 19/01/2025 | 3.0    | Arquivados 12 docs adicionais (deprecated-omnichannel-old/), criado DIFERENCIAL_INTEGRACAO_NATIVA.md, KIT_VENDAS_CONECTCRM.md, PITCH_DECK_INVESTIDORES.md atualizados |
-| 19/12/2025 | 2.0    | Criado novo índice, arquivada documentação omnichannel desatualizada (3 docs)                                                                                         |
-| 19/12/2025 | 2.0    | Criado VISAO_SISTEMA_2025.md como documento oficial                                                                                                                   |
-| 19/12/2025 | 2.0    | Atualizado README.md com foco em suite all-in-one                                                                                                                     |
-
----
-
-**Próxima revisão**: Trimestral ou quando lançar novo módulo

@@ -3,9 +3,11 @@
 # ============================================
 
 # Stage 1: Build
-FROM node:20-alpine AS builder
+FROM node:20-bookworm-slim AS builder
 
 WORKDIR /app
+
+ENV PUPPETEER_SKIP_DOWNLOAD=true
 
 # Copiar arquivos de dependências
 COPY package*.json ./
@@ -16,6 +18,7 @@ RUN npm ci --legacy-peer-deps
 
 # Copiar código fonte
 COPY src ./src
+COPY scripts/start-prod.js ./scripts/start-prod.js
 COPY ormconfig.js ./
 
 # Build da aplicação
@@ -26,22 +29,32 @@ RUN npm prune --production --legacy-peer-deps
 
 # ============================================
 # Stage 2: Production
-FROM node:20-alpine
+FROM node:20-bookworm-slim
 
 WORKDIR /app
 
 # Instalar dumb-init para gerenciamento correto de processos
-RUN apk add --no-cache dumb-init
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  dumb-init \
+  chromium \
+  ca-certificates \
+  fonts-liberation \
+  && rm -rf /var/lib/apt/lists/*
+
+ENV PUPPETEER_SKIP_DOWNLOAD=true \
+  PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
+  CHROME_PATH=/usr/bin/chromium
 
 # Criar usuário não-root
-RUN addgroup -g 1001 -S nodejs && \
-  adduser -S nestjs -u 1001
+RUN groupadd -g 1001 nodejs && \
+  useradd -u 1001 -g nodejs -m -s /usr/sbin/nologin nestjs
 
 # Copiar dependências de produção
 COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
 
 # Copiar build
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
+COPY --from=builder --chown=nestjs:nodejs /app/scripts/start-prod.js ./scripts/start-prod.js
 COPY --from=builder --chown=nestjs:nodejs /app/package*.json ./
 COPY --from=builder --chown=nestjs:nodejs /app/ormconfig.js ./
 
@@ -63,4 +76,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
 ENTRYPOINT ["dumb-init", "--"]
 
 # Executar aplicação
-CMD ["node", "dist/src/main.js"]
+CMD ["node", "scripts/start-prod.js"]

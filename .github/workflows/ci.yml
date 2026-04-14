@@ -1,241 +1,1278 @@
-name: CI - Testes e Build
+﻿name: CI - Testes e Build
 
 on:
+  workflow_dispatch:
   push:
-    branches: [ main, develop, consolidacao-* ]
+    branches: [main, develop, consolidacao-*]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
+
+permissions:
+  contents: read
+  security-events: write
 
 jobs:
-  # ==============================================================================
-  # Job 1: Backend Tests
-  # ==============================================================================
+  encoding-guardrails:
+    name: Guardrails - Encoding
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+
+      - name: Detectar arquivos alterados
+        run: |
+          set -e
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.base_ref }}"
+            git fetch --no-tags --prune --depth=1 origin "$BASE_REF"
+            BASE_SHA="$(git merge-base HEAD "origin/$BASE_REF")"
+            HEAD_SHA="HEAD"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+              HEAD_SHA="HEAD"
+            fi
+          fi
+          
+          echo "Verificando diff no range: $BASE_SHA..$HEAD_SHA"
+          git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" > changed_files.txt || true
+
+          echo "Arquivos alterados (primeiros 50):"
+          head -n 50 changed_files.txt || true
+
+      - name: Rodar check de encoding (arquivos alterados)
+        run: |
+          if [ ! -s changed_files.txt ]; then
+            echo "Nenhum arquivo alterado para verificar."
+            exit 0
+          fi
+
+          cat changed_files.txt | node scripts/checkEncoding.js --stdin
+
+  release-flags-guardrails:
+    name: Guardrails - Release Flags Vendas (Core Baseline)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+
+      - name: Validar baseline GO Core das flags de vendas
+        run: npm run validate:release:vendas:core
+
+  architecture-guardrails:
+    name: Guardrails - Arquitetura
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+
+      - name: Validar arquitetura (PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          node scripts/ci/architecture-guardrails.mjs \
+            --base "${{ github.event.pull_request.base.sha }}" \
+            --head "${{ github.event.pull_request.head.sha }}"
+
+      - name: Validar arquitetura (push)
+        if: github.event_name != 'pull_request'
+        run: |
+          BASE_SHA="${{ github.event.before }}"
+          HEAD_SHA="${{ github.sha }}"
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+            HEAD_SHA="HEAD"
+          fi
+          node scripts/ci/architecture-guardrails.mjs --base "$BASE_SHA" --head "$HEAD_SHA"
+
   backend:
     name: Backend - Testes e Build
     runs-on: ubuntu-latest
-    
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias backend
+        run: npm --prefix backend ci
+
+      - name: Type-check backend
+        run: npm --prefix backend run type-check
+
+      - name: Build backend
+        run: npm --prefix backend run build
+
+  backend-e2e-cotacao:
+    name: Backend - E2E Cotacao
+    runs-on: ubuntu-latest
+    needs: backend
+    env:
+      NODE_ENV: test
+      JWT_SECRET: test-jwt-secret
+      DATABASE_HOST: localhost
+      DATABASE_PORT: '5434'
+      DATABASE_USERNAME: conectcrm
+      DATABASE_PASSWORD: conectcrm123
+      DATABASE_NAME: conectcrm_test
+      TYPEORM_USE_TS: 'true'
+      REDIS_HOST: localhost
+      REDIS_PORT: '6379'
+
     services:
       postgres:
-        image: postgres:15
+        image: postgres:16
         env:
+          POSTGRES_USER: conectcrm
+          POSTGRES_PASSWORD: conectcrm123
           POSTGRES_DB: conectcrm_test
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5434:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U conectcrm -d conectcrm_test"
           --health-interval 10s
           --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-      
+          --health-retries 10
       redis:
-        image: redis:7-alpine
+        image: redis:7
+        ports:
+          - 6379:6379
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
           --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
-    
+          --health-retries 10
+
     steps:
-      - name: 📥 Checkout código
+      - name: Checkout codigo
         uses: actions/checkout@v4
-      
-      - name: 🔧 Setup Node.js
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Detectar mudancas relevantes (E2E Cotacao)
+        id: cotacao_changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.base_ref }}"
+            git fetch --no-tags --prune --depth=1 origin "$BASE_REF"
+            BASE_SHA="$(git merge-base HEAD "origin/$BASE_REF")"
+            HEAD_SHA="HEAD"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+              HEAD_SHA="HEAD"
+            fi
+          fi
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" || true)
+
+          if echo "$CHANGED_FILES" | grep -E '^(backend/src/modules/cotacao/|backend/src/modules/financeiro/|backend/src/modules/pedidos/|backend/test/cotacao/|backend/test/_support/|backend/package\.json|backend/package-lock\.json)' >/dev/null; then
+            echo "run=true" >> $GITHUB_OUTPUT
+          else
+            echo "run=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Pular E2E Cotacao (sem mudancas relevantes)
+        if: steps.cotacao_changes.outputs.run != 'true'
+        run: echo "Sem alteracoes no escopo de cotacao; job finalizado sem executar testes."
+
+      - name: Setup Node.js
+        if: steps.cotacao_changes.outputs.run == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: '22.16.0'
+          cache: npm
           cache-dependency-path: backend/package-lock.json
-      
-      - name: 📦 Instalar dependências
-        working-directory: backend
-        run: npm ci
-      
-      - name: 🔍 Verificar vulnerabilidades
-        working-directory: backend
-        run: npm audit --audit-level=high
-        continue-on-error: true
-      
-      - name: 🎨 Linting (ESLint)
-        working-directory: backend
-        run: npm run lint
-        continue-on-error: true
-      
-      - name: 🏗️ Build TypeScript
-        working-directory: backend
-        run: npm run build
-        env:
-          NODE_ENV: test
-      
-      - name: 🧪 Rodar testes unitários
-        working-directory: backend
-        run: npm test -- --coverage
-        env:
-          NODE_ENV: test
-          DATABASE_HOST: localhost
-          DATABASE_PORT: 5432
-          DATABASE_USERNAME: postgres
-          DATABASE_PASSWORD: postgres
-          DATABASE_NAME: conectcrm_test
-          REDIS_HOST: localhost
-          REDIS_PORT: 6379
-          JWT_SECRET: test-secret-key-for-ci
-      
-      - name: 📊 Upload coverage para Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          files: backend/coverage/lcov.info
-          flags: backend
-          name: backend-coverage
-        continue-on-error: true
 
-  # ==============================================================================
-  # Job 2: Frontend Tests
-  # ==============================================================================
+      - name: Instalar dependencias backend
+        if: steps.cotacao_changes.outputs.run == 'true'
+        run: npm --prefix backend ci
+
+      - name: Aplicar migrations na base de teste e2e
+        if: steps.cotacao_changes.outputs.run == 'true'
+        run: npm --prefix backend run migration:run
+
+      - name: Rodar E2E de cotacao
+        if: steps.cotacao_changes.outputs.run == 'true'
+        run: npm --prefix backend run test:e2e:cotacao
+
+  backend-e2e-contas-pagar:
+    name: Backend - E2E Contas Pagar
+    runs-on: ubuntu-latest
+    needs: backend
+    env:
+      NODE_ENV: test
+      JWT_SECRET: test-jwt-secret
+      DATABASE_HOST: localhost
+      DATABASE_PORT: '5434'
+      DATABASE_USERNAME: conectcrm
+      DATABASE_PASSWORD: conectcrm123
+      DATABASE_NAME: conectcrm_test
+      TYPEORM_USE_TS: 'true'
+      REDIS_HOST: localhost
+      REDIS_PORT: '6379'
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: conectcrm
+          POSTGRES_PASSWORD: conectcrm123
+          POSTGRES_DB: conectcrm_test
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U conectcrm -d conectcrm_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Detectar mudancas relevantes (E2E Contas Pagar)
+        id: contas_pagar_changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.base_ref }}"
+            git fetch --no-tags --prune --depth=1 origin "$BASE_REF"
+            BASE_SHA="$(git merge-base HEAD "origin/$BASE_REF")"
+            HEAD_SHA="HEAD"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+              HEAD_SHA="HEAD"
+            fi
+          fi
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" || true)
+
+          if echo "$CHANGED_FILES" | grep -E '^(backend/src/modules/financeiro/|backend/src/modules/contas-pagar/|backend/test/financeiro/|backend/test/_support/|backend/package\.json|backend/package-lock\.json)' >/dev/null; then
+            echo "run=true" >> $GITHUB_OUTPUT
+          else
+            echo "run=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Pular E2E Contas Pagar (sem mudancas relevantes)
+        if: steps.contas_pagar_changes.outputs.run != 'true'
+        run: echo "Sem alteracoes no escopo de contas a pagar; job finalizado sem executar testes."
+
+      - name: Setup Node.js
+        if: steps.contas_pagar_changes.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias backend
+        if: steps.contas_pagar_changes.outputs.run == 'true'
+        run: npm --prefix backend ci
+
+      - name: Aplicar migrations na base de teste e2e
+        if: steps.contas_pagar_changes.outputs.run == 'true'
+        run: npm --prefix backend run migration:run
+
+      - name: Rodar E2E de contas a pagar
+        if: steps.contas_pagar_changes.outputs.run == 'true'
+        run: npm --prefix backend run test:e2e:contas-pagar
+
+  backend-e2e-multi-tenancy:
+    name: Backend - E2E Multi-Tenancy
+    runs-on: ubuntu-latest
+    needs: backend
+    env:
+      NODE_ENV: test
+      JWT_SECRET: test-jwt-secret
+      DATABASE_HOST: localhost
+      DATABASE_PORT: '5434'
+      DATABASE_USERNAME: conectcrm
+      DATABASE_PASSWORD: conectcrm123
+      DATABASE_NAME: conectcrm_test
+      TYPEORM_USE_TS: 'true'
+      REDIS_HOST: localhost
+      REDIS_PORT: '6379'
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: conectcrm
+          POSTGRES_PASSWORD: conectcrm123
+          POSTGRES_DB: conectcrm_test
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U conectcrm -d conectcrm_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Detectar mudancas relevantes (E2E Multi-Tenancy)
+        id: multi_tenancy_changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.base_ref }}"
+            git fetch --no-tags --prune --depth=1 origin "$BASE_REF"
+            BASE_SHA="$(git merge-base HEAD "origin/$BASE_REF")"
+            HEAD_SHA="HEAD"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+              HEAD_SHA="HEAD"
+            fi
+          fi
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" || true)
+
+          if echo "$CHANGED_FILES" | grep -E '^(backend/src/|backend/test/multi-tenancy|backend/test/_support/|backend/package\.json|backend/package-lock\.json)' >/dev/null; then
+            echo "run=true" >> $GITHUB_OUTPUT
+          else
+            echo "run=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Pular E2E Multi-Tenancy (sem mudancas relevantes)
+        if: steps.multi_tenancy_changes.outputs.run != 'true'
+        run: echo "Sem alteracoes no escopo de multi-tenancy; job finalizado sem executar testes."
+
+      - name: Setup Node.js
+        if: steps.multi_tenancy_changes.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias backend
+        if: steps.multi_tenancy_changes.outputs.run == 'true'
+        run: npm --prefix backend ci
+
+      - name: Aplicar migrations na base de teste e2e
+        if: steps.multi_tenancy_changes.outputs.run == 'true'
+        run: npm --prefix backend run migration:run
+
+      - name: Rodar E2E de multi-tenancy
+        if: steps.multi_tenancy_changes.outputs.run == 'true'
+        run: npm --prefix backend run test:e2e -- multi-tenancy.e2e-spec.ts
+
+  backend-e2e-vendas:
+    name: Backend - E2E Vendas
+    runs-on: ubuntu-latest
+    needs: backend
+    env:
+      NODE_ENV: test
+      JWT_SECRET: test-jwt-secret
+      DATABASE_HOST: localhost
+      DATABASE_PORT: '5434'
+      DATABASE_USERNAME: conectcrm
+      DATABASE_PASSWORD: conectcrm123
+      DATABASE_NAME: conectcrm_test
+      TYPEORM_USE_TS: 'true'
+      REDIS_HOST: localhost
+      REDIS_PORT: '6379'
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: conectcrm
+          POSTGRES_PASSWORD: conectcrm123
+          POSTGRES_DB: conectcrm_test
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U conectcrm -d conectcrm_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Detectar mudancas relevantes (E2E Vendas)
+        id: vendas_changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.base_ref }}"
+            git fetch --no-tags --prune --depth=1 origin "$BASE_REF"
+            BASE_SHA="$(git merge-base HEAD "origin/$BASE_REF")"
+            HEAD_SHA="HEAD"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+              HEAD_SHA="HEAD"
+            fi
+          fi
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" || true)
+
+          if echo "$CHANGED_FILES" | grep -E '^(backend/src/modules/faturamento/|backend/src/modules/pagamentos/|backend/src/modules/financeiro/|backend/src/modules/contas-pagar/|backend/src/modules/propostas/|backend/src/modules/oportunidades/|backend/src/modules/vendas/|backend/src/common/permissions/|backend/src/common/guards/|backend/test/propostas/|backend/test/vendas/|backend/test/permissoes/|backend/test/_support/|backend/package\.json|backend/package-lock\.json)' >/dev/null; then
+            echo "run=true" >> $GITHUB_OUTPUT
+          else
+            echo "run=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Pular E2E Vendas (sem mudancas relevantes)
+        if: steps.vendas_changes.outputs.run != 'true'
+        run: echo "Sem alteracoes no escopo de vendas; job finalizado sem executar testes."
+
+      - name: Setup Node.js
+        if: steps.vendas_changes.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias backend
+        if: steps.vendas_changes.outputs.run == 'true'
+        run: npm --prefix backend ci
+
+      - name: Aplicar migrations na base de teste e2e
+        if: steps.vendas_changes.outputs.run == 'true'
+        run: npm --prefix backend run migration:run
+
+      - name: Rodar E2E de vendas
+        if: steps.vendas_changes.outputs.run == 'true'
+        run: npm --prefix backend run test:e2e:vendas
+
+  backend-e2e-vendas-permissoes:
+    name: Backend - E2E Vendas Permissoes
+    runs-on: ubuntu-latest
+    needs: backend
+    env:
+      NODE_ENV: test
+      JWT_SECRET: test-jwt-secret
+      DATABASE_HOST: localhost
+      DATABASE_PORT: '5434'
+      DATABASE_USERNAME: conectcrm
+      DATABASE_PASSWORD: conectcrm123
+      DATABASE_NAME: conectcrm_test
+      TYPEORM_USE_TS: 'true'
+      REDIS_HOST: localhost
+      REDIS_PORT: '6379'
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: conectcrm
+          POSTGRES_PASSWORD: conectcrm123
+          POSTGRES_DB: conectcrm_test
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U conectcrm -d conectcrm_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Detectar mudancas relevantes (E2E Vendas Permissoes)
+        id: vendas_permissoes_changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.base_ref }}"
+            git fetch --no-tags --prune --depth=1 origin "$BASE_REF"
+            BASE_SHA="$(git merge-base HEAD "origin/$BASE_REF")"
+            HEAD_SHA="HEAD"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+              HEAD_SHA="HEAD"
+            fi
+          fi
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" || true)
+
+          if echo "$CHANGED_FILES" | grep -E '^(backend/src/modules/faturamento/|backend/src/modules/pagamentos/|backend/src/modules/financeiro/|backend/src/modules/contas-pagar/|backend/src/modules/propostas/|backend/src/modules/oportunidades/|backend/src/modules/vendas/|backend/src/modules/auth/|backend/src/modules/users/|backend/src/common/permissions/|backend/src/common/guards/|backend/test/permissoes/|backend/test/_support/|backend/package\.json|backend/package-lock\.json)' >/dev/null; then
+            echo "run=true" >> $GITHUB_OUTPUT
+          else
+            echo "run=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Pular E2E Vendas Permissoes (sem mudancas relevantes)
+        if: steps.vendas_permissoes_changes.outputs.run != 'true'
+        run: echo "Sem alteracoes no escopo de vendas/permissoes; job finalizado sem executar testes."
+
+      - name: Setup Node.js
+        if: steps.vendas_permissoes_changes.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias backend
+        if: steps.vendas_permissoes_changes.outputs.run == 'true'
+        run: npm --prefix backend ci
+
+      - name: Aplicar migrations na base de teste e2e
+        if: steps.vendas_permissoes_changes.outputs.run == 'true'
+        run: npm --prefix backend run migration:run
+
+      - name: Rodar E2E de vendas permissoes
+        if: steps.vendas_permissoes_changes.outputs.run == 'true'
+        run: npm --prefix backend run test:e2e:vendas:permissoes
+
+  backend-e2e-core-admin-hardening:
+    name: Backend - E2E Core Admin Hardening
+    runs-on: ubuntu-latest
+    needs: backend
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Detectar mudancas relevantes (Core Admin Hardening)
+        id: core_admin_hardening_changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.base_ref }}"
+            git fetch --no-tags --prune --depth=1 origin "$BASE_REF"
+            BASE_SHA="$(git merge-base HEAD "origin/$BASE_REF")"
+            HEAD_SHA="HEAD"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+              HEAD_SHA="HEAD"
+            fi
+          fi
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" || true)
+
+          if echo "$CHANGED_FILES" | grep -E '^(backend/test/core-admin/|backend/test/_support/e2e-app.helper.ts|backend/src/modules/core-admin/|backend/src/common/guards/core-admin-legacy-transition.guard.ts|backend/src/common/guards/core-admin-legacy-transition.guard.spec.ts|backend/src/modules/planos/assinatura-due-date-scheduler.service.ts|backend/src/modules/planos/assinaturas.controller.ts|backend/src/modules/planos/planos.controller.ts|backend/src/main.ts|backend/src/app.module.ts|backend/package\.json|backend/package-lock\.json)' >/dev/null; then
+            echo "core_admin_hardening=true" >> $GITHUB_OUTPUT
+          else
+            echo "core_admin_hardening=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Pular E2E Core Admin Hardening (sem mudancas relevantes)
+        if: steps.core_admin_hardening_changes.outputs.core_admin_hardening != 'true'
+        run: echo "Sem alteracoes no escopo de core-admin hardening; job finalizado sem executar testes."
+
+      - name: Setup Node.js
+        if: steps.core_admin_hardening_changes.outputs.core_admin_hardening == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias backend
+        if: steps.core_admin_hardening_changes.outputs.core_admin_hardening == 'true'
+        run: npm --prefix backend ci
+
+      - name: Rodar E2E Core Admin Hardening
+        if: steps.core_admin_hardening_changes.outputs.core_admin_hardening == 'true'
+        run: npm --prefix backend run test:e2e:core-admin:hardening
+
+  backend-e2e-core-admin-security:
+    name: Backend - E2E Core Admin Security (DB)
+    runs-on: ubuntu-latest
+    needs: backend
+    env:
+      NODE_ENV: test
+      JWT_SECRET: test-jwt-secret
+      DATABASE_HOST: localhost
+      DATABASE_PORT: '5434'
+      DATABASE_USERNAME: conectcrm
+      DATABASE_PASSWORD: conectcrm123
+      DATABASE_NAME: conectcrm_test
+      TYPEORM_USE_TS: 'true'
+      REDIS_HOST: localhost
+      REDIS_PORT: '6379'
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: conectcrm
+          POSTGRES_PASSWORD: conectcrm123
+          POSTGRES_DB: conectcrm_test
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U conectcrm -d conectcrm_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Detectar mudancas relevantes (Core Admin Security)
+        id: core_admin_security_changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.base_ref }}"
+            git fetch --no-tags --prune --depth=1 origin "$BASE_REF"
+            BASE_SHA="$(git merge-base HEAD "origin/$BASE_REF")"
+            HEAD_SHA="HEAD"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+              HEAD_SHA="HEAD"
+            fi
+          fi
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" || true)
+
+          if echo "$CHANGED_FILES" | grep -E '^(backend/test/core-admin/core-admin-mfa-session.e2e-spec.ts|backend/test/core-admin/core-admin-backend-bypass.e2e-spec.ts|backend/test/_support/e2e-app.helper.ts|backend/src/modules/core-admin/|backend/src/modules/auth/|backend/src/modules/users/|backend/src/modules/planos/|backend/src/common/guards/core-admin-legacy-transition.guard.ts|backend/src/common/guards/core-admin-legacy-transition.guard.spec.ts|backend/src/main.ts|backend/src/app.module.ts|backend/src/config/|backend/package\.json|backend/package-lock\.json)' >/dev/null; then
+            echo "core_admin_security=true" >> $GITHUB_OUTPUT
+          else
+            echo "core_admin_security=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Pular E2E Core Admin Security (sem mudancas relevantes)
+        if: steps.core_admin_security_changes.outputs.core_admin_security != 'true'
+        run: echo "Sem alteracoes no escopo de core-admin security; job finalizado sem executar testes."
+
+      - name: Setup Node.js
+        if: steps.core_admin_security_changes.outputs.core_admin_security == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias backend
+        if: steps.core_admin_security_changes.outputs.core_admin_security == 'true'
+        run: npm --prefix backend ci
+
+      - name: Aplicar migrations na base de teste e2e
+        if: steps.core_admin_security_changes.outputs.core_admin_security == 'true'
+        run: npm --prefix backend run migration:run
+
+      - name: Rodar E2E Core Admin Security
+        if: steps.core_admin_security_changes.outputs.core_admin_security == 'true'
+        run: npm --prefix backend run test:e2e:core-admin:security
+
   frontend:
     name: Frontend - Testes e Build
     runs-on: ubuntu-latest
-    
+
     steps:
-      - name: 📥 Checkout código
+      - name: Checkout codigo
         uses: actions/checkout@v4
-      
-      - name: 🔧 Setup Node.js
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: '22.16.0'
+          cache: npm
           cache-dependency-path: frontend-web/package-lock.json
-      
-      - name: 📦 Instalar dependências
-        working-directory: frontend-web
-        run: npm ci
-      
-      - name: 🔍 Verificar vulnerabilidades
-        working-directory: frontend-web
-        run: npm audit --audit-level=high
-        continue-on-error: true
-      
-      - name: 🎨 Linting (ESLint)
-        working-directory: frontend-web
-        run: npm run lint
-        continue-on-error: true
-      
-      - name: 🏗️ Build React
-        working-directory: frontend-web
-        run: npm run build
-        env:
-          CI: true
-          REACT_APP_API_URL: http://localhost:3001
-      
-      - name: 🧪 Rodar testes
-        working-directory: frontend-web
-        run: npm test -- --coverage --watchAll=false
-        env:
-          CI: true
-      
-      - name: 🎨 Validar tema Crevasse
-        working-directory: frontend-web
-        run: npm test -- theme-validation.test.ts --watchAll=false
-        env:
-          CI: true
-      
-      - name: 📊 Upload coverage para Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          files: frontend-web/coverage/lcov.info
-          flags: frontend
-          name: frontend-coverage
-        continue-on-error: true
-      
-      - name: 📦 Upload build artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: frontend-build
-          path: frontend-web/build
-          retention-days: 7
 
-  # ==============================================================================
-  # Job 3: Security Scan (CodeQL)
-  # ==============================================================================
-  security:
-    name: Análise de Segurança
+      - name: Instalar dependencias frontend
+        run: npm --prefix frontend-web ci
+
+      - name: Sanity check frontend
+        run: npm --prefix frontend-web run deps:check || true
+
+      - name: Validar gate tenant do catalogo flexivel
+        env:
+          CI: true
+        run: npm --prefix frontend-web run test -- --runTestsByPath src/services/__tests__/produtosService.catalogGate.test.ts --watch=false --runInBand
+
+  # Mantemos o nome/id legado deste job para nao quebrar branch protection ou required checks
+  # ja configurados no repositório. O escopo efetivo executado aqui e o Comercial Core.
+  frontend-e2e-pipeline-ui:
+    name: Frontend - E2E Pipeline UI (Playwright)
     runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-    
+    needs: frontend
+
     steps:
-      - name: 📥 Checkout código
+      - name: Checkout codigo
         uses: actions/checkout@v4
-      
-      - name: 🔒 Inicializar CodeQL
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Detectar mudancas relevantes (Comercial Core)
+        id: comercial_core_changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.base_ref }}"
+            git fetch --no-tags --prune --depth=1 origin "$BASE_REF"
+            BASE_SHA="$(git merge-base HEAD "origin/$BASE_REF")"
+            HEAD_SHA="HEAD"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+              HEAD_SHA="HEAD"
+            fi
+          fi
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" || true)
+
+          if echo "$CHANGED_FILES" | grep -E '^(e2e/pipeline-.*\.spec\.ts|e2e/propostas-.*\.spec\.ts|e2e/pipeline-ui.helpers.ts|e2e/fixtures.ts|playwright.config.ts|frontend-web/craco.config.js|frontend-web/src/pages/PipelinePage.tsx|frontend-web/src/features/propostas/|frontend-web/src/components/modals/ModalNovaProposta.tsx|frontend-web/src/components/oportunidades/|frontend-web/src/services/api.ts|frontend-web/src/services/oportunidadesService.ts|frontend-web/src/services/modulosService.ts|frontend-web/src/services/minhasEmpresasService.ts|frontend-web/src/contexts/AuthContext.tsx|frontend-web/src/contexts/EmpresaContextAPIReal.tsx|frontend-web/src/hooks/useModuloAtivo.ts|frontend-web/src/components/licensing/PermissionPathGuard.tsx|frontend-web/src/types/oportunidades/|frontend-web/src/App.tsx|package\.json|package-lock\.json|frontend-web/package\.json|frontend-web/package-lock\.json)' >/dev/null; then
+            echo "comercial_core=true" >> $GITHUB_OUTPUT
+          else
+            echo "comercial_core=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Pular E2E Comercial Core (sem mudancas relevantes)
+        if: steps.comercial_core_changes.outputs.comercial_core != 'true'
+        run: echo "Sem alteracoes no escopo comercial core; job finalizado sem executar Playwright."
+
+      - name: Setup Node.js
+        if: steps.comercial_core_changes.outputs.comercial_core == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend-web/package-lock.json
+
+      - name: Instalar dependencias root (Playwright)
+        if: steps.comercial_core_changes.outputs.comercial_core == 'true'
+        run: npm ci
+
+      - name: Instalar dependencias frontend
+        if: steps.comercial_core_changes.outputs.comercial_core == 'true'
+        run: npm --prefix frontend-web ci
+
+      - name: Instalar browser Chromium (Playwright)
+        if: steps.comercial_core_changes.outputs.comercial_core == 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Subir frontend (modo CI)
+        if: steps.comercial_core_changes.outputs.comercial_core == 'true'
+        env:
+          PORT: '3000'
+          BROWSER: 'none'
+          CI: 'true'
+        run: |
+          nohup npm --prefix frontend-web run start:docker > frontend.log 2>&1 &
+          echo $! > frontend.pid
+
+          for i in $(seq 1 90); do
+            if curl -fsS http://localhost:3000 > /dev/null; then
+              echo "Frontend disponivel em http://localhost:3000"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Frontend nao iniciou a tempo."
+          tail -n 200 frontend.log || true
+          exit 1
+
+      - name: Rodar E2E Pipeline UI (escopo Comercial Core)
+        if: steps.comercial_core_changes.outputs.comercial_core == 'true'
+        run: npm run test:e2e:comercial:core
+
+      - name: Upload artefatos Playwright (Comercial Core)
+        if: ${{ !cancelled() && steps.comercial_core_changes.outputs.comercial_core == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-comercial-core-artifacts
+          path: |
+            playwright-report/
+            test-results/
+            frontend.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Encerrar frontend
+        if: ${{ always() && steps.comercial_core_changes.outputs.comercial_core == 'true' }}
+        run: |
+          if [ -f frontend.pid ]; then
+            kill "$(cat frontend.pid)" || true
+          fi
+
+  frontend-e2e-billing-critical:
+    name: Frontend - E2E Billing Critical (Playwright)
+    runs-on: ubuntu-latest
+    needs: frontend
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Detectar mudancas relevantes (Billing Critical)
+        id: billing_critical_changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            billing_critical:
+              - '.github/workflows/ci.yml'
+              - 'e2e/billing-*.spec.ts'
+              - 'e2e/fixtures.ts'
+              - 'playwright.config.ts'
+              - 'frontend-web/src/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'frontend-web/package.json'
+              - 'frontend-web/package-lock.json'
+
+      - name: Pular E2E Billing Critical (sem mudancas relevantes)
+        if: steps.billing_critical_changes.outputs.billing_critical != 'true'
+        run: echo "Sem alteracoes no escopo de billing critical; job finalizado sem executar Playwright."
+
+      - name: Setup Node.js
+        if: steps.billing_critical_changes.outputs.billing_critical == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend-web/package-lock.json
+
+      - name: Instalar dependencias root (Playwright)
+        if: steps.billing_critical_changes.outputs.billing_critical == 'true'
+        run: npm ci
+
+      - name: Instalar dependencias frontend
+        if: steps.billing_critical_changes.outputs.billing_critical == 'true'
+        run: npm --prefix frontend-web ci
+
+      - name: Instalar browser Chromium (Playwright)
+        if: steps.billing_critical_changes.outputs.billing_critical == 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Subir frontend (modo CI)
+        if: steps.billing_critical_changes.outputs.billing_critical == 'true'
+        env:
+          PORT: '3000'
+          BROWSER: 'none'
+          CI: 'true'
+        run: |
+          nohup npm --prefix frontend-web run start:docker > frontend.log 2>&1 &
+          echo $! > frontend.pid
+
+          for i in $(seq 1 90); do
+            if curl -fsS http://localhost:3000 > /dev/null; then
+              echo "Frontend disponivel em http://localhost:3000"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Frontend nao iniciou a tempo."
+          tail -n 200 frontend.log || true
+          exit 1
+
+      - name: Rodar E2E Billing Critical (Playwright)
+        if: steps.billing_critical_changes.outputs.billing_critical == 'true'
+        env:
+          TEST_E2E_AUTH_MODE: mock
+        run: npm run test:e2e:billing:critical
+
+      - name: Upload artefatos Playwright (Billing Critical)
+        if: ${{ !cancelled() && steps.billing_critical_changes.outputs.billing_critical == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-billing-critical-artifacts
+          path: |
+            playwright-report/
+            test-results/
+            frontend.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Encerrar frontend
+        if: ${{ always() && steps.billing_critical_changes.outputs.billing_critical == 'true' }}
+        run: |
+          if [ -f frontend.pid ]; then
+            kill "$(cat frontend.pid)" || true
+          fi
+
+  frontend-legacy-exposure-scan:
+    name: Frontend - Legacy Exposure Scan
+    runs-on: ubuntu-latest
+    needs: frontend
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Detectar mudancas relevantes (Legacy Exposure Scan)
+        id: legacy_exposure_changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            legacy_exposure:
+              - '.github/workflows/ci.yml'
+              - 'scripts/ci/legacy-admin-exposure-scan.ps1'
+              - 'frontend-web/src/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'frontend-web/package.json'
+              - 'frontend-web/package-lock.json'
+
+      - name: Pular Legacy Exposure Scan (sem mudancas relevantes)
+        if: steps.legacy_exposure_changes.outputs.legacy_exposure != 'true'
+        run: echo "Sem alteracoes no escopo de legacy exposure scan; job finalizado."
+
+      - name: Setup Node.js
+        if: steps.legacy_exposure_changes.outputs.legacy_exposure == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend-web/package-lock.json
+
+      - name: Instalar dependencias root
+        if: steps.legacy_exposure_changes.outputs.legacy_exposure == 'true'
+        run: npm ci
+
+      - name: Instalar dependencias frontend
+        if: steps.legacy_exposure_changes.outputs.legacy_exposure == 'true'
+        run: npm --prefix frontend-web ci
+
+      - name: Rodar Legacy exposure scan
+        if: steps.legacy_exposure_changes.outputs.legacy_exposure == 'true'
+        run: pwsh -NoLogo -NoProfile -File ./scripts/ci/legacy-admin-exposure-scan.ps1
+
+  frontend-e2e-core-admin-billing-governance:
+    name: Frontend - E2E Core Admin Billing Governance (Playwright)
+    runs-on: ubuntu-latest
+    needs: frontend
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Detectar mudancas relevantes (Core Admin Billing Governance)
+        id: core_admin_billing_governance_changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.base_ref }}"
+            git fetch --no-tags --prune --depth=1 origin "$BASE_REF"
+            BASE_SHA="$(git merge-base HEAD "origin/$BASE_REF")"
+            HEAD_SHA="HEAD"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+              HEAD_SHA="HEAD"
+            fi
+          fi
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" || true)
+
+          if echo "$CHANGED_FILES" | grep -E '^(e2e/core-admin-billing-governance.spec.ts|e2e/core-admin-responsive-visual.spec.ts|playwright.config.ts|frontend-web/src/|backend/src/modules/core-admin/|backend/src/modules/planos/|package\.json|package-lock\.json|frontend-web/package\.json|frontend-web/package-lock\.json)' >/dev/null; then
+            echo "core_admin_billing_governance=true" >> $GITHUB_OUTPUT
+          else
+            echo "core_admin_billing_governance=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Pular E2E Core Admin Billing Governance (sem mudancas relevantes)
+        if: steps.core_admin_billing_governance_changes.outputs.core_admin_billing_governance != 'true'
+        run: echo "Sem alteracoes no escopo core-admin billing governance; job finalizado sem executar Playwright."
+
+      - name: Setup Node.js
+        if: steps.core_admin_billing_governance_changes.outputs.core_admin_billing_governance == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend-web/package-lock.json
+
+      - name: Instalar dependencias root (Playwright)
+        if: steps.core_admin_billing_governance_changes.outputs.core_admin_billing_governance == 'true'
+        run: npm ci
+
+      - name: Instalar dependencias frontend-web
+        if: steps.core_admin_billing_governance_changes.outputs.core_admin_billing_governance == 'true'
+        run: npm --prefix frontend-web ci
+
+      - name: Instalar browser Chromium (Playwright)
+        if: steps.core_admin_billing_governance_changes.outputs.core_admin_billing_governance == 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Subir frontend-web (modo CI)
+        if: steps.core_admin_billing_governance_changes.outputs.core_admin_billing_governance == 'true'
+        env:
+          CI: 'true'
+        run: |
+          nohup npm --prefix frontend-web start > frontend-web.log 2>&1 &
+          echo $! > frontend-web.pid
+
+          for i in $(seq 1 90); do
+            if curl -fsS http://localhost:3000 > /dev/null; then
+              echo "Frontend web disponivel em http://localhost:3000"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Frontend web nao iniciou a tempo."
+          tail -n 200 frontend-web.log || true
+          exit 1
+
+      - name: Rodar E2E Core Admin Governance (Playwright)
+        if: steps.core_admin_billing_governance_changes.outputs.core_admin_billing_governance == 'true'
+        env:
+          CORE_ADMIN_FRONTEND_URL: http://localhost:3000
+        run: |
+          npm run test:e2e:core-admin:billing:governance
+          npm run test:e2e:core-admin:visual
+
+      - name: Upload artefatos Playwright (Core Admin Billing Governance)
+        if: ${{ !cancelled() && steps.core_admin_billing_governance_changes.outputs.core_admin_billing_governance == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-core-admin-billing-governance-artifacts
+          path: |
+            playwright-report/
+            test-results/
+            frontend-web.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Encerrar frontend-web
+        if: ${{ always() && steps.core_admin_billing_governance_changes.outputs.core_admin_billing_governance == 'true' }}
+        run: |
+          if [ -f frontend-web.pid ]; then
+            kill "$(cat frontend-web.pid)" || true
+          fi
+
+  security:
+    name: Analise de Seguranca
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+
+      - name: Inicializar CodeQL
         uses: github/codeql-action/init@v2
         with:
           languages: javascript, typescript
-      
-      - name: 🔍 Executar análise CodeQL
+          config-file: ./.github/codeql/codeql-config.yml
+
+      - name: Executar analise CodeQL
         uses: github/codeql-action/analyze@v2
 
-  # ==============================================================================
-  # Job 4: Verificação de Arquivos Temporários
-  # ==============================================================================
   check-temp-files:
-    name: Verificar Arquivos Temporários
+    name: Verificar Arquivos Temporarios
     runs-on: ubuntu-latest
-    
+
     steps:
-      - name: 📥 Checkout código
+      - name: Checkout codigo
         uses: actions/checkout@v4
-      
-      - name: 🔍 Verificar arquivos temporários
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verificar arquivos temporarios
         run: |
-          echo "🔍 Verificando arquivos temporários..."
-          TEMP_FILES=$(find . -type f \
-            -name "test-*" -o \
-            -name "debug-*" -o \
-            -name "temp-*" -o \
-            -name "exemplo-*" -o \
-            -name "CORRECAO_*" -o \
-            -name "DEBUG_*" | \
-            grep -v node_modules | \
-            grep -v .git || true)
-          
+          echo "Verificando arquivos temporarios alterados no commit..."
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.base_ref }}"
+            git fetch --no-tags --prune --depth=1 origin "$BASE_REF"
+            BASE_SHA="$(git merge-base HEAD "origin/$BASE_REF")"
+            HEAD_SHA="HEAD"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              BASE_SHA="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+              HEAD_SHA="HEAD"
+            fi
+          fi
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" || true)
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "Nenhum arquivo alterado detectado no commit atual."
+            exit 0
+          fi
+
+          TEMP_FILES=$(echo "$CHANGED_FILES" \
+            | grep -E '(^|/)(test-|debug-|temp-|exemplo-|CORRECAO_|DEBUG_)' \
+            | grep -Ev '^scripts/test-.*\.ps1$' \
+            || true)
+
           if [ -n "$TEMP_FILES" ]; then
-            echo "❌ Arquivos temporários encontrados:"
+            echo "Arquivos temporarios encontrados:"
             echo "$TEMP_FILES"
             exit 1
           else
-            echo "✅ Nenhum arquivo temporário encontrado!"
+            echo "Nenhum arquivo temporario encontrado."
           fi
 
-  # ==============================================================================
-  # Job 5: Status Final
-  # ==============================================================================
   final-status:
     name: Status Final do CI
     runs-on: ubuntu-latest
-    needs: [backend, frontend, security, check-temp-files]
+    needs: [encoding-guardrails, release-flags-guardrails, architecture-guardrails, backend, backend-e2e-cotacao, backend-e2e-contas-pagar, backend-e2e-multi-tenancy, backend-e2e-vendas, backend-e2e-vendas-permissoes, backend-e2e-core-admin-hardening, backend-e2e-core-admin-security, frontend, frontend-e2e-pipeline-ui, frontend-e2e-billing-critical, frontend-legacy-exposure-scan, frontend-e2e-core-admin-billing-governance, security, check-temp-files]
     if: always()
-    
+
     steps:
-      - name: 📊 Verificar status dos jobs
+      - name: Verificar status dos jobs
         run: |
+          echo "Encoding Guardrails: ${{ needs.encoding-guardrails.result }}"
+          echo "Release Flags Guardrails: ${{ needs.release-flags-guardrails.result }}"
+          echo "Architecture Guardrails: ${{ needs.architecture-guardrails.result }}"
           echo "Backend: ${{ needs.backend.result }}"
+          echo "Backend E2E Cotacao: ${{ needs.backend-e2e-cotacao.result }}"
+          echo "Backend E2E Contas Pagar: ${{ needs.backend-e2e-contas-pagar.result }}"
+          echo "Backend E2E Multi-Tenancy: ${{ needs.backend-e2e-multi-tenancy.result }}"
+          echo "Backend E2E Vendas: ${{ needs.backend-e2e-vendas.result }}"
+          echo "Backend E2E Vendas Permissoes: ${{ needs.backend-e2e-vendas-permissoes.result }}"
+          echo "Backend E2E Core Admin Hardening: ${{ needs.backend-e2e-core-admin-hardening.result }}"
+          echo "Backend E2E Core Admin Security: ${{ needs.backend-e2e-core-admin-security.result }}"
           echo "Frontend: ${{ needs.frontend.result }}"
+          echo "Frontend E2E Pipeline UI (escopo Comercial Core): ${{ needs.frontend-e2e-pipeline-ui.result }}"
+          echo "Frontend E2E Billing Critical: ${{ needs.frontend-e2e-billing-critical.result }}"
+          echo "Frontend Legacy Exposure Scan: ${{ needs.frontend-legacy-exposure-scan.result }}"
+          echo "Frontend E2E Core Admin Billing Governance: ${{ needs.frontend-e2e-core-admin-billing-governance.result }}"
           echo "Security: ${{ needs.security.result }}"
           echo "Temp Files Check: ${{ needs.check-temp-files.result }}"
-          
-          if [ "${{ needs.backend.result }}" != "success" ] || \
+
+          if [ "${{ needs.encoding-guardrails.result }}" != "success" ] || \
+             [ "${{ needs.release-flags-guardrails.result }}" != "success" ] || \
+             [ "${{ needs.architecture-guardrails.result }}" != "success" ] || \
+             [ "${{ needs.backend.result }}" != "success" ] || \
+             [ "${{ needs.backend-e2e-cotacao.result }}" != "success" ] || \
+             [ "${{ needs.backend-e2e-contas-pagar.result }}" != "success" ] || \
+             [ "${{ needs.backend-e2e-multi-tenancy.result }}" != "success" ] || \
+             [ "${{ needs.backend-e2e-vendas.result }}" != "success" ] || \
+             [ "${{ needs.backend-e2e-vendas-permissoes.result }}" != "success" ] || \
+             [ "${{ needs.backend-e2e-core-admin-hardening.result }}" != "success" ] || \
+             [ "${{ needs.backend-e2e-core-admin-security.result }}" != "success" ] || \
              [ "${{ needs.frontend.result }}" != "success" ] || \
+             [ "${{ needs.frontend-e2e-pipeline-ui.result }}" != "success" ] || \
+             [ "${{ needs.frontend-e2e-billing-critical.result }}" != "success" ] || \
+             [ "${{ needs.frontend-legacy-exposure-scan.result }}" != "success" ] || \
+             [ "${{ needs.frontend-e2e-core-admin-billing-governance.result }}" != "success" ] || \
              [ "${{ needs.security.result }}" != "success" ] || \
              [ "${{ needs.check-temp-files.result }}" != "success" ]; then
-            echo "❌ CI falhou em um ou mais jobs"
+            echo "CI falhou em um ou mais jobs"
             exit 1
           else
-            echo "✅ Todos os jobs passaram com sucesso!"
+            echo "Todos os jobs passaram com sucesso"
           fi

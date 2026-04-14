@@ -1,16 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FieldPath, useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import toast from 'react-hot-toast';
 import { empresaService, RegistrarEmpresaPayload } from '../../services/empresaService';
+import { toastService } from '../../services/toastService';
 import {
   Building,
   User,
   Mail,
   Phone,
-  MapPin,
   CreditCard,
   Check,
   ArrowRight,
@@ -18,6 +17,7 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
+import Conect360Logo from '../../components/ui/Conect360Logo';
 
 // Validação do formulário
 const registroSchema = yup.object({
@@ -28,7 +28,7 @@ const registroSchema = yup.object({
       .string()
       .required('CNPJ é obrigatório')
       .matches(/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/, 'CNPJ deve ter formato XX.XXX.XXX/XXXX-XX'),
-    email: yup.string().email('Email inválido').required('Email da empresa é obrigatório'),
+    email: yup.string().email('E-mail inválido').required('E-mail da empresa é obrigatório'),
     telefone: yup.string().required('Telefone é obrigatório'),
     endereco: yup.string().required('Endereço é obrigatório'),
     cidade: yup.string().required('Cidade é obrigatória'),
@@ -41,10 +41,14 @@ const registroSchema = yup.object({
   // Dados do Usuário Administrador
   usuario: yup.object({
     nome: yup.string().required('Nome do administrador é obrigatório'),
-    email: yup.string().email('Email inválido').required('Email é obrigatório'),
+    email: yup.string().email('E-mail inválido').required('E-mail é obrigatório'),
     senha: yup
       .string()
-      .min(6, 'Senha deve ter pelo menos 6 caracteres')
+      .min(8, 'Senha deve ter pelo menos 8 caracteres')
+      .matches(
+        /^(?=.*[A-Za-z])(?=.*\d).+$/,
+        'Senha deve conter pelo menos 1 letra e 1 número',
+      )
       .required('Senha é obrigatória'),
     confirmarSenha: yup
       .string()
@@ -80,26 +84,35 @@ interface RegistroFormData {
   aceitarTermos: boolean;
 }
 
-// Planos disponíveis
-const PLANOS = [
+interface PlanoCadastro {
+  id: string;
+  nome: string;
+  preco: number;
+  descricao: string;
+  recursos: string[];
+  popular: boolean;
+}
+
+// Fallback local para bootstrap
+const FALLBACK_PLANOS: PlanoCadastro[] = [
   {
     id: 'starter',
     nome: 'Starter',
-    preco: 99,
+    preco: 149,
     descricao: 'Ideal para pequenas empresas',
     recursos: [
       'Até 3 usuários',
       'Até 1.000 clientes',
       'Módulos básicos',
       '5GB de armazenamento',
-      'Suporte por email',
+      'Suporte por e-mail',
     ],
     popular: false,
   },
   {
-    id: 'professional',
-    nome: 'Professional',
-    preco: 299,
+    id: 'business',
+    nome: 'Business',
+    preco: 549,
     descricao: 'Para empresas em crescimento',
     recursos: [
       'Até 10 usuários',
@@ -114,7 +127,7 @@ const PLANOS = [
   {
     id: 'enterprise',
     nome: 'Enterprise',
-    preco: 899,
+    preco: 1790,
     descricao: 'Para grandes operações',
     recursos: [
       'Usuários ilimitados',
@@ -134,22 +147,80 @@ export const RegistroEmpresaPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [planosDisponiveis, setPlanosDisponiveis] = useState<PlanoCadastro[]>(FALLBACK_PLANOS);
+  const [planosLoading, setPlanosLoading] = useState(false);
 
   const {
     register,
     handleSubmit,
     watch,
+    getValues,
     setValue,
     trigger,
     formState: { errors },
   } = useForm<RegistroFormData>({
     resolver: yupResolver(registroSchema),
     defaultValues: {
-      plano: 'professional', // Plano padrão
+      plano: '',
     },
   });
 
   const watchedPlano = watch('plano');
+
+  useEffect(() => {
+    let mounted = true;
+
+    const carregarPlanos = async () => {
+      setPlanosLoading(true);
+
+      try {
+        const planos = await empresaService.obterPlanos();
+        if (!mounted) return;
+
+        const normalizados: PlanoCadastro[] = Array.isArray(planos)
+          ? planos
+              .map((plano, index) => ({
+                id: String(plano?.id || '').trim(),
+                nome: String(plano?.nome || '').trim(),
+                preco: Number(plano?.preco || 0),
+                descricao: String(plano?.descricao || '').trim(),
+                recursos: Array.isArray(plano?.recursos)
+                  ? plano.recursos.map((item) => String(item || '').trim()).filter(Boolean)
+                  : [],
+                popular: String(plano?.id || '').trim().toLowerCase() === 'business' || index === 1,
+              }))
+              .filter((plano) => Boolean(plano.id) && Boolean(plano.nome))
+          : [];
+
+        const fonte = normalizados.length > 0 ? normalizados : FALLBACK_PLANOS;
+        setPlanosDisponiveis(fonte);
+
+        const planoAtual = getValues('plano');
+        if (!planoAtual || !fonte.some((plano) => plano.id === planoAtual)) {
+          const planoPadrao =
+            fonte.find((plano) => plano.id.toLowerCase() === 'business')?.id || fonte[0].id;
+          setValue('plano', planoPadrao, { shouldValidate: true });
+        }
+      } catch {
+        if (!mounted) return;
+        setPlanosDisponiveis(FALLBACK_PLANOS);
+        const planoAtual = getValues('plano');
+        if (!planoAtual) {
+          setValue('plano', 'business', { shouldValidate: true });
+        }
+      } finally {
+        if (mounted) {
+          setPlanosLoading(false);
+        }
+      }
+    };
+
+    void carregarPlanos();
+
+    return () => {
+      mounted = false;
+    };
+  }, [getValues, setValue]);
 
   // Função para buscar CEP
   const buscarCep = async (cep: string) => {
@@ -223,13 +294,13 @@ export const RegistroEmpresaPage: React.FC = () => {
       };
 
       const response = await empresaService.registrarEmpresa(payload);
-
-      toast.success(response.message || 'Empresa registrada com sucesso! 🎉');
-      toast.success('Verifique seu email para ativar a conta.');
+      const precisaVerificarEmail = response?.data?.email_verificado === false;
 
       navigate('/login', {
         state: {
-          message: 'Conta criada com sucesso! Faça login para continuar.',
+          message: precisaVerificarEmail
+            ? 'Conta criada! Verifique seu e-mail para ativar o acesso.'
+            : 'Conta criada com sucesso! Faça login para continuar.',
           email: data.usuario.email,
         },
       });
@@ -237,7 +308,7 @@ export const RegistroEmpresaPage: React.FC = () => {
       console.error('Erro no registro:', error);
       const message =
         error instanceof Error ? error.message : 'Erro ao registrar empresa. Tente novamente.';
-      toast.error(message);
+      toastService.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -245,18 +316,18 @@ export const RegistroEmpresaPage: React.FC = () => {
 
   const renderStep1 = () => (
     <div className="space-y-6">
-      <div className="text-center mb-8">
-        <Building className="w-16 h-16 mx-auto text-[#159A9C] mb-4" />
+      <div className="text-center mb-6">
+        <Building className="w-16 h-16 mx-auto text-[#159A9C] mb-3" />
         <h2 className="text-2xl font-bold text-gray-900">Dados da Empresa</h2>
         <p className="text-gray-600 mt-2">Vamos começar com as informações da sua empresa</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Nome da Empresa *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Nome da empresa *</label>
           <input
             {...register('empresa.nome')}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
             placeholder="Digite o nome da empresa"
           />
           {errors.empresa?.nome && (
@@ -269,7 +340,7 @@ export const RegistroEmpresaPage: React.FC = () => {
           <input
             {...register('empresa.cnpj')}
             onChange={(e) => setValue('empresa.cnpj', formatarCNPJ(e.target.value))}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
             placeholder="XX.XXX.XXX/XXXX-XX"
             maxLength={18}
           />
@@ -280,12 +351,12 @@ export const RegistroEmpresaPage: React.FC = () => {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Email Corporativo *
+            E-mail corporativo *
           </label>
           <input
             {...register('empresa.email')}
             type="email"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
             placeholder="contato@empresa.com"
           />
           {errors.empresa?.email && (
@@ -298,7 +369,7 @@ export const RegistroEmpresaPage: React.FC = () => {
           <input
             {...register('empresa.telefone')}
             onChange={(e) => setValue('empresa.telefone', formatarTelefone(e.target.value))}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
             placeholder="(11) 99999-9999"
             maxLength={15}
           />
@@ -318,7 +389,7 @@ export const RegistroEmpresaPage: React.FC = () => {
                 buscarCep(formatted);
               }
             }}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
             placeholder="XXXXX-XXX"
             maxLength={9}
           />
@@ -331,7 +402,7 @@ export const RegistroEmpresaPage: React.FC = () => {
           <label className="block text-sm font-medium text-gray-700 mb-2">Endereço *</label>
           <input
             {...register('empresa.endereco')}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
             placeholder="Rua, número, bairro"
           />
           {errors.empresa?.endereco && (
@@ -343,7 +414,7 @@ export const RegistroEmpresaPage: React.FC = () => {
           <label className="block text-sm font-medium text-gray-700 mb-2">Cidade *</label>
           <input
             {...register('empresa.cidade')}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
             placeholder="Nome da cidade"
           />
           {errors.empresa?.cidade && (
@@ -355,7 +426,7 @@ export const RegistroEmpresaPage: React.FC = () => {
           <label className="block text-sm font-medium text-gray-700 mb-2">Estado *</label>
           <select
             {...register('empresa.estado')}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
           >
             <option value="">Selecione o estado</option>
             <option value="AC">Acre</option>
@@ -396,18 +467,18 @@ export const RegistroEmpresaPage: React.FC = () => {
 
   const renderStep2 = () => (
     <div className="space-y-6">
-      <div className="text-center mb-8">
-        <User className="w-16 h-16 mx-auto text-[#159A9C] mb-4" />
+      <div className="text-center mb-6">
+        <User className="w-16 h-16 mx-auto text-[#159A9C] mb-3" />
         <h2 className="text-2xl font-bold text-gray-900">Administrador da Conta</h2>
         <p className="text-gray-600 mt-2">Criar o primeiro usuário administrador</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Nome Completo *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Nome completo *</label>
           <input
             {...register('usuario.nome')}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
             placeholder="Digite seu nome completo"
           />
           {errors.usuario?.nome && (
@@ -416,11 +487,11 @@ export const RegistroEmpresaPage: React.FC = () => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">E-mail *</label>
           <input
             {...register('usuario.email')}
             type="email"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
             placeholder="seu@email.com"
           />
           {errors.usuario?.email && (
@@ -433,7 +504,7 @@ export const RegistroEmpresaPage: React.FC = () => {
           <input
             {...register('usuario.telefone')}
             onChange={(e) => setValue('usuario.telefone', formatarTelefone(e.target.value))}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
             placeholder="(11) 99999-9999"
             maxLength={15}
           />
@@ -450,7 +521,7 @@ export const RegistroEmpresaPage: React.FC = () => {
             <input
               {...register('usuario.senha')}
               type={showPassword ? 'text' : 'password'}
-              className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+              className="w-full px-4 py-2.5 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
               placeholder="Mínimo 6 caracteres"
             />
             <button
@@ -467,12 +538,12 @@ export const RegistroEmpresaPage: React.FC = () => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Confirmar Senha *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Confirmar senha *</label>
           <div className="relative">
             <input
               {...register('usuario.confirmarSenha')}
               type={showConfirmPassword ? 'text' : 'password'}
-              className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+              className="w-full px-4 py-2.5 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
               placeholder="Confirme sua senha"
             />
             <button
@@ -493,22 +564,28 @@ export const RegistroEmpresaPage: React.FC = () => {
 
   const renderStep3 = () => (
     <div className="space-y-6">
-      <div className="text-center mb-8">
-        <CreditCard className="w-16 h-16 mx-auto text-[#159A9C] mb-4" />
+      <div className="text-center mb-6">
+        <CreditCard className="w-16 h-16 mx-auto text-[#159A9C] mb-3" />
         <h2 className="text-2xl font-bold text-gray-900">Escolha seu Plano</h2>
         <p className="text-gray-600 mt-2">Selecione o plano ideal para sua empresa</p>
       </div>
 
+      {planosLoading && (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-600">
+          Carregando planos disponíveis...
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {PLANOS.map((plano) => (
+        {planosDisponiveis.map((plano) => (
           <div
             key={plano.id}
-            className={`relative rounded-lg border-2 p-6 cursor-pointer transition-all ${
+            className={`relative rounded-lg border-2 p-5 shadow-sm cursor-pointer transition-all ${
               watchedPlano === plano.id
                 ? 'border-[#159A9C] bg-[#DEEFE7]'
                 : 'border-gray-200 hover:border-gray-300'
             } ${plano.popular ? 'ring-2 ring-[#159A9C] ring-opacity-50' : ''}`}
-            onClick={() => setValue('plano', plano.id)}
+            onClick={() => setValue('plano', plano.id, { shouldValidate: true })}
           >
             {plano.popular && (
               <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
@@ -521,17 +598,19 @@ export const RegistroEmpresaPage: React.FC = () => {
             <div className="text-center">
               <h3 className="text-xl font-bold text-gray-900">{plano.nome}</h3>
               <p className="text-gray-600 mt-2">{plano.descricao}</p>
-              <div className="mt-4">
-                <span className="text-3xl font-bold text-gray-900">R$ {plano.preco}</span>
+              <div className="mt-3">
+                <span className="text-3xl font-bold text-gray-900">
+                  {plano.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </span>
                 <span className="text-gray-600">/mês</span>
               </div>
             </div>
 
-            <div className="mt-6">
-              <ul className="space-y-3">
+            <div className="mt-5">
+              <ul className="space-y-2">
                 {plano.recursos.map((recurso, index) => (
                   <li key={index} className="flex items-center">
-                    <Check className="w-5 h-5 text-green-500 mr-3 flex-shrink-0" />
+                    <Check className="w-4 h-4 text-green-500 mr-3 flex-shrink-0" />
                     <span className="text-gray-700">{recurso}</span>
                   </li>
                 ))}
@@ -542,7 +621,7 @@ export const RegistroEmpresaPage: React.FC = () => {
               {...register('plano')}
               type="radio"
               value={plano.id}
-              className="absolute top-4 right-4 w-5 h-5 text-[#159A9C] focus:ring-[#159A9C]"
+              className="absolute top-3 right-3 w-5 h-5 text-[#159A9C] focus:ring-[#159A9C]"
             />
           </div>
         ))}
@@ -550,14 +629,14 @@ export const RegistroEmpresaPage: React.FC = () => {
 
       {errors.plano && <p className="text-red-500 text-sm text-center">{errors.plano.message}</p>}
 
-      <div className="mt-8">
-        <label className="flex items-center">
+      <div className="mt-6">
+        <label className="flex items-start gap-3">
           <input
             {...register('aceitarTermos')}
             type="checkbox"
-            className="w-5 h-5 text-[#159A9C] focus:ring-[#159A9C] border-gray-300 rounded"
+            className="mt-0.5 w-4 h-4 text-[#159A9C] focus:ring-[#159A9C] border-gray-300 rounded"
           />
-          <span className="ml-3 text-gray-700">
+          <span className="text-sm leading-relaxed text-[#002333]/70">
             Aceito os{' '}
             <a href="/termos" className="text-[#159A9C] hover:underline" target="_blank">
               Termos de Uso
@@ -576,7 +655,7 @@ export const RegistroEmpresaPage: React.FC = () => {
   );
 
   const renderStepIndicator = () => (
-    <div className="flex items-center justify-center mb-8">
+    <div className="flex items-center justify-center mb-6">
       {[1, 2, 3].map((step) => (
         <React.Fragment key={step}>
           <div
@@ -597,21 +676,21 @@ export const RegistroEmpresaPage: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#DEEFE7] to-white py-12">
+    <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
         {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-[#002333] mb-4">Criar Conta Empresarial</h1>
-          <p className="text-xl text-gray-600">
-            Junte-se a milhares de empresas que já usam o Fênix CRM
-          </p>
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center mb-5">
+            <Conect360Logo size="xl" variant="full" className="w-auto" />
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-[#002333] mb-2">Criar Conta Empresarial</h1>
         </div>
 
         {/* Step Indicator */}
         {renderStepIndicator()}
 
         {/* Form */}
-        <div className="bg-white rounded-lg shadow-lg p-8">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <form onSubmit={handleSubmit(onSubmit)}>
             {currentStep === 1 && renderStep1()}
             {currentStep === 2 && renderStep2()}
@@ -622,7 +701,7 @@ export const RegistroEmpresaPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
-                className={`px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 ${
+                className={`px-4 py-2 bg-white text-[#002333] border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium ${
                   currentStep === 1 ? 'invisible' : ''
                 }`}
               >
@@ -666,10 +745,10 @@ export const RegistroEmpresaPage: React.FC = () => {
                     if (valido) {
                       setCurrentStep(currentStep + 1);
                     } else {
-                      toast.error('Preencha os campos obrigatórios antes de continuar.');
+                      toastService.error('Preencha os campos obrigatórios antes de continuar.');
                     }
                   }}
-                  className="px-6 py-3 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] flex items-center gap-2"
+                  className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors flex items-center gap-2 text-sm font-medium"
                 >
                   Próximo
                   <ArrowRight className="w-4 h-4" />
@@ -678,7 +757,7 @@ export const RegistroEmpresaPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-8 py-3 bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white rounded-lg hover:shadow-lg flex items-center gap-2 disabled:opacity-50"
+                  className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
                 >
                   {isSubmitting ? (
                     <>
@@ -699,7 +778,7 @@ export const RegistroEmpresaPage: React.FC = () => {
 
         {/* Footer */}
         <div className="text-center mt-8">
-          <p className="text-gray-600">
+            <p className="text-[#002333]/70">
             Já tem uma conta?{' '}
             <button
               onClick={() => navigate('/login')}

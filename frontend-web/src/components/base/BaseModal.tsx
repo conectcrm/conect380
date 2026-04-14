@@ -11,6 +11,7 @@ interface BaseModalProps {
   showCloseButton?: boolean;
   overlayClassName?: string;
   modalClassName?: string;
+  placement?: 'center' | 'right-drawer' | 'page';
 }
 
 /**
@@ -51,7 +52,21 @@ export const BaseModal: React.FC<BaseModalProps> = ({
   showCloseButton = true,
   overlayClassName = '',
   modalClassName = '',
+  placement = 'center',
 }) => {
+  const maxWidthValues: Record<NonNullable<BaseModalProps['maxWidth']>, string> = {
+    sm: '24rem',
+    md: '28rem',
+    lg: '32rem',
+    xl: '36rem',
+    '2xl': '42rem',
+    '3xl': '48rem',
+    '4xl': '56rem',
+    '5xl': '64rem',
+    '6xl': '72rem',
+    '7xl': '80rem',
+  };
+
   const handleKeyDown = React.useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -61,32 +76,62 @@ export const BaseModal: React.FC<BaseModalProps> = ({
     [onClose],
   );
 
+  const isRightDrawer = placement === 'right-drawer';
+  const isPage = placement === 'page';
+
   React.useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !isPage) {
       document.addEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'hidden';
     }
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = 'unset';
+      if (!isPage) {
+        document.body.style.overflow = 'unset';
+      }
     };
-  }, [isOpen, handleKeyDown]);
+  }, [isOpen, handleKeyDown, isPage]);
 
   if (!isOpen) return null;
+  if (isPage) {
+    return (
+      <div className={`w-full ${overlayClassName}`}>
+        <div
+          className={`
+            relative w-full overflow-hidden
+            bg-white rounded-2xl
+            border border-[#B4BEC9]/35 shadow-sm
+            ${modalClassName}
+          `}
+        >
+          <div className="flex items-center justify-between border-b border-[#B4BEC9]/30 bg-gradient-to-r from-[#159A9C] to-[#1BB5B8] p-6">
+            <div className="flex-1">
+              <h2 className="text-xl font-bold text-white">{title}</h2>
+              {subtitle && <p className="text-sm text-white/80 mt-1">{subtitle}</p>}
+            </div>
 
-  const maxWidthClasses = {
-    sm: 'max-w-sm',
-    md: 'max-w-md',
-    lg: 'max-w-lg',
-    xl: 'max-w-xl',
-    '2xl': 'max-w-2xl',
-    '3xl': 'max-w-3xl',
-    '4xl': 'max-w-4xl',
-    '5xl': 'max-w-5xl',
-    '6xl': 'max-w-6xl',
-    '7xl': 'max-w-7xl',
-  };
+            {showCloseButton && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="
+                  ml-4 p-2 text-white/80 hover:text-white
+                  hover:bg-white/10 rounded-lg transition-all duration-200
+                  focus:outline-none focus:ring-2 focus:ring-white/30
+                "
+                aria-label="Fechar modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
+          </div>
+
+          <div>{children}</div>
+        </div>
+      </div>
+    );
+  }
 
   const handleOverlayClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
@@ -96,18 +141,28 @@ export const BaseModal: React.FC<BaseModalProps> = ({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm transition-opacity duration-300 ${overlayClassName}`}
+      className={`fixed inset-0 z-50 flex bg-black bg-opacity-50 backdrop-blur-sm transition-opacity duration-300 ${
+        isRightDrawer ? 'items-stretch justify-end p-0' : 'items-center justify-center p-4'
+      } ${overlayClassName}`}
       onClick={handleOverlayClick}
     >
       <div
         className={`
-          relative w-full ${maxWidthClasses[maxWidth]} 
-          bg-white rounded-xl shadow-2xl 
-          transform transition-all duration-300 scale-100
+          relative bg-white shadow-2xl
+          transform transition-all duration-300
           border border-gray-200
+          ${
+            isRightDrawer
+              ? 'h-full w-full rounded-none border-y-0 border-r-0'
+              : 'w-full rounded-xl scale-100'
+          }
           ${modalClassName}
         `}
-        style={{ maxHeight: '90vh' }}
+        style={
+          isRightDrawer
+            ? { maxHeight: '100vh', maxWidth: maxWidthValues[maxWidth], width: '100%' }
+            : { maxHeight: '90vh', maxWidth: maxWidthValues[maxWidth] }
+        }
       >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-[#159A9C] to-[#1BB5B8]">
@@ -133,7 +188,10 @@ export const BaseModal: React.FC<BaseModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto" style={{ maxHeight: 'calc(90vh - 140px)' }}>
+        <div
+          className="overflow-y-auto"
+          style={{ maxHeight: isRightDrawer ? 'calc(100vh - 140px)' : 'calc(90vh - 140px)' }}
+        >
           {children}
         </div>
       </div>

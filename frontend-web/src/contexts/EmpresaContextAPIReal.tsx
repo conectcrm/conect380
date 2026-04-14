@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useNotifications } from './NotificationContext';
 import { useAuth } from './AuthContext';
+import { authService } from '../services/authService';
 import {
   minhasEmpresasService,
   EmpresaCompleta,
@@ -19,6 +20,9 @@ interface EmpresaContextType {
   empresaAtiva: EmpresaInfo | null;
   loading: boolean;
   switchEmpresa: (empresaId: string) => Promise<void>;
+  suspenderEmpresa: (empresaId: string, motivo: string) => Promise<void>;
+  reativarEmpresa: (empresaId: string) => Promise<void>;
+  cancelarServicoEmpresa: (empresaId: string, dataFim?: string) => Promise<void>;
   refreshEmpresas: () => Promise<void>;
   addEmpresa: (empresa: NovaEmpresaRequest) => Promise<void>;
   updateEmpresa: (empresaId: string, updates: Partial<EmpresaInfo>) => Promise<void>;
@@ -45,7 +49,7 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { addNotification } = useNotifications();
-  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { isAuthenticated, isLoading: isAuthLoading, updateUser } = useAuth();
 
   // Carregar empresas do usuário
   const loadEmpresas = useCallback(async () => {
@@ -121,11 +125,21 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
 
         setEmpresaAtiva({ ...empresa, isActive: true });
 
+        try {
+          const profileResponse = await authService.getProfile();
+          if (profileResponse?.success && profileResponse?.data) {
+            updateUser(profileResponse.data);
+          }
+        } catch (profileError) {
+          console.warn('[EmpresaContext] Falha ao sincronizar perfil apos switch de empresa:', profileError);
+        }
+
         addNotification({
           type: 'success',
           title: 'Empresa alterada',
           message: `Agora você está trabalhando com ${empresa.nome}`,
           priority: 'medium',
+          browser: false,
         });
       }
     } catch (error: any) {
@@ -134,6 +148,72 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
         type: 'error',
         title: 'Erro ao alterar empresa',
         message: error.message || 'Não foi possível alterar a empresa. Tente novamente.',
+        priority: 'high',
+      });
+      throw error;
+    }
+  };
+
+  const suspenderEmpresa = async (empresaId: string, motivo: string) => {
+    try {
+      await minhasEmpresasService.suspenderEmpresa(empresaId, motivo);
+      await loadEmpresas();
+      addNotification({
+        type: 'success',
+        title: 'Empresa suspensa',
+        message: 'A empresa foi suspensa com sucesso.',
+        priority: 'medium',
+      });
+    } catch (error: any) {
+      console.error('Erro ao suspender empresa:', error);
+      addNotification({
+        type: 'error',
+        title: 'Erro ao suspender empresa',
+        message: error.message || 'Nao foi possivel suspender a empresa.',
+        priority: 'high',
+      });
+      throw error;
+    }
+  };
+
+  const reativarEmpresa = async (empresaId: string) => {
+    try {
+      await minhasEmpresasService.reativarEmpresa(empresaId);
+      await loadEmpresas();
+      addNotification({
+        type: 'success',
+        title: 'Empresa reativada',
+        message: 'A empresa foi reativada com sucesso.',
+        priority: 'medium',
+      });
+    } catch (error: any) {
+      console.error('Erro ao reativar empresa:', error);
+      addNotification({
+        type: 'error',
+        title: 'Erro ao reativar empresa',
+        message: error.message || 'Nao foi possivel reativar a empresa.',
+        priority: 'high',
+      });
+      throw error;
+    }
+  };
+
+  const cancelarServicoEmpresa = async (empresaId: string, dataFim?: string) => {
+    try {
+      await minhasEmpresasService.cancelarServicoEmpresa(empresaId, dataFim);
+      await loadEmpresas();
+      addNotification({
+        type: 'success',
+        title: 'Servico cancelado',
+        message: 'A assinatura da empresa foi cancelada com sucesso.',
+        priority: 'medium',
+      });
+    } catch (error: any) {
+      console.error('Erro ao cancelar servico da empresa:', error);
+      addNotification({
+        type: 'error',
+        title: 'Erro ao cancelar servico',
+        message: error.message || 'Nao foi possivel cancelar o servico da empresa.',
         priority: 'high',
       });
       throw error;
@@ -299,6 +379,9 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
     empresaAtiva,
     loading,
     switchEmpresa,
+    suspenderEmpresa,
+    reativarEmpresa,
+    cancelarServicoEmpresa,
     refreshEmpresas,
     addEmpresa,
     updateEmpresa,

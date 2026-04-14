@@ -102,6 +102,11 @@ docker build `
   -t conectcrm-frontend:latest `
   -t conectcrm-frontend:$(Get-Date -Format "yyyyMMdd-HHmmss") `
   --build-arg REACT_APP_API_URL="http://localhost:3500" `
+  --build-arg REACT_APP_FINANCEIRO_BOLETO_ENABLED="$env:REACT_APP_FINANCEIRO_BOLETO_ENABLED" `
+  --build-arg REACT_APP_PAGAMENTOS_GATEWAY_ENABLED_PROVIDERS="$env:REACT_APP_PAGAMENTOS_GATEWAY_ENABLED_PROVIDERS" `
+  --build-arg REACT_APP_PAGAMENTOS_GATEWAY_ALLOW_UNIMPLEMENTED="$env:REACT_APP_PAGAMENTOS_GATEWAY_ALLOW_UNIMPLEMENTED" `
+  --build-arg REACT_APP_MVP_MODE="$env:REACT_APP_MVP_MODE" `
+  --build-arg REACT_APP_ENABLE_OMNICHANNEL="$env:REACT_APP_ENABLE_OMNICHANNEL" `
   ..
 
 Pop-Location

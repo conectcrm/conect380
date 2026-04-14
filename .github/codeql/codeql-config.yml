@@ -1,0 +1,4 @@
+name: conect360-codeql-config
+
+paths-ignore:
+  - templates/PageTemplate/**

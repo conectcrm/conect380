@@ -1,5 +1,29 @@
 # 🎯 ROADMAP - Módulo de Leads CRM
 
+## Status do documento
+
+Documento historico de planejamento inicial.
+
+Nao usar este arquivo como unica fonte de verdade para o estado atual do modulo de Leads.
+
+Motivo:
+
+1. este roadmap foi escrito quando Leads ainda era tratado como gap funcional;
+2. o backend atual ja possui evidencias de implementacao e validacao que superam este retrato inicial.
+
+Referencias mais confiaveis para o estado atual:
+
+1. `backend/docs/AUDITORIA_ENTITIES_MULTI_TENANCY.md`
+2. `backend/docs/TESTE_E2E_MULTI_TENANCY_RESULTADOS.md`
+3. `docs/handbook/MATRIZ_COBERTURA_REQUISITOS_2026-03.md`
+4. `docs/features/CRM-LEADS-001_CONTRATO_FUNCIONAL_MODULO_LEADS_2026-03.md`
+
+Uso recomendado deste arquivo:
+
+1. contexto historico de intencao de produto;
+2. comparacao entre plano inicial e estado atual;
+3. contexto complementar ao contrato vigente de Leads publicado em `docs/features/CRM-LEADS-001_CONTRATO_FUNCIONAL_MODULO_LEADS_2026-03.md`.
+
 **Data de Criação**: 12 de novembro de 2025  
 **Objetivo**: Implementar módulo completo de Leads para fechar o ciclo do funil de vendas  
 **Prioridade**: 🔴 **CRÍTICA**  

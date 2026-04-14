@@ -22,15 +22,19 @@ import { FinanceiroModule } from './modules/financeiro/financeiro.module';
 import { FaturamentoModule } from './modules/faturamento/faturamento.module';
 import { CotacaoModule } from './cotacao/cotacao.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { DashboardV2Module } from './modules/dashboard-v2/dashboard-v2.module';
 import { OportunidadesModule } from './modules/oportunidades/oportunidades.module';
 import { EmpresasModule } from './empresas/empresas.module';
 import { MetasModule } from './modules/metas/metas.module';
 import { PlanosModule } from './modules/planos/planos.module';
 import { EventosModule } from './modules/eventos/eventos.module';
+import { AgendaModule } from './modules/agenda/agenda.module';
 import { AtendimentoModule } from './modules/atendimento/atendimento.module';
 import { IAModule } from './modules/ia/ia.module';
 import { TriagemModule } from './modules/triagem/triagem.module';
 import { LeadsModule } from './modules/leads/leads.module';
+import { InteracoesModule } from './modules/interacoes/interacoes.module';
+import { CategoriasProdutosModule } from './modules/categorias-produtos/categorias-produtos.module';
 import { SearchModule } from './search/search.module';
 import { AssinaturaMiddleware } from './modules/common/assinatura.middleware';
 import { HealthController } from './health/health.controller';
@@ -40,13 +44,27 @@ import { BullModule } from '@nestjs/bull';
 import { PagamentosModule } from './modules/pagamentos/pagamentos.module';
 import { NotificationModule } from './notifications/notification.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
+import { SystemBrandingModule } from './modules/system-branding/system-branding.module';
+import { CoreAdminModule } from './modules/core-admin/core-admin.module';
+import { CatalogoModule } from './modules/catalogo/catalogo.module';
+import { VehicleInventoryModule } from './modules/vehicle-inventory/vehicle-inventory.module';
+import { ComissoesModule } from './modules/comissoes/comissoes.module';
+
+const nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
+const isProduction = nodeEnv === 'production';
+const throttlerShortLimit = isProduction ? 10 : 200;
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       // Usa caminho absoluto para não depender do cwd (evita cair em defaults de outro DB)
-      envFilePath: path.resolve(__dirname, '..', '.env'),
+      envFilePath: [
+        path.resolve(process.cwd(), '.env'),
+        path.resolve(process.cwd(), 'backend', '.env'),
+        path.resolve(__dirname, '..', '.env'),
+        path.resolve(__dirname, '..', '..', '.env'),
+      ],
     }),
     // 📊 Winston Logger: Logs estruturados e rotação automática
     WinstonModule.forRoot(winstonConfig),
@@ -64,7 +82,7 @@ import { MetricsModule } from './modules/metrics/metrics.module';
       {
         name: 'short',
         ttl: 1000, // 1 segundo
-        limit: 10, // 10 requisições por segundo
+        limit: throttlerShortLimit, // 10 req/s em produção | 200 req/s em desenvolvimento
       },
       {
         name: 'medium',
@@ -87,19 +105,28 @@ import { MetricsModule } from './modules/metrics/metrics.module';
     FaturamentoModule,
     CotacaoModule,
     DashboardModule,
+    DashboardV2Module,
     OportunidadesModule,
     EmpresasModule,
     MetasModule,
     PlanosModule,
     EventosModule,
+    AgendaModule,
     AtendimentoModule,
     IAModule,
     TriagemModule,
     LeadsModule,
+    InteracoesModule,
+    CategoriasProdutosModule,
     SearchModule,
     PagamentosModule,
     NotificationModule,
     MetricsModule, // 📊 Prometheus metrics endpoint
+    SystemBrandingModule,
+    CoreAdminModule,
+    CatalogoModule,
+    VehicleInventoryModule,
+    ComissoesModule,
   ],
   controllers: [HealthController, RateLimitController], // 📊 Health + Rate Limit monitoring
   providers: [
@@ -123,6 +150,13 @@ import { MetricsModule } from './modules/metrics/metrics.module';
   ],
 })
 export class AppModule implements NestModule {
+  private resolveCoreAdminDocsPath(): string {
+    const rawPath = process.env.CORE_ADMIN_DOCS_PATH?.trim() || 'core-admin-docs';
+
+    const sanitizedPath = rawPath.replace(/^\/+|\/+$/g, '').toLowerCase();
+    return sanitizedPath || 'core-admin-docs';
+  }
+
   configure(consumer: MiddlewareConsumer) {
     // 🔗 Correlation ID (primeiro middleware - gera ID para toda requisição)
     consumer.apply(CorrelationIdMiddleware).forRoutes('*');
@@ -130,10 +164,23 @@ export class AppModule implements NestModule {
     // 🔒 HTTPS Redirect (Força HTTPS em produção)
     consumer.apply(HttpsRedirectMiddleware).forRoutes('*');
 
+    const coreAdminDocsPath = this.resolveCoreAdminDocsPath();
+
     // Middleware de verificação de assinatura
     consumer
       .apply(AssinaturaMiddleware)
-      .exclude('/auth/(.*)', '/planos/(.*)', '/assinaturas/(.*)', '/health', '/docs')
+      .exclude(
+        '/auth/(.*)',
+        '/planos/(.*)',
+        '/assinaturas/(.*)',
+        '/core-admin',
+        '/core-admin/(.*)',
+        '/health',
+        '/api-docs',
+        `/${coreAdminDocsPath}`,
+        `/${coreAdminDocsPath}-json`,
+        '/docs',
+      )
       .forRoutes('*');
   }
 }

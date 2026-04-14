@@ -25,7 +25,9 @@ import {
   XCircle,
 } from 'lucide-react';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
-import toast from 'react-hot-toast';
+import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
+import { toastService } from '../../../services/toastService';
+import { SectionCard } from '../../../components/layout-v2';
 
 // Tipos locais
 interface DashboardCards {
@@ -36,6 +38,7 @@ interface DashboardCards {
 }
 
 function DepartamentosPage() {
+  const { confirm } = useGlobalConfirmation();
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [modalCadastroAberto, setModalCadastroAberto] = useState(false);
@@ -93,7 +96,7 @@ function DepartamentosPage() {
       calcularDashboard(dados);
     } catch (error) {
       console.error('Erro ao carregar departamentos:', error);
-      toast.error('Erro ao carregar departamentos');
+      toastService.error('Erro ao carregar departamentos');
     } finally {
       setCarregando(false);
     }
@@ -132,19 +135,21 @@ function DepartamentosPage() {
 
   const handleSalvarDepartamento = () => {
     carregarDepartamentos();
-    toast.success('Departamento salvo com sucesso!');
+    toastService.success('Departamento salvo com sucesso!');
   };
 
   const excluirDepartamento = async (id: string) => {
-    if (window.confirm('Tem certeza que deseja excluir este departamento?')) {
-      try {
-        await departamentoService.remover(id);
-        carregarDepartamentos();
-        toast.success('Departamento excluído com sucesso!');
-      } catch (error) {
-        console.error('Erro ao excluir departamento:', error);
-        toast.error('Erro ao excluir departamento');
-      }
+    if (!(await confirm('Tem certeza que deseja excluir este departamento?'))) {
+      return;
+    }
+
+    try {
+      await departamentoService.remover(id);
+      carregarDepartamentos();
+      toastService.success('Departamento excluído com sucesso!');
+    } catch (error) {
+      console.error('Erro ao excluir departamento:', error);
+      toastService.error('Erro ao excluir departamento');
     }
   };
 
@@ -152,10 +157,10 @@ function DepartamentosPage() {
     try {
       await departamentoService.alterarStatus(id, ativo);
       carregarDepartamentos();
-      toast.success(`Departamento ${ativo ? 'ativado' : 'desativado'} com sucesso!`);
+      toastService.success(`Departamento ${ativo ? 'ativado' : 'desativado'} com sucesso!`);
     } catch (error) {
       console.error('Erro ao alterar status:', error);
-      toast.error('Erro ao alterar status do departamento');
+      toastService.error('Erro ao alterar status do departamento');
     }
   };
 
@@ -188,16 +193,18 @@ function DepartamentosPage() {
   const mostrarAcoesMassa = departamentosSelecionados.length > 0;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="space-y-4 pt-1 sm:pt-2">
       {/* Header */}
-      <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus nucleusName="Configurações" nucleusPath="/nuclei/configuracoes" />
+      <div className="px-2 sm:px-0">
+        <SectionCard className="px-4 py-3">
+          <BackToNucleus nucleusName="Configurações" nucleusPath="/nuclei/configuracoes" />
+        </SectionCard>
       </div>
 
-      <div className="p-6">
+      <div className="px-2 sm:px-0">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
-          <div className="bg-white rounded-lg shadow-sm border mb-6">
+          <SectionCard className="mb-6">
             <div className="px-6 py-6">
               <div className="flex flex-col sm:flex-row justify-between items-start">
                 <div>
@@ -225,7 +232,7 @@ function DepartamentosPage() {
                 </div>
               </div>
             </div>
-          </div>
+          </SectionCard>
 
           {/* Dashboard Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
@@ -299,7 +306,7 @@ function DepartamentosPage() {
           </div>
 
           {/* Filtros e Busca */}
-          <div className="bg-white rounded-lg shadow-sm border mb-6 p-6">
+          <SectionCard className="mb-6 p-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {/* Busca */}
               <div className="md:col-span-2">
@@ -379,10 +386,10 @@ function DepartamentosPage() {
                 </div>
               </div>
             )}
-          </div>
+          </SectionCard>
 
           {/* Lista de Departamentos */}
-          <div className="bg-white rounded-lg shadow-sm border">
+          <SectionCard>
             {carregando ? (
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#159A9C]"></div>
@@ -538,7 +545,7 @@ function DepartamentosPage() {
                 ))}
               </div>
             )}
-          </div>
+          </SectionCard>
         </div>
       </div>
 

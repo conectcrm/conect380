@@ -14,13 +14,17 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { NotaClienteService } from '../services/nota-cliente.service';
 import { CreateNotaClienteDto } from '../dto/create-nota-cliente.dto';
 import { UpdateNotaClienteDto } from '../dto/update-nota-cliente.dto';
 
 @ApiTags('Notas Cliente')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.ATENDIMENTO_CHATS_READ)
 @Controller('notas')
 export class NotaClienteController {
   private readonly logger = new Logger(NotaClienteController.name);
@@ -28,6 +32,7 @@ export class NotaClienteController {
   constructor(private readonly notaService: NotaClienteService) {}
 
   @Post()
+  @Permissions(Permission.ATENDIMENTO_CHATS_REPLY)
   @ApiOperation({ summary: 'Criar nova nota para cliente/ticket' })
   async criar(@Body() dto: CreateNotaClienteDto, @Request() req, @EmpresaId() empresaId: string) {
     this.logger.log(`Criando nota - User: ${req.user.email}`);
@@ -60,6 +65,7 @@ export class NotaClienteController {
   }
 
   @Patch(':id')
+  @Permissions(Permission.ATENDIMENTO_CHATS_REPLY)
   @ApiOperation({ summary: 'Atualizar conteudo ou flag importante' })
   async atualizar(
     @Param('id') id: string,
@@ -70,6 +76,7 @@ export class NotaClienteController {
   }
 
   @Patch(':id/importante')
+  @Permissions(Permission.ATENDIMENTO_CHATS_REPLY)
   @ApiOperation({ summary: 'Marcar ou desmarcar nota como importante' })
   async toggleImportante(
     @Param('id') id: string,
@@ -84,6 +91,7 @@ export class NotaClienteController {
   }
 
   @Delete(':id')
+  @Permissions(Permission.ATENDIMENTO_CHATS_REPLY)
   @ApiOperation({ summary: 'Deletar nota' })
   async deletar(@Param('id') id: string, @EmpresaId() empresaId: string) {
     await this.notaService.deletar(id, empresaId);

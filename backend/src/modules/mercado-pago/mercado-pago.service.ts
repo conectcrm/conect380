@@ -1,11 +1,46 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+  forwardRef,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MercadoPagoConfig, Customer, Preference, Payment } from 'mercadopago';
 import * as crypto from 'crypto';
 import { Repository } from 'typeorm';
-import { AssinaturaEmpresa } from '../planos/entities/assinatura-empresa.entity';
+import {
+  AssinaturaEmpresa,
+  CanonicalAssinaturaStatus,
+  toCanonicalAssinaturaStatus,
+} from '../planos/entities/assinatura-empresa.entity';
+import { canTransitionSubscriptionStatus } from '../planos/subscription-state-machine';
 import { runWithTenant } from '../../common/tenant/tenant-context';
+import { BillingEvent } from '../faturamento/entities/billing-event.entity';
+import { Fatura, FormaPagamento } from '../faturamento/entities/fatura.entity';
+import { Pagamento, StatusPagamento, TipoPagamento } from '../faturamento/entities/pagamento.entity';
+import { PagamentoService } from '../faturamento/services/pagamento.service';
+import { EmpresaModuloService } from '../empresas/services/empresa-modulo.service';
+
+type ReconciliationSource = 'manual' | 'batch' | 'webhook_duplicate';
+type ReconciliationAction = 'updated' | 'aligned' | 'skipped' | 'error';
+type ExternalReferenceResolution =
+  | { kind: 'assinatura'; empresaId: string; assinaturaId: string }
+  | { kind: 'fatura'; empresaId: string; faturaId: number; referenciaGateway: string };
+
+export type PaymentReconciliationResult = {
+  paymentId: string;
+  source: ReconciliationSource;
+  action: ReconciliationAction;
+  paymentStatus?: string;
+  empresaId?: string;
+  assinaturaId?: string;
+  fromStatus?: CanonicalAssinaturaStatus;
+  toStatus?: CanonicalAssinaturaStatus;
+  reason?: string;
+};
 
 @Injectable()
 export class MercadoPagoService {
@@ -19,8 +54,44 @@ export class MercadoPagoService {
     private configService: ConfigService,
     @InjectRepository(AssinaturaEmpresa)
     private readonly assinaturaRepository: Repository<AssinaturaEmpresa>,
+    @InjectRepository(BillingEvent)
+    private readonly billingEventRepository: Repository<BillingEvent>,
+    @InjectRepository(Fatura)
+    private readonly faturaRepository: Repository<Fatura>,
+    @InjectRepository(Pagamento)
+    private readonly pagamentoRepository: Repository<Pagamento>,
+    @Inject(forwardRef(() => PagamentoService))
+    private readonly pagamentoService: PagamentoService,
+    @Inject(forwardRef(() => EmpresaModuloService))
+    private readonly empresaModuloService: EmpresaModuloService,
   ) {
     this.initializeMercadoPago();
+  }
+
+  private extractPlanoModuleCodes(assinatura: AssinaturaEmpresa): string[] {
+    return (assinatura?.plano?.modulosInclusos || [])
+      .map((item: any) => String(item?.modulo?.codigo || '').trim())
+      .filter(Boolean);
+  }
+
+  private async sincronizarModulosAssinatura(
+    empresaId: string,
+    assinatura: AssinaturaEmpresa,
+    origem: string,
+  ): Promise<void> {
+    const modulosPlano = this.extractPlanoModuleCodes(assinatura);
+    if (modulosPlano.length === 0) {
+      this.logger.warn(
+        `Assinatura ${assinatura?.id || 'n/a'} sem modulos vinculados para sincronizacao (${origem})`,
+      );
+      return;
+    }
+
+    await this.empresaModuloService.sincronizarModulosPlano(
+      empresaId,
+      modulosPlano,
+      assinatura?.plano?.codigo || null,
+    );
   }
 
   private parseExternalReference(externalReference?: string):
@@ -38,6 +109,631 @@ export class MercadoPagoService {
     }
 
     return { empresaId: match[1], assinaturaId: match[2] };
+  }
+
+  private parseFaturaExternalReference(
+    externalReference?: string,
+  ): { empresaId: string; faturaId: number; referenciaGateway: string } | null {
+    if (!externalReference || typeof externalReference !== 'string') {
+      return null;
+    }
+
+    const valorNormalizado = externalReference.trim();
+    const match = /^fatura:([0-9a-f-]{36}):(\d+)$/i.exec(valorNormalizado);
+
+    if (!match) {
+      return null;
+    }
+
+    const faturaId = Number.parseInt(match[2], 10);
+    if (!Number.isInteger(faturaId) || faturaId <= 0) {
+      return null;
+    }
+
+    return {
+      empresaId: match[1],
+      faturaId,
+      referenciaGateway: valorNormalizado,
+    };
+  }
+
+  private resolveExternalReference(externalReference?: string): ExternalReferenceResolution | null {
+    const assinatura = this.parseExternalReference(externalReference);
+    if (assinatura) {
+      return { kind: 'assinatura', ...assinatura };
+    }
+
+    const fatura = this.parseFaturaExternalReference(externalReference);
+    if (fatura) {
+      return { kind: 'fatura', ...fatura };
+    }
+
+    return null;
+  }
+
+  private resolveWebhookResourceId(webhookData: any): string | undefined {
+    const directId = webhookData?.data?.id ?? webhookData?.id;
+    if (directId !== undefined && directId !== null) {
+      return String(directId);
+    }
+
+    const resource = webhookData?.resource;
+    if (typeof resource !== 'string' || !resource.trim()) {
+      return undefined;
+    }
+
+    const candidate = resource
+      .trim()
+      .split('?')[0]
+      .split('/')
+      .filter(Boolean)
+      .pop();
+
+    if (!candidate) {
+      return undefined;
+    }
+
+    try {
+      return decodeURIComponent(candidate);
+    } catch {
+      return candidate;
+    }
+  }
+
+  private async registerPaymentWebhookEvent(
+    payment: any,
+    action: string,
+    resolvedReference?: ExternalReferenceResolution | null,
+  ): Promise<boolean> {
+    const resolved =
+      resolvedReference || this.resolveExternalReference(payment?.external_reference);
+    if (!resolved) {
+      return false;
+    }
+
+    const paymentStatus = String(payment?.status || 'unknown')
+      .trim()
+      .toLowerCase();
+    const paymentAction = String(action || 'updated')
+      .trim()
+      .toLowerCase();
+
+    const aggregateId = `${payment?.id || 'unknown'}:${paymentStatus}:${paymentAction}`.slice(0, 120);
+    const correlationId = `mp:${payment?.id || 'unknown'}:${paymentAction}`.slice(0, 120);
+
+    try {
+      await this.billingEventRepository.insert({
+        empresaId: resolved.empresaId,
+        aggregateType: 'mercadopago.payment.webhook',
+        aggregateId,
+        eventType: 'received',
+        source: 'mercadopago',
+        status: 'processed',
+        payload: {
+          paymentId: payment?.id || null,
+          paymentStatus,
+          action: paymentAction,
+          referenciaTipo: resolved.kind,
+          assinaturaId: resolved.kind === 'assinatura' ? resolved.assinaturaId : null,
+          faturaId: resolved.kind === 'fatura' ? resolved.faturaId : null,
+        },
+        correlationId,
+      });
+
+      return false;
+    } catch (error) {
+      if ((error as any)?.code === '23505') {
+        this.logger.warn(
+          `Webhook duplicado ignorado payment=${payment?.id} status=${paymentStatus} action=${paymentAction}`,
+        );
+        return true;
+      }
+
+      throw error;
+    }
+  }
+
+  private toBoundedInteger(value: unknown, fallback: number, min: number, max: number): number {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return fallback;
+    }
+    const rounded = Math.floor(parsed);
+    return Math.min(Math.max(rounded, min), max);
+  }
+
+  private mapPaymentStatusToSubscriptionStatus(
+    paymentStatusRaw: unknown,
+  ): CanonicalAssinaturaStatus | undefined {
+    const paymentStatus = String(paymentStatusRaw || '')
+      .trim()
+      .toLowerCase();
+
+    if (!paymentStatus) {
+      return undefined;
+    }
+
+    if (
+      [
+        'approved',
+        'authorized',
+        'paid',
+        'succeeded',
+        'success',
+      ].includes(paymentStatus)
+    ) {
+      return 'active';
+    }
+
+    if (
+      ['rejected', 'refused', 'denied', 'cancelled', 'canceled'].includes(
+        paymentStatus,
+      )
+    ) {
+      return 'past_due';
+    }
+
+    if (['refunded', 'charged_back', 'chargeback'].includes(paymentStatus)) {
+      return 'suspended';
+    }
+
+    return undefined;
+  }
+
+  private mapPaymentStatusToInvoicePaymentStatus(
+    paymentStatusRaw: unknown,
+  ): StatusPagamento | undefined {
+    const paymentStatus = String(paymentStatusRaw || '')
+      .trim()
+      .toLowerCase();
+
+    if (!paymentStatus) {
+      return undefined;
+    }
+
+    if (['approved', 'authorized', 'paid', 'succeeded', 'success'].includes(paymentStatus)) {
+      return StatusPagamento.APROVADO;
+    }
+
+    if (['pending'].includes(paymentStatus)) {
+      return StatusPagamento.PENDENTE;
+    }
+
+    if (['in_process', 'in_mediation', 'processing', 'under_review'].includes(paymentStatus)) {
+      return StatusPagamento.PROCESSANDO;
+    }
+
+    if (['rejected', 'refused', 'denied'].includes(paymentStatus)) {
+      return StatusPagamento.REJEITADO;
+    }
+
+    if (['cancelled', 'canceled'].includes(paymentStatus)) {
+      return StatusPagamento.CANCELADO;
+    }
+
+    if (['refunded', 'charged_back', 'chargeback'].includes(paymentStatus)) {
+      return StatusPagamento.ESTORNADO;
+    }
+
+    return undefined;
+  }
+
+  private extractPaymentAmount(payment: any): number {
+    const candidates = [
+      payment?.transaction_amount,
+      payment?.transaction_details?.total_paid_amount,
+      payment?.transaction_details?.net_received_amount,
+    ];
+
+    for (const candidate of candidates) {
+      const parsed = Number(candidate);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        return Number(parsed.toFixed(2));
+      }
+    }
+
+    return 0;
+  }
+
+  private isPagamentoNotFoundError(error: unknown): boolean {
+    if (error instanceof NotFoundException) {
+      return true;
+    }
+    const mensagem = String((error as any)?.message || '').toLowerCase();
+    return mensagem.includes('pagamento') && mensagem.includes('encontr');
+  }
+
+  private gerarTransacaoPagamentoWebhook(paymentId: string): string {
+    const normalizado = String(paymentId || 'mp')
+      .replace(/[^a-z0-9_-]/gi, '')
+      .slice(0, 32)
+      .toUpperCase();
+    const sufixo = Date.now().toString(36).toUpperCase();
+    return `MP-${normalizado || 'WEBHOOK'}-${sufixo}`;
+  }
+
+  private async garantirPagamentoPendenteFatura(params: {
+    empresaId: string;
+    faturaId: number;
+    referenciaGateway: string;
+    payment: any;
+  }): Promise<void> {
+    const { empresaId, faturaId, referenciaGateway, payment } = params;
+    const existente = await this.pagamentoRepository.findOne({
+      where: { empresaId, faturaId, gatewayTransacaoId: referenciaGateway },
+    });
+    if (existente) {
+      return;
+    }
+
+    const fatura = await this.faturaRepository.findOne({
+      where: { id: faturaId, empresaId },
+    });
+    if (!fatura) {
+      throw new NotFoundException(`Fatura ${faturaId} nao encontrada para empresa ${empresaId}`);
+    }
+
+    const valorRestante = Number(
+      Math.max(Number(fatura.valorTotal || 0) - Number(fatura.valorPago || 0), 0).toFixed(2),
+    );
+    const valorGateway = this.extractPaymentAmount(payment);
+    const valorPagamento = valorGateway > 0 ? valorGateway : valorRestante || Number(fatura.valorTotal || 0);
+
+    const pagamento = this.pagamentoRepository.create({
+      empresaId,
+      faturaId,
+      transacaoId: this.gerarTransacaoPagamentoWebhook(payment?.id),
+      tipo: TipoPagamento.PAGAMENTO,
+      status: StatusPagamento.PENDENTE,
+      valor: Number(valorPagamento.toFixed(2)),
+      taxa: 0,
+      valorLiquido: Number(valorPagamento.toFixed(2)),
+      metodoPagamento: String(fatura.formaPagamentoPreferida || FormaPagamento.A_COMBINAR),
+      gateway: 'mercadopago',
+      gatewayTransacaoId: referenciaGateway,
+      gatewayStatusRaw: String(payment?.status || 'pending'),
+      dadosCompletos: {
+        externalReference: referenciaGateway,
+        mercadoPagoPaymentId: String(payment?.id || ''),
+        origem: 'mercadopago.webhook',
+      } as any,
+      observacoes: `Pagamento criado automaticamente via webhook Mercado Pago (${payment?.id || 'n/a'}).`,
+      dataProcessamento: new Date(),
+    });
+
+    await this.pagamentoRepository.save(pagamento);
+  }
+
+  private async reconcileInvoiceFromPayment(
+    payment: any,
+    action: string,
+    resolvedReference: Extract<ExternalReferenceResolution, { kind: 'fatura' }>,
+  ): Promise<void> {
+    const novoStatus = this.mapPaymentStatusToInvoicePaymentStatus(payment?.status);
+    if (!novoStatus) {
+      this.logger.log(
+        `Webhook Mercado Pago payment=${payment?.id} com status nao mapeado para faturamento (${payment?.status || 'unknown'})`,
+      );
+      return;
+    }
+
+    const paymentId = String(payment?.id || '').trim() || 'unknown';
+    const correlationId = `mp:${paymentId}:${String(action || 'updated').trim().toLowerCase()}`.slice(
+      0,
+      180,
+    );
+    const origemId = `mercadopago:webhook:${paymentId}`.slice(0, 180);
+
+    const dto = {
+      gatewayTransacaoId: resolvedReference.referenciaGateway,
+      novoStatus,
+      motivoRejeicao:
+        novoStatus === StatusPagamento.REJEITADO
+          ? String(payment?.status_detail || payment?.status || 'rejeitado')
+          : undefined,
+      webhookData: payment,
+      correlationId,
+      origemId,
+    };
+
+    await runWithTenant(resolvedReference.empresaId, async () => {
+      try {
+        await this.pagamentoService.processarPagamento(dto as any, resolvedReference.empresaId);
+      } catch (error) {
+        if (!this.isPagamentoNotFoundError(error)) {
+          throw error;
+        }
+
+        await this.garantirPagamentoPendenteFatura({
+          empresaId: resolvedReference.empresaId,
+          faturaId: resolvedReference.faturaId,
+          referenciaGateway: resolvedReference.referenciaGateway,
+          payment,
+        });
+
+        await this.pagamentoService.processarPagamento(dto as any, resolvedReference.empresaId);
+      }
+    });
+  }
+
+  private async appendReconciliationBillingEvent(
+    result: PaymentReconciliationResult,
+  ): Promise<void> {
+    if (!result.empresaId) {
+      return;
+    }
+
+    const aggregateId = `${result.assinaturaId || 'unknown'}:${result.paymentId}:${result.action}`.slice(
+      0,
+      120,
+    );
+
+    await this.billingEventRepository.insert({
+      empresaId: result.empresaId,
+      aggregateType: 'mercadopago.payment.reconciliation',
+      aggregateId,
+      eventType: result.action,
+      source: 'mercadopago.reconcile',
+      status: result.action === 'error' ? 'failed' : 'processed',
+      payload: {
+        paymentId: result.paymentId,
+        paymentStatus: result.paymentStatus || null,
+        assinaturaId: result.assinaturaId || null,
+        fromStatus: result.fromStatus || null,
+        toStatus: result.toStatus || null,
+        reason: result.reason || null,
+        trigger: result.source,
+      },
+      correlationId: `mp-reconcile:${result.paymentId}`.slice(0, 120),
+    });
+  }
+
+  private async reconcileSubscriptionFromPayment(
+    payment: any,
+    source: ReconciliationSource,
+  ): Promise<PaymentReconciliationResult> {
+    const paymentId = String(payment?.id || '').trim();
+    const paymentStatus = String(payment?.status || '')
+      .trim()
+      .toLowerCase();
+    const resolved = this.parseExternalReference(payment?.external_reference);
+
+    if (!paymentId) {
+      return {
+        paymentId: 'unknown',
+        source,
+        action: 'skipped',
+        paymentStatus,
+        reason: 'payment_without_id',
+      };
+    }
+
+    if (!resolved) {
+      return {
+        paymentId,
+        source,
+        action: 'skipped',
+        paymentStatus,
+        reason: 'external_reference_unrecognized',
+      };
+    }
+
+    const { empresaId, assinaturaId } = resolved;
+    const targetStatus = this.mapPaymentStatusToSubscriptionStatus(paymentStatus);
+
+    if (!targetStatus) {
+      const unsupportedResult: PaymentReconciliationResult = {
+        paymentId,
+        source,
+        action: 'skipped',
+        paymentStatus,
+        empresaId,
+        assinaturaId,
+        reason: 'payment_status_without_subscription_mapping',
+      };
+
+      await this.appendReconciliationBillingEvent(unsupportedResult);
+      return unsupportedResult;
+    }
+
+    let result: PaymentReconciliationResult = {
+      paymentId,
+      source,
+      action: 'skipped',
+      paymentStatus,
+      empresaId,
+      assinaturaId,
+      toStatus: targetStatus,
+      reason: 'subscription_not_found',
+    };
+
+    await runWithTenant(empresaId, async () => {
+      const assinatura = await this.assinaturaRepository.findOne({
+        where: { id: assinaturaId },
+        relations: ['plano', 'plano.modulosInclusos', 'plano.modulosInclusos.modulo'],
+      });
+
+      if (!assinatura) {
+        result = {
+          paymentId,
+          source,
+          action: 'skipped',
+          paymentStatus,
+          empresaId,
+          assinaturaId,
+          toStatus: targetStatus,
+          reason: 'subscription_not_found',
+        };
+        return;
+      }
+
+      const currentStatus = toCanonicalAssinaturaStatus(assinatura.status);
+
+      if (currentStatus === targetStatus) {
+        result = {
+          paymentId,
+          source,
+          action: 'aligned',
+          paymentStatus,
+          empresaId,
+          assinaturaId,
+          fromStatus: currentStatus,
+          toStatus: targetStatus,
+          reason: 'already_aligned',
+        };
+        return;
+      }
+
+      if (!canTransitionSubscriptionStatus(currentStatus, targetStatus)) {
+        result = {
+          paymentId,
+          source,
+          action: 'skipped',
+          paymentStatus,
+          empresaId,
+          assinaturaId,
+          fromStatus: currentStatus,
+          toStatus: targetStatus,
+          reason: 'invalid_transition',
+        };
+        return;
+      }
+
+      const now = new Date();
+      if (targetStatus === 'active') {
+        const proximoVencimento = new Date(now);
+        proximoVencimento.setMonth(proximoVencimento.getMonth() + 1);
+
+        assinatura.dataInicio = now;
+        assinatura.dataFim = null;
+        assinatura.proximoVencimento = proximoVencimento;
+        assinatura.renovacaoAutomatica = true;
+      }
+
+      assinatura.status = targetStatus;
+
+      const observacao = `Reconciliada via ${source} (MP payment ${paymentId}) ${currentStatus} -> ${targetStatus} em ${now.toISOString()}`;
+      assinatura.observacoes = assinatura.observacoes
+        ? `${assinatura.observacoes}\n${observacao}`
+        : observacao;
+
+      await this.assinaturaRepository.save(assinatura);
+      if (targetStatus === 'active') {
+        await this.sincronizarModulosAssinatura(empresaId, assinatura, 'payment_reconciliation');
+      }
+
+      result = {
+        paymentId,
+        source,
+        action: 'updated',
+        paymentStatus,
+        empresaId,
+        assinaturaId,
+        fromStatus: currentStatus,
+        toStatus: targetStatus,
+      };
+    });
+
+    await this.appendReconciliationBillingEvent(result);
+    return result;
+  }
+
+  async reconcilePaymentById(
+    paymentIdRaw: string,
+    source: ReconciliationSource = 'manual',
+  ): Promise<PaymentReconciliationResult> {
+    const paymentId = String(paymentIdRaw || '').trim();
+    if (!paymentId) {
+      return {
+        paymentId: 'unknown',
+        source,
+        action: 'skipped',
+        reason: 'missing_payment_id',
+      };
+    }
+
+    try {
+      const payment = await this.getPayment(paymentId);
+      return await this.reconcileSubscriptionFromPayment(payment, source);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'failed_to_fetch_payment_from_provider';
+      this.logger.warn(`Reconciliacao falhou para payment ${paymentId}: ${message}`);
+      return {
+        paymentId,
+        source,
+        action: 'error',
+        reason: message,
+      };
+    }
+  }
+
+  async reconcileRecentPayments(options?: { lookbackHours?: number; limit?: number }) {
+    const lookbackHours = this.toBoundedInteger(options?.lookbackHours, 72, 1, 24 * 30);
+    const limit = this.toBoundedInteger(options?.limit, 100, 1, 500);
+
+    const rows = await this.billingEventRepository.manager.query(
+      `
+        WITH candidates AS (
+          SELECT
+            payload->>'paymentId' AS payment_id,
+            MAX(created_at) AS last_seen_at
+          FROM billing_events
+          WHERE aggregate_type = $1
+            AND event_type = $2
+            AND created_at >= NOW() - ($3::int * INTERVAL '1 hour')
+          GROUP BY payload->>'paymentId'
+        )
+        SELECT payment_id
+        FROM candidates
+        WHERE payment_id IS NOT NULL
+          AND payment_id <> ''
+        ORDER BY last_seen_at DESC
+        LIMIT $4
+      `,
+      ['mercadopago.payment.webhook', 'received', lookbackHours, limit],
+    );
+
+    const paymentIds = Array.from(
+      new Set(
+        (Array.isArray(rows) ? rows : [])
+          .map((item: any) => String(item?.payment_id || '').trim())
+          .filter(Boolean),
+      ),
+    );
+
+    const results: PaymentReconciliationResult[] = [];
+    let updated = 0;
+    let aligned = 0;
+    let skipped = 0;
+    let errors = 0;
+
+    for (const paymentId of paymentIds) {
+      const result = await this.reconcilePaymentById(paymentId, 'batch');
+      results.push(result);
+
+      if (result.action === 'updated') {
+        updated += 1;
+      } else if (result.action === 'aligned') {
+        aligned += 1;
+      } else if (result.action === 'error') {
+        errors += 1;
+      } else {
+        skipped += 1;
+      }
+    }
+
+    return {
+      lookbackHours,
+      limit,
+      candidates: paymentIds.length,
+      processed: results.length,
+      updated,
+      aligned,
+      skipped,
+      errors,
+      results,
+    };
   }
 
   private initializeMercadoPago() {
@@ -72,6 +768,27 @@ export class MercadoPagoService {
     return raw === 'true' || raw === '1';
   }
 
+  private isProductionEnvironment(): boolean {
+    const nodeEnv = String(this.configService.get<string>('NODE_ENV') || '')
+      .trim()
+      .toLowerCase();
+    const appEnv = String(this.configService.get<string>('APP_ENV') || '')
+      .trim()
+      .toLowerCase();
+
+    return nodeEnv === 'production' || appEnv === 'production';
+  }
+
+  public assertCheckoutReady(): void {
+    if (this.preferenceApi || this.isMockMode()) {
+      return;
+    }
+
+    throw new ServiceUnavailableException(
+      'Checkout Mercado Pago indisponivel. Configure MERCADO_PAGO_ACCESS_TOKEN ou habilite MERCADO_PAGO_MOCK em desenvolvimento.',
+    );
+  }
+
   private buildMockPreference() {
     const id = `mock_pref_${crypto.randomBytes(8).toString('hex')}`;
     const initPoint = `https://mercadopago.mock/checkout/${id}`;
@@ -80,6 +797,33 @@ export class MercadoPagoService {
       id,
       init_point: initPoint,
       sandbox_init_point: initPoint,
+    };
+  }
+
+  private buildMockBoletoPayment(paymentData?: Record<string, unknown>) {
+    const id = 'mock_boleto_' + crypto.randomBytes(8).toString('hex');
+    const externalReference = String(paymentData?.external_reference || ('fatura:mock:' + id)).trim();
+    const ticketUrl = 'https://mercadopago.mock/boleto/' + id + '.pdf';
+    const barcode = '34191.79001 01043.510047 91020.150008 1 99990000010000';
+
+    return {
+      id,
+      status: 'pending',
+      external_reference: externalReference,
+      payment_method_id: 'bolbradesco',
+      transaction_details: {
+        external_resource_url: ticketUrl,
+      },
+      point_of_interaction: {
+        type: 'ticket',
+        transaction_data: {
+          ticket_url: ticketUrl,
+          barcode,
+          line: {
+            content: barcode,
+          },
+        },
+      },
     };
   }
 
@@ -103,6 +847,115 @@ export class MercadoPagoService {
       status: 'approved',
       external_reference: externalReference,
     };
+  }
+
+  private buildMockSubscriptionPreapproval(subscriptionId: string) {
+    const prefix = 'mock-sub:';
+    if (typeof subscriptionId !== 'string' || !subscriptionId.startsWith(prefix)) {
+      return null;
+    }
+
+    const rawPayload = subscriptionId.slice(prefix.length);
+    let status = 'authorized';
+    let encodedExternalReference = rawPayload;
+
+    const separatorIndex = rawPayload.indexOf(':');
+    if (separatorIndex > 0) {
+      status = rawPayload.slice(0, separatorIndex).trim().toLowerCase() || 'authorized';
+      encodedExternalReference = rawPayload.slice(separatorIndex + 1);
+    }
+
+    let externalReference: string;
+    try {
+      externalReference = decodeURIComponent(encodedExternalReference);
+    } catch {
+      externalReference = encodedExternalReference;
+    }
+
+    return {
+      id: subscriptionId,
+      status,
+      external_reference: externalReference,
+    };
+  }
+
+  private mapSubscriptionWebhookStatusToCanonical(
+    providerStatusRaw: unknown,
+  ): CanonicalAssinaturaStatus | undefined {
+    const providerStatus = String(providerStatusRaw || '')
+      .trim()
+      .toLowerCase();
+
+    if (!providerStatus) {
+      return undefined;
+    }
+
+    if (['authorized', 'active'].includes(providerStatus)) {
+      return 'active';
+    }
+
+    if (['pending', 'in_process'].includes(providerStatus)) {
+      return 'trial';
+    }
+
+    if (['paused'].includes(providerStatus)) {
+      return 'suspended';
+    }
+
+    if (['cancelled', 'canceled'].includes(providerStatus)) {
+      return 'canceled';
+    }
+
+    if (['rejected', 'failed'].includes(providerStatus)) {
+      return 'past_due';
+    }
+
+    return undefined;
+  }
+
+  private async getSubscriptionPreapproval(subscriptionId: string) {
+    if (!subscriptionId) {
+      throw new Error('Identificador da assinatura nao informado para webhook de preapproval.');
+    }
+
+    if (this.isMockMode()) {
+      const mockSubscription = this.buildMockSubscriptionPreapproval(subscriptionId);
+      if (mockSubscription) {
+        this.logger.warn(
+          `Mercado Pago em modo MOCK: retornando assinatura simulada para id=${subscriptionId}`,
+        );
+        return mockSubscription;
+      }
+    }
+
+    const accessToken = this.configService.get<string>('MERCADO_PAGO_ACCESS_TOKEN');
+    if (!accessToken) {
+      throw new ServiceUnavailableException(
+        'Mercado Pago nao inicializado. Configure MERCADO_PAGO_ACCESS_TOKEN.',
+      );
+    }
+
+    const response = await fetch(
+      `https://api.mercadopago.com/preapproval/${encodeURIComponent(subscriptionId)}`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      const errorPayload = await response.text();
+      throw new Error(
+        `Falha ao consultar assinatura ${subscriptionId} no Mercado Pago (${response.status}): ${errorPayload.slice(
+          0,
+          240,
+        )}`,
+      );
+    }
+
+    return response.json();
   }
 
   async createCustomer(customerData: any) {
@@ -140,22 +993,58 @@ export class MercadoPagoService {
     }
   }
 
-  async createPreference(preferenceData: any) {
+  async createPreference(
+    preferenceData: any,
+    options?: { accessTokenOverride?: string | null },
+  ) {
     try {
-      if (!this.preferenceApi) {
-        if (this.isMockMode()) {
+      const accessTokenOverride = String(options?.accessTokenOverride || '').trim() || null;
+      const mockMode = this.isMockMode();
+
+      if (!accessTokenOverride) {
+        this.assertCheckoutReady();
+      }
+
+      if (!this.preferenceApi && !accessTokenOverride) {
+        if (mockMode) {
           this.logger.warn(
-            'Mercado Pago em modo MOCK: criando preferência fake (sem chamada externa)',
+            'Mercado Pago em modo MOCK: criando prefer�ncia fake (sem chamada externa)',
           );
           return this.buildMockPreference();
         }
 
         throw new Error(
-          'Mercado Pago não inicializado. Configure MERCADO_PAGO_ACCESS_TOKEN ou habilite MERCADO_PAGO_MOCK=true para desenvolvimento.',
+          'Mercado Pago n�o inicializado. Configure MERCADO_PAGO_ACCESS_TOKEN ou habilite MERCADO_PAGO_MOCK=true para desenvolvimento.',
         );
       }
 
-      const preference = await this.preferenceApi.create({
+      const preferenceApi =
+        accessTokenOverride && accessTokenOverride.length > 0
+          ? new Preference(
+              new MercadoPagoConfig({
+                accessToken: accessTokenOverride,
+                options: {
+                  timeout: 5000,
+                  idempotencyKey: 'TENANT',
+                },
+              }),
+            )
+          : this.preferenceApi;
+
+      if (!preferenceApi) {
+        if (mockMode) {
+          this.logger.warn(
+            'Mercado Pago em modo MOCK: criando prefer�ncia fake (sem chamada externa)',
+          );
+          return this.buildMockPreference();
+        }
+
+        throw new Error(
+          'Mercado Pago n�o inicializado. Configure MERCADO_PAGO_ACCESS_TOKEN ou habilite MERCADO_PAGO_MOCK=true para desenvolvimento.',
+        );
+      }
+
+      const preference = await preferenceApi.create({
         body: {
           items: preferenceData.items,
           payer: {
@@ -183,14 +1072,78 @@ export class MercadoPagoService {
         },
       });
 
-      this.logger.log(`Preferência criada: ${preference.id}`);
+      this.logger.log(`Prefer�ncia criada: ${preference.id}`);
       return preference;
     } catch (error) {
-      this.logger.error('Erro ao criar preferência:', error);
+      this.logger.error('Erro ao criar prefer�ncia:', error);
       throw error;
     }
   }
 
+  async createBoletoPayment(
+    paymentData: any,
+    options?: { accessTokenOverride?: string | null },
+  ) {
+    try {
+      const accessTokenOverride = String(options?.accessTokenOverride || '').trim() || null;
+      const mockMode = this.isMockMode();
+
+      const paymentApi =
+        accessTokenOverride && accessTokenOverride.length > 0
+          ? new Payment(
+              new MercadoPagoConfig({
+                accessToken: accessTokenOverride,
+                options: {
+                  timeout: 5000,
+                  idempotencyKey: 'TENANT',
+                },
+              }),
+            )
+          : this.paymentApi;
+
+      if (!paymentApi) {
+        if (mockMode) {
+          this.logger.warn(
+            'Mercado Pago em modo MOCK: criando boleto fake (sem chamada externa)',
+          );
+          return this.buildMockBoletoPayment(paymentData);
+        }
+
+        throw new Error(
+          'Mercado Pago nao inicializado. Configure MERCADO_PAGO_ACCESS_TOKEN ou habilite MERCADO_PAGO_MOCK=true para desenvolvimento.',
+        );
+      }
+
+      const payment = await paymentApi.create({
+        body: {
+          transaction_amount: paymentData.transaction_amount,
+          description: paymentData.description,
+          payment_method_id: paymentData.payment_method_id || 'bolbradesco',
+          payer: {
+            email: paymentData.payer?.email,
+            first_name: paymentData.payer?.first_name,
+            last_name: paymentData.payer?.last_name,
+            identification: paymentData.payer?.identification,
+            address: paymentData.payer?.address,
+          },
+          external_reference: paymentData.external_reference,
+          notification_url: paymentData.notification_url,
+          date_of_expiration: paymentData.date_of_expiration,
+          metadata: {
+            origem: 'ConectCRM',
+            tipo: 'Boleto',
+            timestamp: new Date().toISOString(),
+          },
+        },
+      });
+
+      this.logger.log('Pagamento boleto criado: ' + String(payment.id || 'n/a'));
+      return payment;
+    } catch (error) {
+      this.logger.error('Erro ao criar pagamento boleto:', error);
+      throw error;
+    }
+  }
   async createPixPayment(paymentData: any) {
     try {
       const payment = await this.paymentApi.create({
@@ -275,8 +1228,8 @@ export class MercadoPagoService {
           return mockPayment;
         }
 
-        throw new Error(
-          'Mercado Pago não inicializado. Configure MERCADO_PAGO_ACCESS_TOKEN.',
+        throw new ServiceUnavailableException(
+          'Mercado Pago nao inicializado. Configure MERCADO_PAGO_ACCESS_TOKEN.',
         );
       }
 
@@ -326,8 +1279,17 @@ export class MercadoPagoService {
       const webhookSecret = this.configService.get<string>('MERCADO_PAGO_WEBHOOK_SECRET');
 
       if (!webhookSecret) {
-        this.logger.warn('Webhook secret não configurado, pulando validação');
-        return true; // Em desenvolvimento, pode pular validação
+        if (this.isProductionEnvironment()) {
+          this.logger.error(
+            'MERCADO_PAGO_WEBHOOK_SECRET nao configurado em producao. Webhook rejeitado por seguranca.',
+          );
+          return false;
+        }
+
+        this.logger.warn(
+          'Webhook secret nao configurado, pulando validacao (ambiente nao producao)',
+        );
+        return true;
       }
 
       // Extrair timestamp e hash da assinatura
@@ -356,29 +1318,35 @@ export class MercadoPagoService {
 
   async processWebhook(webhookData: any) {
     try {
-      const { type, data, action } = webhookData;
+      const typeRaw = String(webhookData?.type || webhookData?.topic || '')
+        .trim()
+        .toLowerCase();
+      const action = String(webhookData?.action || 'updated');
+      const resourceId = this.resolveWebhookResourceId(webhookData);
 
-      this.logger.log(`Processando webhook: ${type} - ${action}`);
+      this.logger.log(`Processando webhook: ${typeRaw || 'unknown'} - ${action}`);
 
-      switch (type) {
+      switch (typeRaw) {
         case 'payment':
-          await this.handlePaymentWebhook(data.id, action);
+          await this.handlePaymentWebhook(resourceId || '', action);
           break;
 
         case 'plan':
-          await this.handlePlanWebhook(data.id, action);
+          await this.handlePlanWebhook(resourceId || '', action);
           break;
 
         case 'subscription':
-          await this.handleSubscriptionWebhook(data.id, action);
+        case 'subscription_preapproval':
+        case 'preapproval':
+          await this.handleSubscriptionWebhook(resourceId || '', action);
           break;
 
         case 'invoice':
-          await this.handleInvoiceWebhook(data.id, action);
+          await this.handleInvoiceWebhook(resourceId || '', action);
           break;
 
         default:
-          this.logger.log(`Tipo de webhook não tratado: ${type}`);
+          this.logger.log(`Tipo de webhook nao tratado: ${typeRaw || 'unknown'}`);
       }
     } catch (error) {
       this.logger.error('Erro ao processar webhook:', error);
@@ -388,7 +1356,33 @@ export class MercadoPagoService {
 
   private async handlePaymentWebhook(paymentId: string, action: string) {
     try {
+      if (!paymentId) {
+        this.logger.warn(`Webhook de pagamento sem identificador (action=${action})`);
+        return;
+      }
+
       const payment = await this.getPayment(paymentId);
+      const resolvedReference = this.resolveExternalReference(payment?.external_reference);
+      const duplicateWebhook = await this.registerPaymentWebhookEvent(
+        payment,
+        action,
+        resolvedReference,
+      );
+      if (duplicateWebhook) {
+        if (resolvedReference?.kind === 'assinatura') {
+          await this.reconcileSubscriptionFromPayment(payment, 'webhook_duplicate');
+        } else if (resolvedReference?.kind === 'fatura') {
+          this.logger.log(
+            `Webhook duplicado de faturamento ignorado payment=${payment?.id} fatura=${resolvedReference.faturaId}`,
+          );
+        }
+        return;
+      }
+
+      if (resolvedReference?.kind === 'fatura') {
+        await this.reconcileInvoiceFromPayment(payment, action, resolvedReference);
+        return;
+      }
 
       this.logger.log(`Webhook pagamento ${paymentId}: ${payment.status} - ${action}`);
 
@@ -439,7 +1433,7 @@ export class MercadoPagoService {
     await runWithTenant(empresaId, async () => {
       const assinatura = await this.assinaturaRepository.findOne({
         where: { id: assinaturaId },
-        relations: ['plano'],
+        relations: ['plano', 'plano.modulosInclusos', 'plano.modulosInclusos.modulo'],
       });
 
       if (!assinatura) {
@@ -449,8 +1443,17 @@ export class MercadoPagoService {
         return;
       }
 
-      if (assinatura.status === 'ativa') {
+      const currentStatus = toCanonicalAssinaturaStatus(assinatura.status);
+
+      if (currentStatus === 'active') {
         this.logger.log(`Assinatura ${assinatura.id} já está ativa (idempotente)`);
+        return;
+      }
+
+      if (!canTransitionSubscriptionStatus(currentStatus, 'active')) {
+        this.logger.warn(
+          `Transicao invalida de assinatura ${assinatura.id}: ${currentStatus} -> active`,
+        );
         return;
       }
 
@@ -458,7 +1461,7 @@ export class MercadoPagoService {
       const proximoVencimento = new Date(hoje);
       proximoVencimento.setMonth(proximoVencimento.getMonth() + 1);
 
-      assinatura.status = 'ativa';
+      assinatura.status = 'active';
       assinatura.dataInicio = hoje;
       assinatura.proximoVencimento = proximoVencimento;
       assinatura.renovacaoAutomatica = true;
@@ -469,6 +1472,7 @@ export class MercadoPagoService {
         : linha;
 
       await this.assinaturaRepository.save(assinatura);
+      await this.sincronizarModulosAssinatura(empresaId, assinatura, 'payment_approved');
       this.logger.log(`✅ Assinatura ${assinatura.id} ativada com sucesso`);
     });
   }
@@ -568,7 +1572,9 @@ export class MercadoPagoService {
         return;
       }
 
-      if (assinatura.status !== 'ativa') {
+      const currentStatus = toCanonicalAssinaturaStatus(assinatura.status);
+
+      if (currentStatus !== 'active') {
         const linha = `Estorno recebido (MP ${payment.id}) com assinatura não-ativa em ${new Date().toISOString()}`;
         assinatura.observacoes = assinatura.observacoes
           ? `${assinatura.observacoes}\n${linha}`
@@ -577,7 +1583,14 @@ export class MercadoPagoService {
         return;
       }
 
-      assinatura.status = 'suspensa';
+      if (!canTransitionSubscriptionStatus(currentStatus, 'suspended')) {
+        this.logger.warn(
+          `Transicao invalida de assinatura ${assinatura.id}: ${currentStatus} -> suspended`,
+        );
+        return;
+      }
+
+      assinatura.status = 'suspended';
       const linha = `Assinatura suspensa por estorno (MP ${payment.id}) em ${new Date().toISOString()}`;
       assinatura.observacoes = assinatura.observacoes
         ? `${assinatura.observacoes}\n${linha}`
@@ -594,8 +1607,100 @@ export class MercadoPagoService {
   }
 
   private async handleSubscriptionWebhook(subscriptionId: string, action: string) {
-    this.logger.log(`Webhook assinatura ${subscriptionId}: ${action}`);
-    // Implementar lógica para assinaturas
+    try {
+      if (!subscriptionId) {
+        this.logger.warn(`Webhook de assinatura sem identificador (action=${action})`);
+        return;
+      }
+
+      const preapproval = await this.getSubscriptionPreapproval(subscriptionId);
+      const providerStatus = String(preapproval?.status || '')
+        .trim()
+        .toLowerCase();
+      const targetStatus = this.mapSubscriptionWebhookStatusToCanonical(providerStatus);
+
+      this.logger.log(`Webhook assinatura ${subscriptionId}: ${providerStatus || 'unknown'} - ${action}`);
+
+      if (!targetStatus) {
+        this.logger.log(
+          `Status de assinatura nao mapeado para reconciliacao (${providerStatus || 'unknown'})`,
+        );
+        return;
+      }
+
+      const resolved = this.parseExternalReference(preapproval?.external_reference);
+      if (!resolved) {
+        this.logger.warn(
+          `Assinatura Mercado Pago ${subscriptionId} sem external_reference reconhecida: ${preapproval?.external_reference}`,
+        );
+        return;
+      }
+
+      const { empresaId, assinaturaId } = resolved;
+      await runWithTenant(empresaId, async () => {
+        const assinatura = await this.assinaturaRepository.findOne({
+          where: { id: assinaturaId },
+          relations: ['plano', 'plano.modulosInclusos', 'plano.modulosInclusos.modulo'],
+        });
+
+        if (!assinatura) {
+          this.logger.warn(
+            `Assinatura ${assinaturaId} nao encontrada para empresa ${empresaId} (webhook ${subscriptionId})`,
+          );
+          return;
+        }
+
+        const currentStatus = toCanonicalAssinaturaStatus(assinatura.status);
+        if (currentStatus === targetStatus) {
+          this.logger.log(`Assinatura ${assinatura.id} ja alinhada em ${targetStatus}`);
+          return;
+        }
+
+        if (!canTransitionSubscriptionStatus(currentStatus, targetStatus)) {
+          this.logger.warn(
+            `Transicao invalida de assinatura ${assinatura.id}: ${currentStatus} -> ${targetStatus}`,
+          );
+          return;
+        }
+
+        const now = new Date();
+        if (targetStatus === 'active') {
+          const proximoVencimento = new Date(now);
+          proximoVencimento.setMonth(proximoVencimento.getMonth() + 1);
+          assinatura.dataInicio = now;
+          assinatura.dataFim = null;
+          assinatura.proximoVencimento = proximoVencimento;
+          assinatura.renovacaoAutomatica = true;
+        }
+
+        if (targetStatus === 'suspended') {
+          assinatura.renovacaoAutomatica = false;
+        }
+
+        if (targetStatus === 'canceled') {
+          assinatura.dataFim = now;
+          assinatura.renovacaoAutomatica = false;
+        }
+
+        assinatura.status = targetStatus;
+
+        const linha = `Atualizada via Mercado Pago preapproval ${subscriptionId} (${providerStatus || 'unknown'}) ${currentStatus} -> ${targetStatus} em ${now.toISOString()}`;
+        assinatura.observacoes = assinatura.observacoes
+          ? `${assinatura.observacoes}\n${linha}`
+          : linha;
+
+        await this.assinaturaRepository.save(assinatura);
+        if (targetStatus === 'active') {
+          await this.sincronizarModulosAssinatura(
+            empresaId,
+            assinatura,
+            'subscription_preapproval_active',
+          );
+        }
+      });
+    } catch (error) {
+      this.logger.error('Erro ao processar webhook de assinatura:', error);
+    }
   }
 
   private async handleInvoiceWebhook(invoiceId: string, action: string) {
@@ -678,3 +1783,6 @@ export class MercadoPagoService {
     }
   }
 }
+
+
+

@@ -5,8 +5,9 @@ export class CreatePagamentoDto {
   @IsNumber()
   faturaId: number;
 
+  @IsOptional()
   @IsString()
-  transacaoId: string;
+  transacaoId?: string;
 
   @IsEnum(TipoPagamento)
   tipo: TipoPagamento;
@@ -70,4 +71,39 @@ export class ProcessarPagamentoDto {
   @IsOptional()
   @IsObject()
   webhookData?: any;
+
+  @IsOptional()
+  @IsString()
+  correlationId?: string;
+
+  @IsOptional()
+  @IsString()
+  origemId?: string;
+}
+
+export class RegistrarPagamentoManualDto {
+  @IsNumber()
+  faturaId: number;
+
+  @IsNumber()
+  valor: number;
+
+  @IsString()
+  metodoPagamento: string;
+
+  @IsOptional()
+  @IsString()
+  dataPagamento?: string;
+
+  @IsOptional()
+  @IsString()
+  observacoes?: string;
+
+  @IsOptional()
+  @IsString()
+  correlationId?: string;
+
+  @IsOptional()
+  @IsString()
+  origemId?: string;
 }

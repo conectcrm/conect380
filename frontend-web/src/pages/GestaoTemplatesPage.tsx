@@ -8,6 +8,7 @@ import React, { useState, useEffect } from 'react';
 import { RefreshCw, Plus, Edit2, Trash2, Search, X, FileText, Eye, Copy, Zap } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { BackToNucleus } from '../components/navigation/BackToNucleus';
+import { useGlobalConfirmation } from '../contexts/GlobalConfirmationContext';
 import messageTemplateService, {
   MessageTemplate,
   CreateMessageTemplateDto,
@@ -15,6 +16,7 @@ import messageTemplateService, {
 } from '../services/messageTemplateService';
 
 const GestaoTemplatesPage: React.FC = () => {
+  const { confirm } = useGlobalConfirmation();
   // Estados principais
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -155,7 +157,7 @@ const GestaoTemplatesPage: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Deseja realmente deletar este template?')) return;
+    if (!(await confirm('Deseja realmente deletar este template?'))) return;
 
     try {
       setError(null);

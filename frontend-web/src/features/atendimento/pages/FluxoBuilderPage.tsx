@@ -67,6 +67,7 @@ import {
 import fluxoService from '../../../services/fluxoService';
 import nucleoService from '../../../services/nucleoService';
 import { FlowTestModal } from '../../bot-builder/components/FlowTestModal';
+import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
 
 // Node Types
 const nodeTypes = {
@@ -82,6 +83,7 @@ const nodeTypes = {
 const FluxoBuilderPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
+  const { confirm } = useGlobalConfirmation();
 
   // Helper para formatar tempo relativo
   const formatarTempoRelativo = (data: Date): string => {
@@ -214,7 +216,7 @@ const FluxoBuilderPage: React.FC = () => {
             error.message,
             '',
             '🤖 CORREÇÃO AUTOMÁTICA DISPONÍVEL',
-            'Clique no botão "� Corrigir Loops Automaticamente" abaixo',
+            'Clique no botão "🔧 Corrigir Loops Automaticamente" abaixo',
             'O sistema removerá as opções "Voltar" que causam ciclos',
             '',
             '📝 OU corrija manualmente:',
@@ -273,12 +275,12 @@ const FluxoBuilderPage: React.FC = () => {
 
       // Exibir resumo das ações
       const resumo = acoesTomadas.join('\n');
-      const confirmacao = window.confirm(
-        `🔧 CORREÇÃO AUTOMÁTICA\n\n${resumo}\n\n` +
-        `Deseja aplicar estas correções e salvar o fluxo?`,
-      );
-
-      if (!confirmacao) {
+      if (
+        !(await confirm(
+          `🔧 CORREÇÃO AUTOMÁTICA\n\n${resumo}\n\n` +
+            `Deseja aplicar estas correções e salvar o fluxo?`,
+        ))
+      ) {
         console.log('❌ Correção cancelada pelo usuário');
         return;
       }
@@ -732,8 +734,8 @@ const FluxoBuilderPage: React.FC = () => {
               <button
                 onClick={handleCorrigirLoopsAutomaticamente}
                 disabled={saving}
-                className="mt-3 w-full px-4 py-2 bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-400 
-                          text-white font-medium rounded-lg transition-colors duration-200 
+                className="mt-3 w-full px-4 py-2 bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-400
+                          text-white font-medium rounded-lg transition-colors duration-200
                           flex items-center justify-center gap-2"
               >
                 {saving ? (

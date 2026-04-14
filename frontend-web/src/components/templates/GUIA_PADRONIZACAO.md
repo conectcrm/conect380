@@ -52,6 +52,12 @@ Toda tela deve implementar:
 - Toda acao sensivel deve respeitar permissoes e contexto da empresa ativa.
 - Nao exibir dados de outro tenant em cache local, upload temporario ou fallback.
 
+### 7) Titulos de Tela
+- O titulo principal deve usar apenas o nome da pagina (ex: `Fornecedores`, `Faturamento`, `Centros de Custo`).
+- Evitar prefixos genericos como `Gestao de ...` no titulo principal.
+- A cor base do titulo principal deve ser `#002333`.
+- O contexto do modulo deve permanecer no `eyebrow` (ex: `Nucleo Financeiro`).
+
 ## Arquitetura de UX por Tipo de Tela
 Nao existe uma unica composicao valida para tudo. Use o tipo de tela correto:
 

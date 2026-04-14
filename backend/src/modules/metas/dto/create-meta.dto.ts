@@ -1,6 +1,5 @@
 import {
   IsEnum,
-  IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -24,9 +23,9 @@ export class CreateMetaDto {
   @IsPositive()
   valor: number;
 
-  @IsInt()
+  @IsUUID()
   @IsOptional()
-  vendedorId?: number;
+  vendedorId?: string;
 
   @IsString()
   @MaxLength(120)

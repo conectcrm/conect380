@@ -126,12 +126,20 @@ export class AtendimentoGateway implements OnGatewayConnection, OnGatewayDisconn
       if (this.DEBUG) this.logger.log(`🔌 Cliente ${client.id} tentando conectar...`);
 
       // Extrair token do handshake
-      const token =
-        client.handshake.auth.token || client.handshake.headers.authorization?.split(' ')[1];
+      const tokenAuth =
+        typeof client.handshake.auth?.token === 'string'
+          ? client.handshake.auth.token.trim()
+          : '';
+      const authorizationHeader =
+        typeof client.handshake.headers.authorization === 'string'
+          ? client.handshake.headers.authorization
+          : '';
+      const tokenHeader = authorizationHeader.replace(/^Bearer\s+/i, '').trim();
+      const token = tokenAuth || tokenHeader;
 
       if (!token) {
         this.logger.warn(`❌ Cliente ${client.id} tentou conectar SEM TOKEN`);
-        client.disconnect();
+        client.disconnect(true);
         return;
       }
 
@@ -142,7 +150,7 @@ export class AtendimentoGateway implements OnGatewayConnection, OnGatewayDisconn
 
       if (!empresaId || typeof empresaId !== 'string') {
         this.logger.warn(`❌ Cliente ${client.id} token sem empresa_id (User: ${payload.sub})`);
-        client.disconnect();
+        client.disconnect(true);
         return;
       }
       if (this.DEBUG)
@@ -184,9 +192,39 @@ export class AtendimentoGateway implements OnGatewayConnection, OnGatewayDisconn
         clientId: client.id,
       });
     } catch (error) {
-      this.logger.error(`❌ Erro ao conectar cliente ${client.id}: ${error.message}`);
-      if (this.DEBUG) this.logger.error(error.stack);
-      client.disconnect();
+      const errorName = (error as any)?.name || 'Error';
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const normalizedMessage = `${errorName} ${errorMessage}`.toLowerCase();
+      const isTokenExpired =
+        normalizedMessage.includes('tokenexpirederror') || normalizedMessage.includes('jwt expired');
+      const isTokenInvalid =
+        normalizedMessage.includes('jsonwebtokenerror') ||
+        normalizedMessage.includes('invalid token') ||
+        normalizedMessage.includes('jwt malformed');
+
+      if (isTokenExpired) {
+        this.logger.warn(`⚠️ Cliente ${client.id} tentou conectar com token expirado`);
+        client.emit('auth:token-expired', {
+          code: 'TOKEN_EXPIRED',
+          message: 'Sessão expirada. Atualize o token para reconectar.',
+        });
+        setTimeout(() => client.disconnect(true), 30);
+        return;
+      }
+
+      if (isTokenInvalid) {
+        this.logger.warn(`⚠️ Cliente ${client.id} tentou conectar com token inválido`);
+        client.emit('auth:token-invalid', {
+          code: 'TOKEN_INVALID',
+          message: 'Token inválido para conexão WebSocket.',
+        });
+        setTimeout(() => client.disconnect(true), 30);
+        return;
+      }
+
+      this.logger.error(`❌ Erro ao conectar cliente ${client.id}: ${errorMessage}`);
+      if (this.DEBUG && error instanceof Error) this.logger.error(error.stack);
+      client.disconnect(true);
     }
   }
 

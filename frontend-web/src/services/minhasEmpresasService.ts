@@ -164,19 +164,19 @@ export interface EmpresaCompleta {
   email: string;
   telefone: string;
   endereco:
-  | string
-  | {
-    rua: string;
-    numero: string;
-    complemento?: string;
-    bairro: string;
-    cidade: string;
-    estado: string;
-    cep: string;
-  };
+    | string
+    | {
+        rua: string;
+        numero: string;
+        complemento?: string;
+        bairro: string;
+        cidade: string;
+        estado: string;
+        cep: string;
+      };
   plano: {
     id: string;
-    nome: 'Starter' | 'Professional' | 'Enterprise';
+    nome: 'Starter' | 'Business' | 'Professional' | 'Enterprise';
     preco: number;
     features: string[];
     limitesUsuarios: number;
@@ -218,6 +218,7 @@ export interface EmpresaCompleta {
     podeVerRelatorios: boolean;
     podeExportarDados: boolean;
     podeAlterarPlano: boolean;
+    podeGerenciarEmpresas: boolean;
   };
 }
 
@@ -240,6 +241,7 @@ export interface NovaEmpresaRequest {
     nome: string;
     email: string;
     telefone: string;
+    senha: string;
   };
 }
 
@@ -289,6 +291,7 @@ class MinhasEmpresasService {
   /**
    * Alternar para uma empresa (switch de contexto)
    */
+
   async switchEmpresa(empresaId: string): Promise<SwitchEmpresaResponse> {
     try {
       const response = await api.post<SwitchEmpresaResponse>('/minhas-empresas/switch', {
@@ -307,12 +310,27 @@ class MinhasEmpresasService {
       dispatchEmpresaAtivaChanged(empresaId);
 
       return response.data;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Erro ao alternar empresa:', error);
-      throw new Error('Não foi possível alternar para esta empresa');
+      if (isAxiosError(error)) {
+        const backendMessage = error.response?.data?.message;
+        if (Array.isArray(backendMessage) && backendMessage.length > 0) {
+          throw new Error(String(backendMessage[0]));
+        }
+        if (typeof backendMessage === 'string' && backendMessage.trim().length > 0) {
+          throw new Error(backendMessage);
+        }
+        if (error.response?.status === 403) {
+          throw new Error('Seu perfil nao possui acesso a esta empresa');
+        }
+        if (error.response?.status === 409) {
+          throw new Error('A empresa selecionada esta indisponivel para acesso neste momento');
+        }
+      }
+
+      throw new Error('Nao foi possivel alternar para esta empresa');
     }
   }
-
   /**
    * Criar uma nova empresa
    */
@@ -323,17 +341,29 @@ class MinhasEmpresasService {
     } catch (error: unknown) {
       console.error('Erro ao criar empresa:', error);
       if (isAxiosError(error)) {
+        const backendMessage = error.response?.data?.message;
+        if (Array.isArray(backendMessage) && backendMessage.length > 0) {
+          throw new Error(String(backendMessage[0]));
+        }
+        if (typeof backendMessage === 'string' && backendMessage.trim().length > 0) {
+          throw new Error(backendMessage);
+        }
         if (error.response?.status === 409) {
-          throw new Error('CNPJ já cadastrado no sistema');
+          throw new Error('CNPJ ja cadastrado no sistema');
         }
         if (error.response?.status === 422) {
-          throw new Error('Dados inválidos. Verifique as informações fornecidas');
+          throw new Error('Dados invalidos. Verifique as informacoes fornecidas');
+        }
+        if (error.response?.status === 403) {
+          throw new Error('Perfil sem permissao para cadastrar empresas');
+        }
+        if (error.response?.status === 404) {
+          throw new Error('Endpoint de cadastro de empresas nao encontrado');
         }
       }
-      throw new Error('Não foi possível criar a empresa');
+      throw new Error('Nao foi possivel criar a empresa');
     }
   }
-
   /**
    * Atualizar dados da empresa
    */
@@ -390,7 +420,7 @@ class MinhasEmpresasService {
    */
   async suspenderEmpresa(empresaId: string, motivo: string): Promise<void> {
     try {
-      await api.post(`/minhas-empresas/${empresaId}/suspender`, { motivo });
+      await api.patch(`/minhas-empresas/${empresaId}/suspender`, { motivo });
     } catch (error) {
       console.error('Erro ao suspender empresa:', error);
       throw new Error('Não foi possível suspender a empresa');
@@ -402,10 +432,21 @@ class MinhasEmpresasService {
    */
   async reativarEmpresa(empresaId: string): Promise<void> {
     try {
-      await api.post(`/minhas-empresas/${empresaId}/reativar`);
+      await api.patch(`/minhas-empresas/${empresaId}/reativar`);
     } catch (error) {
       console.error('Erro ao reativar empresa:', error);
       throw new Error('Não foi possível reativar a empresa');
+    }
+  }
+
+  async cancelarServicoEmpresa(empresaId: string, dataFim?: string): Promise<void> {
+    try {
+      await api.patch(`/minhas-empresas/${empresaId}/cancelar-servico`, {
+        dataFim: dataFim || undefined,
+      });
+    } catch (error) {
+      console.error('Erro ao cancelar servico da empresa:', error);
+      throw new Error('Nao foi possivel cancelar o servico da empresa');
     }
   }
 

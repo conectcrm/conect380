@@ -46,6 +46,10 @@ module.exports = {
     },
   },
   devServer: {
+    client: {
+      // Evita iframe de overlay interceptando eventos do Playwright em CI.
+      overlay: false,
+    },
     historyApiFallback: {
       // Redirecionar todas as rotas para index.html (SPA behavior)
       index: '/index.html',

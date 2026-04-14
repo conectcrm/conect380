@@ -27,6 +27,17 @@ export interface ClienteProposta {
   status?: string;
 }
 
+export interface PropostaComissaoParticipanteConfig {
+  usuarioId: string;
+  percentual: number; // percentual sobre a base liquida (ex: 5 = 5%)
+  papel?: string;
+}
+
+export interface PropostaComissaoConfig {
+  participantes: PropostaComissaoParticipanteConfig[];
+  observacoes?: string;
+}
+
 @Entity('propostas')
 export class Proposta {
   @PrimaryGeneratedColumn('uuid')
@@ -92,6 +103,9 @@ export class Proposta {
   @Column({ nullable: true })
   source: string;
 
+  @Column({ type: 'uuid', name: 'oportunidade_id', nullable: true })
+  oportunidade_id?: string | null;
+
   @Column({ nullable: true })
   vendedor_id: string;
 
@@ -120,7 +134,18 @@ export class Proposta {
     sentAt?: string;
     emailCliente?: string;
     linkPortal?: string;
+    fluxoStatus?: string;
+    motivoPerda?: string;
+    historicoEventos?: Array<Record<string, unknown>>;
+    portalEventos?: Array<Record<string, unknown>>;
+    versoes?: Array<Record<string, unknown>>;
+    aprovacaoInterna?: Record<string, unknown>;
+    lembretes?: Array<Record<string, unknown>>;
+    [key: string]: unknown;
   };
+
+  @Column('jsonb', { nullable: true, name: 'comissao_config' })
+  comissaoConfig?: PropostaComissaoConfig | null;
 
   @CreateDateColumn()
   criadaEm: Date;

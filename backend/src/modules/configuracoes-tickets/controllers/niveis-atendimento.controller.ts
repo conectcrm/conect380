@@ -12,13 +12,17 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { NiveisAtendimentoService } from '../services/niveis-atendimento.service';
 import { CreateNivelAtendimentoDto } from '../dto/create-nivel-atendimento.dto';
 import { UpdateNivelAtendimentoDto } from '../dto/update-nivel-atendimento.dto';
 
 @Controller('configuracoes-tickets/niveis-atendimento')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.ATENDIMENTO_SLA_MANAGE)
 export class NiveisAtendimentoController {
   constructor(private readonly niveisService: NiveisAtendimentoService) {}
 

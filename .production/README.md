@@ -86,6 +86,29 @@ Smoke UI do MVP (login + rotas core):
 ```powershell
 .\scripts\smoke-mvp-ui.ps1
 ```
+Este comando agora tambem executa o guard de regressao mobile (agenda de responsividade + drawer/perfil).
+Se precisar rodar somente o smoke UI legado:
+```powershell
+.\scripts\smoke-mvp-ui.ps1 -SkipMobileGuard
+```
+
+Execucao direta do guard mobile dedicado:
+```powershell
+npm run test:e2e:mobile:guard
+```
+
+Smoke automatizado do ADM-303 (break-glass):
+```powershell
+.\scripts\smoke-adm303-break-glass.ps1 `
+  -BaseUrl "http://localhost:3001" `
+  -RequesterEmail "<admin-requester@email>" `
+  -RequesterPassword "<password>" `
+  -ApproverEmail "<admin-approver@email>" `
+  -ApproverPassword "<password>" `
+  -TargetEmail "<target-usuario@email>" `
+  -TargetPassword "<password>"
+```
+Com MFA habilitado, informar `-RequesterMfaCode`, `-ApproverMfaCode` e `-TargetMfaCode`.
 
 Kickoff de sessao piloto (gera pasta com checklist/evidencias/status):
 ```powershell
@@ -112,6 +135,13 @@ Plano de outreach comercial para os clientes do piloto:
 .\scripts\prepare-mvp-pilot-outreach.ps1 -RunDir ".production\pilot-runs\<sessao>" -Owner "time-comercial"
 ```
 
+Fila automatizada de follow-up comercial (prioriza convites em aberto):
+```powershell
+.\scripts\prepare-mvp-pilot-outreach-followup.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -Owner "time-comercial"
+```
+
 Registro rapido de evidencias do piloto:
 ```powershell
 .\scripts\record-mvp-pilot-evidence.ps1 `
@@ -123,14 +153,172 @@ Registro rapido de evidencias do piloto:
   -Responsavel "time-oncall"
 ```
 
+Registro padronizado de cenarios funcionais (recomendado para cobertura):
+```powershell
+.\scripts\record-mvp-pilot-functional-result.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -Cliente "Codexa LTDA" `
+  -Cenario CriacaoLead `
+  -Resultado PASS `
+  -Evidencia "screenshot://piloto/codexa-lead.png" `
+  -Responsavel "time-oncall"
+```
+
+Gerar planilha funcional da janela (5 cenarios x cliente):
+```powershell
+.\scripts\prepare-mvp-pilot-functional-sheet.ps1 -RunDir ".production\pilot-runs\<sessao>" -Force
+```
+
+Importar resultados preenchidos da planilha:
+```powershell
+.\scripts\import-mvp-pilot-functional-sheet.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -SheetPath ".production\pilot-runs\<sessao>\functional-sheet.csv" `
+  -SkipIfAlreadyRecorded
+
+# Validacao final (falha se ainda existir linha pendente)
+.\scripts\import-mvp-pilot-functional-sheet.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -SheetPath ".production\pilot-runs\<sessao>\functional-sheet.csv" `
+  -SkipIfAlreadyRecorded `
+  -Strict
+```
+
 Ciclo tecnico automatizado do piloto (health + logs + smoke + evidencias):
 ```powershell
 .\scripts\run-mvp-pilot-cycle.ps1 -RunDir ".production\pilot-runs\<sessao>"
+```
+Se executar com `-SkipCoreSmoke` ou `-SkipUiSmoke`, rode um ciclo completo depois antes do readiness final.
+
+Monitoramento continuo da janela (rodando ciclos em intervalo fixo e consolidando resumo):
+```powershell
+# Exemplo completo de 48h com ciclo a cada 2h
+.\scripts\run-mvp-pilot-window-monitor.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -WindowHours 48 `
+  -IntervalMinutes 120 `
+  -BranchProtectionStatus Applied
+
+# Execucao curta de baseline (1 ciclo)
+.\scripts\run-mvp-pilot-window-monitor.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -WindowHours 48 `
+  -IntervalMinutes 120 `
+  -MaxCycles 1 `
+  -BranchProtectionStatus Applied
+```
+
+Snapshot operacional da wave (status de outreach + monitor + ciclo + readiness + cobertura):
+```powershell
+.\scripts\snapshot-mvp-wave-status.ps1 -RunDir ".production\pilot-runs\<sessao>"
+```
+
+Atualizar status de convite no outreach (por `empresa_id` ou `cliente`):
+```powershell
+.\scripts\update-mvp-pilot-outreach-status.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -EmpresaId "<empresa_id>" `
+  -StatusConvite ACEITO `
+  -Observacao "convite confirmado pelo comercial"
+```
+
+Importar atualizacoes de convite em lote (CSV com `empresa_id` ou `cliente` + `status_convite`):
+```powershell
+.\scripts\import-mvp-pilot-outreach-updates.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -UpdatesCsvPath ".production\pilot-runs\<sessao>\outreach-followup-<timestamp>.csv" `
+  -DryRun
+```
+Em `APPLY`, o import falha se `applied=0` (sem mudanca efetiva). Use `-AllowNoChanges` apenas em excecao operacional.
+
+Gerar template de atualizacoes (arquivo enxuto para o comercial preencher):
+```powershell
+.\scripts\prepare-mvp-pilot-outreach-updates-template.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -OutputCsvPath ".production\pilot-runs\<sessao>\outreach-updates-template-<timestamp>.csv"
+```
+
+Rodada comercial completa da wave (follow-up + import + fechamento + snapshot):
+```powershell
+# DryRun de importacao (gera follow-up + template e valida sem gravar)
+.\scripts\run-mvp-pilot-commercial-round.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -ImportDryRun
+
+# Aplicacao real das respostas em lote (arquivo obrigatorio)
+.\scripts\run-mvp-pilot-commercial-round.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -UpdatesCsvPath ".production\pilot-runs\<sessao>\outreach-updates-<timestamp>.csv"
+```
+Em `APPLY`, se o CSV nao tiver mudanca efetiva, a rodada falha por seguranca.
+
+Preparacao da proxima wave (gate + kickoff da nova sessao + clientes + outreach):
+```powershell
+# DryRun (nao cria nova sessao)
+.\scripts\prepare-mvp-next-wave.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -DryRun
+
+# Aplicar quando o fechamento atual estiver GO_NEXT_WAVE
+.\scripts\prepare-mvp-next-wave.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -NextPilotName "piloto-comercial-lote-3"
+```
+
+Avancar wave em um comando (rodada comercial + transicao automatica se `GO_NEXT_WAVE`):
+```powershell
+# Round seguro (dryrun)
+.\scripts\advance-mvp-wave.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -ImportDryRun
+
+# Round real com updates preenchidos
+.\scripts\advance-mvp-wave.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -UpdatesCsvPath ".production\pilot-runs\<sessao>\outreach-updates-template-<timestamp>.csv" `
+  -NextPilotName "piloto-comercial-lote-3"
+```
+
+Fechamento da wave (consolidacao comercial + tecnica e decisao final):
+```powershell
+.\scripts\close-mvp-pilot-wave.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -MinAcceptedClients 1
+```
+
+Execucao automatizada dos 5 cenarios funcionais por cliente (gera evidencias e coverage):
+```powershell
+.\scripts\run-mvp-pilot-functional-scenarios.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -ProvisionMissingUsers
+```
+Quando backend/API estiver ligado a outro Postgres local, alinhe os parametros do DB da API:
+```powershell
+.\scripts\run-mvp-pilot-functional-scenarios.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -DbContainerName conectsuite-postgres `
+  -DbUser postgres `
+  -DbName conectcrm `
+  -ProvisionMissingUsers
+```
+
+Cobertura funcional por cliente (cenarios core do piloto):
+```powershell
+.\scripts\check-mvp-pilot-functional-coverage.ps1 -RunDir ".production\pilot-runs\<sessao>"
 ```
 
 Relatorio de prontidao do piloto (blockers + decisao automatizada):
 ```powershell
 .\scripts\assess-mvp-pilot-readiness.ps1 -RunDir ".production\pilot-runs\<sessao>" -BranchProtectionStatus Unknown
+```
+Por padrao, o readiness usa o ultimo `functional-coverage-*.md` para decidir cobertura funcional (`Auto`).
+
+Exemplo de fechamento final (branch aplicada + cobertura concluida):
+```powershell
+.\scripts\assess-mvp-pilot-readiness.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -BranchProtectionStatus Applied `
+  -FunctionalCoverageStatus COVERAGE_OK
 ```
 
 Opcoes uteis:
@@ -160,12 +348,14 @@ docker compose down
 AWS foi retirado do fluxo atual por decisao de escopo. Quando for retomado, a estrategia de deploy remoto pode ser adicionada novamente em um guia separado.
 
 ## Proximo passo sugerido
-Rodar o checklist de `DEPLOY.md` e registrar o resultado final de prontidao (backend, frontend e multi-tenant) antes do go-live.
-Para proteger merge em producao, aplicar tambem o guia `.production/BRANCH_PROTECTION.md`.
+Status atual: GO liberado para comercializacao controlada.
 Para rollout comercial por escopo reduzido, usar `.production/MVP_GO_LIVE_PLAN_2026-02-17.md`.
+Para execucao da primeira onda comercial, usar `.production/MVP_ROLLOUT_WAVE1_2026-02-18.md`.
 Registrar decisao operacional em `.production/MVP_GO_NO_GO_2026-02-17.md`.
+Resumo executivo para comercial/diretoria em `.production/MVP_EXEC_SUMMARY_2026-02-18.md`.
 Para piloto controlado com clientes, usar `.production/MVP_PILOT_CHECKLIST_2026-02-17.md`.
 Ver execucao de kickoff em `.production/MVP_PILOT_KICKOFF_2026-02-17.md`.
+Para fechamento rapido da sessao atual, seguir `.production/pilot-runs/20260217-174413-piloto-comercial-lote-1-full/next-actions-20260218-1054.md`.
 
 ## Branch protection (automatizado)
 ```powershell
@@ -175,5 +365,11 @@ Ver execucao de kickoff em `.production/MVP_PILOT_KICKOFF_2026-02-17.md`.
 # Aplicar no repo novo (token necessario)
 $env:GITHUB_TOKEN = "ghp_xxx"
 .\scripts\configure-branch-protection.ps1 -Owner conectcrm -Repo conect380
+
+# Aplicar apenas em main (quando develop ainda nao existe)
+.\scripts\configure-branch-protection.ps1 -Owner conectcrm -Repo conect380 -Branches main
 ```
 
+## Deploy remoto com perfil local (Azure VM)
+Quando usar VM remota, consulte `.production/DEPLOY_AGENT_PROFILE.md`.
+Esse fluxo permite deploy sem repetir `ServerIp`, `SshUser` e `PemPath` em cada execucao.

@@ -59,7 +59,7 @@ export const tiposService = {
    * Atualiza um tipo existente - Admin Console
    */
   atualizar: async (id: string, dados: Partial<TipoServico>): Promise<TipoServico> => {
-    const response = await api.patch(`/configuracoes-tickets/tipos-servico/${id}`, dados);
+    const response = await api.put(`/configuracoes-tickets/tipos-servico/${id}`, dados);
     return response.data;
   },
 

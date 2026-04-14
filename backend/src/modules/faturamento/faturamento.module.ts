@@ -10,12 +10,27 @@ import { Pagamento } from './entities/pagamento.entity';
 import { PlanoCobranca } from './entities/plano-cobranca.entity';
 import { ContratosModule } from '../contratos/contratos.module';
 import { PropostasModule } from '../propostas/propostas.module';
+import { Cliente } from '../clientes/cliente.entity';
+import { MercadoPagoModule } from '../mercado-pago/mercado-pago.module';
+import { EmpresaConfig } from '../empresas/entities/empresa-config.entity';
+import { FinanceiroModule } from '../financeiro/financeiro.module';
+import { ComissoesModule } from '../comissoes/comissoes.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Fatura, ItemFatura, Pagamento, PlanoCobranca]),
-    forwardRef(() => ContratosModule), // Para evitar dependência circular
+    TypeOrmModule.forFeature([
+      Fatura,
+      ItemFatura,
+      Pagamento,
+      PlanoCobranca,
+      Cliente,
+      EmpresaConfig,
+    ]),
+    forwardRef(() => ContratosModule), // Para evitar dependencia circular
     PropostasModule, // Para acessar o EmailIntegradoService
+    forwardRef(() => MercadoPagoModule),
+    forwardRef(() => FinanceiroModule),
+    ComissoesModule,
   ],
   controllers: [FaturamentoController],
   providers: [FaturamentoService, PagamentoService, CobrancaService],

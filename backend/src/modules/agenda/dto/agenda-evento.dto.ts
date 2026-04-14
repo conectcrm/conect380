@@ -1,15 +1,26 @@
 import {
+  IsEmail,
   IsBoolean,
   IsDateString,
   IsEnum,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
   IsArray,
+  IsObject,
+  Min,
 } from 'class-validator';
 import { PartialType } from '@nestjs/mapped-types';
-import { AgendaPrioridade, AgendaStatus } from '../agenda-evento.entity';
+import {
+  AgendaAttendeeRsvpStatus,
+  AgendaLocationType,
+  AgendaPrioridade,
+  AgendaReminderType,
+  AgendaStatus,
+  AgendaTipo,
+} from '../agenda-evento.entity';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 
 export class CreateAgendaEventoDto {
@@ -50,7 +61,55 @@ export class CreateAgendaEventoDto {
   @MaxLength(20)
   color?: string;
 
+  @IsEnum(AgendaTipo)
+  @IsOptional()
+  tipo?: AgendaTipo;
+
+  @IsEnum(AgendaLocationType)
+  @IsOptional()
+  location_type?: AgendaLocationType;
+
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  reminder_time?: number;
+
+  @IsEnum(AgendaReminderType)
+  @IsOptional()
+  reminder_type?: AgendaReminderType;
+
+  @IsBoolean()
+  @IsOptional()
+  email_offline?: boolean;
+
   @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  attachments?: string[];
+
+  @IsBoolean()
+  @IsOptional()
+  is_recurring?: boolean;
+
+  @IsObject()
+  @IsOptional()
+  recurring_pattern?: Record<string, unknown>;
+
+  @IsString()
+  @IsOptional()
+  notes?: string;
+
+  @IsUUID()
+  @IsOptional()
+  responsavel_id?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(255)
+  responsavel_nome?: string;
+
+  @IsArray()
+  @IsEmail({}, { each: true })
   @IsOptional()
   attendees?: string[];
 
@@ -60,6 +119,11 @@ export class CreateAgendaEventoDto {
 }
 
 export class UpdateAgendaEventoDto extends PartialType(CreateAgendaEventoDto) {}
+
+export class UpdateAgendaEventoRsvpDto {
+  @IsEnum(AgendaAttendeeRsvpStatus)
+  resposta: AgendaAttendeeRsvpStatus;
+}
 
 export class AgendaEventoFiltroDto extends PaginationDto {
   @IsEnum(AgendaStatus)

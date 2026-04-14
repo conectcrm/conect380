@@ -1,9 +1,10 @@
 export enum UserRole {
   SUPERADMIN = 'superadmin',
   ADMIN = 'admin',
-  MANAGER = 'manager',
+  GERENTE = 'gerente',
   VENDEDOR = 'vendedor',
-  USER = 'user',
+  SUPORTE = 'suporte',
+  FINANCEIRO = 'financeiro',
 }
 
 export enum StatusAtendente {
@@ -21,7 +22,7 @@ export interface Usuario {
   role: UserRole;
   permissoes?: string[];
   empresa_id: string;
-  avatar_url?: string;
+  avatar_url?: string | null;
   idioma_preferido: string;
   configuracoes?: {
     tema?: string;
@@ -29,6 +30,10 @@ export interface Usuario {
       email?: boolean;
       push?: boolean;
     };
+    seguranca?: {
+      mfa_login_habilitado?: boolean;
+    };
+    mfa_login_habilitado?: boolean;
   };
   ativo: boolean;
   deve_trocar_senha?: boolean;
@@ -54,7 +59,7 @@ export interface NovoUsuario {
   role: UserRole;
   permissoes?: string[];
   empresa_id: string;
-  avatar_url?: string;
+  avatar_url?: string | null;
   idioma_preferido?: string;
   configuracoes?: {
     tema?: string;
@@ -62,6 +67,10 @@ export interface NovoUsuario {
       email?: boolean;
       push?: boolean;
     };
+    seguranca?: {
+      mfa_login_habilitado?: boolean;
+    };
+    mfa_login_habilitado?: boolean;
   };
   ativo?: boolean;
 }
@@ -73,7 +82,7 @@ export interface AtualizarUsuario {
   telefone?: string;
   role?: UserRole;
   permissoes?: string[];
-  avatar_url?: string;
+  avatar_url?: string | null;
   idioma_preferido?: string;
   configuracoes?: {
     tema?: string;
@@ -81,6 +90,10 @@ export interface AtualizarUsuario {
       email?: boolean;
       push?: boolean;
     };
+    seguranca?: {
+      mfa_login_habilitado?: boolean;
+    };
+    mfa_login_habilitado?: boolean;
   };
   ativo?: boolean;
 }
@@ -108,20 +121,138 @@ export interface EstatisticasUsuarios {
   ultimosLogins: number;
 }
 
+export interface PermissionCatalogOption {
+  value: string;
+  label: string;
+  legacy?: boolean;
+}
+
+export interface PermissionCatalogGroup {
+  id: string;
+  label: string;
+  description?: string;
+  roles: string[];
+  options: PermissionCatalogOption[];
+}
+
+export interface PermissionCatalogResponse {
+  version: string;
+  groups: PermissionCatalogGroup[];
+  defaultsByRole: Record<string, string[]>;
+  allPermissions: string[];
+  legacyAssignablePermissions: string[];
+}
+
+export type UserAccessChangeAction = 'USER_CREATE' | 'USER_UPDATE';
+
+export type UserAccessChangeStatus = 'REQUESTED' | 'APPROVED' | 'REJECTED';
+
+export interface UserAccessChangeRequest {
+  id: string;
+  empresa_id: string;
+  action: UserAccessChangeAction;
+  status: UserAccessChangeStatus;
+  target_user_id?: string | null;
+  request_payload?: Record<string, unknown>;
+  request_reason?: string | null;
+  decision_reason?: string | null;
+  decided_at?: string | null;
+  applied_at?: string | null;
+  applied_user_id?: string | null;
+  created_at: string;
+  updated_at?: string | null;
+  requested_by?: {
+    id?: string | null;
+    nome?: string | null;
+    email?: string | null;
+  } | null;
+  decided_by?: {
+    id?: string | null;
+    nome?: string | null;
+    email?: string | null;
+  } | null;
+  target_user?: {
+    id?: string | null;
+    nome?: string | null;
+    email?: string | null;
+    role?: string | null;
+  } | null;
+  applied_user?: {
+    id?: string | null;
+    nome?: string | null;
+    email?: string | null;
+    role?: string | null;
+  } | null;
+}
+
+export interface AccessReviewReportUser {
+  id: string;
+  nome: string;
+  email: string;
+  role: string;
+  ativo: boolean;
+  permissoes: string[];
+  ultimo_login?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface AccessReviewReportSummaryEntry {
+  role: string;
+  total: number;
+  ativos: number;
+  inativos: number;
+}
+
+export interface AccessReviewReport {
+  empresa_id: string;
+  generated_at: string;
+  filters: {
+    role?: string | null;
+    include_inactive?: boolean;
+    detail_limit?: number;
+  };
+  summary: {
+    total_users: number;
+    active_users: number;
+    inactive_users: number;
+    by_profile: AccessReviewReportSummaryEntry[];
+  };
+  users: AccessReviewReportUser[];
+}
+
+export interface RecertifyAccessResult {
+  decision: 'approved' | 'rejected';
+  action_taken: 'kept' | 'deactivated' | 'already_inactive';
+  activity_id: string;
+  target_user: Usuario;
+}
+
+export type UserMutationMode = 'applied' | 'pending_approval';
+
+export interface UsuarioMutationResult {
+  mode: UserMutationMode;
+  usuario?: Usuario;
+  request?: UserAccessChangeRequest;
+  message?: string;
+}
+
 export const ROLE_LABELS: Record<UserRole, string> = {
   [UserRole.SUPERADMIN]: 'Super Admin',
   [UserRole.ADMIN]: 'Administrador',
-  [UserRole.MANAGER]: 'Gerente',
+  [UserRole.GERENTE]: 'Gerente',
   [UserRole.VENDEDOR]: 'Vendedor',
-  [UserRole.USER]: 'Usuário',
+  [UserRole.SUPORTE]: 'Suporte',
+  [UserRole.FINANCEIRO]: 'Financeiro',
 };
 
 export const ROLE_COLORS: Record<UserRole, string> = {
   [UserRole.SUPERADMIN]: 'bg-purple-100 text-purple-800',
   [UserRole.ADMIN]: 'bg-red-100 text-red-800',
-  [UserRole.MANAGER]: 'bg-blue-100 text-blue-800',
+  [UserRole.GERENTE]: 'bg-blue-100 text-blue-800',
   [UserRole.VENDEDOR]: 'bg-green-100 text-green-800',
-  [UserRole.USER]: 'bg-gray-100 text-gray-800',
+  [UserRole.SUPORTE]: 'bg-gray-100 text-gray-800',
+  [UserRole.FINANCEIRO]: 'bg-amber-100 text-amber-800',
 };
 
 export const STATUS_ATENDENTE_LABELS: Record<StatusAtendente, string> = {

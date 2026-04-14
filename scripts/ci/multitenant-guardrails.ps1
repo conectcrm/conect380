@@ -64,7 +64,8 @@ $guardExemptControllers = @(
 
 $scopeExemptFiles = @(
   'backend/src/empresas/empresas.service.ts',
-  'backend/src/modules/admin/services/admin-empresas.service.ts'
+  'backend/src/modules/core-admin/services/core-admin-empresas.service.ts',
+  'backend/src/modules/planos/planos.service.ts'
 )
 
 $issues = @()

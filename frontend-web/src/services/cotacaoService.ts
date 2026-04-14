@@ -8,6 +8,11 @@ import {
   CotacaoListResponse,
 } from '../types/cotacaoTypes';
 
+export interface CotacaoMetadataCriacaoResponse {
+  fornecedores: Array<{ id: string; nome: string }>;
+  aprovadores: Array<{ id: string; nome: string; email: string; role?: string }>;
+}
+
 export const cotacaoService = {
   async listar(filtros?: FiltroCotacao): Promise<CotacaoListResponse> {
     const params = new URLSearchParams();
@@ -75,6 +80,16 @@ export const cotacaoService = {
     return response.data;
   },
 
+  async buscarMetadataCriacao(): Promise<CotacaoMetadataCriacaoResponse> {
+    const response = await api.get('/cotacao/metadata/criacao');
+    const payload = response.data ?? {};
+
+    return {
+      fornecedores: Array.isArray(payload.fornecedores) ? payload.fornecedores : [],
+      aprovadores: Array.isArray(payload.aprovadores) ? payload.aprovadores : [],
+    };
+  },
+
   async criar(data: CriarCotacaoRequest): Promise<Cotacao> {
     // Backend calcula todos os valores (valorTotal, descontos, impostos)
     // Frontend envia apenas dados brutos
@@ -112,10 +127,59 @@ export const cotacaoService = {
   },
 
   async alterarStatus(id: string, status: StatusCotacao, observacao?: string): Promise<Cotacao> {
-    const response = await api.patch(`/cotacao/${id}/status`, {
+    const response = await api.put(`/cotacao/${id}/status`, {
       status,
       observacao,
     });
+    return response.data;
+  },
+
+  async converterEmPedido(
+    id: string,
+    observacoes?: string,
+  ): Promise<{
+    id: string;
+    cotacaoId: string;
+    status: string;
+    observacoes?: string;
+    contaPagar?: { id: string; numero?: string; status?: string };
+    contaPagarGeradaAutomaticamente?: boolean;
+    contaPagarAlreadyExisted?: boolean;
+    contaPagarErro?: string;
+  }> {
+    const response = await api.post(`/cotacao/${id}/converter-pedido`, {
+      observacoes,
+    });
+    return response.data;
+  },
+
+  async marcarAdquirido(
+    id: string,
+    data?: {
+      numeroPedido?: string;
+      referenciaPagamento?: string;
+      dataAquisicao?: string;
+      observacoes?: string;
+    },
+  ): Promise<Cotacao> {
+    const response = await api.post(`/cotacao/${id}/marcar-adquirido`, data ?? {});
+    return response.data;
+  },
+
+  async gerarContaPagar(
+    id: string,
+    data?: {
+      dataVencimento?: string;
+      categoria?: string;
+      prioridade?: string;
+      observacoes?: string;
+    },
+  ): Promise<{
+    success: true;
+    alreadyExisted?: boolean;
+    contaPagar: { id: string; numero: string; status: string };
+  }> {
+    const response = await api.post(`/cotacao/${id}/gerar-conta-pagar`, data ?? {});
     return response.data;
   },
 
@@ -162,7 +226,7 @@ export const cotacaoService = {
 
   async buscarProximoNumero(): Promise<string> {
     const response = await api.get('/cotacao/proximo-numero');
-    return response.data.numero;
+    return response.data.proximoNumero ?? response.data.numero;
   },
 
   async minhasAprovacoes(): Promise<Cotacao[]> {

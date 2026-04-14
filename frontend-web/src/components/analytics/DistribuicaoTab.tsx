@@ -49,11 +49,10 @@ const DistribuicaoTab: React.FC = () => {
       setError(null);
 
       // Obter empresaId do usuário logado
-      const userStr = localStorage.getItem('user');
-      const user = userStr ? JSON.parse(userStr) : null;
-      const empresaId = user?.empresaId || 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
-
-      const dados = await distribuicaoService.buscarEstatisticas(empresaId);
+      const dados = await distribuicaoService.buscarEstatisticas();
+      if (!dados) {
+        throw new Error('Nao foi possivel carregar estatisticas de distribuicao.');
+      }
       setEstatisticas(dados);
     } catch (err: unknown) {
       console.error('Erro ao carregar estatísticas de distribuição:', err);

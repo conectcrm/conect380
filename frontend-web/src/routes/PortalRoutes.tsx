@@ -10,7 +10,7 @@ import PortalClienteProposta from '../features/portal/PortalClienteProposta';
 const PortalRoutes: React.FC = () => {
   return (
     <Routes>
-      {/* ✅ CORREÇÃO: Rota para formato direto PROP-2025-537375/4GOLAQ */}
+      {/* Rota para formato direto PROP-YYYY-XXXXXX/TOKEN */}
       <Route path="/:propostaNumero/:token" element={<PortalClienteProposta />} />
 
       {/* Rota original com prefixo "proposta/" */}

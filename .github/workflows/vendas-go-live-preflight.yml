@@ -1,0 +1,142 @@
+name: Vendas Go-Live Preflight
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Modo de release do fluxo de vendas
+        required: true
+        default: core
+        type: choice
+        options:
+          - core
+          - full
+
+jobs:
+  preflight:
+    name: Preflight Vendas
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      JWT_SECRET: test-jwt-secret
+      DATABASE_HOST: localhost
+      DATABASE_PORT: '5434'
+      DATABASE_USERNAME: conectcrm
+      DATABASE_PASSWORD: conectcrm123
+      DATABASE_NAME: conectcrm_test
+      TYPEORM_USE_TS: 'true'
+      REDIS_HOST: localhost
+      REDIS_PORT: '6379'
+      CI: 'true'
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: conectcrm
+          POSTGRES_PASSWORD: conectcrm123
+          POSTGRES_DB: conectcrm_test
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U conectcrm -d conectcrm_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+            frontend-web/package-lock.json
+
+      - name: Endurecer rede do npm
+        run: |
+          npm config set fetch-retries 5
+          npm config set fetch-retry-factor 2
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+
+      - name: Instalar dependencias root
+        run: |
+          for tentativa in 1 2 3; do
+            if npm ci; then
+              exit 0
+            fi
+            if [ "$tentativa" -eq 3 ]; then
+              echo "Falha ao instalar dependencias root apos 3 tentativas."
+              exit 1
+            fi
+            echo "Tentativa ${tentativa}/3 falhou para dependencias root. Repetindo em 15s..."
+            sleep 15
+          done
+
+      - name: Instalar dependencias backend
+        run: |
+          for tentativa in 1 2 3; do
+            if npm --prefix backend ci; then
+              exit 0
+            fi
+            if [ "$tentativa" -eq 3 ]; then
+              echo "Falha ao instalar dependencias backend apos 3 tentativas."
+              exit 1
+            fi
+            echo "Tentativa ${tentativa}/3 falhou para dependencias backend. Repetindo em 15s..."
+            sleep 15
+          done
+
+      - name: Instalar dependencias frontend
+        run: |
+          for tentativa in 1 2 3; do
+            if npm --prefix frontend-web ci; then
+              exit 0
+            fi
+            if [ "$tentativa" -eq 3 ]; then
+              echo "Falha ao instalar dependencias frontend apos 3 tentativas."
+              exit 1
+            fi
+            echo "Tentativa ${tentativa}/3 falhou para dependencias frontend. Repetindo em 15s..."
+            sleep 15
+          done
+
+      - name: Aplicar migrations na base de teste
+        run: npm --prefix backend run migration:run
+
+      - name: Instalar browser Chromium (Playwright)
+        run: npx playwright install --with-deps chromium
+
+      - name: Executar preflight GO Core
+        if: ${{ github.event.inputs.mode == 'core' || github.event.inputs.mode == '' }}
+        run: npm run preflight:go-live:vendas:core
+
+      - name: Executar preflight GO Full
+        if: ${{ github.event.inputs.mode == 'full' }}
+        run: npm run preflight:go-live:vendas:full
+
+      - name: Upload artefatos Playwright
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-vendas-preflight-${{ github.event.inputs.mode || 'core' }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14

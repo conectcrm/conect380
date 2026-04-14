@@ -14,16 +14,21 @@ import {
 } from '@nestjs/common';
 import { EmpresaId } from '../../common/decorators/empresa.decorator';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permission } from '../../common/permissions/permissions.constants';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateEventoDto, UpdateEventoDto } from './dto/evento.dto';
 import { EventosService } from './eventos.service';
 
 @Controller('eventos')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.CRM_AGENDA_READ)
 export class EventosController {
   constructor(private readonly eventosService: EventosService) {}
 
   @Post()
+  @Permissions(Permission.CRM_AGENDA_CREATE)
   async create(
     @Body() createEventoDto: CreateEventoDto,
     @Request() req: any,
@@ -74,6 +79,7 @@ export class EventosController {
   }
 
   @Patch(':id')
+  @Permissions(Permission.CRM_AGENDA_UPDATE)
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateEventoDto: UpdateEventoDto,
@@ -84,6 +90,7 @@ export class EventosController {
   }
 
   @Delete(':id')
+  @Permissions(Permission.CRM_AGENDA_DELETE)
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
     @Request() req: any,

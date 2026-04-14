@@ -1,4 +1,5 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import axios from 'axios';
 import { CalendarEvent, CalendarView, DragData } from '../types/calendar';
 import { agendaEventosService } from '../services/agendaEventosService';
 import { useAuth } from '../contexts/AuthContext';
@@ -23,11 +24,16 @@ export const useCalendarEvents = () => {
       try {
         setLoading(true);
         setError(null);
-        const eventos = await agendaEventosService.listarEventos({
+        let eventos = await agendaEventosService.listarEventos({
           startDate: filtros?.startDate,
           endDate: filtros?.endDate,
           status: filtros?.status,
         });
+
+        if (filtros?.type) {
+          eventos = eventos.filter((event) => event.type === filtros.type);
+        }
+
         setEvents(eventos);
       } catch (error) {
         console.error('Erro ao carregar eventos:', error);
@@ -60,12 +66,32 @@ export const useCalendarEvents = () => {
         setError(null);
 
         const newEvent = await agendaEventosService.criarEvento(event);
-        setEvents((prev) => [...prev, newEvent]);
-        return newEvent;
+        const mergedEvent: CalendarEvent = {
+          ...newEvent,
+          type: event.type ?? newEvent.type,
+          priority: event.priority ?? newEvent.priority,
+          status: event.status ?? newEvent.status,
+          attendees: event.attendees ?? newEvent.attendees,
+          cliente: event.cliente ?? newEvent.cliente,
+          allDay: event.allDay ?? newEvent.allDay,
+          location: event.location ?? newEvent.location,
+          color: event.color ?? newEvent.color,
+          collaborator: event.collaborator ?? newEvent.collaborator,
+          responsavel: event.responsavel ?? newEvent.responsavel,
+          responsavelId: event.responsavelId ?? newEvent.responsavelId,
+          category: event.category ?? newEvent.category,
+          recurring: event.recurring ?? newEvent.recurring,
+          isRecurring: event.isRecurring ?? newEvent.isRecurring,
+          recurringPattern: event.recurringPattern ?? newEvent.recurringPattern,
+          notes: event.notes ?? newEvent.notes,
+        };
+
+        setEvents((prev) => [...prev, mergedEvent]);
+        return mergedEvent;
       } catch (error) {
         console.error('Erro ao criar evento:', error);
         setError('Não foi possível criar o evento');
-        return null;
+        throw error;
       } finally {
         setLoading(false);
       }
@@ -81,15 +107,46 @@ export const useCalendarEvents = () => {
         setError(null);
 
         const updatedEvent = await agendaEventosService.atualizarEvento(eventId, updates);
-        setEvents((prev) => prev.map((event) => (event.id === eventId ? updatedEvent : event)));
+        const mergedUpdatedEvent: CalendarEvent = {
+          ...updatedEvent,
+          type: updates.type ?? updatedEvent.type,
+          priority: updates.priority ?? updatedEvent.priority,
+          status: updates.status ?? updatedEvent.status,
+          attendees: updates.attendees ?? updatedEvent.attendees,
+          cliente: updates.cliente ?? updatedEvent.cliente,
+          allDay: updates.allDay ?? updatedEvent.allDay,
+          location: updates.location ?? updatedEvent.location,
+          color: updates.color ?? updatedEvent.color,
+          collaborator: updates.collaborator ?? updatedEvent.collaborator,
+          responsavel: updates.responsavel ?? updatedEvent.responsavel,
+          responsavelId: updates.responsavelId ?? updatedEvent.responsavelId,
+          category: updates.category ?? updatedEvent.category,
+          recurring: updates.recurring ?? updatedEvent.recurring,
+          isRecurring: updates.isRecurring ?? updatedEvent.isRecurring,
+          recurringPattern: updates.recurringPattern ?? updatedEvent.recurringPattern,
+          notes: updates.notes ?? updatedEvent.notes,
+        };
 
-        // Atualizar selectedEvent se for o mesmo
+        setEvents((prev) =>
+          prev.map((event) => (event.id === eventId ? mergedUpdatedEvent : event)),
+        );
+
         if (selectedEvent?.id === eventId) {
-          setSelectedEvent(updatedEvent);
+          setSelectedEvent(mergedUpdatedEvent);
         }
+
+        return mergedUpdatedEvent;
       } catch (error) {
-        console.error('Erro ao atualizar evento:', error);
-        setError('Não foi possível atualizar o evento');
+        const statusCode = axios.isAxiosError(error) ? error.response?.status : undefined;
+        if (statusCode !== 403) {
+          console.error('Erro ao atualizar evento:', error);
+        }
+        setError(
+          statusCode === 403
+            ? 'Sem permissão para atualizar este evento'
+            : 'Não foi possível atualizar o evento',
+        );
+        throw error;
       } finally {
         setLoading(false);
       }
@@ -110,9 +167,12 @@ export const useCalendarEvents = () => {
         if (selectedEvent?.id === eventId) {
           setSelectedEvent(null);
         }
+
+        return true;
       } catch (error) {
         console.error('Erro ao excluir evento:', error);
         setError('Não foi possível excluir o evento');
+        throw error;
       } finally {
         setLoading(false);
       }
@@ -120,6 +180,49 @@ export const useCalendarEvents = () => {
     [selectedEvent],
   );
 
+  // Atualizar somente metadados locais (sem persistência no backend)
+  const updateEventLocalMeta = useCallback(
+    (eventId: string, updates: Partial<CalendarEvent>) => {
+      agendaEventosService.atualizarMetadadosLocaisEvento(eventId, updates);
+
+      setEvents((prev) =>
+        prev.map((event) => (event.id === eventId ? ({ ...event, ...updates } as CalendarEvent) : event)),
+      );
+
+      if (selectedEvent?.id === eventId) {
+        setSelectedEvent((prev) => (prev ? ({ ...prev, ...updates } as CalendarEvent) : prev));
+      }
+    },
+    [selectedEvent],
+  );
+
+  const respondToInvite = useCallback(
+    async (eventId: string, response: Extract<NonNullable<CalendarEvent['myRsvp']>, 'confirmed' | 'declined'>) => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const updatedEvent = await agendaEventosService.responderConviteEvento(eventId, response);
+
+        setEvents((prev) =>
+          prev.map((event) => (event.id === eventId ? ({ ...event, ...updatedEvent } as CalendarEvent) : event)),
+        );
+
+        if (selectedEvent?.id === eventId) {
+          setSelectedEvent((prev) => (prev ? ({ ...prev, ...updatedEvent } as CalendarEvent) : prev));
+        }
+
+        return updatedEvent;
+      } catch (error) {
+        console.error('Erro ao responder convite:', error);
+        setError('Não foi possível responder ao convite');
+        throw error;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [selectedEvent],
+  );
   // Mover evento (drag & drop)
   const moveEvent = useCallback(
     async (eventId: string, newStart: Date, newEnd: Date) => {
@@ -182,10 +285,18 @@ export const useCalendarEvents = () => {
   // Função para obter lista única de colaboradores
   const getCollaborators = useCallback(() => {
     const collaborators = events
-      .map((event) => event.collaborator)
-      .filter((collaborator): collaborator is string => !!collaborator)
-      .filter((collaborator, index, array) => array.indexOf(collaborator) === index)
-      .sort();
+      .flatMap((event) => {
+        const values: string[] = [];
+
+        if (event.collaborator) values.push(event.collaborator);
+        if (event.responsavel) values.push(event.responsavel);
+        if (event.attendees?.length) values.push(...event.attendees);
+
+        return values;
+      })
+      .filter((value): value is string => !!value)
+      .filter((value, index, array) => array.indexOf(value) === index)
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
     return collaborators.map((name) => ({
       value: name,
@@ -202,6 +313,8 @@ export const useCalendarEvents = () => {
     deleteEvent,
     moveEvent,
     duplicateEvent,
+    respondToInvite,
+    updateEventLocalMeta,
     getCollaborators,
     checkConflicts,
     filterByPeriod,
@@ -264,68 +377,99 @@ export const useCalendarView = () => {
 // Hook para drag & drop
 export const useCalendarDragDrop = (
   events: CalendarEvent[],
-  onMoveEvent: (eventId: string, newStart: Date, newEnd: Date) => void,
+  onMoveEvent: (eventId: string, newStart: Date, newEnd: Date) => void | Promise<void>,
 ) => {
   const [draggedEvent, setDraggedEvent] = useState<DragData | null>(null);
   const [dropTarget, setDropTarget] = useState<Date | null>(null);
+  const draggedEventRef = useRef<DragData | null>(null);
+  const dropTargetRef = useRef<Date | null>(null);
+  const eventsRef = useRef<CalendarEvent[]>(events);
 
-  const startDrag = useCallback(
-    (eventId: string) => {
-      const event = events.find((e) => e.id === eventId);
-      if (event) {
-        setDraggedEvent({
-          eventId,
-          originalDate: event.start,
-          originalStartTime: event.start,
-          originalEndTime: event.end,
-        });
-      }
-    },
-    [events],
-  );
+  useEffect(() => {
+    eventsRef.current = events;
+  }, [events]);
 
-  const endDrag = useCallback(() => {
-    if (draggedEvent && dropTarget) {
-      const event = events.find((e) => e.id === draggedEvent.eventId);
-      if (event) {
-        const duration = event.end.getTime() - event.start.getTime();
-        const newStart = new Date(dropTarget);
-
-        // Mantém o horário original se for o mesmo dia
-        if (dropTarget.toDateString() === event.start.toDateString()) {
-          newStart.setHours(event.start.getHours(), event.start.getMinutes());
-        } else {
-          // Se for dia diferente, mantém o horário
-          newStart.setHours(event.start.getHours(), event.start.getMinutes());
-        }
-
-        const newEnd = new Date(newStart.getTime() + duration);
-
-        onMoveEvent(draggedEvent.eventId, newStart, newEnd);
-      }
-    }
-
-    // Reset states
-    setDraggedEvent(null);
-    setDropTarget(null);
-  }, [draggedEvent, dropTarget, events, onMoveEvent]);
-
-  const cancelDrag = useCallback(() => {
+  const resetDragState = useCallback(() => {
+    draggedEventRef.current = null;
+    dropTargetRef.current = null;
     setDraggedEvent(null);
     setDropTarget(null);
   }, []);
 
-  const setDrop = useCallback(
-    (date: Date) => {
-      setDropTarget(date);
-      // Chama endDrag automaticamente quando um drop target é definido
-      setTimeout(() => {
-        if (draggedEvent) {
-          endDrag();
+  const applyMove = useCallback(
+    (targetDate?: Date, draggedEventId?: string) => {
+      const currentDropTarget = targetDate ?? dropTargetRef.current;
+      const currentDraggedEventId = draggedEventId ?? draggedEventRef.current?.eventId;
+
+      if (!currentDropTarget || !currentDraggedEventId) {
+        return;
+      }
+
+      const event = eventsRef.current.find((calendarEvent) => calendarEvent.id === currentDraggedEventId);
+      if (!event) {
+        return;
+      }
+
+      const duration = event.end.getTime() - event.start.getTime();
+      const newStart = new Date(currentDropTarget);
+
+      // Mantém o horário original no novo dia selecionado.
+      newStart.setHours(event.start.getHours(), event.start.getMinutes());
+
+      const newEnd = new Date(newStart.getTime() + duration);
+
+      try {
+        const maybePromise = onMoveEvent(currentDraggedEventId, newStart, newEnd);
+        if (maybePromise && typeof (maybePromise as Promise<void>).catch === 'function') {
+          void (maybePromise as Promise<void>).catch((error) => {
+            console.error('Erro ao mover evento via drag & drop:', error);
+          });
         }
-      }, 0);
+      } catch (error) {
+        console.error('Erro ao mover evento via drag & drop:', error);
+      }
     },
-    [draggedEvent, endDrag],
+    [onMoveEvent],
+  );
+
+  const startDrag = useCallback(
+    (eventId: string) => {
+      dropTargetRef.current = null;
+      setDropTarget(null);
+
+      const event = eventsRef.current.find((calendarEvent) => calendarEvent.id === eventId);
+      if (event) {
+        const nextDraggedEvent = {
+          eventId,
+          originalDate: event.start,
+          originalStartTime: event.start,
+          originalEndTime: event.end,
+        };
+        draggedEventRef.current = nextDraggedEvent;
+        setDraggedEvent(nextDraggedEvent);
+      }
+    },
+    [],
+  );
+
+  const endDrag = useCallback(() => {
+    // O movimento deve ocorrer apenas no drop explícito.
+    // No dragend, apenas limpamos estado para evitar PATCH indevido.
+    resetDragState();
+  }, [resetDragState]);
+
+  const cancelDrag = useCallback(() => {
+    resetDragState();
+  }, [resetDragState]);
+
+  const setDrop = useCallback(
+    (date: Date, eventId?: string) => {
+      dropTargetRef.current = date;
+      setDropTarget(date);
+      applyMove(date, eventId);
+      resetDragState();
+    },
+    [applyMove, resetDragState],
   );
 
   return {

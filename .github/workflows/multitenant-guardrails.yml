@@ -1,11 +1,8 @@
 name: Multi-tenant Guardrails
 
 on:
+  # Keep this required check available on every PR; the script itself is diff-based.
   pull_request:
-    paths:
-      - 'backend/**'
-      - 'scripts/**'
-      - '.github/**'
   push:
     branches:
       - main

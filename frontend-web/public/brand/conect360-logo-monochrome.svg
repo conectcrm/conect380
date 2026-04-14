@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 260" role="img" aria-labelledby="title desc" shape-rendering="geometricPrecision">
+  <title id="title">Conect360 Logo Monocromatico</title>
+  <desc id="desc">Logo horizontal monocromatico para uso institucional.</desc>
+  <path d="M113 9 L180 48 Q188 53 188 63 L188 161 Q188 171 180 176 L113 215 Q105 220 97 215 L30 176 Q22 171 22 161 L22 63 Q22 53 30 48 L97 9 Q105 4 113 9 Z" fill="#002333"/>
+  <path d="M88 68 L88 146 L156 107 Z" fill="#FFFFFF" stroke="#002333" stroke-width="7" stroke-linejoin="round"/>
+  <text
+    x="230"
+    y="154"
+    fill="#002333"
+    font-family="Poppins, Montserrat, 'Segoe UI', Arial, sans-serif"
+    font-size="98"
+    font-weight="700"
+    letter-spacing="-1.2"
+  >
+    Conect360
+  </text>
+</svg>

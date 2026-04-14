@@ -20,6 +20,8 @@ import {
 import { BackToNucleus } from '../components/navigation/BackToNucleus';
 import { statusService, type StatusCustomizado } from '../services/statusService';
 import { niveisService, type NivelAtendimento } from '../services/niveisService';
+import { useGlobalConfirmation } from '../contexts/GlobalConfirmationContext';
+import { SectionCard } from '../components/layout-v2';
 
 interface CreateStatusDto {
   nivelAtendimentoId: string;
@@ -32,6 +34,7 @@ interface CreateStatusDto {
 }
 
 const GestaoStatusCustomizadosPage: React.FC = () => {
+  const { confirm } = useGlobalConfirmation();
   // Estados principais
   const [status, setStatus] = useState<StatusCustomizado[]>([]);
   const [niveis, setNiveis] = useState<NivelAtendimento[]>([]);
@@ -148,7 +151,11 @@ const GestaoStatusCustomizadosPage: React.FC = () => {
   };
 
   const handleDelete = async (id: string, nome: string) => {
-    if (!window.confirm(`Tem certeza que deseja excluir o status "${nome}"? Esta ação não pode ser desfeita.`)) {
+    if (
+      !(await confirm(
+        `Tem certeza que deseja excluir o status "${nome}"? Esta ação não pode ser desfeita.`,
+      ))
+    ) {
       return;
     }
 
@@ -204,19 +211,21 @@ const GestaoStatusCustomizadosPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="space-y-4 pt-1 sm:pt-2">
       {/* Header com Breadcrumb */}
-      <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus
-          nucleusName="Configurações"
-          nucleusPath="/nuclei/configuracoes"
-        />
+      <div className="px-2 sm:px-0">
+        <SectionCard className="px-4 py-3">
+          <BackToNucleus
+            nucleusName="Configurações"
+            nucleusPath="/nuclei/configuracoes"
+          />
+        </SectionCard>
       </div>
 
-      <div className="p-6">
+      <div className="px-2 sm:px-0">
         <div className="max-w-7xl mx-auto">
           {/* Header da Página */}
-          <div className="bg-white rounded-lg shadow-sm border mb-6">
+          <SectionCard className="mb-6">
             <div className="px-6 py-6">
               <div className="flex flex-col sm:flex-row justify-between items-start">
                 <div>
@@ -251,7 +260,7 @@ const GestaoStatusCustomizadosPage: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </SectionCard>
 
           {/* Dashboard Cards (KPI Cards) */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -329,7 +338,7 @@ const GestaoStatusCustomizadosPage: React.FC = () => {
           </div>
 
           {/* Barra de Busca e Filtros */}
-          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+          <SectionCard className="p-6 mb-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -368,7 +377,7 @@ const GestaoStatusCustomizadosPage: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </SectionCard>
 
           {/* Error Alert */}
           {error && (
@@ -379,7 +388,7 @@ const GestaoStatusCustomizadosPage: React.FC = () => {
 
           {/* Estado Vazio */}
           {!loading && statusOrdenados.length === 0 && (
-            <div className="bg-white rounded-lg shadow-sm border">
+            <SectionCard>
               <div className="text-center py-12 px-6">
                 <ListChecks className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
@@ -400,15 +409,15 @@ const GestaoStatusCustomizadosPage: React.FC = () => {
                   </button>
                 )}
               </div>
-            </div>
+            </SectionCard>
           )}
 
           {/* Grid de Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {statusOrdenados.map((item) => (
-              <div
+              <SectionCard
                 key={item.id}
-                className="bg-white rounded-lg shadow-sm border hover:shadow-lg transition-shadow duration-300"
+                className="hover:shadow-lg transition-shadow duration-300"
               >
                 <div className="p-6">
                   {/* Header do Card */}
@@ -476,7 +485,7 @@ const GestaoStatusCustomizadosPage: React.FC = () => {
                     <span className="text-xs text-gray-500">Ordem #{item.ordem}</span>
                   </div>
                 </div>
-              </div>
+              </SectionCard>
             ))}
           </div>
         </div>

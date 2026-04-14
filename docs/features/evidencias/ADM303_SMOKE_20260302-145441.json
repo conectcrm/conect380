@@ -1,0 +1,96 @@
+﻿{
+    "started_at":  "2026-03-02T14:54:41",
+    "finished_at":  "2026-03-02T14:54:42",
+    "base_url":  "http://localhost:3001",
+    "requester_email":  "admin@conectsuite.com.br",
+    "approver_email":  "superadmin@conectsuite.com.br",
+    "target_email":  "mvp.manager.dashboard@conectsuite.com.br",
+    "target_user_id":  "",
+    "request_id":  "",
+    "permission":  "admin.empresas.manage",
+    "duration_minutes":  20,
+    "target_companies_status_before":  403,
+    "target_companies_status_after_approve":  403,
+    "target_companies_status_after_revoke":  403,
+    "dry_run":  false,
+    "results":  [
+                    {
+                        "Step":  "Login requester",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T14:54:41"
+                    },
+                    {
+                        "Step":  "Login approver",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 401 em POST http://localhost:3001/auth/login. ",
+                        "Timestamp":  "2026-03-02T14:54:41"
+                    },
+                    {
+                        "Step":  "Login target",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T14:54:41"
+                    },
+                    {
+                        "Step":  "Resolver target_user_id pelo admin-bff/users",
+                        "Status":  "FAIL",
+                        "Details":  "Usuario alvo nao encontrado por email: mvp.manager.dashboard@conectsuite.com.br",
+                        "Timestamp":  "2026-03-02T14:54:41"
+                    },
+                    {
+                        "Step":  "Validar acesso alvo antes do break-glass (esperado 403)",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T14:54:41"
+                    },
+                    {
+                        "Step":  "Criar solicitacao break-glass",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 400 em POST http://localhost:3001/admin/bff/break-glass/requests. ",
+                        "Timestamp":  "2026-03-02T14:54:41"
+                    },
+                    {
+                        "Step":  "Aprovar solicitacao break-glass com segundo responsavel",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 404 em POST http://localhost:3001/admin/bff/break-glass/requests//approve. ",
+                        "Timestamp":  "2026-03-02T14:54:41"
+                    },
+                    {
+                        "Step":  "Validar listagem de break-glass ativo",
+                        "Status":  "FAIL",
+                        "Details":  "Solicitacao aprovada nao aparece na listagem de ativos",
+                        "Timestamp":  "2026-03-02T14:54:41"
+                    },
+                    {
+                        "Step":  "Validar acesso alvo durante vigencia (esperado 200)",
+                        "Status":  "FAIL",
+                        "Details":  "Acesso alvo nao foi elevado apos aprovacao (status=403).",
+                        "Timestamp":  "2026-03-02T14:54:41"
+                    },
+                    {
+                        "Step":  "Revogar acesso break-glass ativo",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 404 em POST http://localhost:3001/admin/bff/break-glass//revoke. ",
+                        "Timestamp":  "2026-03-02T14:54:42"
+                    },
+                    {
+                        "Step":  "Validar remocao de break-glass ativo",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T14:54:42"
+                    },
+                    {
+                        "Step":  "Validar acesso alvo apos revogacao (esperado 403)",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T14:54:42"
+                    },
+                    {
+                        "Step":  "Validar trilha de auditoria admin_break_glass",
+                        "Status":  "FAIL",
+                        "Details":  "Nao encontrou evento admin_break_glass na auditoria",
+                        "Timestamp":  "2026-03-02T14:54:42"
+                    }
+                ]
+}

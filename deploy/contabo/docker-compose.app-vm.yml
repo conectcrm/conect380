@@ -1,0 +1,87 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: conect360-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - redis_data:/data
+    networks:
+      - conect360-network
+
+  backend:
+    build:
+      context: ../..
+      dockerfile: .production/docker/Dockerfile.backend
+    container_name: conect360-backend
+    restart: unless-stopped
+    env_file:
+      - ./.env.app-vm
+    environment:
+      NODE_ENV: production
+      APP_PORT: 3001
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "127.0.0.1:3500:3001"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+    volumes:
+      - backend_uploads:/app/uploads
+      - backend_logs:/app/logs
+    networks:
+      - conect360-network
+
+  frontend:
+    build:
+      context: ../..
+      dockerfile: .production/docker/Dockerfile.frontend
+      args:
+        REACT_APP_API_URL: ${REACT_APP_API_URL}
+        REACT_APP_WS_URL: ${REACT_APP_WS_URL}
+        REACT_APP_WEBSOCKET_URL: ${REACT_APP_WEBSOCKET_URL:-}
+        REACT_APP_MVP_MODE: ${REACT_APP_MVP_MODE:-false}
+        REACT_APP_FINANCEIRO_BOLETO_ENABLED: ${REACT_APP_FINANCEIRO_BOLETO_ENABLED:-false}
+        REACT_APP_PAGAMENTOS_GATEWAY_ENABLED_PROVIDERS: ${REACT_APP_PAGAMENTOS_GATEWAY_ENABLED_PROVIDERS:-}
+        REACT_APP_PAGAMENTOS_GATEWAY_ALLOW_UNIMPLEMENTED: ${REACT_APP_PAGAMENTOS_GATEWAY_ALLOW_UNIMPLEMENTED:-false}
+        REACT_APP_GUARDIAN_WEB_URL: ${REACT_APP_GUARDIAN_WEB_URL:-}
+    container_name: conect360-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - conect360-network
+
+volumes:
+  redis_data:
+    name: conect360_redis_data
+  backend_uploads:
+    name: conect360_backend_uploads
+  backend_logs:
+    name: conect360_backend_logs
+
+networks:
+  conect360-network:
+    name: conect360-network
+    driver: bridge

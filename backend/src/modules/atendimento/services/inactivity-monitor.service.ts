@@ -23,6 +23,11 @@ import { runWithTenant } from '../../../common/tenant/tenant-context';
 export class InactivityMonitorService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(InactivityMonitorService.name);
   private intervalId: NodeJS.Timeout | null = null;
+  private readonly nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
+  private readonly enabled =
+    this.nodeEnv !== 'test' &&
+    (process.env.INACTIVITY_MONITOR_ENABLED === 'true' ||
+      (process.env.INACTIVITY_MONITOR_ENABLED !== 'false' && this.nodeEnv !== 'development'));
 
   constructor(
     @InjectRepository(Ticket)
@@ -35,6 +40,13 @@ export class InactivityMonitorService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
+    if (!this.enabled) {
+      this.logger.log(
+        'Monitoramento de inatividade desabilitado (defina INACTIVITY_MONITOR_ENABLED=true para habilitar em desenvolvimento)',
+      );
+      return;
+    }
+
     this.iniciarMonitoramento();
   }
 

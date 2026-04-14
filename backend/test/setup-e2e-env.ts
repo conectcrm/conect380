@@ -1,9 +1,33 @@
+import { config as loadEnv } from 'dotenv';
+import { resolve } from 'path';
+
+// Carrega .env local antes dos defaults de teste sem sobrescrever variaveis ja definidas.
+loadEnv({ path: resolve(__dirname, '../.env') });
+
 process.env.NODE_ENV ??= 'test';
+process.env.APP_ENV ??= 'test';
+process.env.HTTP_LOG_REQUESTS_IN_TEST ??= 'false';
+process.env.HTTP_LOG_EXPECTED_ERRORS_IN_TEST ??= 'false';
+process.env.HTTP_LOG_UNIMPLEMENTED_IN_TEST ??= 'false';
+process.env.CACHE_LOGS_IN_TEST ??= 'false';
+process.env.GATEWAY_FEATURE_GATE_LOGS_IN_TEST ??= 'false';
+process.env.EMAIL_INTEGRADO_LOGS_IN_TEST ??= 'false';
+process.env.EMAIL_INTEGRADO_ERRORS_IN_TEST ??= 'false';
+process.env.NEST_LOGS_IN_TEST ??= 'false';
+process.env.E2E_BOOTSTRAP_LOCK_IN_TEST ??= 'false';
+// Mantem compatibilidade com schema legado/hibrido durante suites E2E de vendas.
+process.env.E2E_DB_COMPAT_LEGACY_SCHEMA ??= 'true';
 process.env.JWT_SECRET ??= 'test-jwt-secret';
+process.env.AUTH_ADMIN_MFA_REQUIRED ??= 'false';
+process.env.AUTH_LOGIN_LOCKOUT_ENABLED ??= 'false';
+// Evita flakiness/dep. externa (Puppeteer/Chrome) nas suites E2E que criam contratos.
+process.env.CONTRATOS_PDF_DISABLE ??= 'true';
 process.env.DATABASE_HOST ??= 'localhost';
-process.env.DATABASE_PORT ??= '5434';
-process.env.DATABASE_USERNAME ??= 'conectcrm';
-process.env.DATABASE_PASSWORD ??= 'conectcrm123';
-process.env.DATABASE_NAME ??= 'conectcrm_test';
+process.env.DATABASE_PORT ??= '5433';
+process.env.DATABASE_USERNAME ??= 'postgres';
+process.env.DATABASE_PASSWORD ??= 'postgres';
+process.env.DATABASE_NAME ??= 'conectcrm';
 process.env.REDIS_HOST ??= 'localhost';
 process.env.REDIS_PORT ??= '6379';
+process.env.DASHBOARD_V2_STAGE_EVENT_RECOMPUTE_ENABLED ??= 'false';
+process.env.DASHBOARD_V2_DAILY_REPROCESS_QUEUE_ENABLED ??= 'false';

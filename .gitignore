@@ -15,6 +15,10 @@ dist/
 .env.test.local
 .env.production.local
 .env.production
+# Contabo deploy runtime env (keep local only)
+deploy/contabo/.env.app-vm
+deploy/contabo/deploy-profile.local.psd1
+deploy/contabo/deploy-profile.*.local.psd1
 # Mas permitir .example
 !.env*.example
 
@@ -60,6 +64,7 @@ Thumbs.db
 
 # Temporary folders
 tmp/
+.tmp/
 temp/
 archived/
 backup*/
@@ -158,6 +163,7 @@ scripts/*.env
 
 # Artefatos gerados/local-only (não versionar)
 .production/pilot-runs/
+.production/deploy-jobs/
 backend/test/tmp-*
 tmp-*.json
 
@@ -228,3 +234,7 @@ temp-docker-export/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# Deploy profile local (dados de ambiente/ssh)
+.production/configs/deploy-profile.local.psd1
+.production/configs/deploy-profile.*.local.psd1

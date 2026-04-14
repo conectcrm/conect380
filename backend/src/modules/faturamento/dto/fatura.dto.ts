@@ -2,6 +2,7 @@ import {
   IsString,
   IsNumber,
   IsEnum,
+  IsIn,
   IsOptional,
   IsDateString,
   IsArray,
@@ -10,9 +11,23 @@ import {
   Min,
   Max,
   IsUUID,
+  IsObject,
+  ArrayNotEmpty,
+  ArrayUnique,
+  IsInt,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { TipoFatura, FormaPagamento } from '../entities/fatura.entity';
+
+export const TIPOS_DOCUMENTO_FINANCEIRO = [
+  'fatura',
+  'recibo',
+  'nfse',
+  'nfe',
+  'folha_pagamento',
+  'outro',
+] as const;
+export type TipoDocumentoFinanceiro = (typeof TIPOS_DOCUMENTO_FINANCEIRO)[number];
 
 export class ItemFaturaDto {
   @IsString()
@@ -51,6 +66,10 @@ export class CreateFaturaDto {
   @IsNumber()
   contratoId?: number;
 
+  @IsOptional()
+  @IsUUID(4, { message: 'propostaId deve ser um UUID valido' })
+  propostaId?: string;
+
   // ✅ CORREÇÃO: Usar UUID para cliente
   @IsUUID(4, { message: 'ID do cliente deve ser um UUID válido' })
   clienteId: string;
@@ -84,6 +103,38 @@ export class CreateFaturaDto {
   @IsNumber()
   @Min(0)
   valorDesconto?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  valorImpostos?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  percentualImpostos?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  diasCarenciaJuros?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  percentualJuros?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  percentualMulta?: number;
+
+  @IsOptional()
+  @IsObject()
+  detalhesTributarios?: Record<string, unknown>;
 }
 
 export class UpdateFaturaDto {
@@ -113,6 +164,38 @@ export class UpdateFaturaDto {
   @ValidateNested({ each: true })
   @Type(() => ItemFaturaDto)
   itens?: ItemFaturaDto[];
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  valorImpostos?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  percentualImpostos?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  diasCarenciaJuros?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  percentualJuros?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  percentualMulta?: number;
+
+  @IsOptional()
+  @IsObject()
+  detalhesTributarios?: Record<string, unknown>;
 }
 
 export class GerarFaturaAutomaticaDto {
@@ -126,4 +209,27 @@ export class GerarFaturaAutomaticaDto {
   @IsOptional()
   @IsBoolean()
   enviarEmail?: boolean;
+}
+
+export class GerarCobrancaLoteDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayUnique()
+  @Type(() => Number)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  faturaIds: number[];
+}
+
+export class GerarNumeroDocumentoFinanceiroDto {
+  @IsString()
+  @IsIn(TIPOS_DOCUMENTO_FINANCEIRO, { message: 'Tipo de documento financeiro invalido.' })
+  tipoDocumento: TipoDocumentoFinanceiro;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(2000)
+  @Max(9999)
+  anoReferencia?: number;
 }

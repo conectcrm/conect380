@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import {
   Eye,
   Calendar,
@@ -37,8 +37,6 @@ export const PreviewProposta: React.FC<PreviewPropostaProps> = ({
   onSend,
   position,
 }) => {
-  const [isHovered, setIsHovered] = useState(false);
-
   // Calcular posição do preview para não sair da tela (sempre executar hooks antes de early returns)
   const adjustedPosition = useMemo(() => {
     return calculateSafePosition(position, 400, 500);
@@ -69,14 +67,6 @@ export const PreviewProposta: React.FC<PreviewPropostaProps> = ({
 
   const diasRestantes = calcularDiasRestantes();
 
-  const getUrgenciaColor = () => {
-    if (!diasRestantes) return 'gray';
-    if (diasRestantes < 0) return 'red';
-    if (diasRestantes <= 3) return 'orange';
-    if (diasRestantes <= 7) return 'yellow';
-    return 'green';
-  };
-
   return (
     <>
       {/* Overlay transparente para fechar */}
@@ -84,60 +74,59 @@ export const PreviewProposta: React.FC<PreviewPropostaProps> = ({
 
       {/* Preview Card */}
       <div
-        className="fixed z-50 w-96 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden"
+        className="fixed z-50 w-96 overflow-hidden rounded-2xl border border-[#D4E2E7] bg-white shadow-[0_24px_60px_-28px_rgba(15,57,74,0.5)]"
         style={{
           left: adjustedPosition.x,
           top: adjustedPosition.y,
           transform: 'translate(10px, -50%)',
         }}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-4 text-white">
+        <div className="bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] p-4 text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <FileText className="w-5 h-5" />
               <h3 className="font-semibold text-lg">{proposta.numero || 'Proposta'}</h3>
             </div>
             <button
+              type="button"
               onClick={onClose}
-              className="p-1 hover:bg-blue-500 rounded-full transition-colors"
+              className="rounded-full p-1 transition hover:bg-white/10"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
           <div className="mt-2">
-            <p className="text-blue-100 text-sm font-medium">{proposta.titulo || 'Sem título'}</p>
+            <p className="text-sm font-medium text-[#D9F5F1]">{proposta.titulo || 'Sem título'}</p>
           </div>
         </div>
 
         {/* Status Flow */}
-        <div className="p-4 bg-gray-50 border-b border-gray-200">
+        <div className="border-b border-[#E4EDF0] bg-[#F7FBFC] p-4">
           <StatusFluxo status={proposta.status} compact={true} />
         </div>
 
         {/* Conteúdo Principal */}
-        <div className="p-4 space-y-4">
+        <div className="space-y-4 p-4">
           {/* Cliente e Vendedor */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <Building className="w-4 h-4 text-gray-500" />
-                <span className="text-sm font-medium text-gray-700">Cliente</span>
+                <Building className="h-4 w-4 text-[#607B89]" />
+                <span className="text-sm font-medium text-[#607B89]">Cliente</span>
               </div>
-              <p className="text-sm text-gray-900 font-medium">
+              <p className="text-sm font-medium text-[#19384C]">
                 {proposta.cliente || 'Cliente não informado'}
               </p>
             </div>
 
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <User className="w-4 h-4 text-gray-500" />
-                <span className="text-sm font-medium text-gray-700">Vendedor</span>
+                <User className="h-4 w-4 text-[#607B89]" />
+                <span className="text-sm font-medium text-[#607B89]">Vendedor</span>
               </div>
-              <p className="text-sm text-gray-900">{proposta.vendedor || 'Não atribuído'}</p>
+              <p className="text-sm text-[#19384C]">{proposta.vendedor || 'Não atribuído'}</p>
             </div>
           </div>
 
@@ -145,18 +134,18 @@ export const PreviewProposta: React.FC<PreviewPropostaProps> = ({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <DollarSign className="w-4 h-4 text-gray-500" />
-                <span className="text-sm font-medium text-gray-700">Valor</span>
+                <DollarSign className="h-4 w-4 text-[#607B89]" />
+                <span className="text-sm font-medium text-[#607B89]">Valor</span>
               </div>
-              <p className="text-lg font-bold text-green-600">{formatCurrency(proposta.valor)}</p>
+              <p className="text-lg font-bold text-[#159A9C]">{formatCurrency(proposta.valor)}</p>
             </div>
 
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <Calendar className="w-4 h-4 text-gray-500" />
-                <span className="text-sm font-medium text-gray-700">Vencimento</span>
+                <Calendar className="h-4 w-4 text-[#607B89]" />
+                <span className="text-sm font-medium text-[#607B89]">Vencimento</span>
               </div>
-              <p className="text-sm text-gray-900">{formatDate(proposta.data_vencimento)}</p>
+              <p className="text-sm text-[#19384C]">{formatDate(proposta.data_vencimento)}</p>
               {diasRestantes !== null && (
                 <p
                   className={`text-xs font-medium mt-1 ${
@@ -182,51 +171,55 @@ export const PreviewProposta: React.FC<PreviewPropostaProps> = ({
           {/* Informações Adicionais */}
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <Clock className="w-4 h-4 text-gray-500" />
-              <span className="text-sm font-medium text-gray-700">Criada em</span>
+              <Clock className="h-4 w-4 text-[#607B89]" />
+              <span className="text-sm font-medium text-[#607B89]">Criada em</span>
             </div>
-            <p className="text-sm text-gray-900">{formatDate(proposta.data_criacao)}</p>
+            <p className="text-sm text-[#19384C]">{formatDate(proposta.data_criacao)}</p>
           </div>
 
           {/* Descrição (se houver) */}
           {proposta.descricao && (
             <div>
-              <h4 className="text-sm font-medium text-gray-700 mb-1">Descrição</h4>
-              <p className="text-sm text-gray-600 line-clamp-3">{proposta.descricao}</p>
+              <h4 className="mb-1 text-sm font-medium text-[#607B89]">Descrição</h4>
+              <p className="line-clamp-3 text-sm text-[#4C6775]">{proposta.descricao}</p>
             </div>
           )}
         </div>
 
         {/* Ações */}
-        <div className="p-4 bg-gray-50 border-t border-gray-200">
+        <div className="border-t border-[#E4EDF0] bg-[#F7FBFC] p-4">
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={onViewFull}
-              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#159A9C] px-3 py-2 text-sm font-medium text-white transition hover:bg-[#0F7B7D]"
             >
               <ExternalLink className="w-4 h-4" />
               Ver Completa
             </button>
 
             <button
+              type="button"
               onClick={onEdit}
-              className="flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors text-sm"
+              className="flex items-center justify-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 py-2 text-sm text-[#244455] transition hover:bg-[#F6FAFB]"
               title="Editar"
             >
               <Edit className="w-4 h-4" />
             </button>
 
             <button
+              type="button"
               onClick={onDownload}
-              className="flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors text-sm"
+              className="flex items-center justify-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 py-2 text-sm text-[#244455] transition hover:bg-[#F6FAFB]"
               title="Download"
             >
               <Download className="w-4 h-4" />
             </button>
 
             <button
+              type="button"
               onClick={onSend}
-              className="flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors text-sm"
+              className="flex items-center justify-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 py-2 text-sm text-[#244455] transition hover:bg-[#F6FAFB]"
               title="Enviar"
             >
               <Send className="w-4 h-4" />

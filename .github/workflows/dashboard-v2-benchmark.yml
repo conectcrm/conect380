@@ -1,0 +1,149 @@
+name: Dashboard V2 Benchmark
+
+on:
+  schedule:
+    - cron: '15 05 * * *'
+  workflow_dispatch:
+    inputs:
+      duration_sec:
+        description: 'Duracao do benchmark por endpoint (segundos)'
+        required: false
+        default: '15'
+        type: string
+      connections:
+        description: 'Conexoes concorrentes do autocannon'
+        required: false
+        default: '2'
+        type: string
+      rate:
+        description: 'Taxa alvo de requests por segundo'
+        required: false
+        default: '1'
+        type: string
+
+jobs:
+  benchmark:
+    name: Dashboard V2 Daily Benchmark
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      BASE_URL: ${{ secrets.DASHBOARD_V2_BENCHMARK_BASE_URL }}
+      EMPRESA_ID: ${{ secrets.DASHBOARD_V2_BENCHMARK_EMPRESA_ID }}
+      TOKEN: ${{ secrets.DASHBOARD_V2_BENCHMARK_TOKEN }}
+      PUSHGATEWAY_URL: ${{ secrets.DASHBOARD_V2_BENCHMARK_PUSHGATEWAY_URL }}
+      PUSHGATEWAY_BASIC_AUTH: ${{ secrets.DASHBOARD_V2_BENCHMARK_PUSHGATEWAY_BASIC_AUTH }}
+      BENCHMARK_ENV_LABEL: ${{ secrets.DASHBOARD_V2_BENCHMARK_ENV_LABEL }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm --prefix backend ci
+
+      - name: Preflight benchmark configuration
+        id: preflight
+        run: |
+          if [ -z "${BASE_URL:-}" ] || [ -z "${EMPRESA_ID:-}" ] || [ -z "${TOKEN:-}" ]; then
+            echo "can_run=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "## Dashboard V2 Benchmark"
+              echo "Execucao ignorada por configuracao incompleta."
+              echo ""
+              echo "Secrets obrigatorios:"
+              echo "- DASHBOARD_V2_BENCHMARK_BASE_URL"
+              echo "- DASHBOARD_V2_BENCHMARK_EMPRESA_ID"
+              echo "- DASHBOARD_V2_BENCHMARK_TOKEN"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "can_run=true" >> "$GITHUB_OUTPUT"
+
+      - name: Run benchmark
+        id: benchmark
+        if: steps.preflight.outputs.can_run == 'true'
+        env:
+          INPUT_DURATION_SEC: ${{ github.event.inputs.duration_sec }}
+          INPUT_CONNECTIONS: ${{ github.event.inputs.connections }}
+          INPUT_RATE: ${{ github.event.inputs.rate }}
+        run: |
+          DURATION_SEC="${INPUT_DURATION_SEC:-15}"
+          CONNECTIONS="${INPUT_CONNECTIONS:-2}"
+          RATE="${INPUT_RATE:-1}"
+          TIMESTAMP="$(date -u +"%Y-%m-%dT%H-%M-%SZ")"
+          OUTPUT_PATH="docs/archive/cleanup-2026-02-20/dashboard-v2-autocannon-${TIMESTAMP}.json"
+          LATEST_PATH="docs/archive/cleanup-2026-02-20/dashboard-v2-autocannon-latest.json"
+
+          npm --prefix backend run benchmark:dashboard-v2 \
+            --baseUrl="${BASE_URL}" \
+            --empresaId="${EMPRESA_ID}" \
+            --token="${TOKEN}" \
+            --durationSec="${DURATION_SEC}" \
+            --connections="${CONNECTIONS}" \
+            --rate="${RATE}" \
+            --output="${OUTPUT_PATH}"
+
+          cp "${OUTPUT_PATH}" "${LATEST_PATH}"
+
+          echo "report_path=${OUTPUT_PATH}" >> "$GITHUB_OUTPUT"
+          echo "latest_path=${LATEST_PATH}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish benchmark summary
+        if: steps.preflight.outputs.can_run == 'true'
+        env:
+          REPORT_PATH: ${{ steps.benchmark.outputs.report_path }}
+        run: |
+          node -e "const fs=require('fs'); const r=JSON.parse(fs.readFileSync(process.env.REPORT_PATH,'utf8')); const g=r.gates||{}; const lines=['## Dashboard V2 Benchmark','- Report: `'+process.env.REPORT_PATH+'`','- maxP95CacheHitMs: `'+g.maxP95CacheHitMs+'ms`','- maxColdMs: `'+g.maxColdMs+'ms`','- totalNon2xx: `'+g.totalNon2xx+'`','- cacheHitP95Pass: `'+g.cacheHitP95Pass+'`','- coldPass: `'+g.coldPass+'`','- noHttpErrorPass: `'+g.noHttpErrorPass+'`']; fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n')+'\n');"
+
+      - name: Push metrics to Pushgateway (optional)
+        if: steps.preflight.outputs.can_run == 'true' && env.PUSHGATEWAY_URL != ''
+        env:
+          REPORT_PATH: ${{ steps.benchmark.outputs.report_path }}
+        run: |
+          ENV_LABEL="${BENCHMARK_ENV_LABEL:-prod}"
+          cat > benchmark-metrics.js <<'JS'
+          const fs = require('fs');
+          const reportPath = process.env.REPORT_PATH;
+          const envLabel = process.env.ENV_LABEL || 'prod';
+          const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+          const gates = report.gates || {};
+          const lines = [
+            `conectcrm_dashboard_v2_benchmark_p95_ms{env="${envLabel}"} ${Number(gates.maxP95CacheHitMs || 0)}`,
+            `conectcrm_dashboard_v2_benchmark_cold_ms{env="${envLabel}"} ${Number(gates.maxColdMs || 0)}`,
+            `conectcrm_dashboard_v2_benchmark_non2xx_total{env="${envLabel}"} ${Number(gates.totalNon2xx || 0)}`,
+            `conectcrm_dashboard_v2_benchmark_gate_pass{env="${envLabel}",gate="cache_hit_p95"} ${gates.cacheHitP95Pass ? 1 : 0}`,
+            `conectcrm_dashboard_v2_benchmark_gate_pass{env="${envLabel}",gate="cold"} ${gates.coldPass ? 1 : 0}`,
+            `conectcrm_dashboard_v2_benchmark_gate_pass{env="${envLabel}",gate="no_http_error"} ${gates.noHttpErrorPass ? 1 : 0}`,
+          ];
+          fs.writeFileSync('dashboard-v2-benchmark.prom', `${lines.join('\n')}\n`, 'utf8');
+          JS
+
+          ENV_LABEL="${ENV_LABEL}" node benchmark-metrics.js
+
+          AUTH_ARGS=()
+          if [ -n "${PUSHGATEWAY_BASIC_AUTH:-}" ]; then
+            AUTH_ARGS=(-u "${PUSHGATEWAY_BASIC_AUTH}")
+          fi
+
+          curl --fail --show-error --silent \
+            "${AUTH_ARGS[@]}" \
+            --data-binary @dashboard-v2-benchmark.prom \
+            "${PUSHGATEWAY_URL%/}/metrics/job/dashboard_v2_benchmark/env/${ENV_LABEL}"
+
+      - name: Upload benchmark artifacts
+        if: steps.preflight.outputs.can_run == 'true' && !cancelled()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-v2-benchmark-${{ github.run_number }}
+          path: |
+            ${{ steps.benchmark.outputs.report_path }}
+            ${{ steps.benchmark.outputs.latest_path }}
+          retention-days: 30

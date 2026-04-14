@@ -1,10 +1,47 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { useI18n } from '../../contexts/I18nContext';
 import { useLocation, useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
-import { Eye, EyeOff, Loader2, Mail, Lock, ArrowRight, Check } from 'lucide-react';
-import ConectCRMLogoFinal from '../../components/ui/ConectCRMLogoFinal';
+import { Eye, EyeOff, Loader2, Mail, Lock, ArrowRight, Check, CheckCircle2 } from 'lucide-react';
+import Conect360Logo from '../../components/ui/Conect360Logo';
+import { toastService } from '../../services/toastService';
+import { MfaRequiredActionData } from '../../types';
+
+const IS_DEV_ENV = process.env.NODE_ENV !== 'production';
+
+interface MfaFlowState extends MfaRequiredActionData {
+  expiresAt: number;
+  resendAvailableAt: number;
+}
+
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const formatCountdown = (seconds: number) => {
+  const total = Math.max(0, seconds);
+  const minutes = Math.floor(total / 60);
+  const remainingSeconds = total % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+};
+
+const LOGIN_HERO_FEATURES = [
+  'Atendimento omnichannel com histórico único por cliente',
+  'CRM completo com funil, propostas e contratos',
+  'Financeiro integrado com cobrança e recorrência',
+  'Automações com IA para triagem e produtividade',
+  'Dashboards em tempo real para decisões rápidas',
+];
+
+const LOGIN_HERO_MODULES = [
+  { title: 'Omnichannel', subtitle: 'WhatsApp, e-mail e chat' },
+  { title: 'CRM', subtitle: 'Pipeline e conversões' },
+  { title: 'Financeiro', subtitle: 'Receitas e cobranças' },
+];
+
+const LOGIN_TRIAL_BADGES = [
+  'Teste grátis por 30 dias',
+  'Sem cartão de crédito',
+  'Ativação em poucos minutos',
+];
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -12,36 +49,80 @@ const LoginPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
-  const { login } = useAuth();
-  const { t } = useI18n();
+  const [redirectMessage, setRedirectMessage] = useState<string | null>(null);
+
+  const [mfaState, setMfaState] = useState<MfaFlowState | null>(null);
+  const [mfaCode, setMfaCode] = useState('');
+  const [mfaError, setMfaError] = useState<string | null>(null);
+  const [mfaIsLoading, setMfaIsLoading] = useState(false);
+  const [mfaIsResending, setMfaIsResending] = useState(false);
+  const [mfaExpiresInSeconds, setMfaExpiresInSeconds] = useState(0);
+  const [mfaResendInSeconds, setMfaResendInSeconds] = useState(0);
+
+  const { login, verifyMfa, resendMfa } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Mostrar mensagem de sucesso se vier do registro
   useEffect(() => {
-    const state = location.state as any;
+    const state = location.state as { message?: string; email?: string } | null;
     if (state?.message) {
-      toast.success(state.message);
+      setRedirectMessage(state.message);
+      toastService.success(state.message);
+
       if (state.email) {
         setEmail(state.email);
       }
+
+      navigate(location.pathname, { replace: true, state: null });
     }
 
-    // Verificar se a sessão expirou
     const sessionExpired = localStorage.getItem('sessionExpired');
     if (sessionExpired === 'true') {
-      toast.error('Sua sessão expirou. Por favor, faça login novamente.');
+      const sessionExpiredReason = localStorage.getItem('sessionExpiredReason');
+      const sessionExpiredMessage = localStorage.getItem('sessionExpiredMessage');
+
+      if (sessionExpiredReason === 'concurrent_login') {
+        toastService.error(
+          sessionExpiredMessage ||
+            'Sua sessao foi encerrada porque sua conta foi acessada em outro dispositivo.',
+        );
+      } else {
+        toastService.error(
+          sessionExpiredMessage || 'Sua sessao expirou. Por favor, faca login novamente.',
+        );
+      }
+
       localStorage.removeItem('sessionExpired');
+      localStorage.removeItem('sessionExpiredReason');
+      localStorage.removeItem('sessionExpiredMessage');
     }
-  }, [location]);
+  }, [location, navigate]);
+
+  useEffect(() => {
+    if (!mfaState) {
+      setMfaExpiresInSeconds(0);
+      setMfaResendInSeconds(0);
+      return;
+    }
+
+    const updateCountdowns = () => {
+      const now = Date.now();
+      setMfaExpiresInSeconds(Math.max(0, Math.ceil((mfaState.expiresAt - now) / 1000)));
+      setMfaResendInSeconds(Math.max(0, Math.ceil((mfaState.resendAvailableAt - now) / 1000)));
+    };
+
+    updateCountdowns();
+    const timerId = window.setInterval(updateCountdowns, 1000);
+    return () => window.clearInterval(timerId);
+  }, [mfaState]);
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
 
     if (!email) {
-      newErrors.email = 'Email é obrigatório';
+      newErrors.email = 'E-mail é obrigatório';
     } else if (!/\S+@\S+\.\S+/.test(email)) {
-      newErrors.email = 'Email inválido';
+      newErrors.email = 'E-mail inválido';
     }
 
     if (!password) {
@@ -52,6 +133,17 @@ const LoginPage: React.FC = () => {
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const applyMfaState = (data: MfaRequiredActionData) => {
+    const now = Date.now();
+    setMfaState({
+      ...data,
+      expiresAt: now + data.expiresInSeconds * 1000,
+      resendAvailableAt: now + data.canResendAfterSeconds * 1000,
+    });
+    setMfaCode('');
+    setMfaError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -65,245 +157,459 @@ const LoginPage: React.FC = () => {
 
     try {
       await login(email, password);
-      toast.success('Login realizado com sucesso!');
-    } catch (error: any) {
-      console.error('Erro no login:', error);
+      toastService.success('Login realizado com sucesso!');
+    } catch (error: unknown) {
+      const errorMessage =
+        isObject(error) && typeof error.message === 'string'
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : undefined;
+      const backendMessage =
+        isObject(error) &&
+        isObject(error.response) &&
+        isObject(error.response.data) &&
+        typeof error.response.data.message === 'string'
+          ? error.response.data.message
+          : null;
 
-      // ✅ VERIFICAR SE PRECISA TROCAR SENHA (primeiro acesso)
-      if (error.message === 'TROCAR_SENHA' && error.data) {
-        toast('🔑 Primeiro acesso detectado. Redirecionando...', { icon: '🔑' });
+      const errorData = isObject(error) ? error.data : undefined;
+
+      if (errorMessage === 'TROCAR_SENHA' && isObject(errorData)) {
+        const userId = typeof errorData.userId === 'string' ? errorData.userId : undefined;
+        const emailFromData = typeof errorData.email === 'string' ? errorData.email : undefined;
+        const nome = typeof errorData.nome === 'string' ? errorData.nome : undefined;
+        const senhaTemporaria =
+          typeof errorData.senhaTemporaria === 'string' ? errorData.senhaTemporaria : undefined;
+
+        if (!userId || !emailFromData || !nome) {
+          toastService.error('Não foi possível iniciar a troca de senha. Tente novamente.');
+          return;
+        }
+
+        toastService.info('Primeiro acesso detectado. Redirecionando...');
         navigate('/trocar-senha', {
           state: {
-            userId: error.data.userId,
-            email: error.data.email,
-            nome: error.data.nome,
-            senhaTemporaria: error.data.senhaTemporaria || password,
+            userId,
+            email: emailFromData,
+            nome,
+            senhaTemporaria: senhaTemporaria || password,
           },
         });
         return;
       }
 
-      toast.error('Credenciais inválidas. Tente novamente.');
-      setErrors({ email: 'Email ou senha incorretos' });
+      if (errorMessage === 'MFA_REQUIRED' && isObject(errorData)) {
+        const challengeId =
+          typeof errorData.challengeId === 'string' ? errorData.challengeId : undefined;
+        const emailMask = typeof errorData.email === 'string' ? errorData.email : '';
+        const expiresInSeconds =
+          typeof errorData.expiresInSeconds === 'number' ? errorData.expiresInSeconds : 600;
+        const canResendAfterSeconds =
+          typeof errorData.canResendAfterSeconds === 'number'
+            ? errorData.canResendAfterSeconds
+            : 30;
+        const deliveryChannel =
+          errorData.deliveryChannel === 'dev_fallback' || errorData.deliveryChannel === 'email'
+            ? errorData.deliveryChannel
+            : undefined;
+        const devCode = typeof errorData.devCode === 'string' ? errorData.devCode : undefined;
+
+        if (!challengeId) {
+          toastService.error('Não foi possível iniciar a verificação em duas etapas.');
+          return;
+        }
+
+        applyMfaState({
+          challengeId,
+          email: emailMask,
+          expiresInSeconds,
+          canResendAfterSeconds,
+          deliveryChannel,
+          devCode,
+        });
+        toastService.info(
+          deliveryChannel === 'dev_fallback' && devCode && IS_DEV_ENV
+            ? 'MFA em modo desenvolvimento: use o código exibido na tela.'
+            : 'Código MFA enviado para o e-mail corporativo.',
+        );
+        return;
+      }
+
+      if (backendMessage && backendMessage.toLowerCase().includes('temporariamente bloqueada')) {
+        toastService.error(backendMessage);
+        setErrors({ email: backendMessage });
+        return;
+      }
+
+      const mensagemAutenticacao =
+        backendMessage ||
+        (errorMessage && errorMessage !== 'Authentication failed' ? errorMessage : null) ||
+        'Credenciais inválidas. Tente novamente.';
+      toastService.error(mensagemAutenticacao);
+      setErrors({ email: mensagemAutenticacao });
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleMfaSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!mfaState) {
+      return;
+    }
+
+    if (!/^\d{6}$/.test(mfaCode.trim())) {
+      setMfaError('Informe o código de 6 dígitos enviado por e-mail.');
+      return;
+    }
+
+    setMfaIsLoading(true);
+    setMfaError(null);
+
+    try {
+      await verifyMfa(mfaState.challengeId, mfaCode.trim());
+      toastService.success('Verificação concluída com sucesso!');
+    } catch (error) {
+      const message =
+        isObject(error) && typeof error.message === 'string'
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : '';
+
+      if (message === 'MFA_REQUIRED') {
+        setMfaError('Código inválido. Verifique e tente novamente.');
+      } else {
+        setMfaError('Não foi possível validar o código. Gere um novo código e tente novamente.');
+      }
+    } finally {
+      setMfaIsLoading(false);
+    }
+  };
+
+  const handleMfaResend = async () => {
+    if (!mfaState || mfaIsResending || mfaResendInSeconds > 0) {
+      return;
+    }
+
+    setMfaIsResending(true);
+    setMfaError(null);
+
+    try {
+      const data = await resendMfa(mfaState.challengeId);
+      applyMfaState(data);
+      toastService.success(
+        data.deliveryChannel === 'dev_fallback' && data.devCode && IS_DEV_ENV
+          ? 'MFA em modo desenvolvimento: use o código exibido na tela.'
+          : 'Novo código MFA enviado com sucesso.',
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : null;
+      setMfaError(message || 'Não foi possível reenviar o código agora. Tente novamente.');
+    } finally {
+      setMfaIsResending(false);
+    }
+  };
+
+  const handleBackToLogin = () => {
+    setMfaState(null);
+    setMfaCode('');
+    setMfaError(null);
+  };
+
+  const loginTitle = 'Bem-vindo';
+  const loginSubtitle = 'Faça login para acessar sua conta.';
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#DEEFE7] via-white to-[#F0F9FA] flex">
-      {/* Left Side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] relative overflow-hidden">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-20 w-64 h-64 rounded-full bg-white"></div>
-          <div className="absolute bottom-20 right-20 w-96 h-96 rounded-full bg-white"></div>
-          <div className="absolute top-1/2 left-1/3 w-32 h-32 rounded-full bg-white"></div>
+    <div className="min-h-screen bg-gray-50 flex">
+      <div className="hidden lg:flex lg:w-1/2 bg-[#159A9C] relative overflow-hidden">
+        <div className="absolute inset-0">
+          <div className="absolute top-16 left-16 w-64 h-64 rounded-full bg-white/10"></div>
+          <div className="absolute bottom-16 right-16 w-96 h-96 rounded-full bg-white/10"></div>
+          <div className="absolute top-1/2 left-1/3 w-32 h-32 rounded-full bg-white/10"></div>
         </div>
 
-        <div className="relative z-10 flex flex-col justify-center p-12 text-white">
-          {/* Logo */}
-          <div className="mb-8">
-            <div className="flex items-center justify-center mb-6">
-              <ConectCRMLogoFinal size="2xl" variant="full" />
+        <div className="relative z-10 flex flex-col h-full p-12 text-white">
+          <div>
+            <div className="mb-8 flex items-center">
+              <Conect360Logo size="2xl" variant="full-light" className="w-auto" />
             </div>
+
             <h2 className="text-fluid-3xl font-bold mb-4">
-              Transforme seus
+              Centralize atendimento,
               <br />
-              <span className="text-[#DEEFE7]">negócios digitais</span>
+              <span className="text-[#DEEFE7]">comercial e financeiro</span>
             </h2>
-            <p className="text-fluid-lg text-[#DEEFE7] mb-8">
-              O CRM mais completo e intuitivo do mercado brasileiro
+            <p className="text-fluid-lg text-[#DEEFE7] mb-10">
+              A Conect360 conecta equipes, processos e indicadores em uma única plataforma.
             </p>
           </div>
 
-          {/* Features */}
           <div className="space-y-4">
-            {[
-              'Gestão completa de clientes e vendas',
-              'Dashboard com métricas em tempo real',
-              'Sistema de notificações inteligente',
-              'Integração com principais ferramentas',
-              'Suporte técnico especializado',
-            ].map((feature, index) => (
-              <div key={index} className="flex items-center space-x-3">
-                <div className="w-5 h-5 bg-[#DEEFE7] rounded-full flex items-center justify-center">
-                  <Check className="w-3 h-3 text-[#159A9C]" />
+            {LOGIN_HERO_FEATURES.map((feature, index) => (
+              <div key={index} className="flex items-start gap-3">
+                <div className="mt-0.5 w-5 h-5 bg-white/15 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Check className="w-3 h-3 text-white" />
                 </div>
-                <span className="text-[#DEEFE7]">{feature}</span>
+                <span className="text-[#DEEFE7] leading-relaxed">{feature}</span>
               </div>
             ))}
           </div>
 
-          {/* Stats */}
-          <div className="mt-12 grid grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="text-fluid-2xl font-bold text-white">5000+</div>
-              <div className="text-sm text-[#DEEFE7]">Empresas</div>
-            </div>
-            <div className="text-center">
-              <div className="text-fluid-2xl font-bold text-white">99.9%</div>
-              <div className="text-sm text-[#DEEFE7]">Uptime</div>
-            </div>
-            <div className="text-center">
-              <div className="text-fluid-2xl font-bold text-white">24/7</div>
-              <div className="text-sm text-[#DEEFE7]">Suporte</div>
-            </div>
+          <div className="mt-12 grid grid-cols-3 gap-3">
+            {LOGIN_HERO_MODULES.map((item) => (
+              <div
+                key={item.title}
+                className="rounded-xl border border-white/15 bg-white/10 px-4 py-3"
+              >
+                <div className="text-sm font-semibold text-white">{item.title}</div>
+                <div className="text-xs text-[#DEEFE7] mt-0.5">{item.subtitle}</div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Right Side - Login Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
-          {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-8">
             <div className="inline-flex items-center justify-center mb-4">
-              <ConectCRMLogoFinal size="lg" variant="full" />
+              <Conect360Logo size="xl" variant="full" className="w-auto" />
             </div>
           </div>
 
-          {/* Form Header */}
           <div className="text-center mb-8">
-            <h1 className="text-fluid-2xl font-bold text-[#002333] mb-2">Bem-vindo de volta!</h1>
-            <p className="text-[#B4BEC9]">Faça login para acessar sua conta</p>
+            <h1 className="text-fluid-2xl font-bold text-[#002333] mb-2">
+              {mfaState ? 'Validação de segurança' : loginTitle}
+            </h1>
+            <p className="text-[#B4BEC9]">
+              {mfaState
+                ? 'Informe o código enviado para concluir seu acesso com segurança.'
+                : loginSubtitle}
+            </p>
+
+            {redirectMessage && !mfaState && (
+              <div className="mt-5 rounded-lg border border-[#DEEFE7] bg-[#DEEFE7] px-4 py-3 text-left">
+                <div className="flex items-start gap-2 text-sm text-[#002333]">
+                  <CheckCircle2 className="h-5 w-5 text-[#159A9C] mt-0.5 flex-shrink-0" />
+                  <span className="leading-relaxed">{redirectMessage}</span>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Login Form */}
-          <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Email Field */}
-              <div>
-                <label className="block text-sm font-semibold text-[#002333] mb-2">
-                  Email corporativo
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#B4BEC9] w-5 h-5" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
-                      if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
-                    }}
-                    className={`w-full pl-11 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
-                      errors.email ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                    }`}
-                    placeholder="seu@empresa.com"
-                  />
+          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+            {mfaState ? (
+              <form onSubmit={handleMfaSubmit} className="space-y-5">
+                <div className="rounded-lg border border-[#DEEFE7] bg-[#F8FCFD] px-4 py-3 text-sm text-[#2E4A5A]">
+                  Código enviado para <strong>{mfaState.email}</strong>.
+                  <br />
+                  Expira em <strong>{formatCountdown(mfaExpiresInSeconds)}</strong>.
                 </div>
-                {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
-              </div>
 
-              {/* Password Field */}
-              <div>
-                <label className="block text-sm font-semibold text-[#002333] mb-2">Senha</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#B4BEC9] w-5 h-5" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
-                    }}
-                    className={`w-full pl-11 pr-12 py-3 border rounded-xl focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
-                      errors.password ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                    }`}
-                    placeholder="Digite sua senha"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#B4BEC9] hover:text-[#159A9C] transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
+                {mfaState.deliveryChannel === 'dev_fallback' && mfaState.devCode && IS_DEV_ENV && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    <p className="font-semibold">Ambiente de desenvolvimento</p>
+                    <p>
+                      Código MFA: <strong>{mfaState.devCode}</strong>
+                    </p>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-semibold text-[#002333] mb-2">
+                    Código de verificação
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#B4BEC9] w-5 h-5" />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      value={mfaCode}
+                      maxLength={6}
+                      onChange={(e) => {
+                        const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 6);
+                        setMfaCode(digitsOnly);
+                        if (mfaError) setMfaError(null);
+                      }}
+                      className={`w-full pl-11 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
+                        mfaError ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                      }`}
+                      placeholder="000000"
+                    />
+                  </div>
+                  {mfaError && <p className="text-red-500 text-sm mt-1">{mfaError}</p>}
                 </div>
-                {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}
-              </div>
 
-              {/* Remember & Forgot */}
-              <div className="flex items-center justify-between">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    className="w-4 h-4 text-[#159A9C] focus:ring-[#159A9C] border-gray-300 rounded"
-                  />
-                  <span className="ml-2 text-sm text-[#B4BEC9]">Lembrar de mim</span>
-                </label>
+                <button
+                  type="submit"
+                  disabled={mfaIsLoading}
+                  className="w-full bg-[#159A9C] text-white px-4 py-2 rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2 text-sm font-medium"
+                >
+                  {mfaIsLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Validando...</span>
+                    </>
+                  ) : (
+                    <span>Validar código</span>
+                  )}
+                </button>
+
                 <button
                   type="button"
-                  onClick={() => navigate('/esqueci-minha-senha')}
-                  className="text-sm font-medium text-[#159A9C] hover:text-[#0F7B7D] transition-colors"
+                  onClick={handleMfaResend}
+                  disabled={mfaIsResending || mfaResendInSeconds > 0}
+                  className="w-full bg-white border border-[#159A9C] text-[#159A9C] px-4 py-2 rounded-lg hover:bg-[#159A9C]/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                 >
-                  Esqueci minha senha
+                  {mfaIsResending
+                    ? 'Reenviando código...'
+                    : mfaResendInSeconds > 0
+                      ? `Reenviar em ${formatCountdown(mfaResendInSeconds)}`
+                      : 'Reenviar código'}
                 </button>
-              </div>
 
-              {/* Login Button */}
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white py-3 px-4 rounded-xl font-semibold hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center space-x-2"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>Entrando...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Entrar</span>
-                    <ArrowRight className="w-5 h-5" />
-                  </>
-                )}
-              </button>
-            </form>
+                <button
+                  type="button"
+                  onClick={handleBackToLogin}
+                  className="w-full text-sm text-[#6A8795] hover:text-[#159A9C] transition-colors"
+                >
+                  Voltar para tela de login
+                </button>
+              </form>
+            ) : (
+              <>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-[#002333] mb-2">
+                      E-mail corporativo
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#B4BEC9] w-5 h-5" />
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
+                        }}
+                        className={`w-full pl-11 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
+                          errors.email ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                        }`}
+                        placeholder="seu@empresa.com"
+                      />
+                    </div>
+                    {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
+                  </div>
 
-            {/* Divider */}
-            <div className="my-8">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-200" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-4 bg-white text-[#B4BEC9] font-medium">
-                    Novo no Conect CRM?
-                  </span>
-                </div>
-              </div>
-            </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-[#002333] mb-2">Senha</label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#B4BEC9] w-5 h-5" />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          if (errors.password)
+                            setErrors((prev) => ({ ...prev, password: undefined }));
+                        }}
+                        className={`w-full pl-11 pr-12 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
+                          errors.password ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                        }`}
+                        placeholder="Digite sua senha"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#B4BEC9] hover:text-[#159A9C] transition-colors"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="w-5 h-5" />
+                        ) : (
+                          <Eye className="w-5 h-5" />
+                        )}
+                      </button>
+                    </div>
+                    {errors.password && (
+                      <p className="text-red-500 text-sm mt-1">{errors.password}</p>
+                    )}
+                  </div>
 
-            {/* Sign Up CTA */}
-            <div className="text-center space-y-4">
-              <button
-                type="button"
-                onClick={() => navigate('/registro')}
-                className="w-full bg-white border-2 border-[#159A9C] text-[#159A9C] py-3 px-4 rounded-xl font-semibold hover:bg-[#DEEFE7] transition-all flex items-center justify-center space-x-2"
-              >
-                <span>🚀 Criar Conta Empresarial</span>
-              </button>
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 text-[#159A9C] focus:ring-[#159A9C] border-gray-300 rounded"
+                      />
+                      <span className="ml-2 text-sm text-[#B4BEC9]">Lembrar de mim</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/esqueci-minha-senha')}
+                      className="text-sm font-medium text-[#159A9C] hover:text-[#0F7B7D] transition-colors"
+                    >
+                      Esqueci minha senha
+                    </button>
+                  </div>
 
-              {/* Benefits */}
-              <div className="flex items-center justify-center space-x-6 text-xs text-[#B4BEC9]">
-                <div className="flex items-center space-x-1">
-                  <Check className="w-3 h-3 text-green-500" />
-                  <span>30 dias grátis</span>
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full bg-[#159A9C] text-white px-4 py-2 rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2 text-sm font-medium"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Entrando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Entrar</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+                </form>
+
+                <div className="my-8">
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-gray-200" />
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="px-4 bg-white text-[#B4BEC9] font-medium">
+                        Ainda não tem conta?
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-1">
-                  <Check className="w-3 h-3 text-green-500" />
-                  <span>Sem cartão</span>
+
+                <div className="text-center space-y-4">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/registro')}
+                    className="w-full bg-white border border-[#159A9C] text-[#159A9C] px-4 py-2 rounded-lg hover:bg-[#159A9C]/10 transition-colors flex items-center justify-center space-x-2 text-sm font-medium"
+                  >
+                    <span>Criar conta empresarial</span>
+                  </button>
+
+                  <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-[#B4BEC9]">
+                    {LOGIN_TRIAL_BADGES.map((badge) => (
+                      <div key={badge} className="flex items-center space-x-1">
+                        <Check className="w-3 h-3 text-green-500" />
+                        <span>{badge}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex items-center space-x-1">
-                  <Check className="w-3 h-3 text-green-500" />
-                  <span>Setup em 5 min</span>
-                </div>
-              </div>
-            </div>
+              </>
+            )}
           </div>
 
-          {/* Footer */}
           <div className="text-center mt-8">
             <p className="text-xs text-[#B4BEC9]">
               Ao continuar, você concorda com nossos{' '}

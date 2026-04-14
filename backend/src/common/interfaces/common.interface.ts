@@ -22,4 +22,8 @@ export interface PaginationParams {
   sortOrder?: 'ASC' | 'DESC';
   status?: string;
   tipo?: string;
+  followup?: 'pendente' | 'vencido';
+  tag?: string;
+  origem?: string;
+  responsavelId?: string;
 }

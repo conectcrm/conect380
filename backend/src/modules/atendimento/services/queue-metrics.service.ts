@@ -176,7 +176,7 @@ export class QueueMetricsService implements OnModuleInit {
             policyKey: this.breakerPolicy,
             channels: this.notificationChannels,
             logger: this.logger,
-            targets: { phone: adminPhone },
+            targets: { phone: adminPhone, empresaId: this.adminNotifyEmpresaId },
             message: preview,
             context: { source: 'notifications-breaker', jobName, failCount: state.failCount },
           });
@@ -237,7 +237,7 @@ export class QueueMetricsService implements OnModuleInit {
       policyKey: this.backlogPolicy,
       channels: this.notificationChannels,
       logger: this.logger,
-      targets: { phone: adminPhone },
+      targets: { phone: adminPhone, empresaId: this.adminNotifyEmpresaId },
       message: preview,
       context: {
         source: 'notifications-backlog',

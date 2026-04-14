@@ -1,29 +1,13 @@
 import {
-  Injectable,
-  NestInterceptor,
-  ExecutionContext,
   CallHandler,
+  ExecutionContext,
   HttpException,
   HttpStatus,
+  Injectable,
+  NestInterceptor,
 } from '@nestjs/common';
 import { Observable, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
-
-/**
- * Rate Limiting Interceptor
- *
- * Protege contra abuso de API limitando requisições por IP/usuário.
- *
- * CONFIGURAÇÃO:
- * - 100 requisições por minuto por IP
- * - 1000 requisições por minuto por empresa (autenticado)
- * - Bloqueio temporário após limite excedido
- *
- * BENEFÍCIOS:
- * - Previne DDoS e brute force
- * - Protege recursos do servidor
- * - Garante fair usage entre empresas
- */
 
 interface RateLimitEntry {
   count: number;
@@ -35,33 +19,55 @@ interface RateLimitEntry {
 export class RateLimitInterceptor implements NestInterceptor {
   private readonly limitsByIP = new Map<string, RateLimitEntry>();
   private readonly limitsByEmpresa = new Map<string, RateLimitEntry>();
+  private readonly nodeEnv = String(process.env.NODE_ENV || 'development').toLowerCase();
+  private readonly isDevelopment = this.nodeEnv === 'development';
+  private readonly DEV_BYPASS_GET_PATHS = [
+    '/empresas/modulos/ativos',
+    '/dashboard/v2/feature-flag',
+    '/dashboard/resumo',
+    '/notifications',
+  ];
 
-  // Configurações
-  private readonly IP_LIMIT = 100; // Requisições por minuto (não autenticado)
-  private readonly EMPRESA_LIMIT = 1000; // Requisições por minuto (autenticado)
-  private readonly WINDOW_MS = 60 * 1000; // 1 minuto
-  private readonly BLOCK_DURATION_MS = 5 * 60 * 1000; // 5 minutos de bloqueio
+  // Base limits (production): 100 req/min per IP and 1000 req/min per empresa.
+  // Development gets wider limits and shorter temporary block duration.
+  private readonly IP_LIMIT = this.isDevelopment ? 300 : 100;
+  private readonly EMPRESA_LIMIT = this.isDevelopment ? 3000 : 1000;
+  private readonly WINDOW_MS = 60 * 1000;
+  private readonly BLOCK_DURATION_MS = this.isDevelopment ? 30 * 1000 : 5 * 60 * 1000;
 
   constructor() {
-    // Limpar entradas expiradas a cada 1 minuto
-    setInterval(() => this.cleanExpiredEntries(), this.WINDOW_MS);
+    const cleanupTimer = setInterval(() => this.cleanExpiredEntries(), this.WINDOW_MS);
+    if (typeof cleanupTimer.unref === 'function') {
+      cleanupTimer.unref();
+    }
   }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
+
+    if (this.shouldBypassInDevelopment(request)) {
+      const response = context.switchToHttp().getResponse();
+      try {
+        response?.setHeader?.('x-rate-limit-bypass', 'development');
+      } catch {
+        // noop
+      }
+      return next.handle();
+    }
+
     const ip = this.getClientIP(request);
-    const empresaId = request.headers['x-empresa-id'] || request.user?.empresaId;
+    const empresaId = (request.headers?.['x-empresa-id'] || request.user?.empresaId) as
+      | string
+      | undefined;
 
-    // Verificar rate limit por IP
     const ipAllowed = this.checkRateLimit(this.limitsByIP, ip, this.IP_LIMIT, 'IP');
-
     if (!ipAllowed) {
       return throwError(
         () =>
           new HttpException(
             {
               statusCode: HttpStatus.TOO_MANY_REQUESTS,
-              message: 'Muitas requisições. Tente novamente em alguns minutos.',
+              message: 'Muitas requisicoes. Tente novamente em alguns minutos.',
               error: 'Too Many Requests',
             },
             HttpStatus.TOO_MANY_REQUESTS,
@@ -69,7 +75,6 @@ export class RateLimitInterceptor implements NestInterceptor {
       );
     }
 
-    // Se autenticado, verificar rate limit por empresa
     if (empresaId) {
       const empresaAllowed = this.checkRateLimit(
         this.limitsByEmpresa,
@@ -85,7 +90,7 @@ export class RateLimitInterceptor implements NestInterceptor {
               {
                 statusCode: HttpStatus.TOO_MANY_REQUESTS,
                 message:
-                  'Limite de requisições da empresa excedido. Tente novamente em alguns minutos.',
+                  'Limite de requisicoes da empresa excedido. Tente novamente em alguns minutos.',
                 error: 'Too Many Requests',
               },
               HttpStatus.TOO_MANY_REQUESTS,
@@ -101,9 +106,30 @@ export class RateLimitInterceptor implements NestInterceptor {
     );
   }
 
-  /**
-   * Verificar rate limit
-   */
+  private shouldBypassInDevelopment(request: any): boolean {
+    if (!this.isDevelopment) {
+      return false;
+    }
+
+    const method = String(request?.method || '').toUpperCase();
+    if (method !== 'GET') {
+      return false;
+    }
+
+    const rawPath = String(request?.path || request?.originalUrl || request?.url || '');
+    const path = rawPath.split('?')[0].replace(/\/+$/, '');
+
+    // Em desenvolvimento, o dashboard e notificações podem disparar várias requisições em sequência
+    // durante reloads/reativações de sessão. Bypass aqui evita 429 local e ruído nos logs.
+    if (path.startsWith('/dashboard/') || path.startsWith('/notifications')) {
+      return true;
+    }
+
+    return this.DEV_BYPASS_GET_PATHS.some(
+      (allowedPath) => path === allowedPath || path.endsWith(allowedPath.replace(/\/+$/, '')),
+    );
+  }
+
   private checkRateLimit(
     limitMap: Map<string, RateLimitEntry>,
     key: string,
@@ -113,7 +139,6 @@ export class RateLimitInterceptor implements NestInterceptor {
     const now = Date.now();
     let entry = limitMap.get(key);
 
-    // Se não existe ou resetou, criar nova entrada
     if (!entry || now >= entry.resetAt) {
       entry = {
         count: 1,
@@ -123,87 +148,53 @@ export class RateLimitInterceptor implements NestInterceptor {
       return true;
     }
 
-    // Se está bloqueado, verificar se já pode desbloquear
     if (entry.blocked) {
       if (now >= entry.resetAt) {
-        // Desbloquear e resetar contador
         entry.blocked = false;
         entry.count = 1;
         entry.resetAt = now + this.WINDOW_MS;
-        console.log(`✅ [RateLimit] ${type} ${key} desbloqueado`);
         return true;
       }
-      // Ainda bloqueado
-      console.log(
-        `🚫 [RateLimit] ${type} ${key} bloqueado (${Math.ceil((entry.resetAt - now) / 1000)}s)`,
-      );
       return false;
     }
 
-    // Incrementar contador
-    entry.count++;
+    entry.count += 1;
 
-    // Verificar se excedeu o limite
     if (entry.count > limit) {
       entry.blocked = true;
       entry.resetAt = now + this.BLOCK_DURATION_MS;
-      console.log(`⚠️ [RateLimit] ${type} ${key} BLOQUEADO! (${entry.count} requisições)`);
       return false;
-    }
-
-    // Avisar quando estiver próximo do limite
-    if (entry.count > limit * 0.8) {
-      console.log(`⚠️ [RateLimit] ${type} ${key} próximo do limite (${entry.count}/${limit})`);
     }
 
     return true;
   }
 
-  /**
-   * Obter IP do cliente (considerando proxies)
-   */
   private getClientIP(request: any): string {
     return (
-      request.headers['x-forwarded-for']?.split(',')[0] ||
-      request.headers['x-real-ip'] ||
-      request.connection.remoteAddress ||
-      request.socket.remoteAddress ||
+      request.headers?.['x-forwarded-for']?.split(',')[0] ||
+      request.headers?.['x-real-ip'] ||
+      request.connection?.remoteAddress ||
+      request.socket?.remoteAddress ||
       'unknown'
     );
   }
 
-  /**
-   * Limpar entradas expiradas
-   */
-  private cleanExpiredEntries() {
+  private cleanExpiredEntries(): void {
     const now = Date.now();
-    let cleanedIP = 0;
-    let cleanedEmpresa = 0;
 
-    // Limpar IPs
     for (const [key, entry] of this.limitsByIP.entries()) {
-      if (now >= entry.resetAt && !entry.blocked) {
+      if (now >= entry.resetAt) {
         this.limitsByIP.delete(key);
-        cleanedIP++;
       }
     }
 
-    // Limpar Empresas
     for (const [key, entry] of this.limitsByEmpresa.entries()) {
-      if (now >= entry.resetAt && !entry.blocked) {
+      if (now >= entry.resetAt) {
         this.limitsByEmpresa.delete(key);
-        cleanedEmpresa++;
       }
-    }
-
-    if (cleanedIP > 0 || cleanedEmpresa > 0) {
-      console.log(`🧹 [RateLimit] Limpou ${cleanedIP} IPs e ${cleanedEmpresa} empresas`);
     }
   }
 
-  /**
-   * Estatísticas de rate limiting
-   */
   getStats() {
     return {
       ips: {
@@ -229,16 +220,12 @@ export class RateLimitInterceptor implements NestInterceptor {
     };
   }
 
-  /**
-   * Desbloquear manualmente (admin)
-   */
   unblock(type: 'ip' | 'empresa', key: string): boolean {
     const map = type === 'ip' ? this.limitsByIP : this.limitsByEmpresa;
     const entry = map.get(key);
 
     if (entry && entry.blocked) {
       map.delete(key);
-      console.log(`✅ [RateLimit] ${type} ${key} desbloqueado manualmente`);
       return true;
     }
 

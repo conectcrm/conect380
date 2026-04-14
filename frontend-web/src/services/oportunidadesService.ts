@@ -9,10 +9,27 @@ import {
   EstatisticasOportunidades,
   DadosKanban,
   EstagioOportunidade,
+  TipoAtividade,
+  LifecycleFeatureFlagDecision,
+  SalesFeatureFlagsDecision,
+  UpdateSalesFeatureFlagsPayload,
+  LifecycleStatusOportunidade,
+  LifecycleViewOportunidade,
+  OportunidadeHistoricoEstagioItem,
+  OportunidadeAtividadeResumo,
+  OportunidadeAtividadesPainelResult,
+  OportunidadeAtividadesPainelStatusFilter,
+  OportunidadeVendedorEnvolvido,
+  StaleDealsResult,
+  StalePolicyDecision,
+  EngagementPolicyDecision,
+  UpdateEngagementPolicyPayload,
 } from '../types/oportunidades/index';
 
 class OportunidadesService {
   private readonly basePath = '/oportunidades';
+  private readonly clienteOuContatoRuleMessage =
+    'Informe um cliente (cliente_id) ou pelo menos o nome do contato (nomeContato).';
 
   private getUrl(path: string = ''): string {
     return `${this.basePath}${path}`;
@@ -27,9 +44,44 @@ class OportunidadesService {
     return trimmed.length > 0 ? trimmed : undefined;
   }
 
+  private normalizeListParams(
+    filtros?: Partial<FiltrosOportunidade> & {
+      lifecycle_status?: LifecycleStatusOportunidade | '';
+      lifecycle_view?: LifecycleViewOportunidade | '';
+      include_deleted?: boolean;
+    },
+  ): Record<string, unknown> | undefined {
+    if (!filtros) return undefined;
+
+    const params: Record<string, unknown> = { ...filtros };
+
+    if (filtros.dataInicio instanceof Date) {
+      params.dataInicio = filtros.dataInicio.toISOString();
+    }
+
+    if (filtros.dataFim instanceof Date) {
+      params.dataFim = filtros.dataFim.toISOString();
+    }
+
+    if (typeof filtros.include_deleted === 'boolean') {
+      params.include_deleted = filtros.include_deleted;
+    }
+
+    Object.keys(params).forEach((key) => {
+      if (params[key] === '' || params[key] === null || params[key] === undefined) {
+        delete params[key];
+      }
+    });
+
+    return params;
+  }
+
   private preparePayload(
     data: Partial<Omit<NovaOportunidade, 'dataFechamentoEsperado'>> & {
       dataFechamentoEsperado?: string | null;
+    },
+    options?: {
+      requireClienteOuContato?: boolean;
     },
   ) {
     const cleanedResponsavel = this.sanitizeString(data.responsavel_id);
@@ -38,6 +90,17 @@ class OportunidadesService {
       throw new Error(
         'Não foi possível identificar o responsável pela oportunidade. Recarregue a página e tente novamente.',
       );
+    }
+
+    const cleanedClienteId = this.sanitizeString(data.cliente_id);
+    const cleanedNomeContato = this.sanitizeString(data.nomeContato);
+    const shouldValidateClienteOuContato =
+      options?.requireClienteOuContato === true ||
+      Object.prototype.hasOwnProperty.call(data, 'cliente_id') ||
+      Object.prototype.hasOwnProperty.call(data, 'nomeContato');
+
+    if (shouldValidateClienteOuContato && !cleanedClienteId && !cleanedNomeContato) {
+      throw new Error(this.clienteOuContatoRuleMessage);
     }
 
     return {
@@ -51,8 +114,8 @@ class OportunidadesService {
       tags: data.tags && data.tags.length > 0 ? data.tags : undefined,
       dataFechamentoEsperado: data.dataFechamentoEsperado || undefined,
       responsavel_id: cleanedResponsavel,
-      cliente_id: this.sanitizeString(data.cliente_id),
-      nomeContato: this.sanitizeString(data.nomeContato),
+      cliente_id: cleanedClienteId,
+      nomeContato: cleanedNomeContato,
       emailContato: this.sanitizeString(data.emailContato),
       telefoneContato: this.sanitizeString(data.telefoneContato),
       empresaContato: this.sanitizeString(data.empresaContato),
@@ -62,11 +125,13 @@ class OportunidadesService {
 
   // CRUD Oportunidades
   async listarOportunidades(filtros?: Partial<FiltrosOportunidade>): Promise<Oportunidade[]> {
-    const response = await api.get(this.getUrl(), { params: filtros });
+    const response = await api.get(this.getUrl(), {
+      params: this.normalizeListParams(filtros),
+    });
     return response.data.map((oportunidade: any) => this.formatarOportunidade(oportunidade));
   }
 
-  async obterOportunidade(id: number): Promise<Oportunidade> {
+  async obterOportunidade(id: number | string): Promise<Oportunidade> {
     const response = await api.get(this.getUrl(`/${id}`));
     return this.formatarOportunidade(response.data);
   }
@@ -80,6 +145,8 @@ class OportunidadesService {
       ...oportunidade,
       cliente_id,
       dataFechamentoEsperado: dataFechamento,
+    }, {
+      requireClienteOuContato: true,
     });
 
     const response = await api.post(this.getUrl(), dadosBackend);
@@ -101,20 +168,138 @@ class OportunidadesService {
     return this.formatarOportunidade(response.data);
   }
 
-  async excluirOportunidade(id: number): Promise<void> {
+  async excluirOportunidade(id: number | string): Promise<void> {
     await api.delete(this.getUrl(`/${id}`));
   }
 
-  async moverOportunidade(id: number, novoEstagio: EstagioOportunidade): Promise<Oportunidade> {
+  async excluirOportunidadePermanente(id: number | string): Promise<void> {
+    await api.delete(this.getUrl(`/${id}/permanente`));
+  }
+
+  async arquivarOportunidade(
+    id: number | string,
+    payload?: { motivo?: string; comentario?: string },
+  ): Promise<Oportunidade> {
+    const response = await api.post(this.getUrl(`/${id}/arquivar`), payload || {});
+    return this.formatarOportunidade(response.data);
+  }
+
+  async restaurarOportunidade(
+    id: number | string,
+    payload?: { motivo?: string; comentario?: string },
+  ): Promise<Oportunidade> {
+    const response = await api.post(this.getUrl(`/${id}/restaurar`), payload || {});
+    return this.formatarOportunidade(response.data);
+  }
+
+  async reabrirOportunidade(
+    id: number | string,
+    payload?: { motivo?: string; comentario?: string },
+  ): Promise<Oportunidade> {
+    const response = await api.post(this.getUrl(`/${id}/reabrir`), payload || {});
+    return this.formatarOportunidade(response.data);
+  }
+
+  async obterLifecycleFeatureFlag(): Promise<LifecycleFeatureFlagDecision> {
+    const response = await api.get(this.getUrl('/lifecycle/feature-flag'));
+    return response.data;
+  }
+
+  async obterSalesFeatureFlags(): Promise<SalesFeatureFlagsDecision> {
+    const response = await api.get(this.getUrl('/sales/feature-flags'));
+    return response.data;
+  }
+
+  async atualizarSalesFeatureFlags(
+    payload: UpdateSalesFeatureFlagsPayload,
+  ): Promise<SalesFeatureFlagsDecision> {
+    const response = await api.patch(this.getUrl('/sales/feature-flags'), payload);
+    return response.data;
+  }
+
+  async obterStalePolicy(): Promise<StalePolicyDecision> {
+    const response = await api.get(this.getUrl('/lifecycle/stale-policy'));
+    return response.data;
+  }
+
+  async atualizarStalePolicy(payload: {
+    enabled?: boolean;
+    thresholdDays?: number;
+    autoArchiveEnabled?: boolean;
+    autoArchiveAfterDays?: number;
+  }): Promise<StalePolicyDecision> {
+    const response = await api.patch(this.getUrl('/lifecycle/stale-policy'), payload);
+    return response.data;
+  }
+
+  async obterEngagementPolicy(): Promise<EngagementPolicyDecision> {
+    const response = await api.get(this.getUrl('/lifecycle/engagement-policy'));
+    return response.data;
+  }
+
+  async atualizarEngagementPolicy(
+    payload: UpdateEngagementPolicyPayload,
+  ): Promise<EngagementPolicyDecision> {
+    const response = await api.patch(this.getUrl('/lifecycle/engagement-policy'), payload);
+    return response.data;
+  }
+
+  async listarOportunidadesParadas(params?: {
+    thresholdDays?: number;
+    limit?: number;
+  }): Promise<StaleDealsResult> {
+    const response = await api.get(this.getUrl('/stale'), {
+      params: {
+        threshold_days: params?.thresholdDays,
+        limit: params?.limit,
+      },
+    });
+
+    return {
+      ...response.data,
+      stale: (response.data?.stale || []).map((oportunidade: any) =>
+        this.formatarOportunidade(oportunidade),
+      ),
+    };
+  }
+
+  async executarAutoArquivamentoStale(params?: {
+    dryRun?: boolean;
+  }): Promise<{
+    enabled: boolean;
+    autoArchiveEnabled: boolean;
+    thresholdDays: number;
+    totalCandidates: number;
+    archivedCount: number;
+    dryRun: boolean;
+    trigger: 'manual' | 'scheduler';
+    archivedIds: string[];
+    failed: Array<{ id: string; reason: string }>;
+    generatedAt: string;
+  }> {
+    const response = await api.post(this.getUrl('/stale/auto-archive/run'), null, {
+      params: {
+        dry_run: params?.dryRun ? 'true' : undefined,
+      },
+    });
+    return response.data;
+  }
+
+  async moverOportunidade(
+    id: number | string,
+    novoEstagio: EstagioOportunidade,
+  ): Promise<Oportunidade> {
     const response = await api.patch(this.getUrl(`/${id}/estagio`), { estagio: novoEstagio });
     return this.formatarOportunidade(response.data);
   }
 
   // ✅ Atualizar estágio com motivo de perda (quando PERDIDO)
   async atualizarEstagio(
-    id: number,
+    id: number | string,
     dados: {
       estagio: EstagioOportunidade;
+      forcarTransicao?: boolean;
+      justificativaForcamento?: string;
       motivoPerda?: string;
       motivoPerdaDetalhes?: string;
       concorrenteNome?: string;
@@ -126,27 +311,297 @@ class OportunidadesService {
   }
 
   async gerarProposta(
-    oportunidadeId: number,
+    oportunidadeId: number | string,
   ): Promise<{ success: boolean; message: string; proposta: any }> {
     const response = await api.post(this.getUrl(`/${oportunidadeId}/gerar-proposta`));
     return response.data;
   }
 
   // Atividades
-  async listarAtividades(oportunidadeId: number): Promise<Atividade[]> {
+  async listarAtividades(oportunidadeId: number | string): Promise<Atividade[]> {
     const response = await api.get(this.getUrl(`/${oportunidadeId}/atividades`));
+    const data = Array.isArray(response.data) ? response.data : [];
+    return data.map((item: any) => ({
+      id: item.id ?? '',
+      tipo: item.tipo,
+      descricao: item.descricao,
+      status: item.status || 'pending',
+      resultadoConclusao: item.resultadoConclusao ?? item.resultado_conclusao ?? null,
+      concluidoEm: item.concluidoEm
+        ? new Date(item.concluidoEm)
+        : item.concluido_em
+          ? new Date(item.concluido_em)
+          : null,
+      concluidoPorId: item.concluidoPorId ?? item.concluido_por ?? undefined,
+      dataAtividade: item.dataAtividade ? new Date(item.dataAtividade) : new Date(),
+      oportunidadeId: item.oportunidadeId ?? item.oportunidade_id ?? oportunidadeId,
+      responsavelId: item.responsavelId ?? item.responsavel_id ?? item.responsavel?.id,
+      criadoPor: item.criadoPor
+        ? {
+            id: item.criadoPor.id,
+            nome: item.criadoPor.nome,
+            avatar: item.criadoPor.avatar || item.criadoPor.avatar_url,
+          }
+        : {
+            id: item.criado_por_id || '',
+            nome: 'Sistema',
+          },
+      responsavel: item.responsavel
+        ? {
+            id: item.responsavel.id,
+            nome: item.responsavel.nome,
+            avatar: item.responsavel.avatar || item.responsavel.avatar_url,
+          }
+        : undefined,
+      concluidoPor: item.concluidoPor
+        ? {
+            id: item.concluidoPor.id,
+            nome: item.concluidoPor.nome,
+            avatar: item.concluidoPor.avatar || item.concluidoPor.avatar_url,
+          }
+        : undefined,
+      createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
+    }));
+  }
+
+  async listarHistoricoEstagios(
+    oportunidadeId: number | string,
+    limit = 50,
+  ): Promise<OportunidadeHistoricoEstagioItem[]> {
+    const response = await api.get(this.getUrl(`/${oportunidadeId}/historico-estagios`), {
+      params: { limit },
+    });
     return response.data;
+  }
+
+  async listarVendedoresEnvolvidos(
+    oportunidadeId: number | string,
+  ): Promise<OportunidadeVendedorEnvolvido[]> {
+    const response = await api.get(this.getUrl(`/${oportunidadeId}/vendedores-envolvidos`));
+    const data = Array.isArray(response.data) ? response.data : [];
+    return data.map((item: any) => ({
+      id: String(item.id || ''),
+      vendedorId: String(item.vendedorId || item.vendedor_id || ''),
+      nome: String(item.nome || item.vendedor_nome || 'Usuario'),
+      email: item.email ?? item.vendedor_email ?? null,
+      avatarUrl: item.avatarUrl ?? item.vendedor_avatar_url ?? null,
+      papel: String(item.papel || 'apoio'),
+      createdAt: item.createdAt || item.created_at || null,
+    }));
+  }
+
+  async adicionarVendedorEnvolvido(
+    oportunidadeId: number | string,
+    payload: { vendedor_id: string; papel?: string },
+  ): Promise<OportunidadeVendedorEnvolvido> {
+    const response = await api.post(this.getUrl(`/${oportunidadeId}/vendedores-envolvidos`), payload);
+    const item = response.data || {};
+    return {
+      id: String(item.id || ''),
+      vendedorId: String(item.vendedorId || item.vendedor_id || payload.vendedor_id),
+      nome: String(item.nome || item.vendedor_nome || 'Usuario'),
+      email: item.email ?? item.vendedor_email ?? null,
+      avatarUrl: item.avatarUrl ?? item.vendedor_avatar_url ?? null,
+      papel: String(item.papel || payload.papel || 'apoio'),
+      createdAt: item.createdAt || item.created_at || null,
+    };
+  }
+
+  async removerVendedorEnvolvido(
+    oportunidadeId: number | string,
+    vendedorId: string,
+  ): Promise<void> {
+    await api.delete(this.getUrl(`/${oportunidadeId}/vendedores-envolvidos/${vendedorId}`));
+  }
+
+  async obterResumoAtividadesComerciais(params?: {
+    periodStart?: string;
+    periodEnd?: string;
+    vendedorId?: string;
+    limit?: number;
+  }): Promise<OportunidadeAtividadeResumo> {
+    const response = await api.get(this.getUrl('/atividades/resumo-gerencial'), {
+      params,
+    });
+    return response.data;
+  }
+
+  async obterPainelAtividadesComerciais(params?: {
+    periodStart?: string;
+    periodEnd?: string;
+    vendedorId?: string;
+    onlyMine?: boolean;
+    status?: OportunidadeAtividadesPainelStatusFilter;
+    tipo?: TipoAtividade | '';
+    busca?: string;
+    limit?: number;
+    includeClosed?: boolean;
+    includeArchived?: boolean;
+  }): Promise<OportunidadeAtividadesPainelResult> {
+    const response = await api.get(this.getUrl('/atividades/painel'), {
+      params: {
+        periodStart: params?.periodStart,
+        periodEnd: params?.periodEnd,
+        vendedorId: params?.vendedorId,
+        onlyMine: params?.onlyMine,
+        status: params?.status,
+        tipo: params?.tipo || undefined,
+        busca: params?.busca,
+        limit: params?.limit,
+        includeClosed: params?.includeClosed,
+        includeArchived: params?.includeArchived,
+      },
+    });
+
+    const data = response.data || {};
+    return {
+      generatedAt: data.generatedAt || new Date().toISOString(),
+      range: {
+        periodStart: data.range?.periodStart || new Date().toISOString(),
+        periodEnd: data.range?.periodEnd || new Date().toISOString(),
+      },
+      filters: {
+        vendedorId: data.filters?.vendedorId || undefined,
+        onlyMine: Boolean(data.filters?.onlyMine ?? true),
+        status: (data.filters?.status || 'all') as OportunidadeAtividadesPainelStatusFilter,
+        tipo: data.filters?.tipo || undefined,
+        busca: data.filters?.busca || undefined,
+        includeClosed: Boolean(data.filters?.includeClosed ?? true),
+        includeArchived: Boolean(data.filters?.includeArchived ?? false),
+      },
+      resumo: {
+        total: Number(data.resumo?.total || 0),
+        pending: Number(data.resumo?.pending || 0),
+        completed: Number(data.resumo?.completed || 0),
+        overdue: Number(data.resumo?.overdue || 0),
+        dueToday: Number(data.resumo?.dueToday || 0),
+        dueWeek: Number(data.resumo?.dueWeek || 0),
+      },
+      items: Array.isArray(data.items) ? data.items : [],
+    };
   }
 
   async criarAtividade(atividade: NovaAtividade): Promise<Atividade> {
+    const payload = {
+      tipo: atividade.tipo,
+      descricao: atividade.descricao,
+      dataAtividade: atividade.dataAtividade
+        ? new Date(atividade.dataAtividade).toISOString()
+        : undefined,
+      responsavel_id: atividade.responsavelId,
+    };
     const response = await api.post(
       this.getUrl(`/${atividade.oportunidadeId}/atividades`),
-      atividade,
+      payload,
     );
-    return response.data;
+    return {
+      id: response.data?.id ?? '',
+      tipo: response.data?.tipo ?? atividade.tipo,
+      descricao: response.data?.descricao ?? atividade.descricao,
+      status: response.data?.status || 'pending',
+      resultadoConclusao:
+        response.data?.resultadoConclusao ?? response.data?.resultado_conclusao ?? null,
+      concluidoEm: response.data?.concluidoEm
+        ? new Date(response.data.concluidoEm)
+        : response.data?.concluido_em
+          ? new Date(response.data.concluido_em)
+          : null,
+      concluidoPorId: response.data?.concluidoPorId ?? response.data?.concluido_por ?? undefined,
+      dataAtividade: response.data?.dataAtividade
+        ? new Date(response.data.dataAtividade)
+        : atividade.dataAtividade || new Date(),
+      oportunidadeId:
+        response.data?.oportunidadeId ?? response.data?.oportunidade_id ?? atividade.oportunidadeId,
+      responsavelId:
+        response.data?.responsavelId ??
+        response.data?.responsavel_id ??
+        atividade.responsavelId,
+      criadoPor: response.data?.criadoPor
+        ? {
+            id: response.data.criadoPor.id,
+            nome: response.data.criadoPor.nome,
+            avatar: response.data.criadoPor.avatar || response.data.criadoPor.avatar_url,
+          }
+        : {
+            id: response.data?.criado_por_id || '',
+            nome: 'Sistema',
+          },
+      responsavel: response.data?.responsavel
+        ? {
+            id: response.data.responsavel.id,
+            nome: response.data.responsavel.nome,
+            avatar: response.data.responsavel.avatar || response.data.responsavel.avatar_url,
+          }
+        : undefined,
+      concluidoPor: response.data?.concluidoPor
+        ? {
+            id: response.data.concluidoPor.id,
+            nome: response.data.concluidoPor.nome,
+            avatar: response.data.concluidoPor.avatar || response.data.concluidoPor.avatar_url,
+          }
+        : undefined,
+      createdAt: response.data?.createdAt ? new Date(response.data.createdAt) : new Date(),
+    };
   }
 
-  async excluirAtividade(oportunidadeId: number, atividadeId: number): Promise<void> {
+  async concluirAtividade(
+    oportunidadeId: number | string,
+    atividadeId: number | string,
+    dados?: { resultadoConclusao?: string },
+  ): Promise<Atividade> {
+    const resultadoConclusao = dados?.resultadoConclusao?.trim();
+    const response = await api.patch(
+      this.getUrl(`/${oportunidadeId}/atividades/${atividadeId}/concluir`),
+      resultadoConclusao ? { resultadoConclusao } : {},
+    );
+    const item = response.data || {};
+    return {
+      id: item.id ?? atividadeId,
+      tipo: item.tipo,
+      descricao: item.descricao,
+      status: item.status || 'completed',
+      resultadoConclusao: item.resultadoConclusao ?? item.resultado_conclusao ?? null,
+      concluidoEm: item.concluidoEm
+        ? new Date(item.concluidoEm)
+        : item.concluido_em
+          ? new Date(item.concluido_em)
+          : null,
+      concluidoPorId: item.concluidoPorId ?? item.concluido_por ?? undefined,
+      dataAtividade: item.dataAtividade ? new Date(item.dataAtividade) : new Date(),
+      oportunidadeId: item.oportunidadeId ?? item.oportunidade_id ?? oportunidadeId,
+      responsavelId: item.responsavelId ?? item.responsavel_id ?? item.responsavel?.id,
+      criadoPor: item.criadoPor
+        ? {
+            id: item.criadoPor.id,
+            nome: item.criadoPor.nome,
+            avatar: item.criadoPor.avatar || item.criadoPor.avatar_url,
+          }
+        : {
+            id: item.criado_por_id || '',
+            nome: 'Sistema',
+          },
+      responsavel: item.responsavel
+        ? {
+            id: item.responsavel.id,
+            nome: item.responsavel.nome,
+            avatar: item.responsavel.avatar || item.responsavel.avatar_url,
+          }
+        : undefined,
+      concluidoPor: item.concluidoPor
+        ? {
+            id: item.concluidoPor.id,
+            nome: item.concluidoPor.nome,
+            avatar: item.concluidoPor.avatar || item.concluidoPor.avatar_url,
+          }
+        : undefined,
+      createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
+    };
+  }
+
+  async excluirAtividade(
+    oportunidadeId: number | string,
+    atividadeId: number | string,
+  ): Promise<void> {
     await api.delete(this.getUrl(`/${oportunidadeId}/atividades/${atividadeId}`));
   }
 
@@ -154,12 +609,16 @@ class OportunidadesService {
   async obterEstatisticas(
     filtros?: Partial<FiltrosOportunidade>,
   ): Promise<EstatisticasOportunidades> {
-    const response = await api.get(this.getUrl('/metricas'), { params: filtros });
+    const response = await api.get(this.getUrl('/metricas'), {
+      params: this.normalizeListParams(filtros),
+    });
     return response.data;
   }
 
   async obterDadosKanban(filtros?: Partial<FiltrosOportunidade>): Promise<DadosKanban> {
-    const response = await api.get(this.getUrl('/pipeline'), { params: filtros });
+    const response = await api.get(this.getUrl('/pipeline'), {
+      params: this.normalizeListParams(filtros),
+    });
 
     // Converter formato do backend para o formato esperado pelo frontend
     const stages = response.data.stages || {};
@@ -211,8 +670,25 @@ class OportunidadesService {
   }
   // Utilitarios
   private formatarOportunidade(oportunidade: any): Oportunidade {
+    const nomeContato =
+      oportunidade.nomeContato ?? oportunidade.nome_contato ?? oportunidade.nomecontato;
+    const emailContato =
+      oportunidade.emailContato ?? oportunidade.email_contato ?? oportunidade.emailcontato;
+    const telefoneContato =
+      oportunidade.telefoneContato ??
+      oportunidade.telefone_contato ??
+      oportunidade.telefonecontato;
+    const empresaContato =
+      oportunidade.empresaContato ?? oportunidade.empresa_contato ?? oportunidade.empresacontato;
     const createdAt = oportunidade.createdAt ? new Date(oportunidade.createdAt) : new Date();
     const updatedAt = oportunidade.updatedAt ? new Date(oportunidade.updatedAt) : createdAt;
+    const lifecycleStatus: LifecycleStatusOportunidade =
+      oportunidade.lifecycle_status ||
+      (oportunidade.estagio === EstagioOportunidade.GANHO
+        ? LifecycleStatusOportunidade.WON
+        : oportunidade.estagio === EstagioOportunidade.PERDIDO
+          ? LifecycleStatusOportunidade.LOST
+          : LifecycleStatusOportunidade.OPEN);
 
     return {
       id: oportunidade.id,
@@ -253,15 +729,15 @@ class OportunidadesService {
             nome: oportunidade.cliente.nome,
             email: oportunidade.cliente.email,
             telefone: oportunidade.cliente.telefone,
-            empresa: oportunidade.cliente.empresa,
+            empresa: oportunidade.cliente.empresa ?? oportunidade.cliente.nome,
           }
         : undefined,
 
       // Informações de contato direto
-      nomeContato: oportunidade.nomeContato,
-      emailContato: oportunidade.emailContato,
-      telefoneContato: oportunidade.telefoneContato,
-      empresaContato: oportunidade.empresaContato,
+      nomeContato,
+      emailContato,
+      telefoneContato,
+      empresaContato,
       observacoes: oportunidade.observacoes,
       criadoEm: oportunidade.criadoEm ?? createdAt,
       atualizadoEm: oportunidade.atualizadoEm ?? updatedAt,
@@ -281,6 +757,51 @@ class OportunidadesService {
         : undefined,
       tempoNoEstagio: this.formatarTempoNoEstagio(oportunidade.updatedAt),
       probabilidadeVisual: this.classificarProbabilidade(oportunidade.probabilidade),
+      lifecycle_status: lifecycleStatus,
+      archived_at: oportunidade.archived_at ? new Date(oportunidade.archived_at) : null,
+      archived_by: oportunidade.archived_by ?? null,
+      deleted_at: oportunidade.deleted_at ? new Date(oportunidade.deleted_at) : null,
+      deleted_by: oportunidade.deleted_by ?? null,
+      reopened_at: oportunidade.reopened_at ? new Date(oportunidade.reopened_at) : null,
+      reopened_by: oportunidade.reopened_by ?? null,
+      is_stale: Boolean(oportunidade.is_stale),
+      stale_days:
+        Number.isFinite(Number(oportunidade.stale_days)) && Number(oportunidade.stale_days) >= 0
+          ? Number(oportunidade.stale_days)
+          : undefined,
+      last_interaction_at: oportunidade.last_interaction_at
+        ? new Date(oportunidade.last_interaction_at)
+        : null,
+      stale_since: oportunidade.stale_since ? new Date(oportunidade.stale_since) : null,
+      next_action_at: oportunidade.next_action_at ? new Date(oportunidade.next_action_at) : null,
+      next_action_type: oportunidade.next_action_type ?? null,
+      next_action_description: oportunidade.next_action_description ?? null,
+      next_action_status: ['overdue', 'due_soon', 'future'].includes(
+        String(oportunidade.next_action_status || '').toLowerCase(),
+      )
+        ? (String(oportunidade.next_action_status).toLowerCase() as
+            | 'overdue'
+            | 'due_soon'
+            | 'future')
+        : null,
+      next_action_days_delta: Number.isFinite(Number(oportunidade.next_action_days_delta))
+        ? Number(oportunidade.next_action_days_delta)
+        : null,
+      engagement_signal: ['hot', 'watch', 'normal'].includes(
+        String(oportunidade.engagement_signal || '').toLowerCase(),
+      )
+        ? (String(oportunidade.engagement_signal).toLowerCase() as 'hot' | 'watch' | 'normal')
+        : undefined,
+      proposta_principal_id: oportunidade.proposta_principal_id ?? null,
+      propostaPrincipal: oportunidade.propostaPrincipal
+        ? {
+            id: String(oportunidade.propostaPrincipal.id || ''),
+            numero: oportunidade.propostaPrincipal.numero || '',
+            titulo: oportunidade.propostaPrincipal.titulo || '',
+            status: oportunidade.propostaPrincipal.status || 'rascunho',
+            sugerePerda: Boolean(oportunidade.propostaPrincipal.sugerePerda),
+          }
+        : undefined,
     };
   }
 
@@ -336,4 +857,3 @@ class OportunidadesService {
 }
 
 export const oportunidadesService = new OportunidadesService();
-

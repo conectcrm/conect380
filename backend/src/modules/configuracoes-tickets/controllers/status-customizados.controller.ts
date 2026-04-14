@@ -12,13 +12,17 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { StatusCustomizadosService } from '../services/status-customizados.service';
 import { CreateStatusCustomizadoDto } from '../dto/create-status-customizado.dto';
 import { UpdateStatusCustomizadoDto } from '../dto/update-status-customizado.dto';
 
 @Controller('configuracoes-tickets/status-customizados')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.ATENDIMENTO_SLA_MANAGE)
 export class StatusCustomizadosController {
   constructor(private readonly statusService: StatusCustomizadosService) {}
 

@@ -7,16 +7,18 @@ import {
   MinLength,
   Matches,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
 class EmpresaDataDto {
   @ApiProperty({ description: 'Nome da empresa' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   @IsNotEmpty()
   nome: string;
 
   @ApiProperty({ description: 'CNPJ da empresa' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   @IsNotEmpty()
   @Matches(/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/, {
@@ -25,31 +27,43 @@ class EmpresaDataDto {
   cnpj: string;
 
   @ApiProperty({ description: 'Email corporativo' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
   @IsEmail()
   @IsNotEmpty()
   email: string;
 
   @ApiProperty({ description: 'Telefone da empresa' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   @IsNotEmpty()
+  @Matches(/^\(?\d{2}\)?\s?\d{4,5}-?\d{4}$/, {
+    message: 'Telefone deve ter formato valido brasileiro',
+  })
   telefone: string;
 
-  @ApiProperty({ description: 'Endereço completo' })
+  @ApiProperty({ description: 'Endereco completo' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   @IsNotEmpty()
   endereco: string;
 
   @ApiProperty({ description: 'Cidade' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   @IsNotEmpty()
   cidade: string;
 
   @ApiProperty({ description: 'Estado (UF)' })
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().toUpperCase() : value,
+  )
   @IsString()
   @IsNotEmpty()
+  @Matches(/^[A-Z]{2}$/, { message: 'Estado deve conter UF com 2 letras' })
   estado: string;
 
   @ApiProperty({ description: 'CEP' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   @IsNotEmpty()
   @Matches(/^\d{5}-\d{3}$/, { message: 'CEP deve ter formato XXXXX-XXX' })
@@ -57,24 +71,34 @@ class EmpresaDataDto {
 }
 
 class UsuarioDataDto {
-  @ApiProperty({ description: 'Nome completo do usuário' })
+  @ApiProperty({ description: 'Nome completo do usuario' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   @IsNotEmpty()
   nome: string;
 
-  @ApiProperty({ description: 'Email do usuário' })
+  @ApiProperty({ description: 'Email do usuario' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
   @IsEmail()
   @IsNotEmpty()
   email: string;
 
-  @ApiProperty({ description: 'Senha do usuário' })
+  @ApiProperty({ description: 'Senha do usuario' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
-  @MinLength(6, { message: 'Senha deve ter pelo menos 6 caracteres' })
+  @MinLength(8, { message: 'Senha deve ter pelo menos 8 caracteres' })
+  @Matches(/^(?=.*[A-Za-z])(?=.*\d).+$/, {
+    message: 'Senha deve conter pelo menos 1 letra e 1 numero',
+  })
   senha: string;
 
-  @ApiProperty({ description: 'Telefone do usuário' })
+  @ApiProperty({ description: 'Telefone do usuario' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   @IsNotEmpty()
+  @Matches(/^\(?\d{2}\)?\s?\d{4,5}-?\d{4}$/, {
+    message: 'Telefone deve ter formato valido brasileiro',
+  })
   telefone: string;
 }
 
@@ -84,24 +108,36 @@ export class CreateEmpresaDto {
   @Type(() => EmpresaDataDto)
   empresa: EmpresaDataDto;
 
-  @ApiProperty({ description: 'Dados do usuário administrador' })
+  @ApiProperty({ description: 'Dados do usuario administrador' })
   @ValidateNested()
   @Type(() => UsuarioDataDto)
   usuario: UsuarioDataDto;
 
   @ApiProperty({ description: 'ID do plano selecionado' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
   @IsString()
   @IsNotEmpty()
+  @Matches(/^[a-z0-9][a-z0-9._-]{1,63}$/, {
+    message: 'Plano invalido para cadastro',
+  })
   plano: string;
 
-  @ApiProperty({ description: 'Aceitação dos termos de uso' })
+  @ApiProperty({ description: 'Aceitacao dos termos de uso' })
   @IsBoolean()
   aceitarTermos: boolean;
 }
 
 export class VerificarEmailDto {
-  @ApiProperty({ description: 'Token de verificação de email' })
+  @ApiProperty({ description: 'Token de verificacao de email' })
   @IsString()
   @IsNotEmpty()
   token: string;
+}
+
+export class ReenviarEmailAtivacaoDto {
+  @ApiProperty({ description: 'Email da empresa para reenvio do link de ativacao' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
 }

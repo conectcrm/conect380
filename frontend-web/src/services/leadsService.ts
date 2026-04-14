@@ -37,6 +37,8 @@ export interface Lead {
   data_primeiro_contato?: string;
   data_ultima_interacao?: string;
   convertido_oportunidade_id?: string;
+  oportunidade_id?: string;
+  convertido_em?: string;
   empresa_id: string;
   created_at: string;
   updated_at: string;
@@ -72,6 +74,11 @@ export interface UpdateLeadDto {
 }
 
 export interface ConvertLeadDto {
+  estagio?: string;
+  valor?: number;
+  descricao?: string;
+  titulo?: string;
+  dataFechamentoEsperado?: string;
   titulo_oportunidade?: string;
   valor_estimado?: number;
   data_fechamento_prevista?: string;
@@ -84,6 +91,9 @@ export interface CaptureLeadDto {
   telefone?: string;
   empresa_nome?: string;
   mensagem?: string;
+  empresa_id?: string;
+  empresa_slug?: string;
+  empresa_subdominio?: string;
 }
 
 export interface LeadEstatisticas {
@@ -93,6 +103,8 @@ export interface LeadEstatisticas {
   qualificados: number;
   desqualificados: number;
   convertidos: number;
+  semResponsavel: number;
+  semContato: number;
   taxaConversao: number;
   scoreMedio: number;
   porOrigem: {
@@ -116,6 +128,7 @@ export interface PaginatedLeads {
 
 export interface LeadFilters {
   search?: string;
+  busca?: string;
   status?: StatusLead | string;
   origem?: OrigemLead | string;
   responsavel_id?: string;
@@ -123,6 +136,8 @@ export interface LeadFilters {
   score_max?: number;
   data_inicio?: string;
   data_fim?: string;
+  dataInicio?: string;
+  dataFim?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -138,6 +153,12 @@ export interface ImportLeadResult {
     erro: string;
     dados?: Record<string, unknown>;
   }>;
+}
+
+export interface LeadConversionResult {
+  id: number;
+  titulo?: string;
+  estagio?: string;
 }
 
 // ===========================
@@ -214,7 +235,35 @@ class LeadsService {
    * Lista todos os leads com filtros e paginação
    */
   async listar(filters: LeadFilters = {}): Promise<PaginatedLeads> {
-    const query = this.buildQueryString(filters);
+    const normalizedFilters: Record<string, unknown> = { ...filters };
+
+    const parsedLimit = Number(filters.limit);
+    if (Number.isFinite(parsedLimit) && parsedLimit > 0) {
+      normalizedFilters.limit = Math.min(100, Math.trunc(parsedLimit));
+    }
+
+    const parsedPage = Number(filters.page);
+    if (Number.isFinite(parsedPage) && parsedPage > 0) {
+      normalizedFilters.page = Math.max(1, Math.trunc(parsedPage));
+    }
+
+    if (filters.search && !filters.busca) {
+      normalizedFilters.busca = filters.search;
+    }
+
+    if (filters.data_inicio && !filters.dataInicio) {
+      normalizedFilters.dataInicio = filters.data_inicio;
+    }
+
+    if (filters.data_fim && !filters.dataFim) {
+      normalizedFilters.dataFim = filters.data_fim;
+    }
+
+    delete normalizedFilters.search;
+    delete normalizedFilters.data_inicio;
+    delete normalizedFilters.data_fim;
+
+    const query = this.buildQueryString(normalizedFilters);
     return this.handleRequest<PaginatedLeads>(
       () => api.get(`${this.baseUrl}${query}`),
       'listar leads',
@@ -267,8 +316,8 @@ class LeadsService {
   /**
    * Converte um lead em oportunidade
    */
-  async converter(id: string, data: ConvertLeadDto = {}): Promise<Lead> {
-    return this.handleRequest<Lead>(
+  async converter(id: string, data: ConvertLeadDto = {}): Promise<LeadConversionResult> {
+    return this.handleRequest<LeadConversionResult>(
       () => api.post(`${this.baseUrl}/${id}/converter`, data),
       `converter lead ${id}`,
     );
@@ -319,7 +368,7 @@ class LeadsService {
   /**
    * Atribui um responsável a um lead
    */
-  async atribuirResponsavel(id: string, responsavel_id: string): Promise<Lead> {
+  async atribuirResponsavel(id: string, responsavel_id: string | null): Promise<Lead> {
     return this.handleRequest<Lead>(
       () =>
         api.patch(`${this.baseUrl}/${id}`, {
@@ -334,7 +383,7 @@ class LeadsService {
    */
   async buscarPorEmail(email: string): Promise<Lead[]> {
     const sanitizedEmail = email.trim();
-    const query = this.buildQueryString({ search: sanitizedEmail });
+    const query = this.buildQueryString({ busca: sanitizedEmail });
 
     return this.handleRequest<Lead[]>(
       () => api.get(`${this.baseUrl}${query}`),

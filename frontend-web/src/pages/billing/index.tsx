@@ -1,196 +1,328 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { BillingDashboard } from '../../components/Billing/BillingDashboard';
+import { BillingHistory } from '../../components/Billing/BillingHistory';
 import { PlanSelection } from '../../components/Billing/PlanSelection';
 import { UsageMeter } from '../../components/Billing/UsageMeter';
 import { PaymentForm } from '../../components/Billing/PaymentForm';
-import { Button } from '../../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { ArrowLeft, Settings, CreditCard, FileText, HelpCircle } from 'lucide-react';
+import { useSubscription, type Plano } from '../../hooks/useSubscription';
+import { ArrowLeft, CalendarDays, CreditCard, FileText, HelpCircle, LayoutDashboard } from 'lucide-react';
+import { FiltersBar, PageHeader, SectionCard } from '../../components/layout-v2';
 
-type BillingView = 'dashboard' | 'plans' | 'usage' | 'settings' | 'payment';
+type BillingTab = 'overview' | 'plans' | 'usage' | 'history' | 'payment';
+
+type BillingPrimaryTab = Exclude<BillingTab, 'payment'>;
+
+const resolveTabFromLocation = (pathname: string, search: string): BillingTab => {
+  const params = new URLSearchParams(search);
+  const queryTab = String(params.get('tab') || '').toLowerCase();
+
+  if (queryTab === 'payment') {
+    return 'payment';
+  }
+
+  if (queryTab === 'usage') {
+    return 'usage';
+  }
+
+  if (queryTab === 'history') {
+    return 'history';
+  }
+
+  if (queryTab === 'plans') {
+    return 'plans';
+  }
+
+  if (pathname.startsWith('/billing/planos')) {
+    return 'plans';
+  }
+
+  return 'overview';
+};
+
+const resolvePathForTab = (tab: BillingTab): string => {
+  if (tab === 'plans' || tab === 'payment') {
+    return '/billing/planos';
+  }
+
+  return '/billing/assinaturas';
+};
+
+const mapPlanoToCheckout = (plano: Plano) => {
+  return {
+    id: plano.id,
+    nome: plano.nome,
+    preco: plano.preco,
+    periodo: 'Cobranca mensal',
+    features: (plano.modulosInclusos || []).map((modulo) => modulo.nome),
+  };
+};
 
 export const BillingPage: React.FC = () => {
-  const [currentView, setCurrentView] = useState<BillingView>('dashboard');
-  const [selectedPlan, setSelectedPlan] = useState<any>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const {
+    planos,
+    isOwnerTenant = false,
+    podeFazerCheckout = true,
+    billingCapabilities,
+  } = useSubscription() as ReturnType<typeof useSubscription> & {
+    isOwnerTenant?: boolean;
+    podeFazerCheckout?: boolean;
+  };
+  const checkoutProviderLabel = useMemo(() => {
+    const rawProvider = billingCapabilities?.enabledGatewayProviders?.[0];
+    const normalized = String(rawProvider || '')
+      .trim()
+      .toLowerCase();
+    if (normalized === 'mercado_pago') return 'Mercado Pago';
+    if (normalized === 'stripe') return 'Stripe';
+    if (normalized === 'pagseguro') return 'PagSeguro';
+    return 'gateway configurado';
+  }, [billingCapabilities?.enabledGatewayProviders]);
 
-  const handlePlanSelect = (plano: any) => {
-    setSelectedPlan(plano);
-    setCurrentView('payment');
+  const activeTab = useMemo(
+    () => resolveTabFromLocation(location.pathname, location.search),
+    [location.pathname, location.search],
+  );
+
+  const selectedPlanId = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('planId');
+  }, [location.search]);
+
+  const selectedPlan = useMemo(() => {
+    if (!selectedPlanId) {
+      return null;
+    }
+
+    return planos.find((plano) => plano.id === selectedPlanId) || null;
+  }, [planos, selectedPlanId]);
+
+  const navigateToTab = useCallback(
+    (tab: BillingTab, planId?: string): void => {
+      const targetPath = resolvePathForTab(tab);
+      const params = new URLSearchParams(location.search);
+      params.delete('tab');
+      params.delete('planId');
+
+      if (tab === 'usage') {
+        params.set('tab', 'usage');
+      } else if (tab === 'history') {
+        params.set('tab', 'history');
+      } else if (tab === 'payment') {
+        params.set('tab', 'payment');
+        if (planId) {
+          params.set('planId', planId);
+        }
+      }
+
+      const targetSearch = params.toString();
+      const currentSearch = location.search.startsWith('?')
+        ? location.search.slice(1)
+        : location.search;
+
+      if (location.pathname === targetPath && currentSearch === targetSearch) {
+        return;
+      }
+
+      navigate({
+        pathname: targetPath,
+        search: targetSearch ? `?${targetSearch}` : '',
+      });
+    },
+    [location.pathname, location.search, navigate],
+  );
+
+  useEffect(() => {
+    if (activeTab === 'payment' && !selectedPlanId) {
+      navigateToTab('plans');
+    }
+  }, [activeTab, navigateToTab, selectedPlanId]);
+
+  useEffect(() => {
+    if (isOwnerTenant && activeTab === 'payment') {
+      navigateToTab('plans');
+    }
+  }, [activeTab, isOwnerTenant, navigateToTab]);
+
+  const currentPrimaryTab: BillingPrimaryTab = activeTab === 'payment' ? 'plans' : activeTab;
+
+  const handlePlanSelect = (plano: Plano, context: { requiresPayment: boolean }) => {
+    if (context.requiresPayment && podeFazerCheckout) {
+      navigateToTab('payment', plano.id);
+      return;
+    }
+
+    navigateToTab('overview');
   };
 
   const handlePaymentSuccess = (paymentData: any) => {
     console.log('Pagamento realizado com sucesso:', paymentData);
-    // Aqui você pode fazer a integração com o backend
-    // Resetar estado e voltar para dashboard
-    setSelectedPlan(null);
-    setCurrentView('dashboard');
+    navigateToTab('overview');
   };
 
+  const handleManageBilling = () => {
+    navigateToTab('plans');
+  };
+
+  const handleOpenDocumentation = useCallback(() => {
+    const docsUrl = (
+      process.env.REACT_APP_BILLING_DOCS_URL || 'https://docs.conect360.com.br/billing'
+    ).trim();
+    window.open(docsUrl, '_blank', 'noopener,noreferrer');
+  }, []);
+
+  const handleOpenSupport = useCallback(() => {
+    navigate('/atendimento/tickets/novo?origem=billing');
+  }, [navigate]);
+
   const renderContent = () => {
-    switch (currentView) {
+    switch (activeTab) {
       case 'plans':
         return (
           <PlanSelection
             onPlanSelect={handlePlanSelect}
-            onClose={() => setCurrentView('dashboard')}
+            onClose={() => navigateToTab('overview')}
           />
         );
 
       case 'payment':
         return (
           <PaymentForm
-            planoSelecionado={selectedPlan}
+            planoSelecionado={selectedPlan ? mapPlanoToCheckout(selectedPlan) : undefined}
+            checkoutEnabled={podeFazerCheckout}
+            checkoutProviderLabel={checkoutProviderLabel}
+            checkoutCredentialScope={billingCapabilities?.checkoutCredentialScope}
+            checkoutCredentialConfigured={billingCapabilities?.checkoutCredentialConfigured}
             onPaymentSuccess={handlePaymentSuccess}
-            onCancel={() => setCurrentView('plans')}
+            onCancel={() => navigateToTab('plans')}
           />
         );
 
       case 'usage':
-        return <UsageMeter showDetails={true} onUpgrade={() => setCurrentView('plans')} />;
+        return <UsageMeter showDetails={true} onUpgrade={() => navigateToTab('plans')} />;
 
-      case 'settings':
-        return (
-          <Card>
-            <CardHeader>
-              <CardTitle>Configurações de Billing</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <div className="text-center py-12">
-                  <Settings className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    Configurações de Billing
-                  </h3>
-                  <p className="text-gray-600 mb-6">
-                    Esta seção permitirá gerenciar métodos de pagamento, histórico de faturas e
-                    configurações de cobrança.
-                  </p>
-                  <div className="space-y-4 max-w-md mx-auto">
-                    <div className="p-4 border border-gray-200 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <CreditCard className="h-5 w-5 text-gray-400" />
-                        <span className="text-sm text-gray-600">Métodos de Pagamento</span>
-                      </div>
-                    </div>
-                    <div className="p-4 border border-gray-200 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-gray-400" />
-                        <span className="text-sm text-gray-600">Histórico de Faturas</span>
-                      </div>
-                    </div>
-                    <div className="p-4 border border-gray-200 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Settings className="h-5 w-5 text-gray-400" />
-                        <span className="text-sm text-gray-600">Configurações de Cobrança</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        );
+      case 'history':
+        return <BillingHistory />;
 
       default:
         return (
           <BillingDashboard
-            onUpgrade={() => setCurrentView('plans')}
-            onManageBilling={() => setCurrentView('settings')}
+            onUpgrade={() => navigateToTab('plans')}
+            onManageBilling={handleManageBilling}
           />
         );
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Navigation */}
-        {currentView !== 'dashboard' && (
-          <div className="mb-6">
-            <Button variant="ghost" onClick={() => setCurrentView('dashboard')} className="mb-4">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Voltar ao Dashboard
-            </Button>
-          </div>
-        )}
+    <div className="space-y-4 pt-1 sm:pt-2">
+      <SectionCard className="p-4 sm:p-5">
+        <PageHeader
+          title={
+            <span className="inline-flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-[#159A9C]" />
+              <span>Assinatura</span>
+            </span>
+          }
+          description="Gerencie assinatura, uso e planos em um fluxo unico para o cliente."
+          actions={
+            activeTab !== 'overview' ? (
+              <button
+                type="button"
+                onClick={() => navigateToTab('overview')}
+                className="inline-flex items-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Voltar para Assinaturas
+              </button>
+            ) : undefined
+          }
+        />
+      </SectionCard>
 
-        {/* Header Navigation */}
-        <div className="mb-8">
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
-              <button
-                onClick={() => setCurrentView('dashboard')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  currentView === 'dashboard'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Dashboard
-              </button>
-              <button
-                onClick={() => setCurrentView('usage')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  currentView === 'usage'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Uso Detalhado
-              </button>
-              <button
-                onClick={() => setCurrentView('plans')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  currentView === 'plans'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Planos
-              </button>
-              <button
-                onClick={() => setCurrentView('settings')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  currentView === 'settings'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Configurações
-              </button>
-            </nav>
+      <FiltersBar className="p-4">
+        <div className="flex w-full flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigateToTab('overview')}
+            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              currentPrimaryTab === 'overview'
+                ? 'bg-[#159A9C] text-white'
+                : 'border border-[#D4E2E7] bg-white text-[#244455] hover:bg-[#F6FAF9]'
+            }`}
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            Assinatura
+          </button>
+          <button
+            type="button"
+            onClick={() => navigateToTab('usage')}
+            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              currentPrimaryTab === 'usage'
+                ? 'bg-[#159A9C] text-white'
+                : 'border border-[#D4E2E7] bg-white text-[#244455] hover:bg-[#F6FAF9]'
+            }`}
+          >
+            Uso
+          </button>
+          <button
+            type="button"
+            onClick={() => navigateToTab('history')}
+            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              currentPrimaryTab === 'history'
+                ? 'bg-[#159A9C] text-white'
+                : 'border border-[#D4E2E7] bg-white text-[#244455] hover:bg-[#F6FAF9]'
+            }`}
+          >
+            <CalendarDays className="h-4 w-4" />
+            Historico
+          </button>
+          <button
+            type="button"
+            onClick={() => navigateToTab('plans')}
+            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              currentPrimaryTab === 'plans'
+                ? 'bg-[#159A9C] text-white'
+                : 'border border-[#D4E2E7] bg-white text-[#244455] hover:bg-[#F6FAF9]'
+            }`}
+          >
+            {isOwnerTenant ? 'Planos' : 'Planos e Upgrade'}
+          </button>
+        </div>
+      </FiltersBar>
+
+      <div className="space-y-4">{renderContent()}</div>
+
+      <SectionCard className="p-4 sm:p-6">
+        <div className="text-center">
+          <HelpCircle className="mx-auto mb-3 h-8 w-8 text-[#159A9C]" />
+          <h3 className="mb-2 text-lg font-semibold text-[#002333]">Precisa de Ajuda?</h3>
+          <p className="mx-auto mb-4 max-w-2xl text-sm text-[#385A6A]">
+            Nossa equipe esta pronta para ajudar voce a escolher o melhor plano e configurar sua
+            assinatura.
+          </p>
+          <div className="flex flex-col justify-center gap-3 sm:flex-row">
+            <button
+              type="button"
+              onClick={handleOpenDocumentation}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
+            >
+              <FileText className="h-4 w-4" />
+              Documentacao
+            </button>
+            <button
+              type="button"
+              onClick={handleOpenSupport}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
+            >
+              <HelpCircle className="h-4 w-4" />
+              Falar com Suporte
+            </button>
           </div>
         </div>
-
-        {/* Content */}
-        <div className="space-y-6">{renderContent()}</div>
-
-        {/* Help Section */}
-        <div className="mt-12 pt-8 border-t border-gray-200">
-          <Card>
-            <CardContent className="p-6">
-              <div className="text-center">
-                <HelpCircle className="h-8 w-8 text-blue-500 mx-auto mb-3" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Precisa de Ajuda?</h3>
-                <p className="text-gray-600 mb-4">
-                  Nossa equipe está pronta para ajudar você a escolher o melhor plano e configurar
-                  sua assinatura.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <Button variant="outline" size="sm">
-                    <FileText className="h-4 w-4 mr-2" />
-                    Documentação
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    <HelpCircle className="h-4 w-4 mr-2" />
-                    Falar com Suporte
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      </SectionCard>
     </div>
   );
 };

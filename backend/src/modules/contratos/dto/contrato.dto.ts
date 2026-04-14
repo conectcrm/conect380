@@ -117,3 +117,13 @@ export class UpdateContratoDto {
   @IsBoolean()
   ativo?: boolean;
 }
+
+export class ConfirmarAssinaturaExternaDto {
+  @IsOptional()
+  @IsDateString()
+  dataAssinatura?: string;
+
+  @IsOptional()
+  @IsString()
+  observacoes?: string;
+}
