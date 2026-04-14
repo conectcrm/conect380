@@ -19,7 +19,6 @@ import { useGlobalConfirmation } from '../../contexts/GlobalConfirmationContext'
 import DashboardPropostas from './components/DashboardPropostas';
 import FiltrosAvancados from './components/FiltrosAvancados';
 import PropostaActions from './components/PropostaActions';
-import ModalVisualizarProposta from './components/ModalVisualizarProposta';
 import StatusFluxo from './components/StatusFluxo';
 import {
   propostasService as propostasFeatureService,
@@ -422,9 +421,6 @@ const PropostasPage: React.FC = () => {
   const [savingMotivoPerda, setSavingMotivoPerda] = useState(false);
   const [selectedPropostaForEdit, setSelectedPropostaForEdit] =
     useState<PropostaCompletaFeature | null>(null);
-  const [selectedPropostaForView, setSelectedPropostaForView] =
-    useState<PropostaCompletaFeature | null>(null);
-  const [showViewModal, setShowViewModal] = useState(false);
   const [wizardContextMessage, setWizardContextMessage] = useState<string | null>(null);
 
   // 🆕 Estados para UX Melhorada - Fase 2
@@ -2009,27 +2005,10 @@ const PropostasPage: React.FC = () => {
         return;
       }
 
-      try {
-        const propostaCompleta = await propostasFeatureService.obterProposta(propostaId);
-        if (!propostaCompleta) {
-          showNotification('Nao foi possivel carregar os detalhes da proposta.', 'error');
-          return;
-        }
-
-        setSelectedPropostaForView(propostaCompleta);
-        setShowViewModal(true);
-      } catch (error) {
-        console.error('Erro ao carregar detalhes da proposta:', error);
-        showNotification('Erro ao abrir a visualizacao da proposta.', 'error');
-      }
+      navigate(`/vendas/propostas/${encodeURIComponent(propostaId)}`);
     },
-    [showNotification],
+    [navigate, showNotification],
   );
-
-  const handleCloseViewModal = useCallback(() => {
-    setShowViewModal(false);
-    setSelectedPropostaForView(null);
-  }, []);
 
   // Função de fallback para gerar HTML local quando API não estiver disponível
   const gerarHtmlLocal = (dados: DadosProposta): string => {
@@ -3273,21 +3252,6 @@ const PropostasPage: React.FC = () => {
         {/* 🆕 FASE 2: Componentes de UX Melhorada */}
 
         {/* Seleção Múltipla - Barra fixa na parte inferior */}
-        {showViewModal && selectedPropostaForView && (
-          <ModalVisualizarProposta
-            isOpen={showViewModal}
-            onClose={handleCloseViewModal}
-            proposta={selectedPropostaForView}
-            onEditProposta={(propostaAtual) => {
-              handleCloseViewModal();
-              void handleEditProposta(propostaAtual);
-            }}
-            onPropostaUpdated={() => {
-              void carregarPropostas({ force: true, source: 'modal-view-actions' });
-            }}
-          />
-        )}
-
         <SelecaoMultipla
           propostasSelecionadas={propostasSelecionadas}
           totalPropostas={filteredPropostas.length}

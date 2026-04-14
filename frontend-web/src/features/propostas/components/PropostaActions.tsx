@@ -41,6 +41,7 @@ import { empresaConfigService } from '../../../services/empresaConfigService';
 import { minhasEmpresasService } from '../../../services/minhasEmpresasService';
 import { useNavigate } from 'react-router-dom';
 import { isMvpModeEnabled } from '../../../config/mvpScope';
+import { userHasPermission } from '../../../config/menuConfig';
 import ModalEnviarWhatsApp from '../../../components/whatsapp/ModalEnviarWhatsApp';
 import { triggerSalesCelebration } from '../../../components/feedback/SalesCelebrationHost';
 import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
@@ -397,7 +398,7 @@ interface PropostaActionsProps {
   onPropostaUpdated?: () => void;
   className?: string;
   showLabels?: boolean;
-  actionScope?: 'all' | 'share' | 'flow';
+  actionScope?: 'all' | 'share' | 'flow' | 'approvals';
 }
 
 type PromptDialogState = {
@@ -445,6 +446,11 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const mvpModeAtivo = isMvpModeEnabled();
   const faturamentoDisponivelNoContexto = !mvpModeAtivo;
   const faturamentoOperacaoPermitidaNoContexto = faturamentoDisponivelNoContexto;
+  const usuarioLogado = authService.getUser() as any;
+  const podeGerenciarAprovacoes = userHasPermission(
+    usuarioLogado,
+    'comercial.propostas.approve.override',
+  );
   const [sendingEmail, setSendingEmail] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [clienteData, setClienteData] = useState<{
@@ -1783,6 +1789,22 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       .toLowerCase();
   };
 
+  const getDispensaContratoSolicitanteId = (fonte?: PropostaCompleta | PropostaUI): string => {
+    const propostaData = getPropostaData(fonte);
+    return String(
+      (propostaData as any)?.emailDetails?.contratoGate?.dispensa?.solicitadaPorId || '',
+    ).trim();
+  };
+
+  const getUsuarioAtualId = (): string => {
+    try {
+      const user = authService.getUser() as any;
+      return String(user?.id || user?.userId || '').trim();
+    } catch {
+      return '';
+    }
+  };
+
   // Gerar contrato a partir da proposta
   const handleGerarContrato = async () => {
     if (!podeGerarContrato()) {
@@ -1906,6 +1928,14 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     try {
       const { propostaCompleta, propostaId } = await obterContextoAutomacao();
       const propostaData = getPropostaData(propostaCompleta);
+      const solicitanteId = getDispensaContratoSolicitanteId(propostaCompleta);
+      const usuarioAtualId = getUsuarioAtualId();
+      if (usuarioAtualId && solicitanteId && usuarioAtualId === solicitanteId) {
+        toastService.info(
+          'Autoaprovacao nao permitida: o solicitante da dispensa nao pode aprovar a propria solicitacao.',
+        );
+        return false;
+      }
       const motivo =
         typeof reasonOverride === 'string'
           ? reasonOverride
@@ -1941,7 +1971,14 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       return true;
     } catch (error) {
       console.error('Erro ao aprovar dispensa de contrato:', error);
-      toastService.error(getErrorMessage(error, 'Erro ao aprovar dispensa de contrato.'));
+      const message = getErrorMessage(error, 'Erro ao aprovar dispensa de contrato.');
+      if (String(message || '').toLowerCase().includes('autoaprovacao')) {
+        toastService.info(
+          'Autoaprovacao nao permitida: a dispensa deve ser aprovada por outro usuario (aprovador/gestor).',
+        );
+      } else {
+        toastService.error(message);
+      }
       return false;
     }
   };
@@ -2272,6 +2309,21 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
           const statusDispensa = getDispensaContratoStatus();
           if (statusDispensa === 'solicitada') {
+            if (!podeGerenciarAprovacoes) {
+              toastService.info(
+                'Dispensa de contrato pendente. Apenas um gerente pode aprovar para seguir sem contrato.',
+              );
+              break;
+            }
+            const solicitanteId = getDispensaContratoSolicitanteId();
+            const usuarioAtualId = getUsuarioAtualId();
+            if (usuarioAtualId && solicitanteId && usuarioAtualId === solicitanteId) {
+              toastService.info(
+                'Dispensa de contrato ja solicitada. Aguarde aprovacao de outro usuario para seguir sem contrato.',
+              );
+              break;
+            }
+
             const aprovarAgora = await confirm({
               title: 'Dispensa pendente de aprovacao',
               message:
@@ -2331,13 +2383,12 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           }
 
           const motivoDispensaAutomatica =
-            'Dispensa automatica aprovada via fluxo comercial para gerar faturamento sem contrato.';
+            'Dispensa de contrato solicitada via fluxo comercial para permitir faturamento sem contrato.';
           const solicitada = await handleSolicitarDispensaContrato(motivoDispensaAutomatica);
           if (solicitada) {
-            const aprovada = await handleAprovarDispensaContrato(motivoDispensaAutomatica);
-            if (aprovada) {
-              await handleCriarFaturaSemContrato();
-            }
+            toastService.info(
+              'Dispensa solicitada. Por regra, o solicitante nao pode aprovar a propria dispensa. Aguarde aprovacao de outro usuario para gerar a fatura sem contrato.',
+            );
           }
           break;
         }
@@ -2396,6 +2447,21 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           break;
 
         case 'dispensa_contrato_solicitada': {
+          if (!podeGerenciarAprovacoes) {
+            toastService.info(
+              'Dispensa de contrato pendente. Apenas um gerente pode aprovar essa solicitacao.',
+            );
+            break;
+          }
+          const solicitanteId = getDispensaContratoSolicitanteId();
+          const usuarioAtualId = getUsuarioAtualId();
+          if (usuarioAtualId && solicitanteId && usuarioAtualId === solicitanteId) {
+            toastService.info(
+              'Dispensa pendente. Por regra, o solicitante nao pode aprovar a propria solicitacao. Aguarde aprovacao de outro usuario.',
+            );
+            break;
+          }
+
           const aprovarAgora = await confirm({
             title: 'Dispensa pendente de aprovacao',
             message:
@@ -2828,14 +2894,20 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
       const resultado = await emailServiceReal.enviarPropostaParaCliente(emailData);
 
-        if (resultado.success) {
-          await sincronizarStatusProposta('enviada', {
-            source: 'email',
-            observacoes: `Proposta enviada por email para ${clienteData.nome} (${emailFinal}).`,
-          });
-          toastService.success(`Proposta enviada por email para ${emailFinal}`);
-          onPropostaUpdated?.();
-        } else {
+      if (resultado.success) {
+        // Se ja estivermos em uma etapa posterior (ex: negociacao), nao devemos regredir para "enviada".
+        const statusAtual = String(getPropostaData().status || '').trim();
+        const statusParaRegistrar = (statusAtual === 'rascunho' ? 'enviada' : statusAtual) as Parameters<
+          typeof sincronizarStatusProposta
+        >[0];
+
+        await sincronizarStatusProposta(statusParaRegistrar, {
+          source: 'email',
+          observacoes: `Proposta enviada por email para ${clienteData.nome} (${emailFinal}).`,
+        });
+        toastService.success(`Proposta enviada por email para ${emailFinal}`);
+        onPropostaUpdated?.();
+      } else {
         toastService.error(`Erro ao enviar email: ${resultado.error}`);
       }
     } catch (error) {
@@ -2991,7 +3063,8 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const exibirCriarFatura = podeCriarFatura();
   const exibirAvancarFluxo = !statusEncerradoSemAcoesComerciais && !bloqueiaAvancoFinanceiroNoMvp;
   const exibirAcoesCompartilhamento = actionScope === 'all' || actionScope === 'share';
-  const exibirAcoesFluxo = actionScope === 'all' || actionScope === 'flow';
+  const exibirAcoesFluxo = actionScope === 'all' || actionScope === 'flow' || actionScope === 'approvals';
+  const exibirAcoesAprovacoes = actionScope === 'approvals';
   const exibirCancelarVenda = exibirAcoesFluxo && !statusEncerradoSemAcoesComerciais;
   const exibirSeparadorAutomacao =
     exibirAcoesCompartilhamento &&
@@ -3089,7 +3162,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
   return (
     <div className={`flex items-center space-x-1 ${className}`}>
-      {exibirAcoesFluxo && onEditProposta && editavelNoFluxo && (
+      {exibirAcoesFluxo && !exibirAcoesAprovacoes && onEditProposta && editavelNoFluxo && (
         <button
           type="button"
           onClick={() => onEditProposta(proposta)}
@@ -3113,7 +3186,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         </button>
       )}
 
-      {exibirAcoesFluxo && podeDefinirComoPrincipal && (
+      {exibirAcoesFluxo && !exibirAcoesAprovacoes && podeDefinirComoPrincipal && (
         <button
           type="button"
           onClick={handleDefinirComoPrincipal}
@@ -3213,42 +3286,54 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
             {showLabels && <span>Alcada pendente</span>}
           </span>
 
-          <button
-            type="button"
-            onClick={handleAprovarAlcada}
-            disabled={decidindoAlcadaAprovacao || decidindoAlcadaReprovacao}
-            className={`${buttonClass} ${buttonThemeClass.success} disabled:opacity-50`}
-            title="Aprovar alcada interna"
-          >
-            {decidindoAlcadaAprovacao ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <ShieldCheck className="w-4 h-4" />
-            )}
-            {showLabels && <span>Aprovar alcada</span>}
-          </button>
+          {podeGerenciarAprovacoes ? (
+            <>
+              <button
+                type="button"
+                onClick={handleAprovarAlcada}
+                disabled={decidindoAlcadaAprovacao || decidindoAlcadaReprovacao}
+                className={`${buttonClass} ${buttonThemeClass.success} disabled:opacity-50`}
+                title="Aprovar alcada interna"
+              >
+                {decidindoAlcadaAprovacao ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <ShieldCheck className="w-4 h-4" />
+                )}
+                {showLabels && <span>Aprovar alcada</span>}
+              </button>
 
-          <button
-            type="button"
-            onClick={handleReprovarAlcada}
-            disabled={decidindoAlcadaAprovacao || decidindoAlcadaReprovacao}
-            className={`${buttonClass} ${buttonThemeClass.danger} disabled:opacity-50`}
-            title="Reprovar alcada interna"
-          >
-            {decidindoAlcadaReprovacao ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <ShieldX className="w-4 h-4" />
-            )}
-            {showLabels && <span>Reprovar alcada</span>}
-          </button>
+              <button
+                type="button"
+                onClick={handleReprovarAlcada}
+                disabled={decidindoAlcadaAprovacao || decidindoAlcadaReprovacao}
+                className={`${buttonClass} ${buttonThemeClass.danger} disabled:opacity-50`}
+                title="Reprovar alcada interna"
+              >
+                {decidindoAlcadaReprovacao ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <ShieldX className="w-4 h-4" />
+                )}
+                {showLabels && <span>Reprovar alcada</span>}
+              </button>
+            </>
+          ) : (
+            <span
+              className={`${buttonClass} cursor-default border border-[#DEE8EC] bg-white text-[#607B89]`}
+              title="Aguardando aprovacao do gerente"
+            >
+              <ShieldAlert className="w-4 h-4" />
+              {showLabels && <span>Aguardando gerente</span>}
+            </span>
+          )}
         </>
       )}
 
       {/* NOVOS BOTOES DE AUTOMACAO */}
 
       {/* Gerar Contrato */}
-      {exibirAcoesFluxo && exibirGerarContrato && (
+      {exibirAcoesFluxo && !exibirAcoesAprovacoes && exibirGerarContrato && (
         <button
           type="button"
           onClick={handleGerarContrato}
@@ -3270,7 +3355,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       )}
 
       {/* Criar Fatura */}
-      {exibirAcoesFluxo && exibirCriarFatura && (
+      {exibirAcoesFluxo && !exibirAcoesAprovacoes && exibirCriarFatura && (
         <button
           type="button"
           onClick={() => {
@@ -3294,7 +3379,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       )}
 
       {/* Cancelar venda */}
-      {exibirAcoesFluxo && exibirCancelarVenda && (
+      {exibirAcoesFluxo && !exibirAcoesAprovacoes && exibirCancelarVenda && (
         <button
           type="button"
           onClick={handleCancelarVenda}
@@ -3312,7 +3397,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       )}
 
       {/* Avancar Fluxo */}
-      {exibirAcoesFluxo && exibirAvancarFluxo && (
+      {exibirAcoesFluxo && !exibirAcoesAprovacoes && exibirAvancarFluxo && (
         <button
           type="button"
           onClick={handleAvancarFluxo}
@@ -3328,6 +3413,24 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           {showLabels && <span>{flowActionMeta.label}</span>}
         </button>
       )}
+
+      {/* Aprovar dispensa de contrato (escopo de aprovacoes) */}
+      {exibirAcoesFluxo &&
+        exibirAcoesAprovacoes &&
+        podeGerenciarAprovacoes &&
+        statusFluxoAtual === 'dispensa_contrato_solicitada' && (
+          <button
+            type="button"
+            onClick={() => {
+              void handleAprovarDispensaContrato();
+            }}
+            className={`${buttonClass} ${buttonThemeClass.success} disabled:opacity-50`}
+            title="Aprovar dispensa de contrato"
+          >
+            <ShieldCheck className="w-4 h-4" />
+            {showLabels && <span>Aprovar dispensa</span>}
+          </button>
+        )}
 
       {/* Modal WhatsApp */}
       {showWhatsAppModal && clienteData && (
@@ -3348,9 +3451,24 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
             },
           }}
           pdfBuffer={propostaPdfBuffer}
-          onSuccess={() => {
-            toastService.success('Proposta enviada via WhatsApp!');
-            setShowWhatsAppModal(false);
+          onSuccess={async () => {
+            try {
+              const statusAtual = String(getPropostaData().status || '').trim();
+              const statusParaRegistrar = (statusAtual === 'rascunho'
+                ? 'enviada'
+                : statusAtual) as Parameters<typeof sincronizarStatusProposta>[0];
+
+              await sincronizarStatusProposta(statusParaRegistrar, {
+                source: 'whatsapp',
+                observacoes: `Proposta enviada por WhatsApp para ${clienteData.nome} (${clienteData.telefone || 'telefone nao informado'}).`,
+              });
+              onPropostaUpdated?.();
+            } catch (error) {
+              console.error('Erro ao sincronizar envio via WhatsApp:', error);
+            } finally {
+              toastService.success('Proposta enviada via WhatsApp!');
+              setShowWhatsAppModal(false);
+            }
           }}
         />
       )}

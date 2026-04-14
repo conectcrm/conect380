@@ -5,6 +5,8 @@ import { propostasService as propostasApiService } from '../../../services/propo
 import { BaseModal, ModalButton } from '../../../components/modals/BaseModal';
 import { produtosService } from '../../../services/produtosService';
 import { toastService } from '../../../services/toastService';
+import { authService } from '../../../services/authService';
+import { userHasPermission } from '../../../config/menuConfig';
 import {
   User,
   Calendar,
@@ -1120,6 +1122,42 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
     </div>
   ) : null;
 
+  const usuarioLogado = authService.getUser() as any;
+  const podeGerenciarAprovacoes = userHasPermission(
+    usuarioLogado,
+    'comercial.propostas.approve.override',
+  );
+  const dispensaStatus = String(
+    (proposta as any)?.emailDetails?.contratoGate?.dispensa?.status || '',
+  )
+    .trim()
+    .toLowerCase();
+  const possuiDispensaPendente = dispensaStatus === 'solicitada';
+  const possuiAlcadaPendente = String(aprovacao?.status || '').trim().toLowerCase() === 'pendente';
+  const exibirAprovacoesSection =
+    Boolean(podeGerenciarAprovacoes) || Boolean(possuiDispensaPendente) || Boolean(possuiAlcadaPendente);
+
+  const aprovacoesSection = exibirAprovacoesSection ? (
+    <div className={`${isPageMode ? '' : 'mb-4 '}rounded-xl border border-[#E2ECF0] bg-[#F7FBFC] p-3 sm:p-4`}>
+      <h4 className="mb-1 text-sm font-medium text-[#19384C]">Aprovacoes</h4>
+      <p className="mb-3 text-xs text-[#607B89]">
+        Pendencias que dependem de gerente (alcada, dispensa de contrato e outras).
+      </p>
+      <PropostaActions
+        proposta={proposta}
+        onPropostaUpdated={onPropostaUpdated}
+        showLabels={true}
+        className="flex-wrap"
+        actionScope="approvals"
+      />
+      {!podeGerenciarAprovacoes && (possuiAlcadaPendente || possuiDispensaPendente) && (
+        <p className="mt-3 text-xs text-[#92400E]">
+          Esta proposta possui pendencias de aprovacao. Somente usuarios com perfil de gerente podem decidir.
+        </p>
+      )}
+    </div>
+  ) : null;
+
   const cicloSection = (
     <div className={`${isPageMode ? '' : 'mb-4 '}rounded-xl border border-[#DCE7EC] bg-[#F8FBFC] p-4`}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1512,167 +1550,185 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
       </div>
   );
 
-  const informacoesFluxoSection = (
-    <div className="space-y-5">
-      <section className="rounded-xl border border-[#DCE7EC] bg-white p-4">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#E2ECF0] pb-3">
-          <h4 className="text-lg font-semibold text-[#19384C]">Informacoes do cliente</h4>
-          <span className="rounded-full bg-[#F1F7FA] px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#486572]">
-            {proposta.cliente?.tipoPessoa === 'juridica' ? 'Pessoa juridica' : 'Pessoa fisica'}
-          </span>
-        </div>
+  const clienteInfoInner = (
+    <>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#E2ECF0] pb-3">
+        <h4 className="text-lg font-semibold text-[#19384C]">Informacoes do cliente</h4>
+        <span className="rounded-full bg-[#F1F7FA] px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#486572]">
+          {proposta.cliente?.tipoPessoa === 'juridica' ? 'Pessoa juridica' : 'Pessoa fisica'}
+        </span>
+      </div>
 
-        <div className="space-y-3">
-          <div className="flex items-start gap-3">
-            <User className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-[#19384C]">
-                {proposta.cliente?.nome || 'Nome nao informado'}
-              </p>
-              {proposta.cliente?.documento ? (
-                <p className="text-xs text-[#607B89]">Documento: {proposta.cliente.documento}</p>
-              ) : (
-                <p className="text-xs text-[#607B89]">Documento nao informado</p>
-              )}
-            </div>
-          </div>
-
-          {proposta.cliente?.email && (
-            <div className="flex items-start gap-3">
-              <Mail className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
-              <span className="text-sm text-[#355166]">{proposta.cliente.email}</span>
-            </div>
-          )}
-
-          {proposta.cliente?.telefone && (
-            <div className="flex items-start gap-3">
-              <Phone className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
-              <span className="text-sm text-[#355166]">{proposta.cliente.telefone}</span>
-            </div>
-          )}
-
-          {proposta.cliente?.endereco && (
-            <div className="flex items-start gap-3">
-              <MapPin className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
-              <span className="text-sm text-[#355166]">
-                {proposta.cliente.endereco}
-                {proposta.cliente.cidade && `, ${proposta.cliente.cidade}`}
-                {proposta.cliente.estado && ` - ${proposta.cliente.estado}`}
-              </span>
-            </div>
-          )}
-
-          {!proposta.cliente?.email && !proposta.cliente?.telefone && !proposta.cliente?.endereco && (
-            <p className="text-[11px] text-[#8BA0AA]">
-              Cliente sem dados complementares cadastrados neste rascunho.
+      <div className="space-y-3">
+        <div className="flex items-start gap-3">
+          <User className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-[#19384C]">
+              {proposta.cliente?.nome || 'Nome nao informado'}
             </p>
-          )}
-        </div>
-      </section>
-
-      <section className="rounded-xl border border-[#DCE7EC] bg-white p-4">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#E2ECF0] pb-3">
-          <h4 className="text-lg font-semibold text-[#19384C]">Produtos / Servicos</h4>
-          {itensNegociados.length > 0 && (
-            <span className="rounded-full bg-[#F1F7FA] px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#486572]">
-              {itensNegociados.length} item(ns)
-            </span>
-          )}
+            {proposta.cliente?.documento ? (
+              <p className="text-xs text-[#607B89]">Documento: {proposta.cliente.documento}</p>
+            ) : (
+              <p className="text-xs text-[#607B89]">Documento nao informado</p>
+            )}
+          </div>
         </div>
 
-        {itensNegociados.length === 0 ? (
-          loadingCiclo ? (
-            <div className="flex items-center gap-2 text-sm text-[#607B89]">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Carregando itens negociados...
-            </div>
-          ) : (
-            <p className="text-sm text-[#607B89]">Nenhum item informado nesta proposta.</p>
-          )
-        ) : (
-          <div className="space-y-3">
-            {itensNegociados.map((item, index) => {
-              const nomeProdutoRaw = item?.nome || 'Produto/Servico';
-              const nomeProduto =
-                nomeProdutoRaw.startsWith('Item ') && item.produtoId && nomesProdutosPorId[item.produtoId]
-                  ? nomesProdutosPorId[item.produtoId]
-                  : nomeProdutoRaw;
-              const descricaoProduto = item?.descricao || '';
-              const precoUnit = Number(item?.precoUnitario || 0);
-              const quantidade = Math.max(1, Number(item?.quantidade || 0));
-              const desconto = Number(item?.desconto || 0);
-              const subtotal = Number(item?.subtotal || 0);
-              const composicaoDetalhes = getComposicaoDetalhes(item);
-
-              return (
-                <article
-                  key={`${item.produtoId || nomeProduto}-${index}`}
-                  className="rounded-lg border border-[#E2ECF0] bg-[#FBFDFD] p-3"
-                >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-[#19384C]">{nomeProduto}</p>
-                      {descricaoProduto ? <p className="mt-1 text-xs text-[#607B89]">{descricaoProduto}</p> : null}
-                    </div>
-                    <span className="inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[#486572] shadow-sm ring-1 ring-[#DCE7EC]">
-                      x{quantidade}
-                    </span>
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-2 gap-3 2xl:grid-cols-4">
-                    <div className="rounded-md bg-white px-3 py-2 ring-1 ring-[#E7EFF3]">
-                      <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Qtd</p>
-                      <p className="mt-1 break-words text-sm font-semibold text-[#19384C]">{quantidade}</p>
-                    </div>
-                    <div className="rounded-md bg-white px-3 py-2 ring-1 ring-[#E7EFF3]">
-                      <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Unitario</p>
-                      <p className="mt-1 break-words text-sm font-semibold text-[#19384C]">
-                        {formatCurrency(precoUnit)}
-                      </p>
-                    </div>
-                    <div className="rounded-md bg-white px-3 py-2 ring-1 ring-[#E7EFF3]">
-                      <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Desconto</p>
-                      <p className="mt-1 break-words text-sm font-semibold text-[#19384C]">{desconto}%</p>
-                    </div>
-                    <div className="rounded-md bg-white px-3 py-2 ring-1 ring-[#E7EFF3]">
-                      <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Subtotal</p>
-                      <p className="mt-1 break-words text-sm font-semibold text-[#159A9C]">
-                        {formatCurrency(subtotal)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {composicaoDetalhes.length > 0 && (
-                    <div className="mt-3 space-y-1 rounded-md border border-[#D4E2E7] bg-white px-3 py-2">
-                      {composicaoDetalhes.map((detalhe, detalheIndex) => (
-                        <p
-                          key={`${item.produtoId || nomeProduto}-comp-${detalheIndex}`}
-                          className="text-xs text-[#35538A]"
-                        >
-                          {detalhe}
-                        </p>
-                      ))}
-                      {(item.componentesPlano?.length || 0) > 3 && (
-                        <p className="text-xs font-medium text-[#607B89]">
-                          +{(item.componentesPlano?.length || 0) - 3} componente(s)
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </article>
-              );
-            })}
+        {proposta.cliente?.email && (
+          <div className="flex items-start gap-3">
+            <Mail className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
+            <span className="text-sm text-[#355166]">{proposta.cliente.email}</span>
           </div>
         )}
-      </section>
 
-      {proposta.observacoes && (
-        <section className="rounded-xl border border-[#DCE7EC] bg-white p-4">
-          <h4 className="mb-3 border-b border-[#E2ECF0] pb-2 text-lg font-semibold text-[#19384C]">
-            Observacoes
-          </h4>
-          <p className="whitespace-pre-wrap text-sm text-[#355166]">{proposta.observacoes}</p>
-        </section>
+        {proposta.cliente?.telefone && (
+          <div className="flex items-start gap-3">
+            <Phone className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
+            <span className="text-sm text-[#355166]">{proposta.cliente.telefone}</span>
+          </div>
+        )}
+
+        {proposta.cliente?.endereco && (
+          <div className="flex items-start gap-3">
+            <MapPin className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
+            <span className="text-sm text-[#355166]">
+              {proposta.cliente.endereco}
+              {proposta.cliente.cidade && `, ${proposta.cliente.cidade}`}
+              {proposta.cliente.estado && ` - ${proposta.cliente.estado}`}
+            </span>
+          </div>
+        )}
+
+        {!proposta.cliente?.email && !proposta.cliente?.telefone && !proposta.cliente?.endereco && (
+          <p className="text-[11px] text-[#8BA0AA]">
+            Cliente sem dados complementares cadastrados neste rascunho.
+          </p>
+        )}
+      </div>
+    </>
+  );
+
+  const produtosInner = (
+    <>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#E2ECF0] pb-3">
+        <h4 className="text-lg font-semibold text-[#19384C]">Produtos / Servicos</h4>
+        {itensNegociados.length > 0 && (
+          <span className="rounded-full bg-[#F1F7FA] px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#486572]">
+            {itensNegociados.length} item(ns)
+          </span>
+        )}
+      </div>
+
+      {itensNegociados.length === 0 ? (
+        loadingCiclo ? (
+          <div className="flex items-center gap-2 text-sm text-[#607B89]">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Carregando itens negociados...
+          </div>
+        ) : (
+          <p className="text-sm text-[#607B89]">Nenhum item informado nesta proposta.</p>
+        )
+      ) : (
+        <div className="space-y-3">
+          {itensNegociados.map((item, index) => {
+            const nomeProdutoRaw = item?.nome || 'Produto/Servico';
+            const nomeProduto =
+              nomeProdutoRaw.startsWith('Item ') && item.produtoId && nomesProdutosPorId[item.produtoId]
+                ? nomesProdutosPorId[item.produtoId]
+                : nomeProdutoRaw;
+            const descricaoProduto = item?.descricao || '';
+            const precoUnit = Number(item?.precoUnitario || 0);
+            const quantidade = Math.max(1, Number(item?.quantidade || 0));
+            const desconto = Number(item?.desconto || 0);
+            const subtotal = Number(item?.subtotal || 0);
+            const composicaoDetalhes = getComposicaoDetalhes(item);
+
+            return (
+              <article
+                key={`${item.produtoId || nomeProduto}-${index}`}
+                className="rounded-lg border border-[#E2ECF0] bg-[#FBFDFD] p-3"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[#19384C]">{nomeProduto}</p>
+                    {descricaoProduto ? (
+                      <p className="mt-1 text-xs text-[#607B89]">{descricaoProduto}</p>
+                    ) : null}
+                  </div>
+                  <span className="inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[#486572] shadow-sm ring-1 ring-[#DCE7EC]">
+                    x{quantidade}
+                  </span>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-3 2xl:grid-cols-4">
+                  <div className="rounded-md bg-white px-3 py-2 ring-1 ring-[#E7EFF3]">
+                    <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Qtd</p>
+                    <p className="mt-1 break-words text-sm font-semibold text-[#19384C]">{quantidade}</p>
+                  </div>
+                  <div className="rounded-md bg-white px-3 py-2 ring-1 ring-[#E7EFF3]">
+                    <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Unitario</p>
+                    <p className="mt-1 break-words text-sm font-semibold text-[#19384C]">
+                      {formatCurrency(precoUnit)}
+                    </p>
+                  </div>
+                  <div className="rounded-md bg-white px-3 py-2 ring-1 ring-[#E7EFF3]">
+                    <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Desconto</p>
+                    <p className="mt-1 break-words text-sm font-semibold text-[#19384C]">{desconto}%</p>
+                  </div>
+                  <div className="rounded-md bg-white px-3 py-2 ring-1 ring-[#E7EFF3]">
+                    <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Subtotal</p>
+                    <p className="mt-1 break-words text-sm font-semibold text-[#159A9C]">
+                      {formatCurrency(subtotal)}
+                    </p>
+                  </div>
+                </div>
+
+                {composicaoDetalhes.length > 0 && (
+                  <div className="mt-3 space-y-1 rounded-md border border-[#D4E2E7] bg-white px-3 py-2">
+                    {composicaoDetalhes.map((detalhe, detalheIndex) => (
+                      <p
+                        key={`${item.produtoId || nomeProduto}-comp-${detalheIndex}`}
+                        className="text-xs text-[#35538A]"
+                      >
+                        {detalhe}
+                      </p>
+                    ))}
+                    {(item.componentesPlano?.length || 0) > 3 && (
+                      <p className="text-xs font-medium text-[#607B89]">
+                        +{(item.componentesPlano?.length || 0) - 3} componente(s)
+                      </p>
+                    )}
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+
+  const observacoesInner = proposta.observacoes ? (
+    <>
+      <h4 className="mb-3 border-b border-[#E2ECF0] pb-2 text-lg font-semibold text-[#19384C]">
+        Observacoes
+      </h4>
+      <p className="whitespace-pre-wrap text-sm text-[#355166]">{proposta.observacoes}</p>
+    </>
+  ) : null;
+
+  const informacoesFluxoSection = isPageMode ? (
+    <section className="rounded-xl border border-[#DCE7EC] bg-white overflow-hidden">
+      <div className="p-4">{clienteInfoInner}</div>
+      <div className="border-t border-[#E2ECF0] p-4">{produtosInner}</div>
+      {observacoesInner && <div className="border-t border-[#E2ECF0] p-4">{observacoesInner}</div>}
+    </section>
+  ) : (
+    <div className="space-y-5">
+      <section className="rounded-xl border border-[#DCE7EC] bg-white p-4">{clienteInfoInner}</section>
+      <section className="rounded-xl border border-[#DCE7EC] bg-white p-4">{produtosInner}</section>
+      {observacoesInner && (
+        <section className="rounded-xl border border-[#DCE7EC] bg-white p-4">{observacoesInner}</section>
       )}
     </div>
   );
@@ -1683,6 +1739,83 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
         <h4 className="mb-4 border-b border-[#E2ECF0] pb-3 text-lg font-semibold text-[#19384C]">
           Detalhes da proposta
         </h4>
+
+        {isPageMode && (
+          <div className="mb-4 rounded-lg bg-[#F7FBFC] p-3 ring-1 ring-[#E7EFF3]">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#607B89]">
+              Acoes
+            </p>
+
+            <div className="mt-3">
+              <p className="text-xs font-semibold text-[#19384C]">Compartilhar</p>
+              <p className="mt-1 text-xs text-[#607B89]">
+                Envie a proposta por e-mail/WhatsApp, baixe o PDF ou compartilhe o link do portal.
+              </p>
+              <div className="mt-2">
+                <PropostaActions
+                  proposta={proposta}
+                  onEditProposta={
+                    onEditProposta
+                      ? (propostaAtual) => onEditProposta(propostaAtual as PropostaCompleta)
+                      : undefined
+                  }
+                  onPropostaUpdated={onPropostaUpdated}
+                  showLabels={true}
+                  className="flex-wrap"
+                  actionScope="share"
+                />
+              </div>
+            </div>
+
+            {exibirAprovacoesSection && (
+              <div className="mt-4 border-t border-[#DCE7EC] pt-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-[#19384C]">Aprovacoes</p>
+                  {!podeGerenciarAprovacoes && (possuiAlcadaPendente || possuiDispensaPendente) && (
+                    <span className="text-[11px] font-medium text-[#92400E]">
+                      Pendente de gerente
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-[#607B89]">
+                  Alcada (desconto) e dispensa de contrato quando aplicavel.
+                </p>
+                <div className="mt-2">
+                  <PropostaActions
+                    proposta={proposta}
+                    onPropostaUpdated={onPropostaUpdated}
+                    showLabels={true}
+                    className="flex-wrap"
+                    actionScope="approvals"
+                  />
+                </div>
+              </div>
+            )}
+
+            {exibirSecaoAcoesFluxo && (
+              <div className="mt-4 border-t border-[#DCE7EC] pt-4">
+                <p className="text-xs font-semibold text-[#19384C]">Proxima etapa</p>
+                <p className="mt-1 text-xs text-[#607B89]">
+                  Acoes comerciais e de fluxo para o estagio atual da proposta.
+                </p>
+                <div className="mt-2">
+                  <PropostaActions
+                    proposta={proposta}
+                    onEditProposta={
+                      onEditProposta
+                        ? (propostaAtual) => onEditProposta(propostaAtual as PropostaCompleta)
+                        : undefined
+                    }
+                    onPropostaUpdated={onPropostaUpdated}
+                    showLabels={true}
+                    className="flex-wrap"
+                    actionScope="flow"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="rounded-md bg-[#F8FBFC] px-3 py-2 ring-1 ring-[#E7EFF3]">
@@ -1784,8 +1917,6 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
         {informacoesFluxoSection}
       </div>
       <div className="space-y-5">
-        {compartilharSection}
-        {fluxoSection}
         {dadosComerciaisSection}
       </div>
     </div>
@@ -1799,6 +1930,7 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
         </div>
       )}
       {compartilharSection}
+      {aprovacoesSection}
       {cicloSection}
       {dadosPropostaSection}
     </>
