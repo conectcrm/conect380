@@ -1,6 +1,7 @@
 import React from 'react';
 import { useModuloAtivo } from '../../hooks/useModuloAtivo';
 import { ModuloEnum } from '../../services/modulosService';
+import BackendIndisponivel from './BackendIndisponivel';
 import ModuloBloqueado from './ModuloBloqueado';
 
 interface RouteGuardProps {
@@ -42,7 +43,7 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({
   recursos = [],
   children,
 }) => {
-  const [isAtivo, loading] = useModuloAtivo(modulo);
+  const [isAtivo, loading, errorKind] = useModuloAtivo(modulo);
 
   // Loading state
   if (loading) {
@@ -54,6 +55,10 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({
         </div>
       </div>
     );
+  }
+
+  if (errorKind === 'backend_unavailable') {
+    return <BackendIndisponivel moduloNome={moduloNome} />;
   }
 
   // Módulo não ativo - mostrar tela de bloqueio
