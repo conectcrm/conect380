@@ -390,7 +390,7 @@ export class PropostasController {
   }
 
   @Post(':id/aprovacao/decidir')
-  @Permissions(Permission.COMERCIAL_PROPOSTAS_UPDATE)
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_APPROVE_OVERRIDE)
   async decidirAprovacaoInterna(
     @EmpresaId() empresaId: string,
     @Param('id') propostaId: string,
