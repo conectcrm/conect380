@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
   ArrowRight,
-  BellRing,
-  CheckCircle2,
   Landmark,
   RefreshCw,
   ShieldCheck,
@@ -20,9 +18,7 @@ import faturamentoService, {
 import contasPagarService from '../../services/contasPagarService';
 import contaBancariaService from '../../services/contaBancariaService';
 import conciliacaoBancariaService from '../../services/conciliacaoBancariaService';
-import alertasOperacionaisFinanceiroService from '../../services/alertasOperacionaisFinanceiroService';
 import {
-  AlertaOperacionalFinanceiro,
   ContaPagar,
   ImportacaoExtrato,
   ResumoFinanceiro,
@@ -32,16 +28,7 @@ import type { DashboardV2Insight, DashboardV2Insights } from './useDashboardV2';
 import GoalProgressCard from './components/GoalProgressCard';
 import InsightsPanel from './components/InsightsPanel';
 import KpiTrendCard from './components/KpiTrendCard';
-import {
-  aplicarAtualizacaoAlertaOperacional,
-  contarAlertasOperacionais,
-  priorizarAlertasOperacionais,
-} from './financeiro-alertas-state';
-import {
-  isAlertaReprocessavel,
-  montarPayloadReprocessamento,
-  REPROCESSAMENTO_CANCELADO,
-} from './financeiro-alertas-reprocessamento';
+import FinanceiroGestaoCharts from './components/FinanceiroGestaoCharts';
 
 type PeriodoFiltro = '7d' | '30d' | '90d';
 
@@ -95,18 +82,6 @@ const formatDate = (value: string): string => {
   return parsed.toLocaleDateString('pt-BR');
 };
 
-const alertSeverityLabelMap = {
-  critical: 'Crítico',
-  warning: 'Atenção',
-  info: 'Informativo',
-} as const;
-
-const alertStatusLabelMap = {
-  ativo: 'Ativo',
-  acknowledged: 'Reconhecido',
-  resolvido: 'Resolvido',
-} as const;
-
 const clampPercent = (value: number): number => Math.max(0, Math.min(100, value));
 
 const sectionSurfaceClass =
@@ -143,21 +118,15 @@ const FinanceiroDashboardV2: React.FC = () => {
   const [resumoContasPagar, setResumoContasPagar] = useState<ResumoFinanceiro | null>(null);
   const [pendenciasAprovacao, setPendenciasAprovacao] = useState<ContaPagar[]>([]);
   const [importacoesConciliacao, setImportacoesConciliacao] = useState<ImportacaoExtrato[]>([]);
-  const [alertasOperacionais, setAlertasOperacionais] = useState<AlertaOperacionalFinanceiro[]>([]);
   const [saldoBancarioTotal, setSaldoBancarioTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [warning, setWarning] = useState<string | null>(null);
-  const [warningAlertas, setWarningAlertas] = useState<string | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
   const [insights, setInsights] = useState<DashboardV2Insight[]>([]);
-  const [alertaActionById, setAlertaActionById] = useState<
-    Record<string, 'ack' | 'resolver' | 'reprocessar' | undefined>
-  >({});
 
   const carregarDados = useCallback(async () => {
     setWarning(null);
-    setWarningAlertas(null);
     const range = periodRange(periodo);
     const dataInicio = range.dataInicioIso.slice(0, 10);
     const dataFim = range.dataFimIso.slice(0, 10);
@@ -179,9 +148,6 @@ const FinanceiroDashboardV2: React.FC = () => {
       contasPagarService.listarPendenciasAprovacao(),
       contaBancariaService.listarAtivas(),
       conciliacaoBancariaService.listarImportacoes({ limite: 10 }),
-      alertasOperacionaisFinanceiroService
-        .recalcular()
-        .then(() => alertasOperacionaisFinanceiroService.listar({ limite: 12 })),
       api.get<DashboardV2Insights>('/dashboard/v2/financeiro/insights', {
         params: {
           periodStart: dataInicio,
@@ -207,18 +173,12 @@ const FinanceiroDashboardV2: React.FC = () => {
       setImportacoesConciliacao(resultados[5].value);
     }
     if (resultados[6].status === 'fulfilled') {
-      setAlertasOperacionais(resultados[6].value);
-    } else {
-      setWarningAlertas('Não foi possível carregar alertas operacionais agora.');
-    }
-    if (resultados[7].status === 'fulfilled') {
-      setInsights(resultados[7].value.data?.insights || []);
+      setInsights(resultados[6].value.data?.insights || []);
     } else {
       falhasCriticas += 1;
       setInsights([]);
     }
-
-    if (falhasCriticas > 0) {
+if (falhasCriticas > 0) {
       setWarning('Alguns indicadores não puderam ser carregados. Exibindo dados parciais.');
     }
 
@@ -290,28 +250,6 @@ const FinanceiroDashboardV2: React.FC = () => {
         .map((item) => (item.status === StatusFatura.VENCIDA ? Number(item.valorTotal || 0) : 0)),
     [faturas],
   );
-
-  const alertasPriorizados = useMemo(
-    () => priorizarAlertasOperacionais(alertasOperacionais),
-    [alertasOperacionais],
-  );
-
-  const contadoresAlertas = useMemo(
-    () => contarAlertasOperacionais(alertasPriorizados),
-    [alertasPriorizados],
-  );
-  const alertasAtivosCount = useMemo(
-    () => alertasPriorizados.filter((alerta) => alerta.status === 'ativo').length,
-    [alertasPriorizados],
-  );
-  const alertasReconhecidosCount = useMemo(
-    () => alertasPriorizados.filter((alerta) => alerta.status === 'acknowledged').length,
-    [alertasPriorizados],
-  );
-  const alertasReprocessaveisCount = useMemo(
-    () => alertasPriorizados.filter((alerta) => isAlertaReprocessavel(alerta.tipo)).length,
-    [alertasPriorizados],
-  );
   const hasActiveFilters = periodo !== '30d';
   const lastUpdatedLabel = lastUpdatedAt ? formatDateTime(lastUpdatedAt) : 'Atualizado agora';
   const periodoLabel = periodLabelMap[periodo];
@@ -335,15 +273,7 @@ const FinanceiroDashboardV2: React.FC = () => {
       : totalAtrasado > 0 || taxaRecebimento < 70
         ? 'bg-[#FFF4E9] text-[#A06213]'
         : 'bg-[#EAF5FA] text-[#2C708D]';
-  const focoAlertasOperacionais = useCallback(() => {
-    if (typeof document === 'undefined') return;
-    const secao = document.getElementById('financeiro-alertas-operacionais');
-    if (secao) {
-      secao.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }, []);
-
-  const compartilharInsights = useCallback(async () => {
+const compartilharInsights = useCallback(async () => {
     if (!insights.length) {
       toastService.info('Sem insights para compartilhar neste período.');
       return;
@@ -392,7 +322,7 @@ const FinanceiroDashboardV2: React.FC = () => {
           return;
         case 'financeiro-alertas-criticos':
         case 'financeiro-alertas-ativos':
-          focoAlertasOperacionais();
+          navigate('/financeiro/contas-pagar');
           return;
         case 'financeiro-conciliacao-recente':
         case 'financeiro-sem-importacao':
@@ -402,59 +332,8 @@ const FinanceiroDashboardV2: React.FC = () => {
           navigate('/nuclei/financeiro');
       }
     },
-    [focoAlertasOperacionais, navigate],
+    [navigate],
   );
-
-  const atualizarAlerta = useCallback(
-    async (alerta: AlertaOperacionalFinanceiro, acao: 'ack' | 'resolver' | 'reprocessar') => {
-      const id = alerta.id;
-      setAlertaActionById((prev) => ({ ...prev, [id]: acao }));
-
-      try {
-        let atualizado: AlertaOperacionalFinanceiro;
-        let limparWarning = true;
-
-        if (acao === 'ack') {
-          atualizado = await alertasOperacionaisFinanceiroService.ack(id, {
-            observacao: 'Atualizado pelo painel financeiro',
-          });
-        } else if (acao === 'resolver') {
-          atualizado = await alertasOperacionaisFinanceiroService.resolver(id, {
-            observacao: 'Resolvido pelo painel financeiro',
-          });
-        } else {
-          const dados = montarPayloadReprocessamento(alerta);
-          if (!dados) {
-            throw new Error(REPROCESSAMENTO_CANCELADO);
-          }
-          const resultado = await alertasOperacionaisFinanceiroService.reprocessar(id, dados);
-          atualizado = resultado.alerta;
-          if (!resultado.sucesso) {
-            limparWarning = false;
-            setWarningAlertas(resultado.mensagem || 'Não foi possível reprocessar o alerta.');
-          }
-        }
-
-        setAlertasOperacionais((prev) => aplicarAtualizacaoAlertaOperacional(prev, atualizado));
-        if (limparWarning) {
-          setWarningAlertas(null);
-        }
-      } catch (error) {
-        if (error instanceof Error && error.message === REPROCESSAMENTO_CANCELADO) {
-          return;
-        }
-        if (acao === 'reprocessar' && error instanceof Error && error.message) {
-          setWarningAlertas(error.message);
-        } else {
-          setWarningAlertas('Não foi possível atualizar o alerta selecionado.');
-        }
-      } finally {
-        setAlertaActionById((prev) => ({ ...prev, [id]: undefined }));
-      }
-    },
-    [],
-  );
-
   if (loading) {
     return <div className="h-60 animate-pulse rounded-[20px] bg-[#E6EFF0]" />;
   }
@@ -670,165 +549,15 @@ const FinanceiroDashboardV2: React.FC = () => {
 
       <section className="grid grid-cols-1 gap-3.5 2xl:grid-cols-12">
         <article className="space-y-3.5 2xl:col-span-9">
-          <div id="financeiro-alertas-operacionais" className={sectionSurfaceClass}>
-            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <span className="inline-flex items-center rounded-full border border-[#D7E5EA] bg-[#F5FAFB] px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4F7282]">
-                  Operacao critica
-                </span>
-                <div className="mt-2 flex items-center gap-2">
-                  <BellRing className="h-4.5 w-4.5 text-[#2A5C70]" />
-                  <h3 className="text-[20px] font-semibold tracking-[-0.012em] text-[#18374B]">
-                    Alertas operacionais
-                  </h3>
-                </div>
-                <p className="mt-1 text-[13px] text-[#617D89]">
-                  Priorização de risco e ações imediatas para o time financeiro.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => void refresh()}
-                className="inline-flex items-center gap-1 rounded-[10px] border border-[#D5E3E8] px-2.5 py-1.5 text-[13px] font-semibold text-[#2A5C70] hover:bg-[#F3F9F8]"
-              >
-                Revalidar alertas
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
-
-            <div className="mb-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2 2xl:grid-cols-4">
-              <div className="rounded-[14px] border border-[#F2D4D4] bg-[#FFF5F5] px-3.5 py-3 text-[#8A3030]">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.08em]">Críticos</p>
-                <p className="mt-1 text-[22px] font-semibold leading-none">
-                  {formatNumber(contadoresAlertas.critical)}
-                </p>
-                <p className="mt-2 text-[12px] text-[#9C5454]">
-                  Itens que exigem resposta imediata.
-                </p>
-              </div>
-              <div className="rounded-[14px] border border-[#F4E1BF] bg-[#FFF8EB] px-3.5 py-3 text-[#8A5D11]">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.08em]">Em atenção</p>
-                <p className="mt-1 text-[22px] font-semibold leading-none">
-                  {formatNumber(contadoresAlertas.warning)}
-                </p>
-                <p className="mt-2 text-[12px] text-[#9A7A34]">
-                  Demandas com potencial de escalada.
-                </p>
-              </div>
-              <div className="rounded-[14px] border border-[#DDEAF0] bg-[#F4FAFD] px-3.5 py-3 text-[#2F5C72]">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.08em]">Ativos</p>
-                <p className="mt-1 text-[22px] font-semibold leading-none">
-                  {formatNumber(alertasAtivosCount)}
-                </p>
-                <p className="mt-2 text-[12px] text-[#5E8397]">
-                  Alertas ainda sem resolução final.
-                </p>
-              </div>
-              <div className="rounded-[14px] border border-[#DDE7EC] bg-[#F8FBFD] px-3.5 py-3 text-[#436273]">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.08em]">Cobertura</p>
-                <p className="mt-1 text-[22px] font-semibold leading-none">
-                  {formatNumber(alertasReprocessaveisCount)}
-                </p>
-                <p className="mt-2 text-[12px] text-[#69808C]">
-                  reprocessáveis • {formatNumber(alertasReconhecidosCount)} reconhecidos
-                </p>
-              </div>
-            </div>
-
-            {warningAlertas ? (
-              <p className="mb-3 text-[13px] text-[#A56B13]">{warningAlertas}</p>
-            ) : null}
-
-            {alertasPriorizados.length === 0 ? (
-              <p className="rounded-[14px] border border-dashed border-[#DCE7EB] bg-[#FAFCFD] px-3 py-4 text-[14px] text-[#5D7785]">
-                Sem alertas operacionais ativos no momento.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {alertasPriorizados.slice(0, 6).map((alerta) => {
-                  const currentAction = alertaActionById[alerta.id];
-                  const isProcessing = Boolean(currentAction);
-                  return (
-                    <div
-                      key={alerta.id}
-                      className="rounded-[16px] border border-[#E2ECEF] bg-[#FBFDFD] px-3.5 py-3.5"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="mb-2 flex flex-wrap items-center gap-2">
-                            <span
-                              className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold ${
-                                alerta.severidade === 'critical'
-                                  ? 'bg-[#FFE9E9] text-[#A93B3B]'
-                                  : alerta.severidade === 'warning'
-                                    ? 'bg-[#FFF2DD] text-[#A16A16]'
-                                    : 'bg-[#EAF4F8] text-[#436B80]'
-                              }`}
-                            >
-                              {alerta.severidade === 'critical' ? (
-                                <AlertTriangle className="h-3 w-3" />
-                              ) : (
-                                <CheckCircle2 className="h-3 w-3" />
-                              )}
-                              {alertSeverityLabelMap[alerta.severidade]}
-                            </span>
-                            <span className="inline-flex items-center rounded-full border border-[#D8E5EA] bg-white px-2 py-1 text-[11px] font-semibold text-[#5D7885]">
-                              {alertStatusLabelMap[alerta.status]}
-                            </span>
-                            <span className="text-[11px] text-[#7E96A2]">
-                              Criado em {formatDateTime(alerta.createdAt)}
-                            </span>
-                          </div>
-
-                          <p className="text-[14px] font-semibold text-[#1C3B4E]">
-                            {alerta.titulo}
-                          </p>
-                          {alerta.descricao ? (
-                            <p className="mt-1 text-[13px] text-[#5F7C89]">{alerta.descricao}</p>
-                          ) : null}
-
-                          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[#7E96A2]">
-                            {alerta.referencia ? <span>Ref.: {alerta.referencia}</span> : null}
-                            <span>Atualizado: {formatDateTime(alerta.updatedAt)}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        {alerta.status === 'ativo' ? (
-                          <button
-                            type="button"
-                            onClick={() => void atualizarAlerta(alerta, 'ack')}
-                            disabled={isProcessing}
-                            className="rounded-[10px] border border-[#D9E7EB] bg-white px-2.5 py-1.5 text-[12px] font-semibold text-[#305C70] disabled:opacity-60"
-                          >
-                            {currentAction === 'ack' ? 'Processando...' : 'Reconhecer'}
-                          </button>
-                        ) : null}
-                        {isAlertaReprocessavel(alerta.tipo) ? (
-                          <button
-                            type="button"
-                            onClick={() => void atualizarAlerta(alerta, 'reprocessar')}
-                            disabled={isProcessing}
-                            className="rounded-[10px] border border-[#D9E7EB] bg-white px-2.5 py-1.5 text-[12px] font-semibold text-[#305C70] disabled:opacity-60"
-                          >
-                            {currentAction === 'reprocessar' ? 'Reprocessando...' : 'Reprocessar'}
-                          </button>
-                        ) : null}
-                        <button
-                          type="button"
-                          onClick={() => void atualizarAlerta(alerta, 'resolver')}
-                          disabled={isProcessing}
-                          className="rounded-[10px] border border-[#159A9C] bg-[#159A9C] px-2.5 py-1.5 text-[12px] font-semibold text-white disabled:opacity-60"
-                        >
-                          {currentAction === 'resolver' ? 'Processando...' : 'Resolver'}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+          <div id="financeiro-indicadores-gerenciais" className={sectionSurfaceClass}>
+            <FinanceiroGestaoCharts
+              faturas={faturas}
+              pagamentosStats={pagamentosStats}
+              periodStart={dataInicioIso.slice(0, 10)}
+              periodEnd={dataFimIso.slice(0, 10)}
+              periodLabel={periodoLabel}
+              onRefresh={() => void refresh()}
+            />
           </div>
 
           <div className={sectionSurfaceClass}>
